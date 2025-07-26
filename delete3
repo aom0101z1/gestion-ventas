@@ -358,7 +358,7 @@
         <div class="login-container">
             <div class="login-header">
                 <h1>?? Ciudad Bilingue</h1>
-                <p>Sistema de Gesti¨®n de Ventas</p>
+                <p>Sistema de GestiÂ¨Â®n de Ventas</p>
             </div>
             <div class="login-form">
                 <form onsubmit="login(event)">
@@ -383,10 +383,10 @@
     <div id="mainApp" class="hidden">
         <div class="header">
             <h1>?? Ciudad Bilingue - Sistema de Ventas</h1>
-            <p>Gesti¨®n en Tiempo Real <span class="real-time-indicator"></span></p>
+            <p>GestiÂ¨Â®n en Tiempo Real <span class="real-time-indicator"></span></p>
         </div>
 
-        <div class="connection-status" id="connectionStatus">?? Sin Conexi¨®n</div>
+        <div class="connection-status" id="connectionStatus">?? Sin ConexiÂ¨Â®n</div>
 
         <div class="container">
             <!-- User Info Bar -->
@@ -396,18 +396,18 @@
                     <span id="userRole" style="color: #667eea; font-size: 0.9rem;"></span>
                 </div>
                 <button onclick="logout()" class="btn btn-secondary" style="width: auto; padding: 0.5rem 1rem;">
-                    ?? Cerrar Sesi¨®n
+                    ?? Cerrar SesiÂ¨Â®n
                 </button>
             </div>
 
             <!-- Director Configuration (Only for Director) -->
             <div id="directorConfig" class="config-section director-only hidden">
-                <h3>?? Configuraci¨®n del Director</h3>
-                <p style="margin-bottom: 1rem; color: #667eea;">Esta secci¨®n solo es visible para el director</p>
+                <h3>?? ConfiguraciÂ¨Â®n del Director</h3>
+                <p style="margin-bottom: 1rem; color: #667eea;">Esta secciÂ¨Â®n solo es visible para el director</p>
                 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
                     <div>
-                        <h4>?? Configuraci¨®n Google Sheets</h4>
+                        <h4>?? ConfiguraciÂ¨Â®n Google Sheets</h4>
                         <div class="form-group">
                             <label for="sheetId">ID de Google Sheet:</label>
                             <input type="text" id="sheetId" placeholder="ID del Google Sheet">
@@ -421,7 +421,7 @@
                     </div>
                     
                     <div>
-                        <h4>?? Gesti¨®n de Usuarios</h4>
+                        <h4>?? GestiÂ¨Â®n de Usuarios</h4>
                         <div class="form-group">
                             <label for="newUsername">Nuevo Usuario:</label>
                             <input type="text" id="newUsername" placeholder="nombre.apellido">
@@ -486,7 +486,7 @@
 
             <!-- Tab: Contactos -->
             <div id="contacts" class="tab-content">
-                <h2>?? Registrar Contactos del D¨ªa</h2>
+                <h2>?? Registrar Contactos del DÂ¨Âªa</h2>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem;">
                     <div>
                         <h3>? Nuevo Contacto</h3>
@@ -496,7 +496,7 @@
                                 <input type="text" id="contactName" required>
                             </div>
                             <div class="form-group">
-                                <label>Tel¨¦fono:</label>
+                                <label>TelÂ¨Â¦fono:</label>
                                 <input type="tel" id="contactPhone" required>
                             </div>
                             <div class="form-group">
@@ -504,7 +504,7 @@
                                 <input type="email" id="contactEmail">
                             </div>
                             <div class="form-group">
-                                <label>?C¨®mo se enter¨®?</label>
+                                <label>?CÂ¨Â®mo se enterÂ¨Â®?</label>
                                 <select id="contactSource" required>
                                     <option value="">Seleccionar...</option>
                                     <option value="Facebook">Facebook</option>
@@ -516,7 +516,7 @@
                                 </select>
                             </div>
                             <div class="form-group">
-                                <label>?D¨®nde vive?</label>
+                                <label>?DÂ¨Â®nde vive?</label>
                                 <select id="contactLocation" required>
                                     <option value="">Seleccionar...</option>
                                     <option value="Pereira">Pereira</option>
@@ -528,7 +528,7 @@
                             </div>
                             <div class="form-group">
                                 <label>Notas:</label>
-                                <textarea id="contactNotes" rows="3" placeholder="Intereses, observaciones, pr¨®ximo seguimiento..."></textarea>
+                                <textarea id="contactNotes" rows="3" placeholder="Intereses, observaciones, prÂ¨Â®ximo seguimiento..."></textarea>
                             </div>
                             <button type="submit" class="btn btn-success">? Registrar Contacto</button>
                         </form>
@@ -544,13 +544,13 @@
 
             <!-- Tab: Leads -->
             <div id="leads" class="tab-content hidden">
-                <h2>?? Gesti¨®n de Mis Leads</h2>
+                <h2>?? GestiÂ¨Â®n de Mis Leads</h2>
                 <button onclick="refreshData()" class="btn btn-primary" style="margin-bottom: 1rem;">?? Actualizar Datos</button>
                 <table class="table">
                     <thead>
                         <tr>
                             <th>Nombre</th>
-                            <th>Tel¨¦fono</th>
+                            <th>TelÂ¨Â¦fono</th>
                             <th>Fuente</th>
                             <th>Estado</th>
                             <th>Fecha</th>
@@ -605,8 +605,8 @@
         // Sistema de Usuarios
         const users = {
             'director': { password: 'admin123', role: 'director', name: 'Director General' },
-            'maria.garcia': { password: 'maria123', role: 'vendedor', name: 'Mar¨ªa Garc¨ªa' },
-            'juan.perez': { password: 'juan123', role: 'vendedor', name: 'Juan P¨¦rez' }
+            'maria.garcia': { password: 'maria123', role: 'vendedor', name: 'MarÂ¨Âªa GarcÂ¨Âªa' },
+            'juan.perez': { password: 'juan123', role: 'vendedor', name: 'Juan PÂ¨Â¦rez' }
         };
 
         // Variables globales
@@ -618,9 +618,9 @@
         let allData = [];
         let isConnected = false;
 
-        // Inicializar aplicaci¨®n
+        // Inicializar aplicaciÂ¨Â®n
         document.addEventListener('DOMContentLoaded', function() {
-            // Verificar si hay sesi¨®n activa
+            // Verificar si hay sesiÂ¨Â®n activa
             const savedUser = localStorage.getItem('currentUser');
             if (savedUser) {
                 currentUser = JSON.parse(savedUser);
@@ -649,15 +649,15 @@
             }
         }
 
-        // Mostrar aplicaci¨®n principal
+        // Mostrar aplicaciÂ¨Â®n principal
         function showMainApp() {
             document.getElementById('loginScreen').classList.add('hidden');
             document.getElementById('mainApp').classList.remove('hidden');
             
-            // Configurar interfaz seg¨²n rol
+            // Configurar interfaz segÂ¨Â²n rol
             setupUserInterface();
             
-            // Si hay configuraci¨®n de sheet, conectar
+            // Si hay configuraciÂ¨Â®n de sheet, conectar
             if (sheetConfig.id) {
                 connectToSheet();
             }
@@ -670,7 +670,7 @@
             }, 30000);
         }
 
-        // Configurar interfaz seg¨²n usuario
+        // Configurar interfaz segÂ¨Â²n usuario
         function setupUserInterface() {
             document.getElementById('currentUserName').textContent = currentUser.name;
             document.getElementById('userRole').textContent = `(${currentUser.role === 'director' ? 'Director' : 'Vendedor'})`;
@@ -681,7 +681,7 @@
                 document.getElementById('reportsTab').textContent = '?? Dashboard Ejecutivo';
                 document.getElementById('reportsTitle').textContent = '?? Dashboard Ejecutivo';
                 
-                // Cargar configuraci¨®n guardada
+                // Cargar configuraciÂ¨Â®n guardada
                 if (sheetConfig.id) {
                     document.getElementById('sheetId').value = sheetConfig.id;
                     document.getElementById('sheetName').value = sheetConfig.name;
@@ -717,7 +717,7 @@
             localStorage.setItem('sheetId', sheetId);
             localStorage.setItem('sheetName', sheetName);
             
-            document.getElementById('configResult').innerHTML = '<div class="success-message">? Configuraci¨®n guardada. Conectando...</div>';
+            document.getElementById('configResult').innerHTML = '<div class="success-message">? ConfiguraciÂ¨Â®n guardada. Conectando...</div>';
             
             setTimeout(() => {
                 connectToSheet();
@@ -751,11 +751,11 @@
             } catch (error) {
                 console.error('Error conectando con Google Sheets:', error);
                 isConnected = false;
-                document.getElementById('connectionStatus').textContent = '?? Error de Conexi¨®n';
+                document.getElementById('connectionStatus').textContent = '?? Error de ConexiÂ¨Â®n';
                 document.getElementById('connectionStatus').className = 'connection-status disconnected';
                 
                 if (currentUser.role === 'director') {
-                    alert('?? Error conectando con Google Sheets. Verifica la configuraci¨®n.');
+                    alert('?? Error conectando con Google Sheets. Verifica la configuraciÂ¨Â®n.');
                 }
             }
         }
@@ -790,7 +790,7 @@
             event.preventDefault();
             
             if (!isConnected) {
-                alert('?? No hay conexi¨®n con Google Sheets. Contacta al director.');
+                alert('?? No hay conexiÂ¨Â®n con Google Sheets. Contacta al director.');
                 return;
             }
             
@@ -808,7 +808,7 @@
                 status: 'Nuevo'
             };
             
-            // Simular adici¨®n local
+            // Simular adiciÂ¨Â®n local
             allData.push(contact);
             
             // Limpiar formulario
@@ -838,7 +838,7 @@
             updateReports();
         }
 
-        // Actualizar estad¨ªsticas
+        // Actualizar estadÂ¨Âªsticas
         function updateStats() {
             const today = new Date().toISOString().split('T')[0];
             const data = getFilteredData();
@@ -846,7 +846,7 @@
             let todayContacts, totalLeads, activeLeads, conversions;
             
             if (currentUser.role === 'director') {
-                // Director: estad¨ªsticas globales
+                // Director: estadÂ¨Âªsticas globales
                 todayContacts = allData.filter(c => c.date === today).length;
                 totalLeads = allData.length;
                 activeLeads = allData.filter(l => l.status !== 'Convertido').length;
@@ -859,7 +859,7 @@
                 conversions = data.filter(l => l.status === 'Convertido').length;
             }
             
-            // Actualizar n¨²meros
+            // Actualizar nÂ¨Â²meros
             document.getElementById('totalLeads').textContent = totalLeads;
             document.getElementById('activeLeads').textContent = activeLeads;
             document.getElementById('conversions').textContent = conversions;
@@ -873,7 +873,7 @@
             document.getElementById('progressCircle').style.strokeDashoffset = offset;
             document.getElementById('progressText').textContent = `${todayContacts}/10`;
             
-            // Cambiar color seg¨²n progreso
+            // Cambiar color segÂ¨Â²n progreso
             const progressCircle = document.getElementById('progressCircle');
             if (progress >= 1) {
                 progressCircle.style.stroke = '#10b981';
@@ -973,11 +973,11 @@
             document.getElementById('personalTargets').innerHTML = `
                 <div style="background: #f9fafb; padding: 1.5rem; border-radius: 8px;">
                     <div style="margin-bottom: 1rem;">
-                        <div style="font-weight: 600;">?? Mis Estad¨ªsticas</div>
+                        <div style="font-weight: 600;">?? Mis EstadÂ¨Âªsticas</div>
                         <div style="font-size: 0.9rem; color: #666; margin-top: 0.5rem;">
                             Total leads: ${data.length}<br>
                             Conversiones: ${conversions}<br>
-                            Tasa de conversi¨®n: ${conversionRate}%
+                            Tasa de conversiÂ¨Â®n: ${conversionRate}%
                         </div>
                     </div>
                     <div style="margin-top: 1rem;">
@@ -1066,7 +1066,7 @@
                         </div>
                         <div style="background: white; padding: 1rem; border-radius: 5px; text-align: center;">
                             <div style="font-size: 1.5rem; font-weight: bold; color: #8b5cf6;">${teamConversionRate}%</div>
-                            <div style="font-size: 0.9rem; color: #666;">Tasa Conversi¨®n</div>
+                            <div style="font-size: 0.9rem; color: #666;">Tasa ConversiÂ¨Â®n</div>
                         </div>
                     </div>
                 </div>
@@ -1078,7 +1078,7 @@
             return users[username] ? users[username].name : username;
         }
 
-        // Gesti¨®n de usuarios (solo director)
+        // GestiÂ¨Â®n de usuarios (solo director)
         function addUser() {
             if (currentUser.role !== 'director') {
                 alert('? Solo el director puede agregar usuarios');
@@ -1139,7 +1139,7 @@
                 return;
             }
             
-            if (confirm(`?Est¨¢s seguro de eliminar al usuario ${users[username].name}?`)) {
+            if (confirm(`?EstÂ¨Â¢s seguro de eliminar al usuario ${users[username].name}?`)) {
                 delete users[username];
                 updateUsersList();
                 alert('? Usuario eliminado');
@@ -1151,7 +1151,7 @@
             if (isConnected) {
                 connectToSheet();
             } else {
-                alert('?? No hay conexi¨®n con Google Sheets');
+                alert('?? No hay conexiÂ¨Â®n con Google Sheets');
             }
         }
 
