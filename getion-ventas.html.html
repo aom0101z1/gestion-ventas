@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Ventas - Tiempo Real</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .setup-warning {
+            background: #fef3c7;
+            border: 2px solid #f59e0b;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        
+        .setup-warning h3 {
+            color: #92400e;
+            margin-bottom: 1rem;
+        }
+        
+        .setup-steps {
+            background: white;
+            border-radius: 10px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .step {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding: 1rem;
+            background: #f9fafb;
+            border-radius: 5px;
+        }
+        
+        .step-number {
+            background: #667eea;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 1rem;
+            flex-shrink: 0;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        
+        .progress-ring {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 1rem;
+            position: relative;
+        }
+        
+        .progress-ring circle {
+            fill: transparent;
+            stroke-width: 8;
+            r: 54;
+            cx: 60;
+            cy: 60;
+        }
+        
+        .progress-ring .background {
+            stroke: #e5e7eb;
+        }
+        
+        .progress-ring .progress {
+            stroke: #10b981;
+            stroke-linecap: round;
+            transform: rotate(-90deg);
+            transform-origin: 60px 60px;
+            transition: stroke-dashoffset 0.3s ease;
+        }
+        
+        .tabs {
+            display: flex;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .tab {
+            flex: 1;
+            padding: 1rem;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            background: white;
+            transition: all 0.3s ease;
+        }
+        
+        .tab.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        .tab-content {
+            background: white;
+            border-radius: 10px;
+            padding: 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+        
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+        
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5a67d8;
+        }
+        
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+        
+        .btn-warning {
+            background: #f59e0b;
+            color: white;
+        }
+        
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        
+        .table th, .table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .table th {
+            background: #f9fafb;
+            font-weight: 600;
+        }
+        
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        
+        .status-nuevo {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .status-contactado {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
+        .status-interesado {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .status-convertido {
+            background: #dcfce7;
+            color: #166534;
+        }
+        
+        .salesperson-select {
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        
+        .connection-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        
+        .connected {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .disconnected {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+        
+        .config-form {
+            background: #f9fafb;
+            padding: 1.5rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+        }
+        
+        .real-time-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #10b981;
+            border-radius: 50%;
+            margin-left: 0.5rem;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .code-block {
+            background: #1f2937;
+            color: #f3f4f6;
+            padding: 1rem;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎯 Gestión de Ventas - Tiempo Real</h1>
+        <p>Sistema conectado a Google Sheets <span class="real-time-indicator"></span></p>
+    </div>
+
+    <div class="connection-status" id="connectionStatus">🔴 Configuración Pendiente</div>
+
+    <div class="container">
+        <!-- Setup Instructions -->
+        <div class="setup-warning" id="setupWarning">
+            <h3>⚙️ CONFIGURACIÓN INICIAL REQUERIDA</h3>
+            <p>Para que el sistema funcione en tiempo real, necesitas configurar Google Sheets</p>
+        </div>
+
+        <!-- Setup Steps -->
+        <div class="setup-steps" id="setupSteps">
+            <h2>📋 Pasos de Configuración (5 minutos)</h2>
+            
+            <div class="step">
+                <div class="step-number">1</div>
+                <div>
+                    <strong>Crear Google Sheet</strong><br>
+                    Ve a <a href="https://sheets.google.com" target="_blank">sheets.google.com</a> y crea una hoja llamada "Gestión de Ventas"
+                </div>
+            </div>
+            
+            <div class="step">
+                <div class="step-number">2</div>
+                <div>
+                    <strong>Crear Encabezados</strong><br>
+                    En la fila 1, agrega estas columnas: ID | Nombre | Teléfono | Email | Fuente | Ubicación | Notas | Vendedor | Fecha | Hora | Estado
+                </div>
+            </div>
+            
+            <div class="step">
+                <div class="step-number">3</div>
+                <div>
+                    <strong>Hacer Público</strong><br>
+                    Clic en "Compartir" > "Cambiar a cualquier persona con el enlace" > "Editor"
+                </div>
+            </div>
+            
+            <div class="step">
+                <div class="step-number">4</div>
+                <div>
+                    <strong>Obtener ID del Sheet</strong><br>
+                    Copia la URL: https://docs.google.com/spreadsheets/d/<strong>[ESTE_ES_EL_ID]</strong>/edit
+                </div>
+            </div>
+            
+            <div class="step">
+                <div class="step-number">5</div>
+                <div>
+                    <strong>Configurar Sistema</strong><br>
+                    Pega el ID en el formulario de abajo
+                </div>
+            </div>
+        </div>
+
+        <!-- Configuration Form -->
+        <div class="config-form">
+            <h3>🔧 Configuración del Sistema de Gestión</h3>
+            <div class="form-group">
+                <label for="sheetId">ID de Google Sheet:</label>
+                <input type="text" id="sheetId" placeholder="Pega aquí el ID de tu Google Sheet">
+            </div>
+            <div class="form-group">
+                <label for="sheetName">Nombre de la Hoja (por defecto: Hoja1):</label>
+                <input type="text" id="sheetName" value="Hoja1">
+            </div>
+            <button onclick="configureSheet()" class="btn btn-primary">🚀 Conectar con Google Sheets</button>
+            <div id="configResult" style="margin-top: 1rem;"></div>
+        </div>
+
+        <!-- Selector de Vendedor -->
+        <div class="salesperson-select">
+            <label for="currentSalesperson">Equipo de Ventas:</label>
+            <select id="currentSalesperson" onchange="switchSalesperson()">
+                <option value="maria_garcia">María García</option>
+                <option value="juan_perez">Juan Pérez</option>
+                <option value="admin">👨‍💼 Gerente (Ver Todo)</option>
+            </select>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="progress-ring">
+                    <svg>
+                        <circle class="background" r="54" cx="60" cy="60"></circle>
+                        <circle class="progress" r="54" cx="60" cy="60" id="progressCircle"></circle>
+                    </svg>
+                    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.5rem; font-weight: bold;" id="progressText">0/10</div>
+                </div>
+                <div style="font-size: 1.1rem; margin-top: 1rem;">Meta Diaria: 10 Contactos</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-number" style="color: #10b981;" id="totalLeads">0</div>
+                <div class="stat-label">Total Leads</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-number" style="color: #667eea;" id="activeLeads">0</div>
+                <div class="stat-label">Leads Activos</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-number" style="color: #f59e0b;" id="conversions">0</div>
+                <div class="stat-label">Conversiones</div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('contacts')">📞 Contactos Hoy</button>
+            <button class="tab" onclick="showTab('leads')">👥 Gestión de Leads</button>
+            <button class="tab" onclick="showTab('reports')">📊 Dashboard Gerencial</button>
+        </div>
+
+        <!-- Tab: Contactos Hoy -->
+        <div id="contacts" class="tab-content">
+            <h2>📞 Registrar Contactos del Día</h2>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem;">
+                <div>
+                    <h3>➕ Nuevo Contacto</h3>
+                    <form onsubmit="addContact(event)">
+                        <div class="form-group">
+                            <label>Nombre Completo:</label>
+                            <input type="text" id="contactName" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Teléfono:</label>
+                            <input type="tel" id="contactPhone" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Email:</label>
+                            <input type="email" id="contactEmail">
+                        </div>
+                        <div class="form-group">
+                            <label>¿Cómo se enteró?</label>
+                            <select id="contactSource" required>
+                                <option value="">Seleccionar...</option>
+                                <option value="Facebook">Facebook</option>
+                                <option value="Instagram">Instagram</option>
+                                <option value="Google">Google</option>
+                                <option value="Referido">Referido</option>
+                                <option value="Volante">Volante</option>
+                                <option value="Pasando por la sede">Pasando por la sede</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>¿Dónde vive?</label>
+                            <select id="contactLocation" required>
+                                <option value="">Seleccionar...</option>
+                                <option value="Pereira">Pereira</option>
+                                <option value="Dosquebradas">Dosquebradas</option>
+                                <option value="La Virginia">La Virginia</option>
+                                <option value="Santa Rosa">Santa Rosa</option>
+                                <option value="Otro">Otro</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Notas:</label>
+                            <textarea id="contactNotes" rows="3" placeholder="Intereses, observaciones, próximo seguimiento..."></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-success">✅ Registrar Contacto</button>
+                    </form>
+                </div>
+                
+                <div>
+                    <h3>📋 Contactos de Hoy</h3>
+                    <button onclick="refreshData()" class="btn btn-primary" style="margin-bottom: 1rem;">🔄 Actualizar</button>
+                    <div id="todayContacts"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Leads -->
+        <div id="leads" class="tab-content hidden">
+            <h2>👥 Gestión de Leads</h2>
+            <button onclick="refreshData()" class="btn btn-primary" style="margin-bottom: 1rem;">🔄 Actualizar Datos</button>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Teléfono</th>
+                        <th>Fuente</th>
+                        <th>Estado</th>
+                        <th>Vendedor</th>
+                        <th>Fecha</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="leadsTable">
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Tab: Dashboard Admin -->
+        <div id="reports" class="tab-content hidden">
+            <h2>📊 Dashboard Administrativo</h2>
+            <button onclick="refreshData()" class="btn btn-primary" style="margin-bottom: 1rem;">🔄 Actualizar Datos</button>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem;">
+                <div>
+                    <h3>📈 Rendimiento Diario</h3>
+                    <div id="dailyPerformance"></div>
+                </div>
+                <div>
+                    <h3>🎯 Metas por Vendedor</h3>
+                    <div id="salesTargets"></div>
+                </div>
+            </div>
+            
+            <div style="margin-top: 2rem;">
+                <h3>📋 Resumen Semanal</h3>
+                <div id="weeklyReport"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Variables globales
+        let currentSalesperson = 'maria_garcia';
+        let sheetConfig = {
+            id: localStorage.getItem('sheetId') || '',
+            name: localStorage.getItem('sheetName') || 'Hoja1'
+        };
+        let allData = [];
+        let isConnected = false;
+
+        // Inicializar
+        document.addEventListener('DOMContentLoaded', function() {
+            checkConfiguration();
+            if (sheetConfig.id) {
+                document.getElementById('sheetId').value = sheetConfig.id;
+                document.getElementById('sheetName').value = sheetConfig.name;
+                connectToSheet();
+            }
+        });
+
+        // Verificar configuración
+        function checkConfiguration() {
+            if (!sheetConfig.id) {
+                document.getElementById('setupWarning').style.display = 'block';
+                document.getElementById('setupSteps').style.display = 'block';
+                document.getElementById('connectionStatus').textContent = '🔴 Sin Configurar';
+                document.getElementById('connectionStatus').className = 'connection-status disconnected';
+            } else {
+                document.getElementById('setupWarning').style.display = 'none';
+                document.getElementById('setupSteps').style.display = 'none';
+            }
+        }
+
+        // Configurar Google Sheet
+        function configureSheet() {
+            const sheetId = document.getElementById('sheetId').value.trim();
+            const sheetName = document.getElementById('sheetName').value.trim();
+            
+            if (!sheetId) {
+                alert('❌ Por favor ingresa el ID del Google Sheet');
+                return;
+            }
+
+            sheetConfig.id = sheetId;
+            sheetConfig.name = sheetName;
+            
+            localStorage.setItem('sheetId', sheetId);
+            localStorage.setItem('sheetName', sheetName);
+            
+            document.getElementById('configResult').innerHTML = '<div style="color: #10b981; font-weight: 500;">✅ Configuración guardada. Conectando...</div>';
+            
+            setTimeout(() => {
+                connectToSheet();
+                checkConfiguration();
+            }, 1000);
+        }
+
+        // Conectar con Google Sheets
+        async function connectToSheet() {
+            try {
+                const url = `https://docs.google.com/spreadsheets/d/${sheetConfig.id}/gviz/tq?tqx=out:json&sheet=${sheetConfig.name}`;
+                const response = await fetch(url);
+                const text = await response.text();
+                
+                // Parsear respuesta de Google Sheets
+                const jsonData = text.substring(47).slice(0, -2);
+                const data = JSON.parse(jsonData);
+                
+                if (data.table && data.table.rows) {
+                    isConnected = true;
+                    document.getElementById('connectionStatus').textContent = '🟢 Conectado';
+                    document.getElementById('connectionStatus').className = 'connection-status connected';
+                    parseSheetData(data.table.rows);
+                } else {
+                    throw new Error('No se pudo leer el Google Sheet');
+                }
+            } catch (error) {
+                console.error('Error conectando con Google Sheets:', error);
+                isConnected = false;
+                document.getElementById('connectionStatus').textContent = '🔴 Error de Conexión';
+                document.getElementById('connectionStatus').className = 'connection-status disconnected';
+                alert('❌ Error conectando con Google Sheets. Verifica:\n1. El ID es correcto\n2. El sheet es público\n3. Tienes internet');
+            }
+        }
+
+        // Parsear datos del sheet
+        function parseSheetData(rows) {
+            allData = [];
+            rows.forEach((row, index) => {
+                if (index === 0 || !row.c || !row.c[1]) return; // Skip header and empty rows
+                
+                const contact = {
+                    id: row.c[0] ? row.c[0].v : '',
+                    name: row.c[1] ? row.c[1].v : '',
+                    phone: row.c[2] ? row.c[2].v : '',
+                    email: row.c[3] ? row.c[3].v : '',
+                    source: row.c[4] ? row.c[4].v : '',
+                    location: row.c[5] ? row.c[5].v : '',
+                    notes: row.c[6] ? row.c[6].v : '',
+                    salesperson: row.c[7] ? row.c[7].v : '',
+                    date: row.c[8] ? row.c[8].v : '',
+                    time: row.c[9] ? row.c[9].v : '',
+                    status: row.c[10] ? row.c[10].v : 'Nuevo'
+                };
+                allData.push(contact);
+            });
+            
+            updateAllViews();
+        }
+
+        // Agregar contacto a Google Sheets
+        async function addContact(event) {
+            event.preventDefault();
+            
+            if (!isConnected) {
+                alert('❌ Primero configura la conexión con Google Sheets');
+                return;
+            }
+            
+            const contact = {
+                id: Date.now(),
+                name: document.getElementById('contactName').value,
+                phone: document.getElementById('contactPhone').value,
+                email: document.getElementById('contactEmail').value,
+                source: document.getElementById('contactSource').value,
+                location: document.getElementById('contactLocation').value,
+                notes: document.getElementById('contactNotes').value,
+                salesperson: currentSalesperson,
+                date: new Date().toISOString().split('T')[0],
+                time: new Date().toLocaleTimeString(),
+                status: 'Nuevo'
+            };
+            
+            // Simular adición (en un sistema real, aquí harías POST a Google Sheets API)
+            allData.push(contact);
+            
+            // Limpiar formulario
+            event.target.reset();
+            
+            // Actualizar vistas
+            updateAllViews();
+            
+            alert('✅ Contacto registrado! \n\n📝 IMPORTANTE: Para guardar en Google Sheets, ve manualmente al sheet y agrega la fila:\n' +
+                  `${contact.id} | ${contact.name} | ${contact.phone} | ${contact.email} | ${contact.source} | ${contact.location} | ${contact.notes} | ${contact.salesperson} | ${contact.date} | ${contact.time} | ${contact.status}`);
+        }
+
+        // Actualizar datos desde Google Sheets
+        function refreshData() {
+            if (isConnected) {
+                connectToSheet();
+            } else {
+                alert('❌ No hay conexión con Google Sheets');
+            }
+        }
+
+        // Cambiar vendedor
+        function switchSalesperson() {
+            currentSalesperson = document.getElementById('currentSalesperson').value;
+            updateAllViews();
+        }
+
+        // Actualizar todas las vistas
+        function updateAllViews() {
+            updateStats();
+            updateTodayContacts();
+            updateLeadsTable();
+            updateReports();
+        }
+
+        // Mostrar tabs
+        function showTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.add('hidden');
+            });
+            
+            document.querySelectorAll('.tab').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            document.getElementById(tabName).classList.remove('hidden');
+            event.target.classList.add('active');
+        }
+
+        // Actualizar estadísticas
+        function updateStats() {
+            const today = new Date().toISOString().split('T')[0];
+            
+            let todayContacts, totalLeads, activeLeads, conversions;
+            
+            if (currentSalesperson === 'admin') {
+                todayContacts = allData.filter(c => c.date === today).length;
+                totalLeads = allData.length;
+                activeLeads = allData.filter(l => l.status !== 'Convertido').length;
+                conversions = allData.filter(l => l.status === 'Convertido').length;
+            } else {
+                todayContacts = allData.filter(c => c.date === today && c.salesperson === currentSalesperson).length;
+                totalLeads = allData.filter(l => l.salesperson === currentSalesperson).length;
+                activeLeads = allData.filter(l => l.status !== 'Convertido' && l.salesperson === currentSalesperson).length;
+                conversions = allData.filter(l => l.status === 'Convertido' && l.salesperson === currentSalesperson).length;
+            }
+            
+            // Actualizar números
+            document.getElementById('totalLeads').textContent = totalLeads;
+            document.getElementById('activeLeads').textContent = activeLeads;
+            document.getElementById('conversions').textContent = conversions;
+            
+            // Actualizar progreso circular
+            const progress = Math.min(todayContacts / 10, 1);
+            const circumference = 2 * Math.PI * 54;
+            const offset = circumference - (progress * circumference);
+            
+            document.getElementById('progressCircle').style.strokeDasharray = circumference;
+            document.getElementById('progressCircle').style.strokeDashoffset = offset;
+            document.getElementById('progressText').textContent = `${todayContacts}/10`;
+            
+            // Cambiar color según progreso
+            const progressCircle = document.getElementById('progressCircle');
+            if (progress >= 1) {
+                progressCircle.style.stroke = '#10b981';
+            } else if (progress >= 0.7) {
+                progressCircle.style.stroke = '#f59e0b';
+            } else {
+                progressCircle.style.stroke = '#ef4444';
+            }
+        }
+
+        // Actualizar contactos de hoy
+        function updateTodayContacts() {
+            const today = new Date().toISOString().split('T')[0];
+            let todayContacts;
+            
+            if (currentSalesperson === 'admin') {
+                todayContacts = allData.filter(c => c.date === today);
+            } else {
+                todayContacts = allData.filter(c => c.date === today && c.salesperson === currentSalesperson);
+            }
+            
+            const container = document.getElementById('todayContacts');
+            
+            if (todayContacts.length === 0) {
+                container.innerHTML = '<p style="color: #666; text-align: center; padding: 2rem;">No hay contactos registrados hoy</p>';
+                return;
+            }
+            
+            container.innerHTML = todayContacts.map(contact => `
+                <div style="background: #f9fafb; padding: 1rem; border-radius: 5px; margin-bottom: 0.5rem;">
+                    <div style="font-weight: 600;">${contact.name}</div>
+                    <div style="color: #666; font-size: 0.9rem;">${contact.phone} • ${contact.source}</div>
+                    <div style="color: #666; font-size: 0.9rem;">${contact.time} • ${getSalespersonName(contact.salesperson)}</div>
+                </div>
+            `).join('');
+        }
+
+        // Actualizar tabla de leads
+        function updateLeadsTable() {
+            let displayLeads;
+            
+            if (currentSalesperson === 'admin') {
+                displayLeads = allData;
+            } else {
+                displayLeads = allData.filter(l => l.salesperson === currentSalesperson);
+            }
+            
+            const tbody = document.getElementById('leadsTable');
+            tbody.innerHTML = displayLeads.map(lead => `
+                <tr>
+                    <td>${lead.name}</td>
+                    <td>${lead.phone}</td>
+                    <td>${lead.source}</td>
+                    <td><span class="status-badge status-${lead.status.toLowerCase().replace(' ', '')}">${lead.status}</span></td>
+                    <td>${getSalespersonName(lead.salesperson)}</td>
+                    <td>${lead.date}</td>
+                    <td>
+                        <button onclick="alert('Para cambiar estado, edita directamente en Google Sheets')" class="btn" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">
+                            Editar en Sheet
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Actualizar reportes
+        function updateReports() {
+            // Performance diario
+            const today = new Date().toISOString().split('T')[0];
+            const salespeople = ['maria_garcia', 'juan_perez'];
+            
+            const dailyPerf = salespeople.map(salesperson => {
+                const todayContacts = allData.filter(c => c.date === today && c.salesperson === salesperson).length;
+                const progress = Math.round((todayContacts / 10) * 100);
+                
+                return {
+                    name: getSalespersonName(salesperson),
+                    contacts: todayContacts,
+                    progress: progress
+                };
+            });
+            
+            document.getElementById('dailyPerformance').innerHTML = `
+                <div style="background: #f9fafb; padding: 1rem; border-radius: 5px;">
+                    ${dailyPerf.map(perf => `
+                        <div style="margin-bottom: 1rem; padding: 1rem; background: white; border-radius: 5px;">
+                            <div style="font-weight: 600; margin-bottom: 0.5rem;">${perf.name}</div>
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span>${perf.contacts}/10 contactos</span>
+                                <span style="font-weight: bold; color: ${perf.progress >= 100 ? '#10b981' : perf.progress >= 70 ? '#f59e0b' : '#ef4444'}">${perf.progress}%</span>
+                            </div>
+                            <div style="background: #e5e7eb; height: 8px; border-radius: 4px; margin-top: 0.5rem;">
+                                <div style="background: ${perf.progress >= 100 ? '#10b981' : perf.progress >= 70 ? '#f59e0b' : '#ef4444'}; height: 8px; border-radius: 4px; width: ${Math.min(perf.progress, 100)}%;"></div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            
+            // Metas por vendedor
+            const salesTargets = salespeople.map(salesperson => {
+                const leads = allData.filter(l => l.salesperson === salesperson);
+                const conversions = leads.filter(l => l.status === 'Convertido').length;
+                const conversionRate = leads.length > 0 ? (conversions / leads.length * 100).toFixed(1) : 0;
+                
+                return {
+                    name: getSalespersonName(salesperson),
+                    leads: leads.length,
+                    conversions,
+                    conversionRate
+                };
+            });
+            
+            document.getElementById('salesTargets').innerHTML = `
+                <div style="background: #f9fafb; padding: 1rem; border-radius: 5px;">
+                    ${salesTargets.map(target => `
+                        <div style="margin-bottom: 1rem; padding: 1rem; background: white; border-radius: 5px;">
+                            <div style="font-weight: 600; margin-bottom: 0.5rem;">${target.name}</div>
+                            <div style="font-size: 0.9rem; color: #666;">
+                                📋 Leads: ${target.leads}<br>
+                                ✅ Conversiones: ${target.conversions}<br>
+                                📊 Tasa: ${target.conversionRate}%
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        // Obtener nombre del vendedor
+        function getSalespersonName(key) {
+            const names = {
+                'maria_garcia': 'María García',
+                'juan_perez': 'Juan Pérez',
+                'admin': 'Admin'
+            };
+            return names[key] || key;
+        }
+
+        // Auto-refresh cada 30 segundos si hay conexión
+        setInterval(() => {
+            if (isConnected && document.visibilityState === 'visible') {
+                refreshData();
+            }
+        }, 30000);
+    </script>
+</body>
+</html>
