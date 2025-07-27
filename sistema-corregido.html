@@ -514,16 +514,17 @@
             </div>
 
             <!-- Tabs -->
-            <div class="tabs">
-                <button class="tab active" onclick="showTab('contacts')">📞 Mis Contactos</button>
-                <button class="tab" onclick="showTab('leads')">👥 Mis Leads</button>
-                <button class="tab" onclick="showTab('pipeline')">🎯 Pipeline</button>
+            <div class="tabs" id="mainTabs">
+                <button class="tab active" onclick="showTab('contacts')" id="contactsTab">📞 Mis Contactos</button>
+                <button class="tab" onclick="showTab('leads')" id="leadsTab">👥 Mis Leads</button>
+                <button class="tab" onclick="showTab('pipeline')" id="pipelineTab">🎯 Pipeline</button>
+                <button class="tab" onclick="showTab('monitoring')" id="monitoringTab" style="display: none;">👀 Monitoreo</button>
                 <button class="tab" id="reportsTab" onclick="showTab('reports')">📊 Dashboard</button>
             </div>
 
             <!-- Tab: Contactos -->
             <div id="contacts" class="tab-content">
-                <h2>📞 Registrar Contactos del Día</h2>
+                <h2 id="contactsTitle">📞 Registrar Contactos del Día</h2>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem;">
                     <div>
                         <h3>➕ Nuevo Contacto</h3>
@@ -579,7 +580,7 @@
                     </div>
                     
                     <div>
-                        <h3>📋 Mis Contactos de Hoy</h3>
+                        <h3 id="todayContactsTitle">📋 Mis Contactos de Hoy</h3>
                         <div style="margin-bottom: 1rem;">
                             <button onclick="refreshData()" class="btn btn-primary" style="margin-bottom: 0.5rem; width: 19%; margin-right: 1%;">🔄 Actualizar</button>
                             <button onclick="debugData()" class="btn btn-secondary" style="margin-bottom: 0.5rem; width: 19%; margin-right: 1%;">🔍 Debug</button>
@@ -594,11 +595,27 @@
 
             <!-- Tab: Leads -->
             <div id="leads" class="tab-content hidden">
-                <h2>👥 Gestión de Mis Leads</h2>
-                <button onclick="refreshData()" class="btn btn-primary" style="margin-bottom: 1rem;">🔄 Actualizar Datos</button>
+                <h2 id="leadsTitle">👥 Gestión de Mis Leads</h2>
+                <div style="display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center;">
+                    <button onclick="refreshData()" class="btn btn-primary">🔄 Actualizar Datos</button>
+                    <div id="leadsFilters" style="display: none;">
+                        <select id="salespersonFilter" onchange="updateLeadsTable()" style="padding: 0.5rem; border-radius: 5px; border: 1px solid #ccc;">
+                            <option value="">Todos los vendedores</option>
+                        </select>
+                        <select id="statusFilter" onchange="updateLeadsTable()" style="padding: 0.5rem; border-radius: 5px; border: 1px solid #ccc; margin-left: 0.5rem;">
+                            <option value="">Todos los estados</option>
+                            <option value="Nuevo">Nuevo</option>
+                            <option value="Contactado">Contactado</option>
+                            <option value="Interesado">Interesado</option>
+                            <option value="Negociación">Negociación</option>
+                            <option value="Convertido">Convertido</option>
+                            <option value="Perdido">Perdido</option>
+                        </select>
+                    </div>
+                </div>
                 <table class="table">
                     <thead>
-                        <tr>
+                        <tr id="leadsTableHeader">
                             <th>Nombre</th>
                             <th>Teléfono</th>
                             <th>Fuente</th>
@@ -611,7 +628,33 @@
                 </table>
             </div>
 
-            <!-- Tab: Pipeline -->
+            <!-- Tab: Monitoring (Director Only) -->
+            <div id="monitoring" class="tab-content hidden">
+                <h2>👀 Monitoreo del Equipo en Tiempo Real</h2>
+                <div style="background: #e0f2fe; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; border-left: 4px solid #0284c7;">
+                    <p><strong>🎯 Vista del Director:</strong> Monitorea la actividad de todo el equipo de ventas en tiempo real. Aquí puedes ver qué está haciendo cada vendedor, sus contactos del día, y su progreso hacia las metas.</p>
+                </div>
+                
+                <button onclick="refreshMonitoring()" class="btn btn-primary" style="margin-bottom: 2rem;">🔄 Actualizar Monitoreo</button>
+                
+                <!-- Team Activity Overview -->
+                <div style="margin-bottom: 2rem;">
+                    <h3>📊 Resumen de Actividad del Equipo</h3>
+                    <div id="teamActivityOverview"></div>
+                </div>
+                
+                <!-- Individual Salesperson Cards -->
+                <div style="margin-bottom: 2rem;">
+                    <h3>👥 Actividad Individual por Vendedor</h3>
+                    <div id="individualSalespeopleActivity"></div>
+                </div>
+                
+                <!-- Recent Team Activity -->
+                <div>
+                    <h3>🕒 Actividad Reciente del Equipo</h3>
+                    <div id="recentTeamActivity"></div>
+                </div>
+            </div>
             <div id="pipeline" class="tab-content hidden">
                 <h2>🎯 Pipeline de Ventas</h2>
                 <div style="background: #e0f2fe; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid #0284c7;">
@@ -771,9 +814,31 @@
             document.getElementById('userRole').textContent = `(${currentUser.role === 'director' ? 'Director' : 'Vendedor'})`;
             
             if (currentUser.role === 'director') {
+                // Director-specific setup
                 document.getElementById('directorConfig').classList.remove('hidden');
                 document.getElementById('reportsTab').textContent = '📊 Dashboard Ejecutivo';
                 document.getElementById('reportsTitle').textContent = '📊 Dashboard Ejecutivo';
+                document.getElementById('monitoringTab').style.display = 'block';
+                
+                // Update tab labels for director
+                document.getElementById('contactsTab').textContent = '📞 Todos los Contactos';
+                document.getElementById('leadsTab').textContent = '👥 Todos los Leads';
+                document.getElementById('pipelineTab').textContent = '🎯 Pipeline del Equipo';
+                document.getElementById('leadsTitle').textContent = '👥 Gestión de Todos los Leads';
+                document.getElementById('contactsTitle').textContent = '📞 Contactos del Equipo';
+                document.getElementById('todayContactsTitle').textContent = '📋 Contactos de Hoy (Todos)';
+                
+                // Show director filters
+                document.getElementById('leadsFilters').style.display = 'block';
+                
+                // Add salesperson column to leads table
+                const leadsHeader = document.getElementById('leadsTableHeader');
+                if (!document.getElementById('salespersonColumn')) {
+                    const salespersonTh = document.createElement('th');
+                    salespersonTh.id = 'salespersonColumn';
+                    salespersonTh.textContent = 'Vendedor';
+                    leadsHeader.insertBefore(salespersonTh, leadsHeader.children[5]); // Insert before Actions column
+                }
                 
                 if (sheetConfig.id) {
                     document.getElementById('sheetId').value = sheetConfig.id;
@@ -781,10 +846,28 @@
                 }
                 updateUsersList();
                 updateConveniosList();
+                populateSalespersonFilter();
             } else {
+                // Vendedor-specific setup
                 document.getElementById('directorConfig').classList.add('hidden');
                 document.getElementById('reportsTab').textContent = '📊 Mi Dashboard';
                 document.getElementById('reportsTitle').textContent = '📊 Mi Dashboard Personal';
+                document.getElementById('monitoringTab').style.display = 'none';
+                document.getElementById('leadsFilters').style.display = 'none';
+                
+                // Reset tab labels for vendedor
+                document.getElementById('contactsTab').textContent = '📞 Mis Contactos';
+                document.getElementById('leadsTab').textContent = '👥 Mis Leads';
+                document.getElementById('pipelineTab').textContent = '🎯 Pipeline';
+                document.getElementById('leadsTitle').textContent = '👥 Gestión de Mis Leads';
+                document.getElementById('contactsTitle').textContent = '📞 Registrar Contactos del Día';
+                document.getElementById('todayContactsTitle').textContent = '📋 Mis Contactos de Hoy';
+                
+                // Remove salesperson column if it exists
+                const salespersonColumn = document.getElementById('salespersonColumn');
+                if (salespersonColumn) {
+                    salespersonColumn.remove();
+                }
             }
             
             loadConveniosInSelect();
@@ -1173,7 +1256,13 @@
             const daysSinceContact = getDaysSinceContact(lead.date);
             const urgencyColor = daysSinceContact > 3 ? '#ef4444' : daysSinceContact > 1 ? '#f59e0b' : '#10b981';
             
+            // Show salesperson info only for directors
+            const salespersonInfo = currentUser.role === 'director' 
+                ? `<div style="font-size: 0.7rem; color: #667eea; margin-bottom: 0.5rem; font-weight: 600;">👤 ${getUserDisplayName(lead.salesperson)}</div>`
+                : '';
+            
             card.innerHTML = `
+                ${salespersonInfo}
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
                     <strong style="font-size: 0.9rem; line-height: 1.2;">${lead.name}</strong>
                     <span style="background: ${urgencyColor}; color: white; padding: 0.1rem 0.3rem; border-radius: 8px; font-size: 0.7rem;">
@@ -1184,8 +1273,8 @@
                 <div style="font-size: 0.8rem; color: #666; margin-bottom: 0.5rem;">📍 ${lead.source}</div>
                 ${lead.notes ? `<div style="font-size: 0.75rem; color: #888; background: #f9fafb; padding: 0.3rem; border-radius: 4px; margin-top: 0.5rem;">💬 ${lead.notes.substring(0, 50)}${lead.notes.length > 50 ? '...' : ''}</div>` : ''}
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem; font-size: 0.7rem; color: #888;">
-                    <span>👤 ${getUserDisplayName(lead.salesperson)}</span>
-                    <span>${formatDate(lead.date)}</span>
+                    <span>${currentUser.role === 'director' ? '📅' : '👤'} ${currentUser.role === 'director' ? formatDate(lead.date) : getUserDisplayName(lead.salesperson)}</span>
+                    <span>${currentUser.role === 'director' ? lead.time : formatDate(lead.date)}</span>
                 </div>
             `;
             return card;
@@ -1375,7 +1464,189 @@
             });
         }
 
-        // ===== UTILIDADES =====
+        // ===== MONITORING (DIRECTOR) =====
+        function refreshMonitoring() {
+            if (currentUser.role !== 'director') {
+                alert('❌ Solo el director puede acceder al monitoreo');
+                return;
+            }
+            
+            updateTeamActivityOverview();
+            updateIndividualSalespeopleActivity();
+            updateRecentTeamActivity();
+        }
+
+        function updateTeamActivityOverview() {
+            const today = new Date().toISOString().split('T')[0];
+            const salespeople = [...new Set(allData.map(d => d.salesperson))].filter(s => s);
+            
+            let totalTodayContacts = 0;
+            let totalActiveLeads = 0;
+            let totalConversions = 0;
+            let salespeopleMetGoal = 0;
+            
+            salespeople.forEach(salesperson => {
+                const userData = allData.filter(d => d.salesperson === salesperson);
+                const todayContacts = userData.filter(c => c.date === today).length;
+                const activeLeads = userData.filter(l => l.status !== 'Convertido' && l.status !== 'Perdido').length;
+                const conversions = userData.filter(l => l.status === 'Convertido').length;
+                
+                totalTodayContacts += todayContacts;
+                totalActiveLeads += activeLeads;
+                totalConversions += conversions;
+                
+                if (todayContacts >= 10) salespeopleMetGoal++;
+            });
+            
+            const teamGoalProgress = salespeople.length > 0 ? (salespeopleMetGoal / salespeople.length * 100).toFixed(0) : 0;
+            
+            document.getElementById('teamActivityOverview').innerHTML = `
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+                    <div style="background: white; padding: 1.5rem; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center;">
+                        <div style="font-size: 2rem; font-weight: bold; color: #667eea;">${totalTodayContacts}</div>
+                        <div style="font-size: 0.9rem; color: #666;">Contactos Hoy (Equipo)</div>
+                        <div style="font-size: 0.8rem; color: #888; margin-top: 0.5rem;">Meta: ${salespeople.length * 10}</div>
+                    </div>
+                    
+                    <div style="background: white; padding: 1.5rem; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center;">
+                        <div style="font-size: 2rem; font-weight: bold; color: #10b981;">${totalActiveLeads}</div>
+                        <div style="font-size: 0.9rem; color: #666;">Leads Activos</div>
+                        <div style="font-size: 0.8rem; color: #888; margin-top: 0.5rem;">En proceso</div>
+                    </div>
+                    
+                    <div style="background: white; padding: 1.5rem; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center;">
+                        <div style="font-size: 2rem; font-weight: bold; color: #f59e0b;">${totalConversions}</div>
+                        <div style="font-size: 0.9rem; color: #666;">Conversiones Totales</div>
+                        <div style="font-size: 0.8rem; color: #888; margin-top: 0.5rem;">Este periodo</div>
+                    </div>
+                    
+                    <div style="background: white; padding: 1.5rem; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center;">
+                        <div style="font-size: 2rem; font-weight: bold; color: #8b5cf6;">${teamGoalProgress}%</div>
+                        <div style="font-size: 0.9rem; color: #666;">Equipo en Meta</div>
+                        <div style="font-size: 0.8rem; color: #888; margin-top: 0.5rem;">${salespeopleMetGoal}/${salespeople.length} vendedores</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function updateIndividualSalespeopleActivity() {
+            const today = new Date().toISOString().split('T')[0];
+            const salespeople = [...new Set(allData.map(d => d.salesperson))].filter(s => s);
+            
+            const salespeopleData = salespeople.map(salesperson => {
+                const userData = allData.filter(d => d.salesperson === salesperson);
+                const todayContacts = userData.filter(c => c.date === today).length;
+                const totalLeads = userData.length;
+                const activeLeads = userData.filter(l => l.status !== 'Convertido' && l.status !== 'Perdido').length;
+                const conversions = userData.filter(l => l.status === 'Convertido').length;
+                const conversionRate = totalLeads > 0 ? (conversions / totalLeads * 100).toFixed(1) : 0;
+                const lastActivity = userData.length > 0 ? Math.max(...userData.map(d => new Date(d.date).getTime())) : 0;
+                const daysSinceLastActivity = lastActivity > 0 ? Math.floor((Date.now() - lastActivity) / (1000 * 60 * 60 * 24)) : 999;
+                
+                return {
+                    username: salesperson,
+                    name: getUserDisplayName(salesperson),
+                    todayContacts,
+                    totalLeads,
+                    activeLeads,
+                    conversions,
+                    conversionRate: parseFloat(conversionRate),
+                    daysSinceLastActivity,
+                    goalProgress: (todayContacts / 10 * 100).toFixed(0)
+                };
+            });
+            
+            // Sort by today's contacts (most active first)
+            salespeopleData.sort((a, b) => b.todayContacts - a.todayContacts);
+            
+            document.getElementById('individualSalespeopleActivity').innerHTML = `
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1rem;">
+                    ${salespeopleData.map(person => {
+                        const statusColor = person.todayContacts >= 10 ? '#10b981' : person.todayContacts >= 5 ? '#f59e0b' : '#ef4444';
+                        const activityStatus = person.daysSinceLastActivity === 0 ? '🟢 Activo hoy' : 
+                                             person.daysSinceLastActivity === 1 ? '🟡 Ayer' : 
+                                             person.daysSinceLastActivity < 7 ? `🟠 Hace ${person.daysSinceLastActivity} días` : '🔴 Inactivo';
+                        
+                        return `
+                            <div style="background: white; padding: 1.5rem; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border-left: 4px solid ${statusColor};">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                    <h4 style="margin: 0; color: #333;">${person.name}</h4>
+                                    <span style="font-size: 0.8rem; color: #666;">${activityStatus}</span>
+                                </div>
+                                
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                                    <div>
+                                        <div style="font-size: 1.5rem; font-weight: bold; color: ${statusColor};">${person.todayContacts}/10</div>
+                                        <div style="font-size: 0.8rem; color: #666;">Contactos Hoy</div>
+                                    </div>
+                                    <div>
+                                        <div style="font-size: 1.5rem; font-weight: bold; color: #667eea;">${person.activeLeads}</div>
+                                        <div style="font-size: 0.8rem; color: #666;">Leads Activos</div>
+                                    </div>
+                                </div>
+                                
+                                <div style="margin-bottom: 1rem;">
+                                    <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #666;">
+                                        <span>Progreso Meta Diaria</span>
+                                        <span>${person.goalProgress}%</span>
+                                    </div>
+                                    <div style="background: #e5e7eb; height: 6px; border-radius: 3px; margin-top: 0.25rem;">
+                                        <div style="background: ${statusColor}; height: 6px; border-radius: 3px; width: ${Math.min(person.goalProgress, 100)}%;"></div>
+                                    </div>
+                                </div>
+                                
+                                <div style="display: flex; justify-content: between; gap: 1rem; font-size: 0.85rem; color: #666;">
+                                    <span>📊 Total: ${person.totalLeads}</span>
+                                    <span>✅ Convertidos: ${person.conversions}</span>
+                                    <span>📈 Tasa: ${person.conversionRate}%</span>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        }
+
+        function updateRecentTeamActivity() {
+            // Get recent activities (last 5 days)
+            const recentData = [...allData]
+                .sort((a, b) => new Date(b.date) - new Date(a.date))
+                .slice(0, 20); // Latest 20 activities
+            
+            document.getElementById('recentTeamActivity').innerHTML = `
+                <div style="background: white; padding: 1.5rem; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Vendedor</th>
+                                <th>Cliente</th>
+                                <th>Fuente</th>
+                                <th>Estado</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${recentData.map(activity => `
+                                <tr>
+                                    <td style="font-size: 0.9rem;">${formatDate(activity.date)}</td>
+                                    <td><span style="background: #667eea; color: white; padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.8rem;">${getUserDisplayName(activity.salesperson)}</span></td>
+                                    <td style="font-weight: 500;">${activity.name}</td>
+                                    <td style="font-size: 0.9rem;">${activity.source}</td>
+                                    <td><span class="status-badge status-${activity.status.toLowerCase().replace(' ', '')}">${activity.status}</span></td>
+                                    <td>
+                                        <button onclick="showLeadDetails('${activity.id}')" class="btn btn-primary" style="padding: 0.2rem 0.4rem; font-size: 0.7rem;">
+                                            👁️ Ver
+                                        </button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                    ${recentData.length === 0 ? '<p style="text-align: center; color: #666; padding: 2rem;">No hay actividad reciente</p>' : ''}
+                </div>
+            `;
+        }
         function getFilteredData() {
             console.log('Getting filtered data for user:', currentUser);
             console.log('All data:', allData);
@@ -1410,6 +1681,10 @@
             
             if (tabName === 'pipeline') {
                 setTimeout(() => refreshPipeline(), 100); // Small delay to ensure DOM is ready
+            } else if (tabName === 'monitoring' && currentUser.role === 'director') {
+                setTimeout(() => refreshMonitoring(), 100);
+            } else if (tabName === 'leads') {
+                updateLeadsTable();
             }
         }
 
@@ -1462,6 +1737,16 @@ ${filtered.map(c => `- ${c.name} (${c.date})`).join('\n') || 'Ninguno'}`);
             updateTodayContacts();
             updateLeadsTable();
             updateReports();
+            
+            // Director-specific updates
+            if (currentUser.role === 'director') {
+                populateSalespersonFilter();
+                // Update monitoring if the tab is currently active
+                const monitoringTab = document.getElementById('monitoring');
+                if (monitoringTab && !monitoringTab.classList.contains('hidden')) {
+                    refreshMonitoring();
+                }
+            }
         }
 
         function updateStats() {
@@ -1541,7 +1826,21 @@ ${filtered.map(c => `- ${c.name} (${c.date})`).join('\n') || 'Ninguno'}`);
         }
 
         function updateLeadsTable() {
-            const data = getFilteredData();
+            let data = getFilteredData();
+            
+            // Apply director filters if director is logged in
+            if (currentUser.role === 'director') {
+                const salespersonFilter = document.getElementById('salespersonFilter').value;
+                const statusFilter = document.getElementById('statusFilter').value;
+                
+                if (salespersonFilter) {
+                    data = data.filter(lead => lead.salesperson === salespersonFilter);
+                }
+                if (statusFilter) {
+                    data = data.filter(lead => lead.status === statusFilter);
+                }
+            }
+            
             const tbody = document.getElementById('leadsTable');
             if (!tbody) {
                 console.log('Leads table not found');
@@ -1551,24 +1850,47 @@ ${filtered.map(c => `- ${c.name} (${c.date})`).join('\n') || 'Ninguno'}`);
             console.log('Updating leads table with data:', data);
             
             if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #666; padding: 2rem;">No tienes leads registrados</td></tr>';
+                const colSpan = currentUser.role === 'director' ? '7' : '6';
+                tbody.innerHTML = `<tr><td colspan="${colSpan}" style="text-align: center; color: #666; padding: 2rem;">No hay leads registrados</td></tr>`;
                 return;
             }
             
-            tbody.innerHTML = data.map(lead => `
-                <tr>
-                    <td style="font-weight: 500;">${lead.name}</td>
-                    <td>${lead.phone}</td>
-                    <td>${lead.source}</td>
-                    <td><span class="status-badge status-${lead.status.toLowerCase().replace(' ', '')}">${lead.status}</span></td>
-                    <td>${lead.date}</td>
-                    <td>
-                        <button onclick="showLeadDetails('${lead.id}')" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">
-                            📋 Ver
-                        </button>
-                    </td>
-                </tr>
-            `).join('');
+            tbody.innerHTML = data.map(lead => {
+                const salespersonCell = currentUser.role === 'director' 
+                    ? `<td><span style="background: #667eea; color: white; padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.8rem;">${getUserDisplayName(lead.salesperson)}</span></td>`
+                    : '';
+                
+                return `
+                    <tr>
+                        <td style="font-weight: 500;">${lead.name}</td>
+                        <td>${lead.phone}</td>
+                        <td>${lead.source}</td>
+                        <td><span class="status-badge status-${lead.status.toLowerCase().replace(' ', '')}">${lead.status}</span></td>
+                        <td>${lead.date}</td>
+                        ${salespersonCell}
+                        <td>
+                            <button onclick="showLeadDetails('${lead.id}')" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">
+                                📋 Ver
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function populateSalespersonFilter() {
+            const filter = document.getElementById('salespersonFilter');
+            if (!filter) return;
+            
+            const salespeople = [...new Set(allData.map(d => d.salesperson))].filter(s => s);
+            filter.innerHTML = '<option value="">Todos los vendedores</option>';
+            
+            salespeople.forEach(salesperson => {
+                const option = document.createElement('option');
+                option.value = salesperson;
+                option.textContent = getUserDisplayName(salesperson);
+                filter.appendChild(option);
+            });
         }
 
         function exportTodayContacts() {
