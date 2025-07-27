@@ -570,10 +570,11 @@
                     <div>
                         <h3>📋 Mis Contactos de Hoy</h3>
                         <div style="margin-bottom: 1rem;">
-                            <button onclick="refreshData()" class="btn btn-primary" style="margin-bottom: 0.5rem; width: 24%; margin-right: 1%;">🔄 Actualizar</button>
-                            <button onclick="debugData()" class="btn btn-secondary" style="margin-bottom: 0.5rem; width: 24%; margin-right: 1%;">🔍 Debug</button>
-                            <button onclick="exportTodayContacts()" class="btn btn-warning" style="margin-bottom: 0.5rem; width: 24%; margin-right: 1%;">📋 Exportar</button>
-                            <button onclick="clearLocalData()" class="btn" style="margin-bottom: 0.5rem; width: 24%; background: #ef4444; color: white;">🗑️ Limpiar</button>
+                            <button onclick="refreshData()" class="btn btn-primary" style="margin-bottom: 0.5rem; width: 19%; margin-right: 1%;">🔄 Actualizar</button>
+                            <button onclick="debugData()" class="btn btn-secondary" style="margin-bottom: 0.5rem; width: 19%; margin-right: 1%;">🔍 Debug</button>
+                            <button onclick="exportTodayContacts()" class="btn btn-warning" style="margin-bottom: 0.5rem; width: 19%; margin-right: 1%;">📋 Exportar</button>
+                            <button onclick="toggleAutoSync()" class="btn" id="autoSyncBtn" style="margin-bottom: 0.5rem; width: 19%; margin-right: 1%; background: #10b981; color: white;">⚡ Auto</button>
+                            <button onclick="clearLocalData()" class="btn" style="margin-bottom: 0.5rem; width: 19%; background: #ef4444; color: white;">🗑️ Limpiar</button>
                         </div>
                         <div id="todayContacts"></div>
                     </div>
@@ -666,6 +667,8 @@
         };
         let allData = [];
         let isConnected = false;
+        let autoSyncEnabled = localStorage.getItem('autoSyncEnabled') !== 'false'; // Default true
+        let autoSyncInterval = null;
 
         // Pipeline stages
         const pipelineStages = [
@@ -688,11 +691,13 @@
                 showMainApp();
             }
             
+            // Auto-refresh menos agresivo: cada 5 minutos en lugar de 30 segundos
             setInterval(() => {
                 if (isConnected && document.visibilityState === 'visible') {
+                    console.log('Auto-refresh: syncing with Google Sheets...');
                     refreshData();
                 }
-            }, 30000);
+            }, 300000); // 5 minutos = 300000 ms
         });
 
         // Cargar datos del localStorage
@@ -837,11 +842,15 @@
         }
 
         function parseSheetData(rows) {
-            console.log('Parsing sheet data, rows:', rows);
+            console.log('Parsing sheet data, rows received:', rows.length);
+            
+            // BACKUP de datos locales antes de procesar
+            const localDataBackup = [...allData];
+            console.log('Local data backup:', localDataBackup.length);
             
             const sheetData = [];
             rows.forEach((row, index) => {
-                if (index === 0 || !row.c || !row.c[1]) return;
+                if (index === 0 || !row.c || !row.c[1]) return; // Skip header and empty rows
                 
                 const contact = {
                     id: row.c[0] ? row.c[0].v : '',
@@ -856,26 +865,45 @@
                     time: row.c[9] ? row.c[9].v : '',
                     status: row.c[10] ? row.c[10].v : 'Nuevo'
                 };
-                sheetData.push(contact);
-            });
-            
-            console.log('Sheet data parsed:', sheetData);
-            console.log('Current local data before merge:', allData);
-            
-            // COMBINAR datos del sheet con datos locales
-            // Solo agregar datos del sheet que no estén ya en local
-            sheetData.forEach(sheetContact => {
-                const existsInLocal = allData.find(localContact => 
-                    localContact.id === sheetContact.id || 
-                    (localContact.name === sheetContact.name && localContact.phone === sheetContact.phone)
-                );
                 
-                if (!existsInLocal && sheetContact.name) {
-                    allData.push(sheetContact);
+                if (contact.name && contact.name.trim()) {
+                    sheetData.push(contact);
                 }
             });
             
-            console.log('Final merged data:', allData);
+            console.log('Sheet data parsed:', sheetData.length, 'valid contacts');
+            
+            // Si el sheet está vacío, mantener TODOS los datos locales
+            if (sheetData.length === 0) {
+                console.log('Sheet is empty - keeping all local data');
+                allData = localDataBackup;
+            } else {
+                // Si hay datos en el sheet, combinar inteligentemente
+                console.log('Merging sheet data with local data');
+                
+                // Empezar con datos del sheet
+                allData = [...sheetData];
+                
+                // Agregar datos locales que no estén en el sheet
+                localDataBackup.forEach(localContact => {
+                    const existsInSheet = sheetData.find(sheetContact => 
+                        sheetContact.id === localContact.id || 
+                        (sheetContact.name === localContact.name && 
+                         sheetContact.phone === localContact.phone &&
+                         sheetContact.salesperson === localContact.salesperson)
+                    );
+                    
+                    if (!existsInSheet) {
+                        console.log('Adding local contact not in sheet:', localContact.name);
+                        allData.push(localContact);
+                    }
+                });
+            }
+            
+            console.log('Final data after merge:', allData.length);
+            
+            // Guardar datos combinados localmente
+            saveLocalData();
             
             updateAllViews();
             refreshPipeline();
@@ -1216,7 +1244,23 @@
 
         function refreshData() {
             if (isConnected) {
+                // Mostrar indicador de sincronización
+                const originalText = document.getElementById('connectionStatus').textContent;
+                document.getElementById('connectionStatus').textContent = '🔄 Sincronizando...';
+                document.getElementById('connectionStatus').className = 'connection-status';
+                document.getElementById('connectionStatus').style.background = '#fbbf24';
+                document.getElementById('connectionStatus').style.color = '#92400e';
+                
+                // Ejecutar conectToSheet y restaurar después
                 connectToSheet();
+                
+                // Restaurar indicador después de 2 segundos
+                setTimeout(() => {
+                    if (isConnected) {
+                        document.getElementById('connectionStatus').textContent = '🟢 Conectado';
+                        document.getElementById('connectionStatus').className = 'connection-status connected';
+                    }
+                }, 2000);
             } else {
                 alert('⚠️ No hay conexión con Google Sheets');
             }
