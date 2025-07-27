@@ -18,9 +18,20 @@ let isConnected = false;
 let autoSyncEnabled = localStorage.getItem('autoSyncEnabled') !== 'false';
 let autoSyncInterval = null;
 
-// Use AdminData instead of local allData
+// ===== CENTRALIZED DATA ACCESS =====
 function getAllData() {
-    return window.AdminData ? AdminData.getAllData() : [];
+    if (window.AdminData) {
+        return AdminData.getAllData();
+    } else {
+        console.warn('⚠️ AdminData not available, using localStorage fallback');
+        try {
+            const savedData = localStorage.getItem('allData');
+            return savedData ? JSON.parse(savedData) : [];
+        } catch (e) {
+            console.error('Error loading fallback data:', e);
+            return [];
+        }
+    }
 }
 
 function getFilteredData() {
@@ -68,11 +79,16 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 Initializing Ciudad Bilingue Sales System');
     
     // Wait for AdminData to be available
-    if (window.AdminData) {
-        console.log('✅ AdminData loaded successfully');
-    } else {
-        console.log('⏳ Waiting for AdminData...');
-    }
+    const checkAdminData = () => {
+        if (window.AdminData) {
+            console.log('✅ AdminData loaded successfully');
+            setupAdminDataObservers();
+        } else {
+            console.log('⏳ Waiting for AdminData...');
+            setTimeout(checkAdminData, 100);
+        }
+    };
+    checkAdminData();
     
     const savedUser = localStorage.getItem('currentUser');
     if (savedUser) {
@@ -89,6 +105,17 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 300000);
 });
 
+// Setup AdminData observers for automatic UI updates
+function setupAdminDataObservers() {
+    if (window.AdminData) {
+        AdminData.addObserver((data) => {
+            console.log('📊 AdminData changed, updating all views...');
+            updateAllViews();
+        });
+        console.log('✅ AdminData observers setup complete');
+    }
+}
+
 // ===== DATA MANAGEMENT =====
 function loadLocalData() {
     // AdminData handles all data loading now
@@ -103,6 +130,11 @@ function loadLocalData() {
             const count = data.filter(d => d.salesperson === sp).length;
             console.log(`   - ${sp}: ${count} contacts`);
         });
+        
+        // Force update all views after loading data
+        setTimeout(() => {
+            updateAllViews();
+        }, 100);
     } else {
         console.log('⚠️ AdminData not yet available');
     }
@@ -111,20 +143,6 @@ function loadLocalData() {
 function saveLocalData() {
     // AdminData handles all data saving automatically
     console.log('💾 Data saving handled by AdminData');
-}
-
-function getFilteredData() {
-    console.log('🔍 Obteniendo datos filtrados para:', currentUser?.role, currentUser?.username);
-    console.log('📊 Total datos en sistema:', allData.length);
-    
-    if (currentUser?.role === 'director') {
-        console.log('👑 Director - devolviendo TODOS los datos');
-        return allData;
-    } else {
-        const filtered = allData.filter(item => item.salesperson === currentUser.username);
-        console.log('👤 Vendedor - datos filtrados:', filtered.length);
-        return filtered;
-    }
 }
 
 // ===== AUTENTICACIÓN =====
@@ -231,11 +249,16 @@ function setupUserInterface() {
     
     loadConveniosInSelect();
     
-    // CARGAR DATOS LOCALES Y ACTUALIZAR VISTAS INMEDIATAMENTE
-    loadLocalData();
-    updateAllViews();
-    
-    console.log('✅ Interfaz configurada completamente');
+    // LOAD DATA AND UPDATE VIEWS - WITH PROPER TIMING
+    setTimeout(() => {
+        loadLocalData();
+        updateAllViews();
+        // Force pipeline refresh if we're on that tab
+        if (typeof refreshPipeline === 'function') {
+            refreshPipeline();
+        }
+        console.log('✅ Interfaz configurada completamente con datos cargados');
+    }, 200);
 }
 
 // ===== GOOGLE SHEETS =====
@@ -270,20 +293,23 @@ async function connectToSheet() {
             return;
         }
 
-        const url = `https://docs.google.com/spreadsheets/d/${sheetConfig.id}/gviz/tq?tqx=out:json&sheet=${sheetConfig.name}`;
+        // Use the published CSV URL instead of the API endpoint to avoid CORS issues
+        const url = `https://docs.google.com/spreadsheets/d/${sheetConfig.id}/export?format=csv&gid=0`;
         const response = await fetch(url);
-        const text = await response.text();
         
-        const jsonData = text.substring(47).slice(0, -2);
-        const data = JSON.parse(jsonData);
+        if (!response.ok) {
+            throw new Error('No se pudo acceder al Google Sheet');
+        }
         
-        if (data.table && data.table.rows) {
+        const csvText = await response.text();
+        
+        if (csvText && csvText.length > 0) {
             isConnected = true;
             document.getElementById('connectionStatus').textContent = '🟢 Conectado';
             document.getElementById('connectionStatus').className = 'connection-status connected';
-            parseSheetData(data.table.rows);
+            parseCSVData(csvText);
         } else {
-            throw new Error('No se pudo leer el Google Sheet');
+            throw new Error('El Google Sheet está vacío');
         }
     } catch (error) {
         console.error('Error conectando con Google Sheets:', error);
@@ -292,52 +318,56 @@ async function connectToSheet() {
         document.getElementById('connectionStatus').className = 'connection-status disconnected';
         
         if (currentUser && currentUser.role === 'director') {
-            alert('⚠️ Error conectando con Google Sheets. Verifica la configuración.');
+            alert('⚠️ Error conectando con Google Sheets. Asegúrate de que:\n\n1. El Google Sheet sea público\n2. El ID sea correcto\n3. El sheet tenga datos');
         }
     }
 }
 
-function parseSheetData(rows) {
-    console.log('📊 Parsing Google Sheets data, rows received:', rows.length);
+function parseCSVData(csvText) {
+    console.log('📊 Parsing CSV data from Google Sheets');
     
     if (!window.AdminData) {
         console.log('❌ AdminData not available for sheet parsing');
         return;
     }
     
+    const lines = csvText.split('\n');
     const sheetData = [];
-    rows.forEach((row, index) => {
-        if (index === 0 || !row.c || !row.c[1]) return; // Skip header and empty rows
+    
+    // Skip header row and process data
+    for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
         
-        const contact = {
-            id: row.c[0] ? row.c[0].v : '',
-            name: row.c[1] ? row.c[1].v : '',
-            phone: row.c[2] ? row.c[2].v : '',
-            email: row.c[3] ? row.c[3].v : '',
-            source: row.c[4] ? row.c[4].v : '',
-            location: row.c[5] ? row.c[5].v : '',
-            notes: row.c[6] ? row.c[6].v : '',
-            salesperson: row.c[7] ? row.c[7].v : '',
-            date: row.c[8] ? row.c[8].v : '',
-            time: row.c[9] ? row.c[9].v : '',
-            status: row.c[10] ? row.c[10].v : 'Nuevo'
-        };
+        const columns = line.split(',').map(col => col.replace(/"/g, '').trim());
         
-        if (contact.name && contact.name.trim()) {
+        if (columns.length >= 11 && columns[1]) { // Make sure we have enough columns and a name
+            const contact = {
+                id: columns[0] || Date.now() + i,
+                name: columns[1],
+                phone: columns[2] || '',
+                email: columns[3] || '',
+                source: columns[4] || '',
+                location: columns[5] || '',
+                notes: columns[6] || '',
+                salesperson: columns[7] || '',
+                date: columns[8] || new Date().toISOString().split('T')[0],
+                time: columns[9] || new Date().toLocaleTimeString(),
+                status: columns[10] || 'Nuevo'
+            };
+            
             sheetData.push(contact);
         }
-    });
+    }
     
-    console.log('✅ Sheet data parsed:', sheetData.length, 'valid contacts');
+    console.log('✅ CSV data parsed:', sheetData.length, 'valid contacts');
     
     if (sheetData.length > 0) {
         // Import data to AdminData (this will merge with existing data)
         AdminData.importData(sheetData);
         console.log('📥 Sheet data imported to AdminData');
+        updateAllViews();
     }
-    
-    updateAllViews();
-    if (typeof refreshPipeline === 'function') refreshPipeline();
 }
 
 // ===== USUARIOS =====
@@ -488,17 +518,18 @@ function showTab(tabName) {
     document.getElementById(tabName).classList.remove('hidden');
     event.target.classList.add('active');
     
-    if (tabName === 'pipeline') {
-        setTimeout(() => {
+    // Force refresh specific views when tabs are shown
+    setTimeout(() => {
+        if (tabName === 'pipeline') {
             if (typeof refreshPipeline === 'function') refreshPipeline();
-        }, 100);
-    } else if (tabName === 'monitoring' && currentUser.role === 'director') {
-        setTimeout(() => {
+        } else if (tabName === 'monitoring' && currentUser.role === 'director') {
             if (typeof refreshMonitoring === 'function') refreshMonitoring();
-        }, 100);
-    } else if (tabName === 'leads') {
-        updateLeadsTable();
-    }
+        } else if (tabName === 'leads') {
+            updateLeadsTable();
+        } else if (tabName === 'reports') {
+            updateReports();
+        }
+    }, 100);
 }
 
 function refreshData() {
@@ -518,7 +549,10 @@ function refreshData() {
             }
         }, 2000);
     } else {
-        alert('⚠️ No hay conexión con Google Sheets');
+        // Even without sheet connection, refresh local data views
+        updateAllViews();
+        if (typeof refreshPipeline === 'function') refreshPipeline();
+        console.log('🔄 Data refreshed locally');
     }
 }
 
@@ -566,13 +600,14 @@ function debugData() {
 }
 
 function updateAllViews() {
-    updateStats();
-    updateTodayContacts();
-    updateLeadsTable();
-    updateReports();
+    console.log('🔄 Updating all views...');
+    if (typeof updateStats === 'function') updateStats();
+    if (typeof updateTodayContacts === 'function') updateTodayContacts();
+    if (typeof updateLeadsTable === 'function') updateLeadsTable();
+    if (typeof updateReports === 'function') updateReports();
     
     // Director-specific updates
-    if (currentUser.role === 'director') {
+    if (currentUser && currentUser.role === 'director') {
         populateSalespersonFilter();
         // Update monitoring if the tab is currently active
         const monitoringTab = document.getElementById('monitoring');
@@ -580,6 +615,8 @@ function updateAllViews() {
             if (typeof refreshMonitoring === 'function') refreshMonitoring();
         }
     }
+    
+    console.log('✅ All views updated');
 }
 
 function populateSalespersonFilter() {
@@ -700,28 +737,6 @@ function generateTestData() {
             salesperson: "juan.perez",
             date: getYesterdayDate(),
             status: "Contactado"
-        },
-        {
-            name: "Miguel Torres",
-            phone: "3145678901",
-            email: "miguel.torres@empresa.com",
-            source: "CONVENIO: Coats Cadena",
-            location: "Pereira",
-            notes: "Curso avanzado de negocios",
-            salesperson: "maria.garcia",
-            date: getTwoDaysAgoDate(),
-            status: "Convertido"
-        },
-        {
-            name: "Sandra Ruiz",
-            phone: "3176543210",
-            email: "sandra.ruiz@hotmail.com",
-            source: "Pasando por la sede",
-            location: "Otro",
-            notes: "Vive en Cartago, puede venir sábados",
-            salesperson: "juan.perez",
-            date: getTwoDaysAgoDate(),
-            status: "Perdido"
         }
     ];
     
@@ -731,6 +746,9 @@ function generateTestData() {
     });
     
     console.log(`✅ ${testContacts.length} test contacts added to AdminData`);
+    
+    // Force update all views
+    updateAllViews();
     
     // Get updated stats
     const teamStats = AdminData.getTeamStats();
