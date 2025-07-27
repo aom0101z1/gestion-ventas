@@ -68,6 +68,102 @@ function getFilteredDataFallback() {
     }
 }
 
+// ===== VERIFICACIÓN DE INTEGRIDAD DE DATOS =====
+function verifyDataIntegrity() {
+    if (!window.AdminData) {
+        console.error('❌ AdminData no disponible');
+        return false;
+    }
+    
+    console.log('🔍 VERIFICANDO INTEGRIDAD DE DATOS...');
+    
+    const adminData = AdminData.getAllData();
+    const localStorage = JSON.parse(window.localStorage.getItem('ciudad_bilingue_sales_data') || '[]');
+    
+    console.log('📊 AdminData:', adminData.length, 'registros');
+    console.log('📊 localStorage:', localStorage.length, 'registros');
+    
+    // Verificar sincronización
+    if (adminData.length !== localStorage.length) {
+        console.warn('⚠️ Desincronización detectada');
+        return false;
+    }
+    
+    // Verificar que los últimos IDs coinciden
+    if (adminData.length > 0 && localStorage.length > 0) {
+        const lastAdminId = Math.max(...adminData.map(d => d.id));
+        const lastLocalId = Math.max(...localStorage.map(d => d.id));
+        
+        console.log('🆔 Último ID AdminData:', lastAdminId);
+        console.log('🆔 Último ID localStorage:', lastLocalId);
+        
+        if (lastAdminId !== lastLocalId) {
+            console.warn('⚠️ IDs no coinciden');
+            return false;
+        }
+    }
+    
+    console.log('✅ Integridad de datos verificada');
+    return true;
+}
+
+// ===== FUNCIÓN DE DEBUG EN TIEMPO REAL =====
+function realTimeDataDebug() {
+    console.log('🔴 INICIANDO DEBUG EN TIEMPO REAL...');
+    
+    if (!window.AdminData) {
+        alert('❌ AdminData no disponible');
+        return;
+    }
+    
+    const currentData = AdminData.getAllData();
+    const localStorage = JSON.parse(window.localStorage.getItem('ciudad_bilingue_sales_data') || '[]');
+    
+    let debugInfo = `🔍 DEBUG EN TIEMPO REAL - ${new Date().toLocaleTimeString()}\n\n`;
+    debugInfo += `👤 Usuario: ${currentUser.username} (${currentUser.role})\n`;
+    debugInfo += `📊 AdminData: ${currentData.length} registros\n`;
+    debugInfo += `📊 localStorage: ${localStorage.length} registros\n`;
+    debugInfo += `🔄 Sincronización: ${currentData.length === localStorage.length ? '✅ OK' : '❌ ERROR'}\n\n`;
+    
+    if (currentUser.role === 'director') {
+        debugInfo += `👑 VISTA DEL DIRECTOR:\n`;
+        const teamStats = AdminData.getTeamStats();
+        debugInfo += `   - Vendedores: ${teamStats.salespeople.length}\n`;
+        teamStats.salespeople.forEach(sp => {
+            debugInfo += `   - ${sp.displayName}: ${sp.stats.totalContacts} contactos\n`;
+        });
+    } else {
+        const myData = AdminData.getDataBySalesperson(currentUser.username);
+        debugInfo += `👤 MIS DATOS:\n`;
+        debugInfo += `   - Mis contactos: ${myData.length}\n`;
+        debugInfo += `   - Contactos hoy: ${myData.filter(c => c.date === new Date().toISOString().split('T')[0]).length}\n`;
+    }
+    
+    // Últimos 3 contactos agregados
+    const recentContacts = [...currentData]
+        .sort((a, b) => b.id - a.id)
+        .slice(0, 3);
+    
+    debugInfo += `\n📋 ÚLTIMOS 3 CONTACTOS:\n`;
+    recentContacts.forEach((contact, index) => {
+        debugInfo += `   ${index + 1}. ${contact.name} (${contact.salesperson}) - ID: ${contact.id}\n`;
+    });
+    
+    alert(debugInfo);
+    
+    // También log detallado en consola
+    console.log('📊 AdminData completo:', currentData);
+    console.log('📊 localStorage completo:', localStorage);
+    
+    return {
+        adminDataCount: currentData.length,
+        localStorageCount: localStorage.length,
+        synchronized: currentData.length === localStorage.length,
+        user: currentUser,
+        timestamp: new Date().toISOString()
+    };
+}
+
 // ===== INICIALIZACIÓN =====
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 Initializing Ciudad Bilingue Sales System');
@@ -198,7 +294,6 @@ function setupUserInterface() {
         
         updateUsersList();
         updateConveniosList();
-        populateSalespersonFilter();
         
         // Add test data button for director
         setTimeout(addTestDataButton, 500);
@@ -232,16 +327,66 @@ function setupUserInterface() {
     
     loadConveniosInSelect();
     
-    // LOAD DATA AND UPDATE VIEWS - WITH PROPER TIMING
+    // CARGA DE DATOS MEJORADA
     setTimeout(() => {
-        loadLocalData();
-        updateAllViews();
-        // Force pipeline refresh if we're on that tab
-        if (typeof refreshPipeline === 'function') {
-            refreshPipeline();
+        if (window.AdminData) {
+            console.log('🔄 Iniciando carga de datos mejorada...');
+            
+            // Paso 1: Verificar y reparar datos
+            const wasRepaired = AdminData.verifyAndRepairData();
+            
+            // Paso 2: Forzar sincronización si es director
+            if (currentUser.role === 'director') {
+                console.log('👑 Director detectado - forzando sincronización completa');
+                const syncedCount = AdminData.forceSyncFromStorage();
+                console.log(`✅ Director sincronizado con ${syncedCount} registros`);
+            }
+            
+            // Paso 3: Cargar datos y actualizar vistas
+            loadLocalData();
+            
+            // Paso 4: Actualizar todas las vistas con delay escalonado
+            setTimeout(() => {
+                console.log('🎯 Actualizando todas las vistas...');
+                updateAllViews();
+                
+                // Paso 5: Actualizar filtros del director
+                if (currentUser.role === 'director') {
+                    populateSalespersonFilter();
+                    
+                    // Forzar actualización de la tabla de leads
+                    setTimeout(() => {
+                        updateLeadsTable();
+                        console.log('✅ Vista del director completamente actualizada');
+                    }, 300);
+                }
+                
+                // Paso 6: Refresh pipeline
+                if (typeof refreshPipeline === 'function') {
+                    setTimeout(() => {
+                        refreshPipeline();
+                    }, 500);
+                }
+                
+            }, 200);
+            
+            // Paso 7: Verificar integridad final
+            setTimeout(() => {
+                if (window.AdminData) {
+                    console.log('🔍 Verificando integridad al cargar interfaz...');
+                    const isIntegre = verifyDataIntegrity();
+                    if (!isIntegre) {
+                        console.warn('⚠️ Problemas de integridad detectados al cargar');
+                        AdminData.forceSyncFromStorage();
+                    }
+                }
+            }, 1000);
+            
+        } else {
+            console.log('❌ AdminData no disponible, reintentando...');
+            setTimeout(setupUserInterface, 500);
         }
-        console.log('✅ Interfaz configurada completamente con datos cargados');
-    }, 200);
+    }, 100);
 }
 
 // ===== GITHUB INTEGRATION =====
@@ -479,6 +624,97 @@ function debugData() {
     alert(debugInfo);
 }
 
+// ===== FUNCIONES NUEVAS DE SINCRONIZACIÓN =====
+
+// Función de diagnóstico para el director
+function diagnoseDirectorData() {
+    if (currentUser.role !== 'director') {
+        alert('❌ Esta función es solo para el director');
+        return;
+    }
+    
+    console.log('🔍 DIAGNÓSTICO COMPLETO DE DATOS DEL DIRECTOR');
+    
+    const localStorageData = localStorage.getItem('ciudad_bilingue_sales_data');
+    const localStorageCount = localStorageData ? JSON.parse(localStorageData).length : 0;
+    const adminDataCount = window.AdminData ? AdminData.getAllData().length : 0;
+    const filteredDataCount = getFilteredData().length;
+    
+    let diagnostic = `🔍 DIAGNÓSTICO DEL DIRECTOR\n\n`;
+    diagnostic += `📊 localStorage: ${localStorageCount} registros\n`;
+    diagnostic += `📊 AdminData: ${adminDataCount} registros\n`;
+    diagnostic += `📊 Vista filtrada: ${filteredDataCount} registros\n\n`;
+    
+    if (window.AdminData) {
+        const teamStats = AdminData.getTeamStats();
+        diagnostic += `👥 Vendedores detectados: ${teamStats.salespeople.length}\n`;
+        teamStats.salespeople.forEach(sp => {
+            diagnostic += `   - ${sp.displayName}: ${sp.stats.totalContacts} contactos\n`;
+        });
+        
+        diagnostic += `\n📈 Estadísticas del equipo:\n`;
+        diagnostic += `   - Total contactos: ${teamStats.totalContacts}\n`;
+        diagnostic += `   - Contactos hoy: ${teamStats.todayContacts}\n`;
+        diagnostic += `   - Leads activos: ${teamStats.activeLeads}\n`;
+        diagnostic += `   - Conversiones: ${teamStats.conversions}\n`;
+    }
+    
+    alert(diagnostic);
+    
+    // También forzar una reparación de datos
+    if (window.AdminData && localStorageCount > adminDataCount) {
+        if (confirm('🔧 Se detectaron más datos en localStorage que en AdminData. ¿Quieres sincronizar?')) {
+            AdminData.forceSyncFromStorage();
+            updateAllViews();
+            setTimeout(() => {
+                updateLeadsTable();
+                alert('✅ Datos sincronizados. La vista debería actualizarse ahora.');
+            }, 500);
+        }
+    }
+}
+
+// Función de sincronización forzada
+function forceDataSync() {
+    if (currentUser.role !== 'director') {
+        alert('❌ Solo el director puede usar esta función');
+        return;
+    }
+    
+    if (!window.AdminData) {
+        alert('❌ Sistema no disponible');
+        return;
+    }
+    
+    console.log('🔄 Iniciando sincronización forzada...');
+    
+    // Paso 1: Forzar carga desde localStorage
+    const syncedCount = AdminData.forceSyncFromStorage();
+    
+    // Paso 2: Actualizar todas las vistas
+    updateAllViews();
+    
+    // Paso 3: Actualizar tabla de leads específicamente
+    setTimeout(() => {
+        updateLeadsTable();
+    }, 200);
+    
+    // Paso 4: Actualizar pipeline
+    setTimeout(() => {
+        if (typeof refreshPipeline === 'function') {
+            refreshPipeline();
+        }
+    }, 400);
+    
+    alert(`✅ Sincronización forzada completada!
+
+📊 Registros sincronizados: ${syncedCount}
+🔄 Vistas actualizadas
+📋 Tabla de leads refrescada
+
+Si aún no ves los datos, verifica que los vendedores hayan guardado correctamente los contactos.`);
+}
+
 function updateAllViews() {
     console.log('🔄 Updating all views...');
     if (typeof updateStats === 'function') updateStats();
@@ -544,7 +780,7 @@ function clearLocalData() {
     }
 }
 
-// ===== TEST DATA GENERATOR =====
+// ===== TEST DATA GENERATOR MEJORADO =====
 function generateTestData() {
     console.log('🧪 Generating test data...');
     
@@ -552,6 +788,9 @@ function generateTestData() {
         alert('❌ AdminData not available. Please refresh the page.');
         return;
     }
+    
+    // Verificar integridad antes de agregar datos de prueba
+    verifyDataIntegrity();
     
     const testContacts = [
         // María García's data
@@ -620,34 +859,53 @@ function generateTestData() {
         }
     ];
     
-    // Add test contacts to AdminData
+    console.log('➕ Agregando datos de prueba usando AdminData.addContact()...');
+    
+    // Add test contacts using the SAME method as real contacts
+    let addedCount = 0;
     testContacts.forEach(contact => {
-        AdminData.addContact(contact);
+        try {
+            const savedContact = AdminData.addContact(contact);
+            if (savedContact) {
+                addedCount++;
+                console.log(`✅ Dato de prueba agregado: ${savedContact.name} (ID: ${savedContact.id})`);
+            }
+        } catch (error) {
+            console.error('❌ Error agregando dato de prueba:', contact.name, error);
+        }
     });
     
-    console.log(`✅ ${testContacts.length} test contacts added to AdminData`);
+    console.log(`✅ ${addedCount} datos de prueba agregados usando AdminData.addContact()`);
     
-    // Force update all views
-    updateAllViews();
+    // Force immediate UI updates (same as real contacts)
+    setTimeout(() => {
+        updateAllViews();
+        if (typeof refreshPipeline === 'function') {
+            refreshPipeline();
+        }
+        
+        // Verificar integridad después de agregar
+        setTimeout(() => {
+            const isIntegre = verifyDataIntegrity();
+            console.log('🔍 Integridad post-test data:', isIntegre);
+        }, 500);
+        
+    }, 100);
     
     // Get updated stats
     const teamStats = AdminData.getTeamStats();
     
     alert(`🧪 ¡Test data generated successfully!
 
-✅ Added ${testContacts.length} sample contacts:
+✅ Added ${addedCount} sample contacts usando AdminData.addContact()
    • María García: ${testContacts.filter(c => c.salesperson === 'maria.garcia').length} contacts
    • Juan Pérez: ${testContacts.filter(c => c.salesperson === 'juan.perez').length} contacts
 
 📊 Total in system: ${teamStats.totalContacts} contacts
 
-🎯 Now the DIRECTOR can see:
-   • 👀 Team Monitoring
-   • 👥 All Leads with filters  
-   • 🎯 Complete Team Pipeline
-   • 📊 Executive Dashboard
+🎯 IMPORTANTE: Datos de prueba y datos reales ahora usan EXACTAMENTE el mismo flujo!
 
-✨ Data is automatically shared between all users!`);
+✨ El director puede ver todos los datos inmediatamente!`);
 }
 
 function getYesterdayDate() {
