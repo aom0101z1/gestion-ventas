@@ -2,10 +2,18 @@
 async function addContact(event) {
     event.preventDefault();
     
+    console.log('🚀 INICIANDO PROCESO DE AGREGAR CONTACTO REAL...');
+    console.log('   - Usuario actual:', currentUser.username, '(' + currentUser.role + ')');
+    
     if (!window.AdminData) {
+        console.error('❌ AdminData no disponible');
         alert('❌ Sistema no disponible. Recarga la página.');
         return;
     }
+    
+    // Verificar estado de AdminData antes de agregar
+    const datosAntes = AdminData.getAllData().length;
+    console.log('📊 Datos en AdminData ANTES de agregar:', datosAntes);
     
     let source = document.getElementById('contactSource').value;
     if (source === 'CONVENIO') {
@@ -30,42 +38,79 @@ async function addContact(event) {
         status: 'Nuevo'
     };
     
-    console.log('📝 Adding contact to AdminData:', contact);
+    console.log('📝 Contacto a agregar:', contact);
     
-    // Add to AdminData (this automatically saves and notifies observers)
-    const savedContact = AdminData.addContact(contact);
-    
-    // Save to GitHub if available
-    if (window.GitHubData && window.GitHubData.getToken()) {
-        try {
-            await window.GitHubData.addContact(savedContact);
-            console.log('✅ Contact also saved to GitHub');
-        } catch (error) {
-            console.log('⚠️ GitHub save failed, but contact saved locally:', error.message);
+    try {
+        // PASO CRÍTICO: Usar AdminData.addContact (igual que los datos de prueba)
+        console.log('➕ Agregando contacto a AdminData...');
+        const savedContact = AdminData.addContact(contact);
+        
+        // Verificar que se agregó correctamente
+        const datosDespues = AdminData.getAllData().length;
+        console.log('📊 Datos en AdminData DESPUÉS de agregar:', datosDespues);
+        console.log('✅ Incremento de datos:', datosDespues - datosAntes);
+        
+        if (!savedContact) {
+            throw new Error('AdminData.addContact devolvió null');
         }
-    }
-    
-    // Clear form
-    event.target.reset();
-    document.getElementById('convenioGroup').style.display = 'none';
-    document.getElementById('contactConvenio').required = false;
-    
-    console.log('✅ Contact added successfully. ID:', savedContact.id);
-    
-    // Force immediate UI updates (don't rely only on observers)
-    setTimeout(() => {
-        updateAllViews();
-        if (typeof refreshPipeline === 'function') {
-            refreshPipeline();
+        
+        console.log('✅ Contacto guardado en AdminData con ID:', savedContact.id);
+        
+        // Verificar que el contacto está realmente en AdminData
+        const verification = AdminData.getAllData().find(c => c.id === savedContact.id);
+        if (!verification) {
+            throw new Error('Contacto no encontrado en verificación');
         }
-    }, 100);
-    
-    // Get updated stats
-    const stats = AdminData.getSalespersonStats(currentUser.username);
-    const teamStats = AdminData.getTeamStats();
-    
-    alert(`✅ Contacto registrado exitosamente!
+        console.log('✅ Verificación exitosa: contacto existe en AdminData');
+        
+        // Save to GitHub if available (opcional)
+        if (window.GitHubData && window.GitHubData.getToken()) {
+            try {
+                await window.GitHubData.addContact(savedContact);
+                console.log('✅ Contacto también guardado en GitHub');
+            } catch (error) {
+                console.log('⚠️ GitHub save failed, pero contacto guardado localmente:', error.message);
+            }
+        }
+        
+        // Clear form
+        event.target.reset();
+        document.getElementById('convenioGroup').style.display = 'none';
+        document.getElementById('contactConvenio').required = false;
+        
+        console.log('🔄 INICIANDO ACTUALIZACIÓN DE VISTAS...');
+        
+        // FORZAR ACTUALIZACIÓN INMEDIATA de todas las vistas
+        // Usar el mismo patrón que los datos de prueba
+        setTimeout(() => {
+            console.log('🎯 Actualizando todas las vistas...');
+            updateAllViews();
+            
+            // Forzar actualización específica para directores
+            if (typeof refreshPipeline === 'function') {
+                refreshPipeline();
+            }
+            
+            // Actualización específica de tabla de leads
+            setTimeout(() => {
+                updateLeadsTable();
+                console.log('✅ Vista de leads actualizada');
+            }, 200);
+            
+        }, 100);
+        
+        // Get updated stats
+        const stats = AdminData.getSalespersonStats(currentUser.username);
+        const teamStats = AdminData.getTeamStats();
+        
+        console.log('📊 Stats actualizados:', stats);
+        console.log('🏢 Team stats:', teamStats);
+        
+        // NOTIFICACIÓN DETALLADA
+        alert(`✅ ¡Contacto registrado exitosamente!
 
+👤 Contacto: ${savedContact.name}
+🆔 ID: ${savedContact.id}
 📊 Tus estadísticas:
    • Total contactos: ${stats.totalContacts}
    • Contactos hoy: ${stats.todayContacts}
@@ -73,7 +118,22 @@ async function addContact(event) {
 
 🏢 Sistema total: ${teamStats.totalContacts} contactos
 
-✨ Los datos están disponibles inmediatamente para el director!`);
+✨ Los datos están disponibles INMEDIATAMENTE para el director!
+
+🔍 DEBUG INFO:
+   • AdminData: ${AdminData.getAllData().length} registros
+   • Fecha: ${savedContact.date}
+   • Hora: ${savedContact.time}`);
+        
+    } catch (error) {
+        console.error('❌ ERROR AL AGREGAR CONTACTO:', error);
+        alert(`❌ Error al guardar contacto: ${error.message}
+
+🔍 Para debug:
+1. Abre la consola del navegador (F12)
+2. Mira los logs detallados
+3. Verifica que AdminData esté funcionando`);
+    }
 }
 
 function handleSourceChange() {
@@ -93,6 +153,28 @@ function handleSourceChange() {
 // ===== LEADS TABLE =====
 function updateLeadsTable() {
     console.log('📋 Updating leads table for user:', currentUser?.username, currentUser?.role);
+    
+    // PASO CRÍTICO: Verificar datos antes de continuar
+    if (!window.AdminData) {
+        console.log('❌ AdminData not available');
+        const tbody = document.getElementById('leadsTable');
+        if (tbody) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #dc2626; padding: 2rem;">❌ Sistema no disponible</td></tr>';
+        }
+        return;
+    }
+    
+    // PASO CRÍTICO: Para director, forzar sincronización si no hay datos
+    if (currentUser.role === 'director') {
+        const currentDataCount = AdminData.getAllData().length;
+        console.log('👑 Director - verificando datos actuales:', currentDataCount);
+        
+        if (currentDataCount === 0) {
+            console.log('⚠️ Director no tiene datos, forzando sincronización...');
+            const syncedCount = AdminData.forceSyncFromStorage();
+            console.log('🔄 Sincronizados', syncedCount, 'registros para el director');
+        }
+    }
     
     let data = getFilteredData();
     
@@ -121,7 +203,10 @@ function updateLeadsTable() {
     
     if (data.length === 0) {
         const colSpan = currentUser.role === 'director' ? '7' : '6';
-        tbody.innerHTML = `<tr><td colspan="${colSpan}" style="text-align: center; color: #666; padding: 2rem;">No hay leads registrados</td></tr>`;
+        const message = currentUser.role === 'director' 
+            ? `No hay leads registrados por el equipo. <button onclick="diagnoseDirectorData()" style="background: #667eea; color: white; border: none; padding: 0.5rem 1rem; border-radius: 5px; margin-left: 1rem; cursor: pointer;">🔍 Diagnosticar</button>`
+            : 'No hay leads registrados';
+        tbody.innerHTML = `<tr><td colspan="${colSpan}" style="text-align: center; color: #666; padding: 2rem;">${message}</td></tr>`;
         return;
     }
     
