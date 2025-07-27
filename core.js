@@ -27,8 +27,8 @@ function getFilteredData() {
     console.log('🔍 Getting filtered data for:', currentUser?.role, currentUser?.username);
     
     if (!window.AdminData) {
-        console.log('❌ AdminData not available');
-        return [];
+        console.log('⚠️ AdminData not available, using localStorage fallback');
+        return getFilteredDataFallback();
     }
     
     if (currentUser?.role === 'director') {
@@ -39,6 +39,27 @@ function getFilteredData() {
         const data = AdminData.getDataBySalesperson(currentUser.username);
         console.log('👤 Salesperson - filtered data:', data.length, 'records');
         return data;
+    }
+}
+
+function getFilteredDataFallback() {
+    let allData = [];
+    try {
+        const savedData = localStorage.getItem('allData');
+        if (savedData) {
+            allData = JSON.parse(savedData);
+        }
+    } catch (e) {
+        console.error('Error loading fallback data:', e);
+    }
+    
+    if (currentUser?.role === 'director') {
+        console.log('👑 Director fallback - returning ALL data:', allData.length, 'records');
+        return allData;
+    } else {
+        const filtered = allData.filter(item => item.salesperson === currentUser.username);
+        console.log('👤 Salesperson fallback - filtered data:', filtered.length, 'records');
+        return filtered;
     }
 }
 
