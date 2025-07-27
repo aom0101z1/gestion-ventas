@@ -238,6 +238,13 @@ function updateLeadStatus(leadId, newStageId) {
     if (updatedLead) {
         console.log(`✅ Status updated in AdminData from "${oldStatus}" to "${stage.status}"`);
         
+        // Save to GitHub if available
+        if (window.GitHubData && window.GitHubData.getToken()) {
+            window.GitHubData.updateContact(leadId, { status: stage.status }).catch(error => {
+                console.log('⚠️ GitHub update failed, but local update succeeded:', error.message);
+            });
+        }
+        
         // Refresh pipeline to show updated positions
         setTimeout(() => {
             refreshPipeline();
@@ -391,4 +398,51 @@ function showPipelineDebug() {
         
         alert(message);
     }
+}
+
+// ===== MOBILE SUPPORT =====
+function setupMobileTouch() {
+    // Add touch support for mobile devices
+    document.querySelectorAll('.pipeline-card').forEach(card => {
+        let isDragging = false;
+        let startY = 0;
+        let startX = 0;
+        
+        card.addEventListener('touchstart', (e) => {
+            isDragging = true;
+            startY = e.touches[0].clientY;
+            startX = e.touches[0].clientX;
+            card.classList.add('dragging');
+        });
+        
+        card.addEventListener('touchmove', (e) => {
+            if (!isDragging) return;
+            e.preventDefault();
+            
+            const touch = e.touches[0];
+            const deltaY = touch.clientY - startY;
+            const deltaX = touch.clientX - startX;
+            
+            card.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+        });
+        
+        card.addEventListener('touchend', (e) => {
+            if (!isDragging) return;
+            isDragging = false;
+            
+            card.classList.remove('dragging');
+            card.style.transform = '';
+            
+            // Find column under touch point
+            const touch = e.changedTouches[0];
+            const elementBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+            const column = elementBelow?.closest('.pipeline-column');
+            
+            if (column && column.dataset.stage) {
+                const leadId = card.dataset.leadId;
+                const newStage = column.dataset.stage;
+                updateLeadStatus(leadId, newStage);
+            }
+        });
+    });
 }
