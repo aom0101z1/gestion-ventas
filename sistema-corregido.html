@@ -325,6 +325,12 @@
             background: #f8fafc;
             border-radius: 10px;
             padding: 1rem;
+            min-height: 400px;
+        }
+        
+        .pipeline-column.drag-over {
+            background: #e0f2fe;
+            border: 2px dashed #0284c7;
         }
         
         .pipeline-header {
@@ -344,6 +350,7 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             cursor: grab;
             transition: all 0.2s ease;
+            draggable: true;
         }
         
         .pipeline-card:hover {
@@ -351,7 +358,11 @@
             box-shadow: 0 4px 8px rgba(0,0,0,0.15);
         }
         
-        .pipeline-card.dragging { opacity: 0.5; }
+        .pipeline-card.dragging { 
+            opacity: 0.5;
+            transform: rotate(5deg);
+            cursor: grabbing;
+        }
         
         @media (max-width: 768px) {
             .container { padding: 1rem; }
@@ -603,6 +614,9 @@
             <!-- Tab: Pipeline -->
             <div id="pipeline" class="tab-content hidden">
                 <h2>🎯 Pipeline de Ventas</h2>
+                <div style="background: #e0f2fe; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid #0284c7;">
+                    <p><strong>💡 Instrucciones:</strong> Arrastra las tarjetas entre las columnas para cambiar el estado de los leads. El sistema guardará automáticamente los cambios.</p>
+                </div>
                 <button onclick="refreshPipeline()" class="btn btn-primary" style="margin-bottom: 1rem;">🔄 Actualizar Pipeline</button>
                 <div id="pipelineContainer" class="pipeline-container">
                     <!-- Pipeline se carga aquí -->
@@ -672,12 +686,12 @@
 
         // Pipeline stages
         const pipelineStages = [
-            { id: 'nuevo', name: 'Nuevo', color: '#f59e0b' },
-            { id: 'contactado', name: 'Contactado', color: '#3b82f6' },
-            { id: 'interesado', name: 'Interesado', color: '#8b5cf6' },
-            { id: 'negociacion', name: 'Negociación', color: '#f97316' },
-            { id: 'convertido', name: 'Convertido', color: '#10b981' },
-            { id: 'perdido', name: 'Perdido', color: '#ef4444' }
+            { id: 'nuevo', name: 'Nuevo', color: '#f59e0b', status: 'Nuevo' },
+            { id: 'contactado', name: 'Contactado', color: '#3b82f6', status: 'Contactado' },
+            { id: 'interesado', name: 'Interesado', color: '#8b5cf6', status: 'Interesado' },
+            { id: 'negociacion', name: 'Negociación', color: '#f97316', status: 'Negociación' },
+            { id: 'convertido', name: 'Convertido', color: '#10b981', status: 'Convertido' },
+            { id: 'perdido', name: 'Perdido', color: '#ef4444', status: 'Perdido' }
         ];
 
         // ===== INICIALIZACIÓN =====
@@ -1108,10 +1122,11 @@
             `).join('');
         }
 
-        // ===== PIPELINE =====
+        // ===== PIPELINE DRAG & DROP =====
         function refreshPipeline() {
             createPipelineBoard();
             loadPipelineData();
+            setupDragAndDrop();
         }
 
         function createPipelineBoard() {
@@ -1153,6 +1168,7 @@
             const card = document.createElement('div');
             card.className = 'pipeline-card';
             card.dataset.leadId = lead.id;
+            card.draggable = true;
             
             const daysSinceContact = getDaysSinceContact(lead.date);
             const urgencyColor = daysSinceContact > 3 ? '#ef4444' : daysSinceContact > 1 ? '#f59e0b' : '#10b981';
@@ -1174,6 +1190,161 @@
             `;
             return card;
         }
+
+        function setupDragAndDrop() {
+            console.log('Setting up drag and drop...');
+            
+            // Add drag event listeners to all cards
+            document.querySelectorAll('.pipeline-card').forEach(card => {
+                card.addEventListener('dragstart', handleDragStart);
+                card.addEventListener('dragend', handleDragEnd);
+            });
+
+            // Add drop event listeners to all columns
+            document.querySelectorAll('.pipeline-column').forEach(column => {
+                column.addEventListener('dragover', handleDragOver);
+                column.addEventListener('drop', handleDrop);
+                column.addEventListener('dragenter', handleDragEnter);
+                column.addEventListener('dragleave', handleDragLeave);
+            });
+        }
+
+        let draggedCard = null;
+
+        function handleDragStart(e) {
+            draggedCard = this;
+            this.classList.add('dragging');
+            console.log('Drag started for card:', this.dataset.leadId);
+            
+            // Store the lead ID for transfer
+            e.dataTransfer.setData('text/plain', this.dataset.leadId);
+            e.dataTransfer.effectAllowed = 'move';
+        }
+
+        function handleDragEnd(e) {
+            this.classList.remove('dragging');
+            draggedCard = null;
+            console.log('Drag ended');
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        }
+
+        function handleDragEnter(e) {
+            if (e.target.classList.contains('pipeline-column') || e.target.classList.contains('pipeline-cards')) {
+                const column = e.target.classList.contains('pipeline-column') ? e.target : e.target.closest('.pipeline-column');
+                column.classList.add('drag-over');
+            }
+        }
+
+        function handleDragLeave(e) {
+            // Only remove drag-over if we're leaving the column entirely
+            if (!e.currentTarget.contains(e.relatedTarget)) {
+                e.currentTarget.classList.remove('drag-over');
+            }
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('drag-over');
+            
+            const leadId = e.dataTransfer.getData('text/plain');
+            const column = e.currentTarget;
+            const newStage = column.dataset.stage;
+            
+            console.log('Drop event - Lead ID:', leadId, 'New stage:', newStage);
+            
+            if (leadId && newStage) {
+                updateLeadStatus(leadId, newStage);
+            }
+        }
+
+        function updateLeadStatus(leadId, newStageId) {
+            console.log('Updating lead status:', leadId, 'to stage:', newStageId);
+            
+            // Find the lead in allData
+            const leadIndex = allData.findIndex(lead => lead.id == leadId);
+            if (leadIndex === -1) {
+                console.error('Lead not found:', leadId);
+                return;
+            }
+
+            // Get new status from stage
+            const stage = pipelineStages.find(s => s.id === newStageId);
+            if (!stage) {
+                console.error('Stage not found:', newStageId);
+                return;
+            }
+
+            // Update the lead status
+            const oldStatus = allData[leadIndex].status;
+            allData[leadIndex].status = stage.status;
+            
+            console.log('Status updated from', oldStatus, 'to', stage.status);
+            
+            // Save to localStorage
+            saveLocalData();
+            
+            // Refresh pipeline to show updated positions
+            refreshPipeline();
+            
+            // Update other views
+            updateAllViews();
+            
+            // Show success message
+            const leadName = allData[leadIndex].name;
+            console.log(`✅ ${leadName} movido a ${stage.name}`);
+            
+            // Optional: Show a subtle notification
+            showNotification(`✅ ${leadName} → ${stage.name}`, 'success');
+        }
+
+        function showNotification(message, type = 'info') {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 80px;
+                right: 20px;
+                background: ${type === 'success' ? '#10b981' : '#667eea'};
+                color: white;
+                padding: 0.75rem 1rem;
+                border-radius: 8px;
+                font-size: 0.9rem;
+                font-weight: 500;
+                z-index: 1000;
+                animation: slideIn 0.3s ease;
+            `;
+            
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            // Remove after 3 seconds
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }, 3000);
+        }
+
+        // Add CSS animations for notifications
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOut {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
 
         function getStageIdFromStatus(status) {
             const mapping = {
@@ -1238,7 +1409,7 @@
             event.target.classList.add('active');
             
             if (tabName === 'pipeline') {
-                refreshPipeline();
+                setTimeout(() => refreshPipeline(), 100); // Small delay to ensure DOM is ready
             }
         }
 
@@ -1634,6 +1805,23 @@ Para cambiar estado: Ve al Pipeline y arrastra la tarjeta`);
                     </div>
                 `;
             }
+        }
+
+        // Add toggle auto-sync function
+        function toggleAutoSync() {
+            autoSyncEnabled = !autoSyncEnabled;
+            localStorage.setItem('autoSyncEnabled', autoSyncEnabled.toString());
+            
+            const btn = document.getElementById('autoSyncBtn');
+            if (autoSyncEnabled) {
+                btn.style.background = '#10b981';
+                btn.textContent = '⚡ Auto';
+            } else {
+                btn.style.background = '#6b7280';
+                btn.textContent = '⏸️ Auto';
+            }
+            
+            console.log('Auto-sync toggled:', autoSyncEnabled);
         }
     </script>
 </body>
