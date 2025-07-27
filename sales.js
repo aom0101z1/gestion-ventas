@@ -35,6 +35,16 @@ async function addContact(event) {
     // Add to AdminData (this automatically saves and notifies observers)
     const savedContact = AdminData.addContact(contact);
     
+    // Save to GitHub if available
+    if (window.GitHubData && window.GitHubData.getToken()) {
+        try {
+            await window.GitHubData.addContact(savedContact);
+            console.log('✅ Contact also saved to GitHub');
+        } catch (error) {
+            console.log('⚠️ GitHub save failed, but contact saved locally:', error.message);
+        }
+    }
+    
     // Clear form
     event.target.reset();
     document.getElementById('convenioGroup').style.display = 'none';
