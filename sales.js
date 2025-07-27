@@ -42,6 +42,14 @@ async function addContact(event) {
     
     console.log('✅ Contact added successfully. ID:', savedContact.id);
     
+    // Force immediate UI updates (don't rely only on observers)
+    setTimeout(() => {
+        updateAllViews();
+        if (typeof refreshPipeline === 'function') {
+            refreshPipeline();
+        }
+    }, 100);
+    
     // Get updated stats
     const stats = AdminData.getSalespersonStats(currentUser.username);
     const teamStats = AdminData.getTeamStats();
@@ -74,29 +82,30 @@ function handleSourceChange() {
 
 // ===== LEADS TABLE =====
 function updateLeadsTable() {
+    console.log('📋 Updating leads table for user:', currentUser?.username, currentUser?.role);
+    
     let data = getFilteredData();
     
-    console.log('📋 Actualizando tabla de leads');
-    console.log('   - Datos base:', data.length);
+    console.log('   - Base data:', data.length, 'records');
     
     // Apply director filters if director is logged in
     if (currentUser.role === 'director') {
-        const salespersonFilter = document.getElementById('salespersonFilter').value;
-        const statusFilter = document.getElementById('statusFilter').value;
+        const salespersonFilter = document.getElementById('salespersonFilter');
+        const statusFilter = document.getElementById('statusFilter');
         
-        if (salespersonFilter) {
-            data = data.filter(lead => lead.salesperson === salespersonFilter);
-            console.log('   - Filtrado por vendedor:', data.length);
+        if (salespersonFilter && salespersonFilter.value) {
+            data = data.filter(lead => lead.salesperson === salespersonFilter.value);
+            console.log('   - Filtered by salesperson:', data.length, 'records');
         }
-        if (statusFilter) {
-            data = data.filter(lead => lead.status === statusFilter);
-            console.log('   - Filtrado por estado:', data.length);
+        if (statusFilter && statusFilter.value) {
+            data = data.filter(lead => lead.status === statusFilter.value);
+            console.log('   - Filtered by status:', data.length, 'records');
         }
     }
     
     const tbody = document.getElementById('leadsTable');
     if (!tbody) {
-        console.log('❌ Tabla de leads no encontrada');
+        console.log('❌ Leads table not found');
         return;
     }
     
@@ -105,6 +114,9 @@ function updateLeadsTable() {
         tbody.innerHTML = `<tr><td colspan="${colSpan}" style="text-align: center; color: #666; padding: 2rem;">No hay leads registrados</td></tr>`;
         return;
     }
+    
+    // Sort by date (newest first)
+    data.sort((a, b) => new Date(b.date) - new Date(a.date));
     
     tbody.innerHTML = data.map(lead => {
         const salespersonCell = currentUser.role === 'director' 
@@ -115,9 +127,9 @@ function updateLeadsTable() {
             <tr>
                 <td style="font-weight: 500;">${lead.name}</td>
                 <td>${lead.phone}</td>
-                <td>${lead.source}</td>
-                <td><span class="status-badge status-${lead.status.toLowerCase().replace(' ', '')}">${lead.status}</span></td>
-                <td>${lead.date}</td>
+                <td style="font-size: 0.9rem;">${lead.source}</td>
+                <td><span class="status-badge status-${lead.status.toLowerCase().replace(' ', '').replace('ó', 'o')}">${lead.status}</span></td>
+                <td style="font-size: 0.9rem;">${formatDate(lead.date)}</td>
                 ${salespersonCell}
                 <td>
                     <button onclick="showLeadDetails('${lead.id}')" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">
@@ -128,7 +140,7 @@ function updateLeadsTable() {
         `;
     }).join('');
     
-    console.log('✅ Tabla de leads actualizada con', data.length, 'registros');
+    console.log('✅ Leads table updated with', data.length, 'records');
 }
 
 function showLeadDetails(leadId) {
@@ -190,7 +202,10 @@ function updateTeamActivityOverview() {
     const teamGoalProgress = teamStats.salespeople.length > 0 ? 
         (teamStats.salespeople.filter(sp => sp.stats.todayContacts >= 10).length / teamStats.salespeople.length * 100).toFixed(0) : 0;
     
-    document.getElementById('teamActivityOverview').innerHTML = `
+    const container = document.getElementById('teamActivityOverview');
+    if (!container) return;
+    
+    container.innerHTML = `
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
             <div style="background: white; padding: 1.5rem; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center;">
                 <div style="font-size: 2rem; font-weight: bold; color: #667eea;">${teamStats.todayContacts}</div>
@@ -228,7 +243,10 @@ function updateIndividualSalespeopleActivity() {
     // Sort by today's contacts (most active first)
     const sortedSalespeople = teamStats.salespeople.sort((a, b) => b.stats.todayContacts - a.stats.todayContacts);
     
-    document.getElementById('individualSalespeopleActivity').innerHTML = `
+    const container = document.getElementById('individualSalespeopleActivity');
+    if (!container) return;
+    
+    container.innerHTML = `
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1rem;">
             ${sortedSalespeople.map(person => {
                 const stats = person.stats;
@@ -292,12 +310,15 @@ function updateRecentTeamActivity() {
     // Get recent activities (last 20 activities)
     const allData = AdminData.getAllData();
     const recentData = [...allData]
-        .sort((a, b) => new Date(b.date) - new Date(a.date))
+        .sort((a, b) => new Date(b.date + ' ' + b.time) - new Date(a.date + ' ' + a.time))
         .slice(0, 20);
     
     console.log('🕒 Generating recent team activity from AdminData:', recentData.length, 'activities');
     
-    document.getElementById('recentTeamActivity').innerHTML = `
+    const container = document.getElementById('recentTeamActivity');
+    if (!container) return;
+    
+    container.innerHTML = `
         <div style="background: white; padding: 1.5rem; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
             <table class="table">
                 <thead>
@@ -317,7 +338,7 @@ function updateRecentTeamActivity() {
                             <td><span style="background: #667eea; color: white; padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.8rem;">${getUserDisplayName(activity.salesperson)}</span></td>
                             <td style="font-weight: 500;">${activity.name}</td>
                             <td style="font-size: 0.9rem;">${activity.source}</td>
-                            <td><span class="status-badge status-${activity.status.toLowerCase().replace(' ', '')}">${activity.status}</span></td>
+                            <td><span class="status-badge status-${activity.status.toLowerCase().replace(' ', '').replace('ó', 'o')}">${activity.status}</span></td>
                             <td>
                                 <button onclick="showLeadDetails('${activity.id}')" class="btn btn-primary" style="padding: 0.2rem 0.4rem; font-size: 0.7rem;">
                                     👁️ Ver
@@ -339,7 +360,7 @@ function updateStats() {
         return;
     }
     
-    console.log('📊 Updating stats with AdminData');
+    console.log('📊 Updating stats with AdminData for user:', currentUser?.username, currentUser?.role);
     
     let stats;
     if (currentUser.role === 'director') {
@@ -350,10 +371,16 @@ function updateStats() {
         console.log('👤 Salesperson stats:', stats);
     }
     
-    document.getElementById('totalLeads').textContent = stats.totalContacts || 0;
-    document.getElementById('activeLeads').textContent = stats.activeLeads || 0;
-    document.getElementById('conversions').textContent = stats.conversions || 0;
+    // Update stat cards
+    const totalLeadsEl = document.getElementById('totalLeads');
+    const activeLeadsEl = document.getElementById('activeLeads');
+    const conversionsEl = document.getElementById('conversions');
     
+    if (totalLeadsEl) totalLeadsEl.textContent = stats.totalContacts || 0;
+    if (activeLeadsEl) activeLeadsEl.textContent = stats.activeLeads || 0;
+    if (conversionsEl) conversionsEl.textContent = stats.conversions || 0;
+    
+    // Update progress circle
     const todayContacts = stats.todayContacts || 0;
     const progress = Math.min(todayContacts / 10, 1);
     const circumference = 2 * Math.PI * 54;
@@ -375,6 +402,8 @@ function updateStats() {
             progressCircle.style.stroke = '#ef4444';
         }
     }
+    
+    console.log('✅ Stats updated successfully');
 }
 
 function updateTodayContacts() {
@@ -404,6 +433,13 @@ function updateTodayContacts() {
         container.innerHTML = `<p style="color: #666; text-align: center; padding: 2rem;">${message}</p>`;
         return;
     }
+    
+    // Sort by time (newest first)
+    todayContacts.sort((a, b) => {
+        const timeA = a.time || '00:00:00';
+        const timeB = b.time || '00:00:00';
+        return timeB.localeCompare(timeA);
+    });
     
     container.innerHTML = todayContacts.map(contact => {
         const salespersonInfo = currentUser.role === 'director' 
@@ -490,66 +526,50 @@ function updatePersonalReports() {
 }
 
 function updateDirectorReports() {
-    const today = new Date().toISOString().split('T')[0];
-    const salespeople = [...new Set(allData.map(d => d.salesperson))].filter(s => s);
+    if (!window.AdminData) return;
     
-    const teamPerf = salespeople.map(salesperson => {
-        const userData = allData.filter(d => d.salesperson === salesperson);
-        const todayContacts = userData.filter(c => c.date === today).length;
-        const totalLeads = userData.length;
-        const conversions = userData.filter(l => l.status === 'Convertido').length;
-        const conversionRate = totalLeads > 0 ? (conversions / totalLeads * 100).toFixed(1) : 0;
-        
-        return {
-            name: getUserDisplayName(salesperson),
-            todayContacts,
-            totalLeads,
-            conversions,
-            conversionRate: parseFloat(conversionRate)
-        };
-    });
+    const teamStats = AdminData.getTeamStats();
+    const today = new Date().toISOString().split('T')[0];
     
     const teamPerformanceEl = document.getElementById('teamPerformance');
     if (teamPerformanceEl) {
         teamPerformanceEl.innerHTML = `
             <div style="background: #f9fafb; padding: 1rem; border-radius: 8px;">
-                ${teamPerf.map(perf => `
-                    <div style="margin-bottom: 1rem; padding: 1rem; background: white; border-radius: 5px;">
-                        <div style="font-weight: 600; margin-bottom: 0.5rem;">${perf.name}</div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; font-size: 0.9rem;">
-                            <div>Hoy: ${perf.todayContacts}/10</div>
-                            <div>Total: ${perf.totalLeads}</div>
-                            <div>Tasa: ${perf.conversionRate}%</div>
+                ${teamStats.salespeople.map(person => {
+                    const perf = person.stats;
+                    return `
+                        <div style="margin-bottom: 1rem; padding: 1rem; background: white; border-radius: 5px;">
+                            <div style="font-weight: 600; margin-bottom: 0.5rem;">${person.displayName}</div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; font-size: 0.9rem;">
+                                <div>Hoy: ${perf.todayContacts}/10</div>
+                                <div>Total: ${perf.totalContacts}</div>
+                                <div>Tasa: ${perf.conversionRate}%</div>
+                            </div>
                         </div>
-                    </div>
-                `).join('')}
+                    `;
+                }).join('')}
             </div>
         `;
     }
     
-    const sortedTeam = [...teamPerf].sort((a, b) => b.conversions - a.conversions);
+    const sortedTeam = [...teamStats.salespeople].sort((a, b) => b.stats.conversions - a.stats.conversions);
     
     const salesRankingEl = document.getElementById('salesRanking');
     if (salesRankingEl) {
         salesRankingEl.innerHTML = `
             <div style="background: #f9fafb; padding: 1rem; border-radius: 8px;">
-                ${sortedTeam.map((perf, index) => `
+                ${sortedTeam.map((person, index) => `
                     <div style="margin-bottom: 0.5rem; padding: 0.75rem; background: white; border-radius: 5px; display: flex; justify-content: space-between; align-items: center;">
                         <div>
                             <span style="font-weight: bold; color: ${index === 0 ? '#f59e0b' : '#666'};">${index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '#' + (index + 1)}</span>
-                            ${perf.name}
+                            ${person.displayName}
                         </div>
-                        <div style="font-weight: bold; color: #10b981;">${perf.conversions} ventas</div>
+                        <div style="font-weight: bold; color: #10b981;">${person.stats.conversions} ventas</div>
                     </div>
                 `).join('')}
             </div>
         `;
     }
-    
-    const totalTeamLeads = allData.length;
-    const totalTeamConversions = allData.filter(l => l.status === 'Convertido').length;
-    const teamConversionRate = totalTeamLeads > 0 ? (totalTeamConversions / totalTeamLeads * 100).toFixed(1) : 0;
-    const todayTotalContacts = allData.filter(c => c.date === today).length;
     
     const executiveSummaryEl = document.getElementById('executiveSummary');
     if (executiveSummaryEl) {
@@ -557,19 +577,19 @@ function updateDirectorReports() {
             <div style="background: #f9fafb; padding: 1.5rem; border-radius: 8px;">
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
                     <div style="background: white; padding: 1rem; border-radius: 5px; text-align: center;">
-                        <div style="font-size: 1.5rem; font-weight: bold; color: #667eea;">${todayTotalContacts}</div>
+                        <div style="font-size: 1.5rem; font-weight: bold; color: #667eea;">${teamStats.todayContacts}</div>
                         <div style="font-size: 0.9rem; color: #666;">Contactos Hoy</div>
                     </div>
                     <div style="background: white; padding: 1rem; border-radius: 5px; text-align: center;">
-                        <div style="font-size: 1.5rem; font-weight: bold; color: #10b981;">${totalTeamLeads}</div>
+                        <div style="font-size: 1.5rem; font-weight: bold; color: #10b981;">${teamStats.totalContacts}</div>
                         <div style="font-size: 0.9rem; color: #666;">Total Leads</div>
                     </div>
                     <div style="background: white; padding: 1rem; border-radius: 5px; text-align: center;">
-                        <div style="font-size: 1.5rem; font-weight: bold; color: #f59e0b;">${totalTeamConversions}</div>
+                        <div style="font-size: 1.5rem; font-weight: bold; color: #f59e0b;">${teamStats.conversions}</div>
                         <div style="font-size: 0.9rem; color: #666;">Conversiones</div>
                     </div>
                     <div style="background: white; padding: 1rem; border-radius: 5px; text-align: center;">
-                        <div style="font-size: 1.5rem; font-weight: bold; color: #8b5cf6;">${teamConversionRate}%</div>
+                        <div style="font-size: 1.5rem; font-weight: bold; color: #8b5cf6;">${teamStats.conversionRate}%</div>
                         <div style="font-size: 0.9rem; color: #666;">Tasa Conversión</div>
                     </div>
                 </div>
