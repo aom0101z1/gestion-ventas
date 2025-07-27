@@ -10,13 +10,7 @@ let convenios = JSON.parse(localStorage.getItem('convenios')) || [
 ];
 
 let currentUser = null;
-let sheetConfig = {
-    id: localStorage.getItem('sheetId') || '',
-    name: localStorage.getItem('sheetName') || 'Hoja1'
-};
-let isConnected = false;
 let autoSyncEnabled = localStorage.getItem('autoSyncEnabled') !== 'false';
-let autoSyncInterval = null;
 
 // ===== CENTRALIZED DATA ACCESS =====
 function getAllData() {
@@ -95,14 +89,6 @@ document.addEventListener('DOMContentLoaded', function() {
         currentUser = JSON.parse(savedUser);
         showMainApp();
     }
-    
-    // Auto-refresh cada 5 minutos
-    setInterval(() => {
-        if (isConnected && document.visibilityState === 'visible') {
-            console.log('Auto-refresh: syncing with Google Sheets...');
-            refreshData();
-        }
-    }, 300000);
 });
 
 // Setup AdminData observers for automatic UI updates
@@ -118,7 +104,6 @@ function setupAdminDataObservers() {
 
 // ===== DATA MANAGEMENT =====
 function loadLocalData() {
-    // AdminData handles all data loading now
     if (window.AdminData) {
         const data = AdminData.getAllData();
         console.log('✅ AdminData available with', data.length, 'records');
@@ -174,7 +159,6 @@ function showMainApp() {
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('mainApp').classList.remove('hidden');
     setupUserInterface();
-    if (sheetConfig.id) connectToSheet();
 }
 
 function setupUserInterface() {
@@ -212,16 +196,15 @@ function setupUserInterface() {
             leadsHeader.insertBefore(salespersonTh, leadsHeader.children[5]);
         }
         
-        if (sheetConfig.id) {
-            document.getElementById('sheetId').value = sheetConfig.id;
-            document.getElementById('sheetName').value = sheetConfig.name;
-        }
         updateUsersList();
         updateConveniosList();
         populateSalespersonFilter();
         
         // Add test data button for director
         setTimeout(addTestDataButton, 500);
+        
+        // Initialize GitHub integration if available
+        setTimeout(initializeGitHubIntegration, 1000);
     } else {
         console.log('👤 Configurando interfaz de VENDEDOR');
         
@@ -261,112 +244,19 @@ function setupUserInterface() {
     }, 200);
 }
 
-// ===== GOOGLE SHEETS =====
-function configureSheet() {
-    if (currentUser.role !== 'director') {
-        alert('❌ Solo el director puede configurar el sistema');
-        return;
-    }
-    
-    const sheetId = document.getElementById('sheetId').value.trim();
-    const sheetName = document.getElementById('sheetName').value.trim();
-    
-    if (!sheetId) {
-        alert('⚠️ Por favor ingresa el ID del Google Sheet');
-        return;
-    }
-
-    sheetConfig.id = sheetId;
-    sheetConfig.name = sheetName;
-    localStorage.setItem('sheetId', sheetId);
-    localStorage.setItem('sheetName', sheetName);
-    
-    document.getElementById('configResult').innerHTML = '<div class="success-message">✅ Configuración guardada. Conectando...</div>';
-    setTimeout(() => connectToSheet(), 1000);
-}
-
-async function connectToSheet() {
-    try {
-        if (!sheetConfig.id) {
-            document.getElementById('connectionStatus').textContent = '🔴 Sin Configurar';
-            document.getElementById('connectionStatus').className = 'connection-status disconnected';
-            return;
+// ===== GITHUB INTEGRATION =====
+async function initializeGitHubIntegration() {
+    if (currentUser.role === 'director' && window.GitHubData && window.GitHubData.getToken()) {
+        try {
+            console.log('🔄 Initializing GitHub integration...');
+            await window.GitHubData.syncWithLocal();
+            console.log('✅ GitHub integration ready');
+            if (typeof updateGitHubStatus === 'function') {
+                updateGitHubStatus();
+            }
+        } catch (error) {
+            console.log('⚠️ GitHub sync failed, continuing with local data:', error.message);
         }
-
-        // Use the published CSV URL instead of the API endpoint to avoid CORS issues
-        const url = `https://docs.google.com/spreadsheets/d/${sheetConfig.id}/export?format=csv&gid=0`;
-        const response = await fetch(url);
-        
-        if (!response.ok) {
-            throw new Error('No se pudo acceder al Google Sheet');
-        }
-        
-        const csvText = await response.text();
-        
-        if (csvText && csvText.length > 0) {
-            isConnected = true;
-            document.getElementById('connectionStatus').textContent = '🟢 Conectado';
-            document.getElementById('connectionStatus').className = 'connection-status connected';
-            parseCSVData(csvText);
-        } else {
-            throw new Error('El Google Sheet está vacío');
-        }
-    } catch (error) {
-        console.error('Error conectando con Google Sheets:', error);
-        isConnected = false;
-        document.getElementById('connectionStatus').textContent = '🔴 Error de Conexión';
-        document.getElementById('connectionStatus').className = 'connection-status disconnected';
-        
-        if (currentUser && currentUser.role === 'director') {
-            alert('⚠️ Error conectando con Google Sheets. Asegúrate de que:\n\n1. El Google Sheet sea público\n2. El ID sea correcto\n3. El sheet tenga datos');
-        }
-    }
-}
-
-function parseCSVData(csvText) {
-    console.log('📊 Parsing CSV data from Google Sheets');
-    
-    if (!window.AdminData) {
-        console.log('❌ AdminData not available for sheet parsing');
-        return;
-    }
-    
-    const lines = csvText.split('\n');
-    const sheetData = [];
-    
-    // Skip header row and process data
-    for (let i = 1; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line) continue;
-        
-        const columns = line.split(',').map(col => col.replace(/"/g, '').trim());
-        
-        if (columns.length >= 11 && columns[1]) { // Make sure we have enough columns and a name
-            const contact = {
-                id: columns[0] || Date.now() + i,
-                name: columns[1],
-                phone: columns[2] || '',
-                email: columns[3] || '',
-                source: columns[4] || '',
-                location: columns[5] || '',
-                notes: columns[6] || '',
-                salesperson: columns[7] || '',
-                date: columns[8] || new Date().toISOString().split('T')[0],
-                time: columns[9] || new Date().toLocaleTimeString(),
-                status: columns[10] || 'Nuevo'
-            };
-            
-            sheetData.push(contact);
-        }
-    }
-    
-    console.log('✅ CSV data parsed:', sheetData.length, 'valid contacts');
-    
-    if (sheetData.length > 0) {
-        // Import data to AdminData (this will merge with existing data)
-        AdminData.importData(sheetData);
-        console.log('📥 Sheet data imported to AdminData');
-        updateAllViews();
     }
 }
 
@@ -533,26 +423,16 @@ function showTab(tabName) {
 }
 
 function refreshData() {
-    if (isConnected) {
-        const originalText = document.getElementById('connectionStatus').textContent;
-        document.getElementById('connectionStatus').textContent = '🔄 Sincronizando...';
-        document.getElementById('connectionStatus').className = 'connection-status';
-        document.getElementById('connectionStatus').style.background = '#fbbf24';
-        document.getElementById('connectionStatus').style.color = '#92400e';
-        
-        connectToSheet();
-        
-        setTimeout(() => {
-            if (isConnected) {
-                document.getElementById('connectionStatus').textContent = '🟢 Conectado';
-                document.getElementById('connectionStatus').className = 'connection-status connected';
-            }
-        }, 2000);
-    } else {
-        // Even without sheet connection, refresh local data views
-        updateAllViews();
-        if (typeof refreshPipeline === 'function') refreshPipeline();
-        console.log('🔄 Data refreshed locally');
+    // Refresh local data views
+    updateAllViews();
+    if (typeof refreshPipeline === 'function') refreshPipeline();
+    console.log('🔄 Data refreshed locally');
+    
+    // Sync with GitHub if available
+    if (window.GitHubData && window.GitHubData.getToken() && currentUser.role === 'director') {
+        window.GitHubData.syncWithLocal().catch(error => {
+            console.log('GitHub sync failed during refresh:', error.message);
+        });
     }
 }
 
