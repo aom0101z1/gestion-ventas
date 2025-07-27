@@ -216,6 +216,8 @@
         .status-contactado { background: #dbeafe; color: #1e40af; }
         .status-interesado { background: #d1fae5; color: #065f46; }
         .status-convertido { background: #dcfce7; color: #166534; }
+        .status-negociacion { background: #fed7aa; color: #c2410c; }
+        .status-perdido { background: #fee2e2; color: #dc2626; }
         
         .connection-status {
             position: fixed;
@@ -363,6 +365,39 @@
             transform: rotate(5deg);
             cursor: grabbing;
         }
+
+        /* GitHub Integration Styles */
+        .github-integration {
+            margin-top: 2rem; 
+            padding: 2rem; 
+            background: #f0f9ff; 
+            border-radius: 10px; 
+            border-left: 4px solid #0284c7;
+        }
+
+        .github-integration h3 {
+            color: #0369a1;
+            margin-bottom: 1rem;
+        }
+
+        .github-integration h4 {
+            color: #0369a1;
+            margin-bottom: 0.5rem;
+        }
+
+        .github-integration .btn {
+            margin-right: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        #githubStatusDisplay {
+            background: white; 
+            padding: 1rem; 
+            border-radius: 5px; 
+            font-family: monospace; 
+            font-size: 0.9rem;
+            white-space: pre-line;
+        }
         
         @media (max-width: 768px) {
             .container { padding: 1rem; }
@@ -373,6 +408,19 @@
             }
             .pipeline-container { flex-direction: column; }
             .pipeline-column { min-width: auto; }
+            
+            .github-integration .btn {
+                width: 100%;
+                margin-right: 0;
+            }
+            
+            .github-integration > div[style*="grid"] {
+                display: block !important;
+            }
+            
+            .github-integration > div[style*="flex"] {
+                flex-wrap: wrap;
+            }
         }
 
         @keyframes slideIn {
@@ -419,7 +467,7 @@
             <p>Gestión en Tiempo Real <span class="real-time-indicator"></span></p>
         </div>
 
-        <div class="connection-status" id="connectionStatus">🔴 Sin Conexión</div>
+        <div class="connection-status" id="connectionStatus">🟢 Sistema Local</div>
 
         <div class="container">
             <!-- User Info Bar -->
@@ -436,23 +484,51 @@
             <!-- Director Configuration -->
             <div id="directorConfig" class="config-section director-only hidden">
                 <h3>🔧 Configuración del Director</h3>
-                <p style="margin-bottom: 1rem; color: #667eea;">Esta sección solo es visible para el director</p>
+                <p style="margin-bottom: 1.5rem; color: #667eea;">Esta sección solo es visible para el director</p>
                 
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2rem;">
-                    <div>
-                        <h4>📊 Configuración Google Sheets</h4>
+                <!-- GitHub Integration Section -->
+                <div class="github-integration">
+                    <h3>🗄️ GitHub Database Integration</h3>
+                    <p style="margin-bottom: 1.5rem; color: #0369a1;">
+                        Your own database - faster and more reliable than Google Sheets!
+                    </p>
+                    
+                    <div style="margin-bottom: 2rem;">
+                        <h4>🔑 Step 1: Connect GitHub</h4>
                         <div class="form-group">
-                            <label for="sheetId">ID de Google Sheet:</label>
-                            <input type="text" id="sheetId" placeholder="ID del Google Sheet">
+                            <label for="githubToken">GitHub Personal Access Token:</label>
+                            <input type="password" id="githubToken" placeholder="Paste your token here" style="font-family: monospace;">
                         </div>
-                        <div class="form-group">
-                            <label for="sheetName">Nombre de la Hoja:</label>
-                            <input type="text" id="sheetName" value="Hoja1">
+                        
+                        <div style="display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                            <button onclick="setupGitHubToken()" class="btn btn-primary">🔗 Connect GitHub</button>
+                            <button onclick="testGitHubConnection()" class="btn btn-secondary">🧪 Test Connection</button>
+                            <button onclick="quickGitHubSetup()" class="btn btn-success">⚡ Quick Setup</button>
                         </div>
-                        <button onclick="configureSheet()" class="btn btn-primary">🔗 Conectar Sheet</button>
-                        <div id="configResult" style="margin-top: 1rem;"></div>
+                        
+                        <div id="githubConnectionStatus"></div>
                     </div>
                     
+                    <div style="margin-bottom: 2rem;">
+                        <h4>📊 Step 2: Data Management</h4>
+                        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                            <button onclick="pullGitHubData()" class="btn btn-success">📥 Pull from GitHub</button>
+                            <button onclick="pushGitHubData()" class="btn btn-warning">📤 Push to GitHub</button>
+                            <button onclick="syncGitHubData()" class="btn btn-primary">🔄 Sync Now</button>
+                            <button onclick="createGitHubBackup()" class="btn btn-secondary">💾 Create Backup</button>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h4>📈 Status</h4>
+                        <div id="githubStatusDisplay">
+                            Ready to connect to GitHub
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Traditional Configuration -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem;">
                     <div>
                         <h4>👥 Gestión de Usuarios</h4>
                         <div class="form-group">
@@ -718,6 +794,7 @@
 
     <!-- Load JavaScript modules -->
     <script src="AdminData.js"></script>
+    <script src="github-integration.js"></script>
     <script src="core.js"></script>
     <script src="sales.js"></script>
     <script src="pipeline.js"></script>
