@@ -14,15 +14,44 @@ let sheetConfig = {
     id: localStorage.getItem('sheetId') || '',
     name: localStorage.getItem('sheetName') || 'Hoja1'
 };
-let allData = [];
 let isConnected = false;
 let autoSyncEnabled = localStorage.getItem('autoSyncEnabled') !== 'false';
 let autoSyncInterval = null;
 
+// Use AdminData instead of local allData
+function getAllData() {
+    return window.AdminData ? AdminData.getAllData() : [];
+}
+
+function getFilteredData() {
+    console.log('🔍 Getting filtered data for:', currentUser?.role, currentUser?.username);
+    
+    if (!window.AdminData) {
+        console.log('❌ AdminData not available');
+        return [];
+    }
+    
+    if (currentUser?.role === 'director') {
+        const data = AdminData.getAllData();
+        console.log('👑 Director - returning ALL data:', data.length, 'records');
+        return data;
+    } else {
+        const data = AdminData.getDataBySalesperson(currentUser.username);
+        console.log('👤 Salesperson - filtered data:', data.length, 'records');
+        return data;
+    }
+}
+
 // ===== INICIALIZACIÓN =====
 document.addEventListener('DOMContentLoaded', function() {
-    // Cargar datos guardados localmente
-    loadLocalData();
+    console.log('🚀 Initializing Ciudad Bilingue Sales System');
+    
+    // Wait for AdminData to be available
+    if (window.AdminData) {
+        console.log('✅ AdminData loaded successfully');
+    } else {
+        console.log('⏳ Waiting for AdminData...');
+    }
     
     const savedUser = localStorage.getItem('currentUser');
     if (savedUser) {
@@ -41,35 +70,26 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // ===== DATA MANAGEMENT =====
 function loadLocalData() {
-    const savedData = localStorage.getItem('allData');
-    if (savedData) {
-        try {
-            allData = JSON.parse(savedData);
-            console.log('✅ Datos locales cargados:', allData.length, 'contactos');
-            
-            // DEBUG: Mostrar qué vendedores tienen datos
-            const salespeople = [...new Set(allData.map(d => d.salesperson))].filter(s => s);
-            console.log('📊 Vendedores con datos:', salespeople);
-            salespeople.forEach(sp => {
-                const count = allData.filter(d => d.salesperson === sp).length;
-                console.log(`   - ${sp}: ${count} contactos`);
-            });
-        } catch (e) {
-            console.error('Error loading local data:', e);
-            allData = [];
-        }
+    // AdminData handles all data loading now
+    if (window.AdminData) {
+        const data = AdminData.getAllData();
+        console.log('✅ AdminData available with', data.length, 'records');
+        
+        // DEBUG: Show breakdown by salesperson
+        const salespeople = [...new Set(data.map(d => d.salesperson))].filter(s => s);
+        console.log('📊 Salespeople in AdminData:', salespeople.length);
+        salespeople.forEach(sp => {
+            const count = data.filter(d => d.salesperson === sp).length;
+            console.log(`   - ${sp}: ${count} contacts`);
+        });
     } else {
-        console.log('📝 No hay datos locales guardados');
+        console.log('⚠️ AdminData not yet available');
     }
 }
 
 function saveLocalData() {
-    try {
-        localStorage.setItem('allData', JSON.stringify(allData));
-        console.log('💾 Datos guardados localmente:', allData.length, 'contactos');
-    } catch (e) {
-        console.error('Error saving local data:', e);
-    }
+    // AdminData handles all data saving automatically
+    console.log('💾 Data saving handled by AdminData');
 }
 
 function getFilteredData() {
@@ -257,11 +277,12 @@ async function connectToSheet() {
 }
 
 function parseSheetData(rows) {
-    console.log('📊 Procesando datos del sheet, filas recibidas:', rows.length);
+    console.log('📊 Parsing Google Sheets data, rows received:', rows.length);
     
-    // BACKUP de datos locales antes de procesar
-    const localDataBackup = [...allData];
-    console.log('💾 Backup datos locales:', localDataBackup.length);
+    if (!window.AdminData) {
+        console.log('❌ AdminData not available for sheet parsing');
+        return;
+    }
     
     const sheetData = [];
     rows.forEach((row, index) => {
@@ -286,39 +307,13 @@ function parseSheetData(rows) {
         }
     });
     
-    console.log('✅ Datos del sheet procesados:', sheetData.length, 'contactos válidos');
+    console.log('✅ Sheet data parsed:', sheetData.length, 'valid contacts');
     
-    // Si el sheet está vacío, mantener TODOS los datos locales
-    if (sheetData.length === 0) {
-        console.log('📄 Sheet vacío - manteniendo todos los datos locales');
-        allData = localDataBackup;
-    } else {
-        // Si hay datos en el sheet, combinar inteligentemente
-        console.log('🔄 Combinando datos del sheet con datos locales');
-        
-        // Empezar con datos del sheet
-        allData = [...sheetData];
-        
-        // Agregar datos locales que no estén en el sheet
-        localDataBackup.forEach(localContact => {
-            const existsInSheet = sheetData.find(sheetContact => 
-                sheetContact.id === localContact.id || 
-                (sheetContact.name === localContact.name && 
-                 sheetContact.phone === localContact.phone &&
-                 sheetContact.salesperson === localContact.salesperson)
-            );
-            
-            if (!existsInSheet) {
-                console.log('➕ Agregando contacto local no presente en sheet:', localContact.name);
-                allData.push(localContact);
-            }
-        });
+    if (sheetData.length > 0) {
+        // Import data to AdminData (this will merge with existing data)
+        AdminData.importData(sheetData);
+        console.log('📥 Sheet data imported to AdminData');
     }
-    
-    console.log('🎯 Datos finales después de merge:', allData.length);
-    
-    // Guardar datos combinados localmente
-    saveLocalData();
     
     updateAllViews();
     if (typeof refreshPipeline === 'function') refreshPipeline();
@@ -507,14 +502,20 @@ function refreshData() {
 }
 
 function debugData() {
+    if (!window.AdminData) {
+        alert('❌ AdminData not available');
+        return;
+    }
+    
     const today = new Date().toISOString().split('T')[0];
+    const allData = AdminData.getAllData();
     const filtered = getFilteredData();
     const todayContacts = filtered.filter(c => c.date === today);
     
-    let debugInfo = `🔍 DEBUG INFO:\n\n`;
+    let debugInfo = `🔍 ADMIN DATA DEBUG INFO:\n\n`;
     debugInfo += `Usuario actual: ${currentUser.username} (${currentUser.role})\n`;
     debugInfo += `Fecha de hoy: ${today}\n`;
-    debugInfo += `Total contactos en sistema: ${allData.length}\n`;
+    debugInfo += `Total contactos en AdminData: ${allData.length}\n`;
     
     if (currentUser.role === 'director') {
         debugInfo += `Vista del director - viendo TODOS los contactos\n`;
@@ -530,6 +531,15 @@ function debugData() {
         debugInfo += `Detalles de mis contactos de hoy:\n`;
         debugInfo += todayContacts.map(c => `- ${c.name} (${c.time})`).join('\n') || 'Ninguno';
     }
+    
+    // Add AdminData stats
+    const teamStats = AdminData.getTeamStats();
+    debugInfo += `\n\n📊 ESTADÍSTICAS ADMINDATA:\n`;
+    debugInfo += `Total contactos: ${teamStats.totalContacts}\n`;
+    debugInfo += `Contactos hoy: ${teamStats.todayContacts}\n`;
+    debugInfo += `Leads activos: ${teamStats.activeLeads}\n`;
+    debugInfo += `Conversiones: ${teamStats.conversions}\n`;
+    debugInfo += `Tasa conversión: ${teamStats.conversionRate}%\n`;
     
     alert(debugInfo);
 }
@@ -553,8 +563,9 @@ function updateAllViews() {
 
 function populateSalespersonFilter() {
     const filter = document.getElementById('salespersonFilter');
-    if (!filter) return;
+    if (!filter || !window.AdminData) return;
     
+    const allData = AdminData.getAllData();
     const salespeople = [...new Set(allData.map(d => d.salesperson))].filter(s => s);
     filter.innerHTML = '<option value="">Todos los vendedores</option>';
     
@@ -564,6 +575,8 @@ function populateSalespersonFilter() {
         option.textContent = getUserDisplayName(salesperson);
         filter.appendChild(option);
     });
+    
+    console.log('📋 Populated salesperson filter with', salespeople.length, 'salespeople');
 }
 
 function toggleAutoSync() {
@@ -583,22 +596,28 @@ function toggleAutoSync() {
 }
 
 function clearLocalData() {
-    if (confirm('⚠️ ¿Estás seguro de eliminar TODOS los contactos locales?\n\nEsta acción no se puede deshacer.\n\nAsegúrate de haber exportado los datos primero.')) {
-        allData = [];
-        saveLocalData();
-        updateAllViews();
-        alert('🗑️ Todos los datos locales han sido eliminados');
+    if (confirm('⚠️ ¿Estás seguro de eliminar TODOS los contactos?\n\nEsta acción eliminará todos los datos del sistema.\n\nAsegúrate de haber exportado los datos primero.')) {
+        if (window.AdminData) {
+            AdminData.clearAllData();
+            alert('🗑️ Todos los datos han sido eliminados del sistema');
+        } else {
+            alert('❌ AdminData no disponible');
+        }
     }
 }
 
 // ===== TEST DATA GENERATOR =====
 function generateTestData() {
-    console.log('🧪 Generando datos de prueba...');
+    console.log('🧪 Generating test data...');
+    
+    if (!window.AdminData) {
+        alert('❌ AdminData not available. Please refresh the page.');
+        return;
+    }
     
     const testContacts = [
         // María García's data
         {
-            id: Date.now() + 1,
             name: "Carlos Rodríguez",
             phone: "3001234567",
             email: "carlos.rodriguez@email.com",
@@ -606,12 +625,9 @@ function generateTestData() {
             location: "Pereira",
             notes: "Interesado en curso de inglés intensivo",
             salesperson: "maria.garcia",
-            date: new Date().toISOString().split('T')[0],
-            time: "09:30:00",
             status: "Contactado"
         },
         {
-            id: Date.now() + 2,
             name: "Ana Martínez",
             phone: "3109876543",
             email: "ana.martinez@gmail.com",
@@ -619,12 +635,9 @@ function generateTestData() {
             location: "Dosquebradas", 
             notes: "Quiere clases para su hijo de 12 años",
             salesperson: "maria.garcia",
-            date: new Date().toISOString().split('T')[0],
-            time: "10:15:00",
             status: "Interesado"
         },
         {
-            id: Date.now() + 3,
             name: "Luis Gómez",
             phone: "3156789012",
             email: "luis.gomez@hotmail.com",
@@ -633,12 +646,10 @@ function generateTestData() {
             notes: "Necesita certificación para trabajo",
             salesperson: "maria.garcia",
             date: getYesterdayDate(),
-            time: "14:20:00",
             status: "Convertido"
         },
         // Juan Pérez's data
         {
-            id: Date.now() + 4,
             name: "Patricia López",
             phone: "3187654321",
             email: "patricia.lopez@empresa.com",
@@ -646,12 +657,9 @@ function generateTestData() {
             location: "Pereira",
             notes: "Curso corporativo para 5 empleados",
             salesperson: "juan.perez",
-            date: new Date().toISOString().split('T')[0],
-            time: "11:45:00",
             status: "Negociación"
         },
         {
-            id: Date.now() + 5,
             name: "Roberto Silva",
             phone: "3203456789",
             email: "roberto.silva@yahoo.com",
@@ -659,12 +667,9 @@ function generateTestData() {
             location: "Santa Rosa",
             notes: "Recomendado por Ana Martínez",
             salesperson: "juan.perez",
-            date: new Date().toISOString().split('T')[0],
-            time: "16:30:00",
             status: "Nuevo"
         },
         {
-            id: Date.now() + 6,
             name: "Carmen Fernández",
             phone: "3134567890",
             email: "carmen.fernandez@gmail.com",
@@ -673,11 +678,9 @@ function generateTestData() {
             notes: "Interesada en clases nocturnas",
             salesperson: "juan.perez",
             date: getYesterdayDate(),
-            time: "13:15:00",
             status: "Contactado"
         },
         {
-            id: Date.now() + 7,
             name: "Miguel Torres",
             phone: "3145678901",
             email: "miguel.torres@empresa.com",
@@ -686,11 +689,9 @@ function generateTestData() {
             notes: "Curso avanzado de negocios",
             salesperson: "maria.garcia",
             date: getTwoDaysAgoDate(),
-            time: "08:45:00",
             status: "Convertido"
         },
         {
-            id: Date.now() + 8,
             name: "Sandra Ruiz",
             phone: "3176543210",
             email: "sandra.ruiz@hotmail.com",
@@ -699,38 +700,35 @@ function generateTestData() {
             notes: "Vive en Cartago, puede venir sábados",
             salesperson: "juan.perez",
             date: getTwoDaysAgoDate(),
-            time: "15:20:00",
             status: "Perdido"
         }
     ];
     
-    // Add test data to allData
-    allData.push(...testContacts);
+    // Add test contacts to AdminData
+    testContacts.forEach(contact => {
+        AdminData.addContact(contact);
+    });
     
-    // Save to localStorage
-    saveLocalData();
+    console.log(`✅ ${testContacts.length} test contacts added to AdminData`);
     
-    console.log(`✅ ${testContacts.length} contactos de prueba agregados`);
+    // Get updated stats
+    const teamStats = AdminData.getTeamStats();
     
-    // Update all views
-    updateAllViews();
-    if (typeof refreshPipeline === 'function') {
-        refreshPipeline();
-    }
-    
-    alert(`🧪 ¡Datos de prueba generados!
+    alert(`🧪 ¡Test data generated successfully!
 
-✅ Se agregaron ${testContacts.length} contactos de ejemplo:
-   • María García: ${testContacts.filter(c => c.salesperson === 'maria.garcia').length} contactos
-   • Juan Pérez: ${testContacts.filter(c => c.salesperson === 'juan.perez').length} contactos
+✅ Added ${testContacts.length} sample contacts:
+   • María García: ${testContacts.filter(c => c.salesperson === 'maria.garcia').length} contacts
+   • Juan Pérez: ${testContacts.filter(c => c.salesperson === 'juan.perez').length} contacts
 
-🎯 Ahora el DIRECTOR puede ver:
-   • 👀 Monitoreo del Equipo
-   • 👥 Todos los Leads con filtros
-   • 🎯 Pipeline del Equipo completo
-   • 📊 Dashboard Ejecutivo
+📊 Total in system: ${teamStats.totalContacts} contacts
 
-📝 Para limpiar: usa "🗑️ Limpiar"`);
+🎯 Now the DIRECTOR can see:
+   • 👀 Team Monitoring
+   • 👥 All Leads with filters  
+   • 🎯 Complete Team Pipeline
+   • 📊 Executive Dashboard
+
+✨ Data is automatically shared between all users!`);
 }
 
 function getYesterdayDate() {
