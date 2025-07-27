@@ -43,11 +43,16 @@ function createPipelineBoard() {
 }
 
 function loadPipelineData() {
+    if (!window.AdminData) {
+        console.log('❌ AdminData not available for pipeline');
+        return;
+    }
+    
     const data = getFilteredData();
     
-    console.log('📊 Cargando datos en pipeline');
-    console.log(`   - Total leads para mostrar: ${data.length}`);
-    console.log(`   - Usuario: ${currentUser.role} (${currentUser.username})`);
+    console.log('📊 Loading pipeline data from AdminData');
+    console.log(`   - Total leads for pipeline: ${data.length}`);
+    console.log(`   - User: ${currentUser.role} (${currentUser.username})`);
     
     // Clear all containers first
     pipelineStages.forEach(stage => {
@@ -67,7 +72,7 @@ function loadPipelineData() {
 
     updatePipelineCounters();
     
-    console.log('✅ Datos cargados en pipeline');
+    console.log('✅ Pipeline data loaded from AdminData');
     
     // Debug: Show leads per stage
     pipelineStages.forEach(stage => {
@@ -184,17 +189,24 @@ function handleDrop(e) {
 }
 
 function updateLeadStatus(leadId, newStageId) {
-    console.log('🔄 Actualizando estado del lead:', leadId, 'a etapa:', newStageId);
+    console.log('🔄 Updating lead status in AdminData:', leadId, 'to stage:', newStageId);
     
-    // Find the lead in allData
-    const leadIndex = allData.findIndex(lead => lead.id == leadId);
-    if (leadIndex === -1) {
-        console.error('❌ Lead no encontrado:', leadId);
+    if (!window.AdminData) {
+        console.error('❌ AdminData not available');
+        alert('❌ Sistema no disponible');
+        return;
+    }
+    
+    // Find the lead in AdminData
+    const allData = AdminData.getAllData();
+    const lead = allData.find(lead => lead.id == leadId);
+    if (!lead) {
+        console.error('❌ Lead not found:', leadId);
         return;
     }
 
     // Check permissions - salespeople can only update their own leads
-    if (currentUser.role !== 'director' && allData[leadIndex].salesperson !== currentUser.username) {
+    if (currentUser.role !== 'director' && lead.salesperson !== currentUser.username) {
         alert('❌ Solo puedes modificar tus propios leads');
         refreshPipeline(); // Refresh to restore original position
         return;
@@ -203,31 +215,31 @@ function updateLeadStatus(leadId, newStageId) {
     // Get new status from stage
     const stage = pipelineStages.find(s => s.id === newStageId);
     if (!stage) {
-        console.error('❌ Etapa no encontrada:', newStageId);
+        console.error('❌ Stage not found:', newStageId);
         return;
     }
 
-    // Update the lead status
-    const oldStatus = allData[leadIndex].status;
-    allData[leadIndex].status = stage.status;
+    // Update the lead status using AdminData
+    const oldStatus = lead.status;
+    const updatedLead = AdminData.updateContact(leadId, { status: stage.status });
     
-    console.log(`✅ Estado actualizado de "${oldStatus}" a "${stage.status}"`);
-    
-    // Save to localStorage
-    saveLocalData();
-    
-    // Refresh pipeline to show updated positions
-    refreshPipeline();
-    
-    // Update other views
-    updateAllViews();
-    
-    // Show success message
-    const leadName = allData[leadIndex].name;
-    console.log(`✅ ${leadName} movido a ${stage.name}`);
-    
-    // Show notification
-    showNotification(`✅ ${leadName} → ${stage.name}`, 'success');
+    if (updatedLead) {
+        console.log(`✅ Status updated in AdminData from "${oldStatus}" to "${stage.status}"`);
+        
+        // Refresh pipeline to show updated positions
+        refreshPipeline();
+        
+        // Update other views (AdminData observers will handle this automatically)
+        
+        // Show success message
+        console.log(`✅ ${updatedLead.name} moved to ${stage.name}`);
+        
+        // Show notification
+        showNotification(`✅ ${updatedLead.name} → ${stage.name}`, 'success');
+    } else {
+        console.error('❌ Failed to update lead status');
+        refreshPipeline(); // Refresh to restore original position
+    }
 }
 
 // ===== UTILITY FUNCTIONS =====
@@ -293,9 +305,16 @@ function showNotification(message, type = 'info') {
 
 // ===== DEBUGGING =====
 function debugPipeline() {
-    console.log('🔍 PIPELINE DEBUG INFO:');
+    console.log('🔍 PIPELINE DEBUG INFO WITH ADMINDATA:');
     console.log(`   - Usuario: ${currentUser.role} (${currentUser.username})`);
-    console.log(`   - Total leads en sistema: ${allData.length}`);
+    
+    if (!window.AdminData) {
+        console.log('❌ AdminData not available');
+        return;
+    }
+    
+    const allData = AdminData.getAllData();
+    console.log(`   - Total leads en AdminData: ${allData.length}`);
     
     const filtered = getFilteredData();
     console.log(`   - Leads filtrados para usuario: ${filtered.length}`);
@@ -311,11 +330,16 @@ function debugPipeline() {
     
     // Show salespeople data if director
     if (currentUser.role === 'director') {
-        const salespeople = [...new Set(allData.map(d => d.salesperson))].filter(s => s);
-        console.log(`   - Vendedores en sistema: ${salespeople.length}`);
-        salespeople.forEach(sp => {
-            const count = allData.filter(d => d.salesperson === sp).length;
-            console.log(`     * ${getUserDisplayName(sp)}: ${count} leads totales`);
+        const teamStats = AdminData.getTeamStats();
+        console.log(`   - Vendedores en AdminData: ${teamStats.salespeople.length}`);
+        teamStats.salespeople.forEach(sp => {
+            console.log(`     * ${sp.displayName}: ${sp.stats.totalContacts} leads totales`);
         });
     }
+    
+    // Show AdminData stats
+    const stats = currentUser.role === 'director' 
+        ? AdminData.getTeamStats() 
+        : AdminData.getSalespersonStats(currentUser.username);
+    console.log('📊 AdminData Stats:', stats);
 }
