@@ -902,7 +902,7 @@
             container.innerHTML = todayContacts.map(contact => `
                 <div style="background: #f9fafb; padding: 1rem; border-radius: 5px; margin-bottom: 0.5rem;">
                     <div style="font-weight: 600;">${contact.name}</div>
-                    <div style="color: #666; font-size: 0.9rem;">${contact.phone} ¡E ${contact.source}</div>
+                    <div style="color: #666; font-size: 0.9rem;">${contact.phone} Â¡E ${contact.source}</div>
                     <div style="color: #666; font-size: 0.9rem;">${contact.time}</div>
                 </div>
             `).join('');
