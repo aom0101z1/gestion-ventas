@@ -570,9 +570,10 @@
                     <div>
                         <h3>📋 Mis Contactos de Hoy</h3>
                         <div style="margin-bottom: 1rem;">
-                            <button onclick="refreshData()" class="btn btn-primary" style="margin-bottom: 0.5rem; width: 32%; margin-right: 2%;">🔄 Actualizar</button>
-                            <button onclick="debugData()" class="btn btn-secondary" style="margin-bottom: 0.5rem; width: 32%; margin-right: 2%;">🔍 Debug</button>
-                            <button onclick="exportTodayContacts()" class="btn btn-warning" style="margin-bottom: 0.5rem; width: 32%;">📋 Exportar</button>
+                            <button onclick="refreshData()" class="btn btn-primary" style="margin-bottom: 0.5rem; width: 24%; margin-right: 1%;">🔄 Actualizar</button>
+                            <button onclick="debugData()" class="btn btn-secondary" style="margin-bottom: 0.5rem; width: 24%; margin-right: 1%;">🔍 Debug</button>
+                            <button onclick="exportTodayContacts()" class="btn btn-warning" style="margin-bottom: 0.5rem; width: 24%; margin-right: 1%;">📋 Exportar</button>
+                            <button onclick="clearLocalData()" class="btn" style="margin-bottom: 0.5rem; width: 24%; background: #ef4444; color: white;">🗑️ Limpiar</button>
                         </div>
                         <div id="todayContacts"></div>
                     </div>
@@ -678,6 +679,9 @@
 
         // ===== INICIALIZACIÓN =====
         document.addEventListener('DOMContentLoaded', function() {
+            // Cargar datos guardados localmente
+            loadLocalData();
+            
             const savedUser = localStorage.getItem('currentUser');
             if (savedUser) {
                 currentUser = JSON.parse(savedUser);
@@ -690,6 +694,30 @@
                 }
             }, 30000);
         });
+
+        // Cargar datos del localStorage
+        function loadLocalData() {
+            const savedData = localStorage.getItem('allData');
+            if (savedData) {
+                try {
+                    allData = JSON.parse(savedData);
+                    console.log('Loaded local data:', allData);
+                } catch (e) {
+                    console.error('Error loading local data:', e);
+                    allData = [];
+                }
+            }
+        }
+
+        // Guardar datos en localStorage
+        function saveLocalData() {
+            try {
+                localStorage.setItem('allData', JSON.stringify(allData));
+                console.log('Data saved locally:', allData);
+            } catch (e) {
+                console.error('Error saving local data:', e);
+            }
+        }
 
         // ===== AUTENTICACIÓN =====
         function login(event) {
@@ -742,8 +770,11 @@
             
             loadConveniosInSelect();
             
-            // ACTUALIZAR VISTAS INMEDIATAMENTE DESPUÉS DEL LOGIN
+            // CARGAR DATOS LOCALES Y ACTUALIZAR VISTAS INMEDIATAMENTE
+            loadLocalData();
             updateAllViews();
+            
+            console.log('User interface setup completed. Current data:', allData);
         }
 
         // ===== GOOGLE SHEETS =====
@@ -806,7 +837,9 @@
         }
 
         function parseSheetData(rows) {
-            allData = [];
+            console.log('Parsing sheet data, rows:', rows);
+            
+            const sheetData = [];
             rows.forEach((row, index) => {
                 if (index === 0 || !row.c || !row.c[1]) return;
                 
@@ -823,8 +856,27 @@
                     time: row.c[9] ? row.c[9].v : '',
                     status: row.c[10] ? row.c[10].v : 'Nuevo'
                 };
-                allData.push(contact);
+                sheetData.push(contact);
             });
+            
+            console.log('Sheet data parsed:', sheetData);
+            console.log('Current local data before merge:', allData);
+            
+            // COMBINAR datos del sheet con datos locales
+            // Solo agregar datos del sheet que no estén ya en local
+            sheetData.forEach(sheetContact => {
+                const existsInLocal = allData.find(localContact => 
+                    localContact.id === sheetContact.id || 
+                    (localContact.name === sheetContact.name && localContact.phone === sheetContact.phone)
+                );
+                
+                if (!existsInLocal && sheetContact.name) {
+                    allData.push(sheetContact);
+                }
+            });
+            
+            console.log('Final merged data:', allData);
+            
             updateAllViews();
             refreshPipeline();
         }
@@ -832,11 +884,6 @@
         // ===== CONTACTOS =====
         async function addContact(event) {
             event.preventDefault();
-            
-            if (!isConnected) {
-                alert('⚠️ No hay conexión con Google Sheets. Contacta al director.');
-                return;
-            }
             
             let source = document.getElementById('contactSource').value;
             if (source === 'CONVENIO') {
@@ -862,8 +909,13 @@
                 status: 'Nuevo'
             };
             
+            console.log('Adding contact:', contact);
+            
             // AGREGAR A LA LISTA GLOBAL
             allData.push(contact);
+            
+            // GUARDAR LOCALMENTE INMEDIATAMENTE
+            saveLocalData();
             
             // LIMPIAR FORMULARIO
             event.target.reset();
@@ -874,13 +926,15 @@
             updateAllViews();
             refreshPipeline();
             
-            // FORZAR ACTUALIZACIÓN DE CONTACTOS DE HOY
-            updateTodayContacts();
+            console.log('Contact added. Total contacts:', allData.length);
             
-            console.log('Contact added:', contact);
-            console.log('All data now:', allData);
-            
-            alert(`✅ Contacto registrado y visible en el sistema!\n\n📝 PARA GUARDAR PERMANENTE: Ve a Google Sheets y agrega:\n${contact.id} | ${contact.name} | ${contact.phone} | ${contact.email} | ${contact.source} | ${contact.location} | ${contact.notes} | ${contact.salesperson} | ${contact.date} | ${contact.time} | ${contact.status}`);
+            alert(`✅ Contacto registrado y guardado localmente!
+
+📊 Total contactos en sistema: ${allData.length}
+👤 Agregado por: ${currentUser.name}
+📅 Fecha: ${contact.date}
+
+📝 NOTA: Para backup permanente, usa el botón "📋 Exportar" y pega en Google Sheets`);
         }
 
         function handleSourceChange() {
@@ -1349,6 +1403,15 @@ Total contactos: ${todayContacts.length}
 Para copy/paste manual:
 ${copyText}`);
             });
+        }
+
+        function clearLocalData() {
+            if (confirm('⚠️ ¿Estás seguro de eliminar TODOS los contactos locales?\n\nEsta acción no se puede deshacer.\n\nAsegúrate de haber exportado los datos primero.')) {
+                allData = [];
+                saveLocalData();
+                updateAllViews();
+                alert('🗑️ Todos los datos locales han sido eliminados');
+            }
         }
 
         function showLeadDetails(leadId) {
