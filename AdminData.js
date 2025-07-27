@@ -305,50 +305,6 @@ class AdminDataManager {
         console.log('📦 Bulk deleted', deleted, 'contacts');
         return deleted;
     }
-
-    // ===== IMPROVED SYNCHRONIZATION METHODS =====
-    
-    // Forzar sincronización de datos al cargar
-    forceSyncFromStorage() {
-        console.log('🔄 Forzando sincronización desde localStorage...');
-        try {
-            const savedData = localStorage.getItem(this.storageKey);
-            if (savedData) {
-                const parsedData = JSON.parse(savedData);
-                this.data = parsedData;
-                console.log('✅ Datos forzadamente sincronizados:', this.data.length, 'registros');
-                this.notifyObservers();
-                return this.data.length;
-            } else {
-                console.log('⚠️ No hay datos en localStorage para sincronizar');
-                return 0;
-            }
-        } catch (e) {
-            console.error('❌ Error en sincronización forzada:', e);
-            return 0;
-        }
-    }
-
-    // Verificar y reparar datos si es necesario
-    verifyAndRepairData() {
-        console.log('🔧 Verificando integridad de datos...');
-        
-        const localStorageData = localStorage.getItem(this.storageKey);
-        const adminDataCount = this.data.length;
-        const localStorageCount = localStorageData ? JSON.parse(localStorageData).length : 0;
-        
-        console.log(`   - AdminData: ${adminDataCount} registros`);
-        console.log(`   - localStorage: ${localStorageCount} registros`);
-        
-        if (adminDataCount !== localStorageCount) {
-            console.log('⚠️ Discrepancia detectada, reparando...');
-            this.forceSyncFromStorage();
-            return true;
-        }
-        
-        console.log('✅ Datos íntegros');
-        return false;
-    }
 }
 
 // ===== GLOBAL INSTANCE =====
