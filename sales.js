@@ -2,6 +2,11 @@
 async function addContact(event) {
     event.preventDefault();
     
+    if (!window.AdminData) {
+        alert('❌ Sistema no disponible. Recarga la página.');
+        return;
+    }
+    
     let source = document.getElementById('contactSource').value;
     if (source === 'CONVENIO') {
         const convenio = document.getElementById('contactConvenio').value;
@@ -13,7 +18,6 @@ async function addContact(event) {
     }
     
     const contact = {
-        id: Date.now(),
         name: document.getElementById('contactName').value,
         phone: document.getElementById('contactPhone').value,
         email: document.getElementById('contactEmail').value,
@@ -26,32 +30,32 @@ async function addContact(event) {
         status: 'Nuevo'
     };
     
-    console.log('📝 Agregando contacto:', contact);
+    console.log('📝 Adding contact to AdminData:', contact);
     
-    // AGREGAR A LA LISTA GLOBAL
-    allData.push(contact);
+    // Add to AdminData (this automatically saves and notifies observers)
+    const savedContact = AdminData.addContact(contact);
     
-    // GUARDAR LOCALMENTE INMEDIATAMENTE
-    saveLocalData();
-    
-    // LIMPIAR FORMULARIO
+    // Clear form
     event.target.reset();
     document.getElementById('convenioGroup').style.display = 'none';
     document.getElementById('contactConvenio').required = false;
     
-    // ACTUALIZAR TODAS LAS VISTAS INMEDIATAMENTE
-    updateAllViews();
-    if (typeof refreshPipeline === 'function') refreshPipeline();
+    console.log('✅ Contact added successfully. ID:', savedContact.id);
     
-    console.log('✅ Contacto agregado. Total contactos:', allData.length);
+    // Get updated stats
+    const stats = AdminData.getSalespersonStats(currentUser.username);
+    const teamStats = AdminData.getTeamStats();
     
-    alert(`✅ Contacto registrado y guardado localmente!
+    alert(`✅ Contacto registrado exitosamente!
 
-📊 Total contactos en sistema: ${allData.length}
-👤 Agregado por: ${currentUser.name}
-📅 Fecha: ${contact.date}
+📊 Tus estadísticas:
+   • Total contactos: ${stats.totalContacts}
+   • Contactos hoy: ${stats.todayContacts}
+   • Conversiones: ${stats.conversions}
 
-📝 NOTA: Para backup permanente, usa el botón "📋 Exportar" y pega en Google Sheets`);
+🏢 Sistema total: ${teamStats.totalContacts} contactos
+
+✨ Los datos están disponibles inmediatamente para el director!`);
 }
 
 function handleSourceChange() {
@@ -128,6 +132,12 @@ function updateLeadsTable() {
 }
 
 function showLeadDetails(leadId) {
+    if (!window.AdminData) {
+        alert('❌ Sistema no disponible');
+        return;
+    }
+    
+    const allData = AdminData.getAllData();
     const lead = allData.find(l => l.id == leadId);
     if (!lead) {
         alert('❌ Lead no encontrado');
@@ -160,57 +170,42 @@ function refreshMonitoring() {
         return;
     }
     
-    console.log('👀 Actualizando monitoreo del equipo');
+    if (!window.AdminData) {
+        alert('❌ Sistema no disponible');
+        return;
+    }
+    
+    console.log('👀 Actualizando monitoreo del equipo con AdminData');
     updateTeamActivityOverview();
     updateIndividualSalespeopleActivity();
     updateRecentTeamActivity();
 }
 
 function updateTeamActivityOverview() {
-    const today = new Date().toISOString().split('T')[0];
-    const salespeople = [...new Set(allData.map(d => d.salesperson))].filter(s => s);
+    if (!window.AdminData) return;
     
-    console.log('📊 Generando resumen de actividad del equipo');
-    console.log('   - Vendedores encontrados:', salespeople);
+    const teamStats = AdminData.getTeamStats();
+    console.log('📊 Team stats from AdminData:', teamStats);
     
-    let totalTodayContacts = 0;
-    let totalActiveLeads = 0;
-    let totalConversions = 0;
-    let salespeopleMetGoal = 0;
-    
-    salespeople.forEach(salesperson => {
-        const userData = allData.filter(d => d.salesperson === salesperson);
-        const todayContacts = userData.filter(c => c.date === today).length;
-        const activeLeads = userData.filter(l => l.status !== 'Convertido' && l.status !== 'Perdido').length;
-        const conversions = userData.filter(l => l.status === 'Convertido').length;
-        
-        totalTodayContacts += todayContacts;
-        totalActiveLeads += activeLeads;
-        totalConversions += conversions;
-        
-        if (todayContacts >= 10) salespeopleMetGoal++;
-        
-        console.log(`   - ${getUserDisplayName(salesperson)}: ${todayContacts} contactos hoy, ${activeLeads} activos, ${conversions} conversiones`);
-    });
-    
-    const teamGoalProgress = salespeople.length > 0 ? (salespeopleMetGoal / salespeople.length * 100).toFixed(0) : 0;
+    const teamGoalProgress = teamStats.salespeople.length > 0 ? 
+        (teamStats.salespeople.filter(sp => sp.stats.todayContacts >= 10).length / teamStats.salespeople.length * 100).toFixed(0) : 0;
     
     document.getElementById('teamActivityOverview').innerHTML = `
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
             <div style="background: white; padding: 1.5rem; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center;">
-                <div style="font-size: 2rem; font-weight: bold; color: #667eea;">${totalTodayContacts}</div>
+                <div style="font-size: 2rem; font-weight: bold; color: #667eea;">${teamStats.todayContacts}</div>
                 <div style="font-size: 0.9rem; color: #666;">Contactos Hoy (Equipo)</div>
-                <div style="font-size: 0.8rem; color: #888; margin-top: 0.5rem;">Meta: ${salespeople.length * 10}</div>
+                <div style="font-size: 0.8rem; color: #888; margin-top: 0.5rem;">Meta: ${teamStats.salespeople.length * 10}</div>
             </div>
             
             <div style="background: white; padding: 1.5rem; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center;">
-                <div style="font-size: 2rem; font-weight: bold; color: #10b981;">${totalActiveLeads}</div>
+                <div style="font-size: 2rem; font-weight: bold; color: #10b981;">${teamStats.activeLeads}</div>
                 <div style="font-size: 0.9rem; color: #666;">Leads Activos</div>
                 <div style="font-size: 0.8rem; color: #888; margin-top: 0.5rem;">En proceso</div>
             </div>
             
             <div style="background: white; padding: 1.5rem; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center;">
-                <div style="font-size: 2rem; font-weight: bold; color: #f59e0b;">${totalConversions}</div>
+                <div style="font-size: 2rem; font-weight: bold; color: #f59e0b;">${teamStats.conversions}</div>
                 <div style="font-size: 0.9rem; color: #666;">Conversiones Totales</div>
                 <div style="font-size: 0.8rem; color: #888; margin-top: 0.5rem;">Este periodo</div>
             </div>
@@ -218,66 +213,53 @@ function updateTeamActivityOverview() {
             <div style="background: white; padding: 1.5rem; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center;">
                 <div style="font-size: 2rem; font-weight: bold; color: #8b5cf6;">${teamGoalProgress}%</div>
                 <div style="font-size: 0.9rem; color: #666;">Equipo en Meta</div>
-                <div style="font-size: 0.8rem; color: #888; margin-top: 0.5rem;">${salespeopleMetGoal}/${salespeople.length} vendedores</div>
+                <div style="font-size: 0.8rem; color: #888; margin-top: 0.5rem;">${teamStats.salespeople.filter(sp => sp.stats.todayContacts >= 10).length}/${teamStats.salespeople.length} vendedores</div>
             </div>
         </div>
     `;
 }
 
 function updateIndividualSalespeopleActivity() {
-    const today = new Date().toISOString().split('T')[0];
-    const salespeople = [...new Set(allData.map(d => d.salesperson))].filter(s => s);
+    if (!window.AdminData) return;
     
-    console.log('👥 Generando actividad individual por vendedor');
-    
-    const salespeopleData = salespeople.map(salesperson => {
-        const userData = allData.filter(d => d.salesperson === salesperson);
-        const todayContacts = userData.filter(c => c.date === today).length;
-        const totalLeads = userData.length;
-        const activeLeads = userData.filter(l => l.status !== 'Convertido' && l.status !== 'Perdido').length;
-        const conversions = userData.filter(l => l.status === 'Convertido').length;
-        const conversionRate = totalLeads > 0 ? (conversions / totalLeads * 100).toFixed(1) : 0;
-        const lastActivity = userData.length > 0 ? Math.max(...userData.map(d => new Date(d.date).getTime())) : 0;
-        const daysSinceLastActivity = lastActivity > 0 ? Math.floor((Date.now() - lastActivity) / (1000 * 60 * 60 * 24)) : 999;
-        
-        return {
-            username: salesperson,
-            name: getUserDisplayName(salesperson),
-            todayContacts,
-            totalLeads,
-            activeLeads,
-            conversions,
-            conversionRate: parseFloat(conversionRate),
-            daysSinceLastActivity,
-            goalProgress: (todayContacts / 10 * 100).toFixed(0)
-        };
-    });
+    const teamStats = AdminData.getTeamStats();
+    console.log('👥 Generating individual salesperson activity from AdminData');
     
     // Sort by today's contacts (most active first)
-    salespeopleData.sort((a, b) => b.todayContacts - a.todayContacts);
+    const sortedSalespeople = teamStats.salespeople.sort((a, b) => b.stats.todayContacts - a.stats.todayContacts);
     
     document.getElementById('individualSalespeopleActivity').innerHTML = `
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1rem;">
-            ${salespeopleData.map(person => {
-                const statusColor = person.todayContacts >= 10 ? '#10b981' : person.todayContacts >= 5 ? '#f59e0b' : '#ef4444';
-                const activityStatus = person.daysSinceLastActivity === 0 ? '🟢 Activo hoy' : 
-                                     person.daysSinceLastActivity === 1 ? '🟡 Ayer' : 
-                                     person.daysSinceLastActivity < 7 ? `🟠 Hace ${person.daysSinceLastActivity} días` : '🔴 Inactivo';
+            ${sortedSalespeople.map(person => {
+                const stats = person.stats;
+                const statusColor = stats.todayContacts >= 10 ? '#10b981' : stats.todayContacts >= 5 ? '#f59e0b' : '#ef4444';
+                
+                // Calculate days since last activity
+                const allData = AdminData.getAllData();
+                const userData = allData.filter(d => d.salesperson === person.name);
+                const lastActivity = userData.length > 0 ? Math.max(...userData.map(d => new Date(d.date).getTime())) : 0;
+                const daysSinceLastActivity = lastActivity > 0 ? Math.floor((Date.now() - lastActivity) / (1000 * 60 * 60 * 24)) : 999;
+                
+                const activityStatus = daysSinceLastActivity === 0 ? '🟢 Activo hoy' : 
+                                     daysSinceLastActivity === 1 ? '🟡 Ayer' : 
+                                     daysSinceLastActivity < 7 ? `🟠 Hace ${daysSinceLastActivity} días` : '🔴 Inactivo';
+                
+                const goalProgress = (stats.todayContacts / 10 * 100).toFixed(0);
                 
                 return `
                     <div style="background: white; padding: 1.5rem; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border-left: 4px solid ${statusColor};">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                            <h4 style="margin: 0; color: #333;">${person.name}</h4>
+                            <h4 style="margin: 0; color: #333;">${person.displayName}</h4>
                             <span style="font-size: 0.8rem; color: #666;">${activityStatus}</span>
                         </div>
                         
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                             <div>
-                                <div style="font-size: 1.5rem; font-weight: bold; color: ${statusColor};">${person.todayContacts}/10</div>
+                                <div style="font-size: 1.5rem; font-weight: bold; color: ${statusColor};">${stats.todayContacts}/10</div>
                                 <div style="font-size: 0.8rem; color: #666;">Contactos Hoy</div>
                             </div>
                             <div>
-                                <div style="font-size: 1.5rem; font-weight: bold; color: #667eea;">${person.activeLeads}</div>
+                                <div style="font-size: 1.5rem; font-weight: bold; color: #667eea;">${stats.activeLeads}</div>
                                 <div style="font-size: 0.8rem; color: #666;">Leads Activos</div>
                             </div>
                         </div>
@@ -285,17 +267,17 @@ function updateIndividualSalespeopleActivity() {
                         <div style="margin-bottom: 1rem;">
                             <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #666;">
                                 <span>Progreso Meta Diaria</span>
-                                <span>${person.goalProgress}%</span>
+                                <span>${goalProgress}%</span>
                             </div>
                             <div style="background: #e5e7eb; height: 6px; border-radius: 3px; margin-top: 0.25rem;">
-                                <div style="background: ${statusColor}; height: 6px; border-radius: 3px; width: ${Math.min(person.goalProgress, 100)}%;"></div>
+                                <div style="background: ${statusColor}; height: 6px; border-radius: 3px; width: ${Math.min(goalProgress, 100)}%;"></div>
                             </div>
                         </div>
                         
                         <div style="display: flex; justify-content: between; gap: 1rem; font-size: 0.85rem; color: #666;">
-                            <span>📊 Total: ${person.totalLeads}</span>
-                            <span>✅ Convertidos: ${person.conversions}</span>
-                            <span>📈 Tasa: ${person.conversionRate}%</span>
+                            <span>📊 Total: ${stats.totalContacts}</span>
+                            <span>✅ Convertidos: ${stats.conversions}</span>
+                            <span>📈 Tasa: ${stats.conversionRate}%</span>
                         </div>
                     </div>
                 `;
@@ -305,12 +287,15 @@ function updateIndividualSalespeopleActivity() {
 }
 
 function updateRecentTeamActivity() {
+    if (!window.AdminData) return;
+    
     // Get recent activities (last 20 activities)
+    const allData = AdminData.getAllData();
     const recentData = [...allData]
         .sort((a, b) => new Date(b.date) - new Date(a.date))
         .slice(0, 20);
     
-    console.log('🕒 Generando actividad reciente del equipo:', recentData.length, 'actividades');
+    console.log('🕒 Generating recent team activity from AdminData:', recentData.length, 'activities');
     
     document.getElementById('recentTeamActivity').innerHTML = `
         <div style="background: white; padding: 1.5rem; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
@@ -349,34 +334,27 @@ function updateRecentTeamActivity() {
 
 // ===== STATS & REPORTS =====
 function updateStats() {
-    const today = new Date().toISOString().split('T')[0];
-    const data = getFilteredData();
-    
-    let todayContacts, totalLeads, activeLeads, conversions;
-    
-    if (currentUser.role === 'director') {
-        console.log('📊 Calculando estadísticas del DIRECTOR');
-        todayContacts = allData.filter(c => c.date === today).length;
-        totalLeads = allData.length;
-        activeLeads = allData.filter(l => l.status !== 'Convertido' && l.status !== 'Perdido').length;
-        conversions = allData.filter(l => l.status === 'Convertido').length;
-    } else {
-        console.log('📊 Calculando estadísticas del VENDEDOR');
-        todayContacts = data.filter(c => c.date === today).length;
-        totalLeads = data.length;
-        activeLeads = data.filter(l => l.status !== 'Convertido' && l.status !== 'Perdido').length;
-        conversions = data.filter(l => l.status === 'Convertido').length;
+    if (!window.AdminData) {
+        console.log('❌ AdminData not available for stats');
+        return;
     }
     
-    console.log(`   - Contactos hoy: ${todayContacts}`);
-    console.log(`   - Total leads: ${totalLeads}`);
-    console.log(`   - Leads activos: ${activeLeads}`);
-    console.log(`   - Conversiones: ${conversions}`);
+    console.log('📊 Updating stats with AdminData');
     
-    document.getElementById('totalLeads').textContent = totalLeads;
-    document.getElementById('activeLeads').textContent = activeLeads;
-    document.getElementById('conversions').textContent = conversions;
+    let stats;
+    if (currentUser.role === 'director') {
+        stats = AdminData.getTeamStats();
+        console.log('👑 Director stats:', stats);
+    } else {
+        stats = AdminData.getSalespersonStats(currentUser.username);
+        console.log('👤 Salesperson stats:', stats);
+    }
     
+    document.getElementById('totalLeads').textContent = stats.totalContacts || 0;
+    document.getElementById('activeLeads').textContent = stats.activeLeads || 0;
+    document.getElementById('conversions').textContent = stats.conversions || 0;
+    
+    const todayContacts = stats.todayContacts || 0;
     const progress = Math.min(todayContacts / 10, 1);
     const circumference = 2 * Math.PI * 54;
     const offset = circumference - (progress * circumference);
@@ -400,19 +378,22 @@ function updateStats() {
 }
 
 function updateTodayContacts() {
-    const today = new Date().toISOString().split('T')[0];
-    const data = getFilteredData();
-    const todayContacts = data.filter(c => c.date === today);
+    if (!window.AdminData) {
+        console.log('❌ AdminData not available for today contacts');
+        return;
+    }
     
-    console.log('📅 Actualizando contactos de hoy');
-    console.log(`   - Usuario: ${currentUser.username} (${currentUser.role})`);
-    console.log(`   - Fecha: ${today}`);
-    console.log(`   - Datos filtrados: ${data.length}`);
-    console.log(`   - Contactos de hoy: ${todayContacts.length}`);
+    const todayContacts = AdminData.getTodayContacts(
+        currentUser.role === 'director' ? null : currentUser.username
+    );
+    
+    console.log('📅 Updating today contacts with AdminData');
+    console.log(`   - User: ${currentUser.username} (${currentUser.role})`);
+    console.log(`   - Today contacts: ${todayContacts.length}`);
     
     const container = document.getElementById('todayContacts');
     if (!container) {
-        console.log('❌ Contenedor de contactos de hoy no encontrado');
+        console.log('❌ Today contacts container not found');
         return;
     }
     
@@ -441,7 +422,7 @@ function updateTodayContacts() {
         `;
     }).join('');
     
-    console.log('✅ Contactos de hoy actualizados');
+    console.log('✅ Today contacts updated with AdminData');
 }
 
 function updateReports() {
@@ -457,9 +438,13 @@ function updateReports() {
 }
 
 function updatePersonalReports() {
-    const data = getFilteredData();
+    if (!window.AdminData) return;
     
-    const weeklyContacts = data.filter(c => {
+    const stats = AdminData.getSalespersonStats(currentUser.username);
+    
+    // Calculate weekly contacts
+    const allData = AdminData.getDataBySalesperson(currentUser.username);
+    const weeklyContacts = allData.filter(c => {
         const contactDate = new Date(c.date);
         const weekAgo = new Date();
         weekAgo.setDate(weekAgo.getDate() - 7);
@@ -482,9 +467,6 @@ function updatePersonalReports() {
         `;
     }
     
-    const conversions = data.filter(l => l.status === 'Convertido').length;
-    const conversionRate = data.length > 0 ? (conversions / data.length * 100).toFixed(1) : 0;
-    
     const personalTargetsEl = document.getElementById('personalTargets');
     if (personalTargetsEl) {
         personalTargetsEl.innerHTML = `
@@ -492,14 +474,14 @@ function updatePersonalReports() {
                 <div style="margin-bottom: 1rem;">
                     <div style="font-weight: 600;">📊 Mis Estadísticas</div>
                     <div style="font-size: 0.9rem; color: #666; margin-top: 0.5rem;">
-                        Total leads: ${data.length}<br>
-                        Conversiones: ${conversions}<br>
-                        Tasa de conversión: ${conversionRate}%
+                        Total leads: ${stats.totalContacts}<br>
+                        Conversiones: ${stats.conversions}<br>
+                        Tasa de conversión: ${stats.conversionRate}%
                     </div>
                 </div>
                 <div style="margin-top: 1rem;">
-                    <div style="font-weight: 600; color: ${conversionRate >= 15 ? '#10b981' : conversionRate >= 10 ? '#f59e0b' : '#ef4444'}">
-                        ${conversionRate >= 15 ? '🏆 ¡Excelente!' : conversionRate >= 10 ? '📈 Buen trabajo' : '💪 Puedes mejorar'}
+                    <div style="font-weight: 600; color: ${stats.conversionRate >= 15 ? '#10b981' : stats.conversionRate >= 10 ? '#f59e0b' : '#ef4444'}">
+                        ${stats.conversionRate >= 15 ? '🏆 ¡Excelente!' : stats.conversionRate >= 10 ? '📈 Buen trabajo' : '💪 Puedes mejorar'}
                     </div>
                 </div>
             </div>
