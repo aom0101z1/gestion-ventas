@@ -15,20 +15,28 @@ let draggedCard = null;
 
 // ===== PIPELINE FUNCTIONS =====
 function refreshPipeline() {
-    console.log('🎯 Actualizando pipeline');
+    console.log('🎯 Refreshing pipeline for user:', currentUser?.username, currentUser?.role);
+    
+    if (!window.AdminData) {
+        console.log('❌ AdminData not available, cannot refresh pipeline');
+        return;
+    }
+    
     createPipelineBoard();
     loadPipelineData();
     setupDragAndDrop();
+    
+    console.log('✅ Pipeline refreshed successfully');
 }
 
 function createPipelineBoard() {
     const container = document.getElementById('pipelineContainer');
     if (!container) {
-        console.log('❌ Contenedor de pipeline no encontrado');
+        console.log('❌ Pipeline container not found');
         return;
     }
 
-    console.log('🏗️ Creando tablero de pipeline');
+    console.log('🏗️ Creating pipeline board');
     container.innerHTML = pipelineStages.map(stage => `
         <div class="pipeline-column" id="column-${stage.id}" data-stage="${stage.id}">
             <div class="pipeline-header" style="border-left: 4px solid ${stage.color};">
@@ -39,18 +47,20 @@ function createPipelineBoard() {
         </div>
     `).join('');
     
-    console.log('✅ Tablero de pipeline creado');
+    console.log('✅ Pipeline board created');
 }
 
 function loadPipelineData() {
     if (!window.AdminData) {
-        console.log('❌ AdminData not available for pipeline');
+        console.log('❌ AdminData not available for pipeline data loading');
         return;
     }
     
+    console.log('📊 Loading pipeline data from AdminData');
+    
+    // Get filtered data based on user role
     const data = getFilteredData();
     
-    console.log('📊 Loading pipeline data from AdminData');
     console.log(`   - Total leads for pipeline: ${data.length}`);
     console.log(`   - User: ${currentUser.role} (${currentUser.username})`);
     
@@ -67,6 +77,8 @@ function loadPipelineData() {
         if (container) {
             const card = createLeadCard(lead);
             container.appendChild(card);
+        } else {
+            console.warn('⚠️ Container not found for stage:', stageId);
         }
     });
 
@@ -105,11 +117,11 @@ function createLeadCard(lead) {
             </span>
         </div>
         <div style="font-size: 0.8rem; color: #666; margin-bottom: 0.5rem;">📞 ${lead.phone}</div>
-        <div style="font-size: 0.8rem; color: #666; margin-bottom: 0.5rem;">📍 ${lead.source}</div>
+        <div style="font-size: 0.8rem; color: #666; margin-bottom: 0.5rem;">📍 ${lead.source.length > 20 ? lead.source.substring(0, 20) + '...' : lead.source}</div>
         ${lead.notes ? `<div style="font-size: 0.75rem; color: #888; background: #f9fafb; padding: 0.3rem; border-radius: 4px; margin-top: 0.5rem;">💬 ${lead.notes.substring(0, 50)}${lead.notes.length > 50 ? '...' : ''}</div>` : ''}
         <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem; font-size: 0.7rem; color: #888;">
-            <span>${currentUser.role === 'director' ? '📅' : '👤'} ${currentUser.role === 'director' ? formatDate(lead.date) : getUserDisplayName(lead.salesperson)}</span>
-            <span>${currentUser.role === 'director' ? lead.time : formatDate(lead.date)}</span>
+            <span>📅 ${formatDate(lead.date)}</span>
+            <span>⏰ ${lead.time || '00:00'}</span>
         </div>
     `;
     return card;
@@ -117,7 +129,7 @@ function createLeadCard(lead) {
 
 // ===== DRAG & DROP FUNCTIONS =====
 function setupDragAndDrop() {
-    console.log('🖱️ Configurando drag & drop');
+    console.log('🖱️ Setting up drag & drop');
     
     // Add drag event listeners to all cards
     document.querySelectorAll('.pipeline-card').forEach(card => {
@@ -133,13 +145,13 @@ function setupDragAndDrop() {
         column.addEventListener('dragleave', handleDragLeave);
     });
     
-    console.log('✅ Drag & drop configurado');
+    console.log('✅ Drag & drop configured');
 }
 
 function handleDragStart(e) {
     draggedCard = this;
     this.classList.add('dragging');
-    console.log('🖱️ Drag iniciado para lead:', this.dataset.leadId);
+    console.log('🖱️ Drag started for lead:', this.dataset.leadId);
     
     // Store the lead ID for transfer
     e.dataTransfer.setData('text/plain', this.dataset.leadId);
@@ -149,7 +161,7 @@ function handleDragStart(e) {
 function handleDragEnd(e) {
     this.classList.remove('dragging');
     draggedCard = null;
-    console.log('🖱️ Drag terminado');
+    console.log('🖱️ Drag ended');
 }
 
 function handleDragOver(e) {
@@ -181,7 +193,7 @@ function handleDrop(e) {
     const column = e.currentTarget;
     const newStage = column.dataset.stage;
     
-    console.log('🎯 Drop detectado - Lead ID:', leadId, 'Nueva etapa:', newStage);
+    console.log('🎯 Drop detected - Lead ID:', leadId, 'New stage:', newStage);
     
     if (leadId && newStage) {
         updateLeadStatus(leadId, newStage);
@@ -227,18 +239,20 @@ function updateLeadStatus(leadId, newStageId) {
         console.log(`✅ Status updated in AdminData from "${oldStatus}" to "${stage.status}"`);
         
         // Refresh pipeline to show updated positions
-        refreshPipeline();
-        
-        // Update other views (AdminData observers will handle this automatically)
-        
-        // Show success message
-        console.log(`✅ ${updatedLead.name} moved to ${stage.name}`);
+        setTimeout(() => {
+            refreshPipeline();
+            // Also update other views
+            if (typeof updateAllViews === 'function') {
+                updateAllViews();
+            }
+        }, 100);
         
         // Show notification
         showNotification(`✅ ${updatedLead.name} → ${stage.name}`, 'success');
     } else {
         console.error('❌ Failed to update lead status');
         refreshPipeline(); // Refresh to restore original position
+        alert('❌ Error al actualizar el estado del lead');
     }
 }
 
@@ -287,6 +301,7 @@ function showNotification(message, type = 'info') {
         font-weight: 500;
         z-index: 1000;
         animation: slideIn 0.3s ease;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     `;
     
     notification.textContent = message;
@@ -342,4 +357,38 @@ function debugPipeline() {
         ? AdminData.getTeamStats() 
         : AdminData.getSalespersonStats(currentUser.username);
     console.log('📊 AdminData Stats:', stats);
+    
+    // Return debug info for alert
+    return {
+        user: currentUser,
+        totalInAdmin: allData.length,
+        filteredForUser: filtered.length,
+        stageBreakdown: pipelineStages.map(stage => ({
+            stage: stage.name,
+            count: filtered.filter(l => l.status === stage.status).length
+        })),
+        stats: stats
+    };
+}
+
+// Add a manual debug function that can be called from the UI
+function showPipelineDebug() {
+    const debugInfo = debugPipeline();
+    if (debugInfo) {
+        let message = `🔍 PIPELINE DEBUG\n\n`;
+        message += `Usuario: ${debugInfo.user.username} (${debugInfo.user.role})\n`;
+        message += `Total en AdminData: ${debugInfo.totalInAdmin}\n`;
+        message += `Filtrado para usuario: ${debugInfo.filteredForUser}\n\n`;
+        message += `Distribución por etapa:\n`;
+        debugInfo.stageBreakdown.forEach(item => {
+            message += `• ${item.stage}: ${item.count}\n`;
+        });
+        message += `\nEstadísticas:\n`;
+        message += `• Total contactos: ${debugInfo.stats.totalContacts}\n`;
+        message += `• Contactos hoy: ${debugInfo.stats.todayContacts}\n`;
+        message += `• Leads activos: ${debugInfo.stats.activeLeads}\n`;
+        message += `• Conversiones: ${debugInfo.stats.conversions}\n`;
+        
+        alert(message);
+    }
 }
