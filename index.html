@@ -21,10 +21,7 @@
             -moz-osx-font-smoothing: grayscale;
         }
         
-        /* Asegurar renderizado correcto de emojis */
-        * {
-            font-variant-emoji: emoji;
-        }
+        * { font-variant-emoji: emoji; }
         
         .header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -40,7 +37,6 @@
             padding: 2rem;
         }
         
-        /* Login Styles */
         .login-container {
             max-width: 400px;
             margin: 5rem auto;
@@ -57,14 +53,8 @@
             text-align: center;
         }
         
-        .login-form {
-            padding: 2rem;
-        }
-        
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
-        
+        .login-form { padding: 2rem; }
+        .form-group { margin-bottom: 1.5rem; }
         .form-group label {
             display: block;
             margin-bottom: 0.5rem;
@@ -101,26 +91,13 @@
             background: #667eea;
             color: white;
         }
-        
         .btn-primary:hover {
             background: #5a67d8;
             transform: translateY(-2px);
         }
-        
-        .btn-success {
-            background: #10b981;
-            color: white;
-        }
-        
-        .btn-warning {
-            background: #f59e0b;
-            color: white;
-        }
-        
-        .btn-secondary {
-            background: #6b7280;
-            color: white;
-        }
+        .btn-success { background: #10b981; color: white; }
+        .btn-warning { background: #f59e0b; color: white; }
+        .btn-secondary { background: #6b7280; color: white; }
         
         .user-info {
             background: white;
@@ -169,10 +146,7 @@
             cy: 60;
         }
         
-        .progress-ring .background {
-            stroke: #e5e7eb;
-        }
-        
+        .progress-ring .background { stroke: #e5e7eb; }
         .progress-ring .progress {
             stroke: #10b981;
             stroke-linecap: round;
@@ -212,9 +186,7 @@
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
         
-        .hidden {
-            display: none;
-        }
+        .hidden { display: none; }
         
         .table {
             width: 100%;
@@ -240,25 +212,10 @@
             font-weight: 500;
         }
         
-        .status-nuevo {
-            background: #fef3c7;
-            color: #92400e;
-        }
-        
-        .status-contactado {
-            background: #dbeafe;
-            color: #1e40af;
-        }
-        
-        .status-interesado {
-            background: #d1fae5;
-            color: #065f46;
-        }
-        
-        .status-convertido {
-            background: #dcfce7;
-            color: #166534;
-        }
+        .status-nuevo { background: #fef3c7; color: #92400e; }
+        .status-contactado { background: #dbeafe; color: #1e40af; }
+        .status-interesado { background: #d1fae5; color: #065f46; }
+        .status-convertido { background: #dcfce7; color: #166534; }
         
         .connection-status {
             position: fixed;
@@ -270,15 +227,8 @@
             font-weight: 500;
         }
         
-        .connected {
-            background: #d1fae5;
-            color: #065f46;
-        }
-        
-        .disconnected {
-            background: #fee2e2;
-            color: #dc2626;
-        }
+        .connected { background: #d1fae5; color: #065f46; }
+        .disconnected { background: #fee2e2; color: #dc2626; }
         
         .config-section {
             background: #f9fafb;
@@ -304,7 +254,6 @@
             border: 1px solid #e5e7eb;
             transition: all 0.2s ease;
         }
-        
         .convenio-item:hover {
             background: #f3f4f6;
             border-color: #d1d5db;
@@ -376,6 +325,12 @@
             background: #f8fafc;
             border-radius: 10px;
             padding: 1rem;
+            min-height: 400px;
+        }
+        
+        .pipeline-column.drag-over {
+            background: #e0f2fe;
+            border: 2px dashed #0284c7;
         }
         
         .pipeline-header {
@@ -395,6 +350,7 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             cursor: grab;
             transition: all 0.2s ease;
+            draggable: true;
         }
         
         .pipeline-card:hover {
@@ -402,31 +358,30 @@
             box-shadow: 0 4px 8px rgba(0,0,0,0.15);
         }
         
-        .pipeline-card.dragging {
+        .pipeline-card.dragging { 
             opacity: 0.5;
+            transform: rotate(5deg);
+            cursor: grabbing;
         }
         
         @media (max-width: 768px) {
-            .container {
-                padding: 1rem;
-            }
-            
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
-            
+            .container { padding: 1rem; }
+            .stats-grid { grid-template-columns: 1fr; }
             .user-info {
                 flex-direction: column;
                 gap: 1rem;
             }
-            
-            .pipeline-container {
-                flex-direction: column;
-            }
-            
-            .pipeline-column {
-                min-width: auto;
-            }
+            .pipeline-container { flex-direction: column; }
+            .pipeline-column { min-width: auto; }
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
         }
     </style>
 </head>
@@ -439,7 +394,7 @@
                 <p>Sistema de Gestión de Ventas</p>
             </div>
             <div class="login-form">
-                <form onsubmit="Auth.login(event)">
+                <form onsubmit="login(event)">
                     <div class="form-group">
                         <label for="username">Usuario:</label>
                         <input type="text" id="username" required>
@@ -473,12 +428,12 @@
                     <strong id="currentUserName">Usuario</strong>
                     <span id="userRole" style="color: #667eea; font-size: 0.9rem;"></span>
                 </div>
-                <button onclick="Auth.logout()" class="btn btn-secondary" style="width: auto; padding: 0.5rem 1rem;">
+                <button onclick="logout()" class="btn btn-secondary" style="width: auto; padding: 0.5rem 1rem;">
                     🚪 Cerrar Sesión
                 </button>
             </div>
 
-            <!-- Director Configuration (Only for Director) -->
+            <!-- Director Configuration -->
             <div id="directorConfig" class="config-section director-only hidden">
                 <h3>🔧 Configuración del Director</h3>
                 <p style="margin-bottom: 1rem; color: #667eea;">Esta sección solo es visible para el director</p>
@@ -494,7 +449,7 @@
                             <label for="sheetName">Nombre de la Hoja:</label>
                             <input type="text" id="sheetName" value="Hoja1">
                         </div>
-                        <button onclick="Sheets.configure()" class="btn btn-primary">🔗 Conectar Sheet</button>
+                        <button onclick="configureSheet()" class="btn btn-primary">🔗 Conectar Sheet</button>
                         <div id="configResult" style="margin-top: 1rem;"></div>
                     </div>
                     
@@ -515,7 +470,7 @@
                                 <option value="director">Director</option>
                             </select>
                         </div>
-                        <button onclick="Sales.addUser()" class="btn btn-success">➕ Agregar Usuario</button>
+                        <button onclick="addUser()" class="btn btn-success">➕ Agregar Usuario</button>
                     </div>
                     
                     <div>
@@ -524,7 +479,7 @@
                             <label for="newConvenio">Nuevo Convenio:</label>
                             <input type="text" id="newConvenio" placeholder="Nombre del convenio">
                         </div>
-                        <button onclick="Sales.addConvenio()" class="btn btn-success">➕ Agregar Convenio</button>
+                        <button onclick="addConvenio()" class="btn btn-success">➕ Agregar Convenio</button>
                         <div style="margin-top: 1rem;">
                             <h5>Convenios Actuales:</h5>
                             <div id="conveniosList" style="max-height: 200px; overflow-y: auto;"></div>
@@ -532,7 +487,6 @@
                     </div>
                 </div>
                 
-                <!-- User Management -->
                 <div class="user-management">
                     <h4>👥 Usuarios Actuales</h4>
                     <div id="usersList"></div>
@@ -569,20 +523,21 @@
             </div>
 
             <!-- Tabs -->
-            <div class="tabs">
-                <button class="tab active" onclick="Utils.showTab('contacts')">📞 Mis Contactos</button>
-                <button class="tab" onclick="Utils.showTab('leads')">👥 Mis Leads</button>
-                <button class="tab" onclick="Utils.showTab('pipeline')">🎯 Pipeline</button>
-                <button class="tab" id="reportsTab" onclick="Utils.showTab('reports')">📊 Dashboard</button>
+            <div class="tabs" id="mainTabs">
+                <button class="tab active" onclick="showTab('contacts')" id="contactsTab">📞 Mis Contactos</button>
+                <button class="tab" onclick="showTab('leads')" id="leadsTab">👥 Mis Leads</button>
+                <button class="tab" onclick="showTab('pipeline')" id="pipelineTab">🎯 Pipeline</button>
+                <button class="tab" onclick="showTab('monitoring')" id="monitoringTab" style="display: none;">👀 Monitoreo</button>
+                <button class="tab" id="reportsTab" onclick="showTab('reports')">📊 Dashboard</button>
             </div>
 
             <!-- Tab: Contactos -->
             <div id="contacts" class="tab-content">
-                <h2>📞 Registrar Contactos del Día</h2>
+                <h2 id="contactsTitle">📞 Registrar Contactos del Día</h2>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem;">
                     <div>
                         <h3>➕ Nuevo Contacto</h3>
-                        <form onsubmit="Sales.addContact(event)">
+                        <form onsubmit="addContact(event)">
                             <div class="form-group">
                                 <label>Nombre Completo:</label>
                                 <input type="text" id="contactName" required>
@@ -597,7 +552,7 @@
                             </div>
                             <div class="form-group">
                                 <label>¿Cómo se enteró?</label>
-                                <select id="contactSource" required onchange="Sales.handleSourceChange()">
+                                <select id="contactSource" required onchange="handleSourceChange()">
                                     <option value="">Seleccionar...</option>
                                     <option value="Facebook">Facebook</option>
                                     <option value="Instagram">Instagram</option>
@@ -634,8 +589,14 @@
                     </div>
                     
                     <div>
-                        <h3>📋 Mis Contactos de Hoy</h3>
-                        <button onclick="Sales.refreshData()" class="btn btn-primary" style="margin-bottom: 1rem;">🔄 Actualizar</button>
+                        <h3 id="todayContactsTitle">📋 Mis Contactos de Hoy</h3>
+                        <div style="margin-bottom: 1rem;">
+                            <button onclick="refreshData()" class="btn btn-primary" style="margin-bottom: 0.5rem; width: 19%; margin-right: 1%;">🔄 Actualizar</button>
+                            <button onclick="debugData()" class="btn btn-secondary" style="margin-bottom: 0.5rem; width: 19%; margin-right: 1%;">🔍 Debug</button>
+                            <button onclick="exportTodayContacts()" class="btn btn-warning" style="margin-bottom: 0.5rem; width: 19%; margin-right: 1%;">📋 Exportar</button>
+                            <button onclick="toggleAutoSync()" class="btn" id="autoSyncBtn" style="margin-bottom: 0.5rem; width: 19%; margin-right: 1%; background: #10b981; color: white;">⚡ Auto</button>
+                            <button onclick="clearLocalData()" class="btn" style="margin-bottom: 0.5rem; width: 19%; background: #ef4444; color: white;">🗑️ Limpiar</button>
+                        </div>
                         <div id="todayContacts"></div>
                     </div>
                 </div>
@@ -643,11 +604,27 @@
 
             <!-- Tab: Leads -->
             <div id="leads" class="tab-content hidden">
-                <h2>👥 Gestión de Mis Leads</h2>
-                <button onclick="Sales.refreshData()" class="btn btn-primary" style="margin-bottom: 1rem;">🔄 Actualizar Datos</button>
+                <h2 id="leadsTitle">👥 Gestión de Mis Leads</h2>
+                <div style="display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center;">
+                    <button onclick="refreshData()" class="btn btn-primary">🔄 Actualizar Datos</button>
+                    <div id="leadsFilters" style="display: none;">
+                        <select id="salespersonFilter" onchange="updateLeadsTable()" style="padding: 0.5rem; border-radius: 5px; border: 1px solid #ccc;">
+                            <option value="">Todos los vendedores</option>
+                        </select>
+                        <select id="statusFilter" onchange="updateLeadsTable()" style="padding: 0.5rem; border-radius: 5px; border: 1px solid #ccc; margin-left: 0.5rem;">
+                            <option value="">Todos los estados</option>
+                            <option value="Nuevo">Nuevo</option>
+                            <option value="Contactado">Contactado</option>
+                            <option value="Interesado">Interesado</option>
+                            <option value="Negociación">Negociación</option>
+                            <option value="Convertido">Convertido</option>
+                            <option value="Perdido">Perdido</option>
+                        </select>
+                    </div>
+                </div>
                 <table class="table">
                     <thead>
-                        <tr>
+                        <tr id="leadsTableHeader">
                             <th>Nombre</th>
                             <th>Teléfono</th>
                             <th>Fuente</th>
@@ -656,24 +633,54 @@
                             <th>Acciones</th>
                         </tr>
                     </thead>
-                    <tbody id="leadsTable">
-                    </tbody>
+                    <tbody id="leadsTable"></tbody>
                 </table>
             </div>
 
             <!-- Tab: Pipeline -->
             <div id="pipeline" class="tab-content hidden">
                 <h2>🎯 Pipeline de Ventas</h2>
-                <button onclick="Pipeline.refresh()" class="btn btn-primary" style="margin-bottom: 1rem;">🔄 Actualizar Pipeline</button>
+                <div style="background: #e0f2fe; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid #0284c7;">
+                    <p><strong>💡 Instrucciones:</strong> Arrastra las tarjetas entre las columnas para cambiar el estado de los leads. El sistema guardará automáticamente los cambios.</p>
+                </div>
+                <button onclick="refreshPipeline()" class="btn btn-primary" style="margin-bottom: 1rem;">🔄 Actualizar Pipeline</button>
                 <div id="pipelineContainer" class="pipeline-container">
-                    <!-- Pipeline visual se carga aquí -->
+                    <!-- Pipeline se carga aquí -->
+                </div>
+            </div>
+
+            <!-- Tab: Monitoring (Director Only) -->
+            <div id="monitoring" class="tab-content hidden">
+                <h2>👀 Monitoreo del Equipo en Tiempo Real</h2>
+                <div style="background: #e0f2fe; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; border-left: 4px solid #0284c7;">
+                    <p><strong>🎯 Vista del Director:</strong> Monitorea la actividad de todo el equipo de ventas en tiempo real. Aquí puedes ver qué está haciendo cada vendedor, sus contactos del día, y su progreso hacia las metas.</p>
+                </div>
+                
+                <button onclick="refreshMonitoring()" class="btn btn-primary" style="margin-bottom: 2rem;">🔄 Actualizar Monitoreo</button>
+                
+                <!-- Team Activity Overview -->
+                <div style="margin-bottom: 2rem;">
+                    <h3>📊 Resumen de Actividad del Equipo</h3>
+                    <div id="teamActivityOverview"></div>
+                </div>
+                
+                <!-- Individual Salesperson Cards -->
+                <div style="margin-bottom: 2rem;">
+                    <h3>👥 Actividad Individual por Vendedor</h3>
+                    <div id="individualSalespeopleActivity"></div>
+                </div>
+                
+                <!-- Recent Team Activity -->
+                <div>
+                    <h3>🕒 Actividad Reciente del Equipo</h3>
+                    <div id="recentTeamActivity"></div>
                 </div>
             </div>
 
             <!-- Tab: Reports -->
             <div id="reports" class="tab-content hidden">
                 <h2 id="reportsTitle">📊 Mi Dashboard</h2>
-                <button onclick="Sales.refreshData()" class="btn btn-primary" style="margin-bottom: 1rem;">🔄 Actualizar Datos</button>
+                <button onclick="refreshData()" class="btn btn-primary" style="margin-bottom: 1rem;">🔄 Actualizar Datos</button>
                 
                 <div id="personalReports">
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem;">
@@ -709,16 +716,9 @@
         </div>
     </div>
 
-    <!-- Scripts Modulares -->
+    <!-- Load JavaScript modules -->
     <script src="core.js"></script>
     <script src="sales.js"></script>
     <script src="pipeline.js"></script>
-    
-    <script>
-        // Inicialización de la aplicación
-        document.addEventListener('DOMContentLoaded', function() {
-            App.init();
-        });
-    </script>
 </body>
 </html>
