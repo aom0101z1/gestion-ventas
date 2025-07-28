@@ -439,6 +439,27 @@
             color: #666;
             margin-bottom: 1rem;
         }
+
+        /* Data Management Styles */
+        .data-management {
+            margin-bottom: 1rem;
+            padding: 1rem;
+            background: #fef3c7;
+            border-radius: 8px;
+            border-left: 4px solid #f59e0b;
+        }
+
+        .data-management h4 {
+            color: #92400e;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .data-management p {
+            font-size: 0.8rem;
+            color: #666;
+            margin-bottom: 1rem;
+        }
         
         @media (max-width: 768px) {
             .container { padding: 1rem; }
@@ -580,6 +601,16 @@
                     <button onclick="forceCrossDeviceSync()" class="btn btn-primary" style="margin-right: 1rem;">🔄 Sincronizar Dispositivos</button>
                     <button onclick="diagnoseDirectorData()" class="btn btn-warning" style="margin-right: 1rem;">🔍 Diagnosticar Datos</button>
                     <button onclick="forceDataSync()" class="btn btn-secondary">🔧 Forzar Sync Local</button>
+                </div>
+
+                <!-- Data Cleanup Section -->
+                <div class="data-management">
+                    <h4>🧹 Limpieza de Datos</h4>
+                    <p>Herramientas para limpiar y gestionar los datos del sistema:</p>
+                    <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                        <button onclick="clearTestData()" class="btn" style="background: #f59e0b; color: white;">🧪 Limpiar Datos de Prueba</button>
+                        <button onclick="clearLocalData()" class="btn" style="background: #ef4444; color: white;">🗑️ Limpiar TODOS los Datos</button>
+                    </div>
                 </div>
                 
                 <!-- Traditional Configuration -->
@@ -728,6 +759,16 @@
                             <p>Sincroniza datos entre todos los dispositivos del equipo</p>
                             <button onclick="forceCrossDeviceSync()" class="btn btn-primary" style="width: 100%;">🔄 Sincronizar Ahora</button>
                         </div>
+
+                        <!-- Data Management Section -->
+                        <div class="data-management">
+                            <h4>🧹 Gestión de Datos</h4>
+                            <p>Administra tus contactos y datos</p>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                                <button onclick="clearMyData()" class="btn" style="background: #f59e0b; color: white; font-size: 0.9rem;">🗑️ Mis Datos</button>
+                                <button onclick="clearTestData()" class="btn" style="background: #8b5cf6; color: white; font-size: 0.9rem;">🧪 Test Data</button>
+                            </div>
+                        </div>
                         
                         <div style="margin-bottom: 1rem;">
                             <button onclick="refreshData()" class="btn btn-primary" style="margin-bottom: 0.5rem; width: 19%; margin-right: 1%;">🔄 Actualizar</button>
@@ -736,9 +777,7 @@
                             <button onclick="exportTodayContacts()" class="btn btn-warning" style="margin-bottom: 0.5rem; width: 19%; margin-right: 1%;">📋 Exportar</button>
                             <button onclick="toggleAutoSync()" class="btn" id="autoSyncBtn" style="margin-bottom: 0.5rem; width: 19%; background: #10b981; color: white;">⚡ Auto</button>
                         </div>
-                        <div style="margin-bottom: 1rem;">
-                            <button onclick="clearLocalData()" class="btn" style="margin-bottom: 0.5rem; width: 100%; background: #ef4444; color: white;">🗑️ Limpiar Todos los Datos</button>
-                        </div>
+                        
                         <div id="todayContacts"></div>
                     </div>
                 </div>
@@ -747,7 +786,7 @@
             <!-- Tab: Leads -->
             <div id="leads" class="tab-content hidden">
                 <h2 id="leadsTitle">👥 Gestión de Mis Leads</h2>
-                <div style="display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center;">
+                <div style="display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap;">
                     <button onclick="refreshData()" class="btn btn-primary">🔄 Actualizar Datos</button>
                     <button onclick="forceCrossDeviceSync()" class="btn btn-secondary">🔄 Sync Dispositivos</button>
                     <div id="leadsFilters" style="display: none;">
