@@ -929,22 +929,36 @@
     <script src="pipeline.js"></script>
 
     <script>
-// SOLUCIÓN AUTOMÁTICA - Crear perfil si no existe
+// SOLUCIÓN: Agregar este código al final de index.html antes de </body>
+
+// Función para crear perfil de usuario si no existe
 async function ensureUserProfile() {
-    if (!window.FirebaseData || !window.FirebaseData.currentUser) return;
+    if (!window.FirebaseData || !window.FirebaseData.currentUser) {
+        console.log('No hay usuario autenticado');
+        return;
+    }
 
     try {
         const user = window.FirebaseData.currentUser;
+        console.log('Verificando perfil para usuario:', user.email);
+        
+        // Intentar cargar el perfil existente
         let profile = await window.FirebaseData.loadUserProfile();
         
         if (!profile) {
-            console.log('⚠️ Creando perfil faltante...');
+            console.log('⚠️ Perfil no encontrado, creando uno nuevo...');
             
+            // Determinar rol basado en email (temporal)
             const isDirector = user.email.includes('director') || user.email.includes('admin');
             const role = isDirector ? 'director' : 'vendedor';
-            const name = user.email.split('@')[0].split('.').map(part => 
-                part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
             
+            // Crear nombre a partir del email
+            const name = user.email.split('@')[0]
+                .split('.')
+                .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+                .join(' ');
+            
+            // Crear perfil en Firebase
             const profileRef = window.firebaseDb.ref(`users/${user.uid}/profile`);
             await profileRef.set({
                 name: name,
@@ -954,21 +968,75 @@ async function ensureUserProfile() {
                 lastLogin: new Date().toISOString()
             });
             
-            alert(`✅ Perfil creado: ${name} (${role})`);
+            console.log('✅ Perfil creado:', { name, email: user.email, role });
+            
+            // Mostrar mensaje al usuario
+            alert(`✅ Perfil creado automáticamente!
+
+👤 Nombre: ${name}
+📧 Email: ${user.email} 
+🎭 Rol: ${role === 'director' ? 'Director' : 'Vendedor'}
+
+Ahora puedes usar el sistema normalmente.`);
+            
+            // Recargar la página para aplicar cambios
             window.location.reload();
+        } else {
+            console.log('✅ Perfil encontrado:', profile);
         }
     } catch (error) {
-        console.error('❌ Error:', error);
+        console.error('❌ Error verificando perfil:', error);
+        alert(`❌ Error creando perfil: ${error.message}`);
     }
 }
 
-// Auto-ejecutar cuando Firebase esté listo
+// Función para mostrar información de debug del usuario
+function debugUserProfile() {
+    if (!window.FirebaseData || !window.FirebaseData.currentUser) {
+        alert('❌ No hay usuario autenticado');
+        return;
+    }
+    
+    const user = window.FirebaseData.currentUser;
+    window.FirebaseData.loadUserProfile().then(profile => {
+        alert(`🔍 DEBUG INFORMACIÓN DEL USUARIO:
+
+🔐 Usuario Autenticado:
+   - UID: ${user.uid}
+   - Email: ${user.email}
+   - Verificado: ${user.emailVerified}
+
+👤 Perfil en Database:
+   - Existe: ${profile ? 'SÍ' : 'NO'}
+   ${profile ? `- Nombre: ${profile.name}
+   - Rol: ${profile.role}
+   - Creado: ${profile.createdAt}` : '- ⚠️ PERFIL FALTANTE - Esta es la causa del error'}
+
+💡 Solución: ${profile ? 'Perfil OK' : 'Click "Crear Perfil" para solucionarlo'}`);
+    }).catch(error => {
+        alert(`❌ Error cargando perfil: ${error.message}`);
+    });
+}
+
+// Auto-ejecutar verificación cuando Firebase esté listo
 window.addEventListener('firebaseReady', () => {
     setTimeout(() => {
-        if (window.FirebaseData?.currentUser) ensureUserProfile();
+        if (window.FirebaseData && window.FirebaseData.currentUser) {
+            ensureUserProfile();
+        }
     }, 2000);
 });
-</script>
+
+// También verificar cuando el usuario hace login
+if (window.FirebaseData && window.FirebaseData.auth) {
+    window.FirebaseData.auth.onAuthStateChanged((user) => {
+        if (user) {
+            setTimeout(ensureUserProfile, 1000);
+        }
+    });
+}
+
+console.log('🔧 Script de reparación de perfil cargado');
     
 </body>
 </html>
