@@ -418,6 +418,27 @@
             color: #666; 
             margin-bottom: 1rem;
         }
+
+        /* Cross-Device Sync Styles */
+        .sync-section {
+            margin-bottom: 1rem;
+            padding: 1rem;
+            background: #e0f2fe;
+            border-radius: 8px;
+            border-left: 4px solid #0284c7;
+        }
+
+        .sync-section h4 {
+            color: #0369a1;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .sync-section p {
+            font-size: 0.8rem;
+            color: #666;
+            margin-bottom: 1rem;
+        }
         
         @media (max-width: 768px) {
             .container { padding: 1rem; }
@@ -556,8 +577,9 @@
                 <div class="emergency-tools">
                     <h4>🚨 Herramientas de Emergencia</h4>
                     <p>Si no ves los datos de tus vendedores, usa estas herramientas:</p>
+                    <button onclick="forceCrossDeviceSync()" class="btn btn-primary" style="margin-right: 1rem;">🔄 Sincronizar Dispositivos</button>
                     <button onclick="diagnoseDirectorData()" class="btn btn-warning" style="margin-right: 1rem;">🔍 Diagnosticar Datos</button>
-                    <button onclick="forceDataSync()" class="btn btn-primary">🔄 Forzar Sincronización</button>
+                    <button onclick="forceDataSync()" class="btn btn-secondary">🔧 Forzar Sync Local</button>
                 </div>
                 
                 <!-- Traditional Configuration -->
@@ -699,6 +721,14 @@
                     
                     <div>
                         <h3 id="todayContactsTitle">📋 Mis Contactos de Hoy</h3>
+                        
+                        <!-- Cross-Device Sync Section -->
+                        <div class="sync-section">
+                            <h4>🔄 Sincronización entre Dispositivos</h4>
+                            <p>Sincroniza datos entre todos los dispositivos del equipo</p>
+                            <button onclick="forceCrossDeviceSync()" class="btn btn-primary" style="width: 100%;">🔄 Sincronizar Ahora</button>
+                        </div>
+                        
                         <div style="margin-bottom: 1rem;">
                             <button onclick="refreshData()" class="btn btn-primary" style="margin-bottom: 0.5rem; width: 19%; margin-right: 1%;">🔄 Actualizar</button>
                             <button onclick="debugData()" class="btn btn-secondary" style="margin-bottom: 0.5rem; width: 19%; margin-right: 1%;">🔍 Debug</button>
@@ -719,6 +749,7 @@
                 <h2 id="leadsTitle">👥 Gestión de Mis Leads</h2>
                 <div style="display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center;">
                     <button onclick="refreshData()" class="btn btn-primary">🔄 Actualizar Datos</button>
+                    <button onclick="forceCrossDeviceSync()" class="btn btn-secondary">🔄 Sync Dispositivos</button>
                     <div id="leadsFilters" style="display: none;">
                         <select id="salespersonFilter" onchange="updateLeadsTable()" style="padding: 0.5rem; border-radius: 5px; border: 1px solid #ccc;">
                             <option value="">Todos los vendedores</option>
@@ -755,7 +786,10 @@
                 <div style="background: #e0f2fe; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid #0284c7;">
                     <p><strong>💡 Instrucciones:</strong> Arrastra las tarjetas entre las columnas para cambiar el estado de los leads. El sistema guardará automáticamente los cambios.</p>
                 </div>
-                <button onclick="refreshPipeline()" class="btn btn-primary" style="margin-bottom: 1rem;">🔄 Actualizar Pipeline</button>
+                <div style="margin-bottom: 1rem;">
+                    <button onclick="refreshPipeline()" class="btn btn-primary" style="margin-right: 1rem;">🔄 Actualizar Pipeline</button>
+                    <button onclick="forceCrossDeviceSync()" class="btn btn-secondary">🔄 Sincronizar Datos</button>
+                </div>
                 <div id="pipelineContainer" class="pipeline-container">
                     <!-- Pipeline se carga aquí -->
                 </div>
@@ -768,7 +802,10 @@
                     <p><strong>🎯 Vista del Director:</strong> Monitorea la actividad de todo el equipo de ventas en tiempo real. Aquí puedes ver qué está haciendo cada vendedor, sus contactos del día, y su progreso hacia las metas.</p>
                 </div>
                 
-                <button onclick="refreshMonitoring()" class="btn btn-primary" style="margin-bottom: 2rem;">🔄 Actualizar Monitoreo</button>
+                <div style="margin-bottom: 2rem;">
+                    <button onclick="refreshMonitoring()" class="btn btn-primary" style="margin-right: 1rem;">🔄 Actualizar Monitoreo</button>
+                    <button onclick="forceCrossDeviceSync()" class="btn btn-secondary">🔄 Sincronizar Todo</button>
+                </div>
                 
                 <!-- Team Activity Overview -->
                 <div style="margin-bottom: 2rem;">
@@ -792,7 +829,10 @@
             <!-- Tab: Reports -->
             <div id="reports" class="tab-content hidden">
                 <h2 id="reportsTitle">📊 Mi Dashboard</h2>
-                <button onclick="refreshData()" class="btn btn-primary" style="margin-bottom: 1rem;">🔄 Actualizar Datos</button>
+                <div style="margin-bottom: 1rem;">
+                    <button onclick="refreshData()" class="btn btn-primary" style="margin-right: 1rem;">🔄 Actualizar Datos</button>
+                    <button onclick="forceCrossDeviceSync()" class="btn btn-secondary">🔄 Sincronizar</button>
+                </div>
                 
                 <div id="personalReports">
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem;">
