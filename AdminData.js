@@ -1,41 +1,36 @@
+// AdminData.js
+
 const AdminData = (() => {
-  let allData = [];
+  let _dataCache = [];
+
+  function fetchAllContacts(callback) {
+    firebase
+      .database()
+      .ref("contacts")
+      .once("value")
+      .then((snapshot) => {
+        const data = snapshot.val() || {};
+        _dataCache = Object.values(data);
+        if (callback) callback(_dataCache);
+      })
+      .catch((error) => {
+        console.error("❌ Error al obtener datos de contactos:", error);
+        _dataCache = [];
+        if (callback) callback([]);
+      });
+  }
 
   function getAllData() {
-    return allData;
+    return _dataCache;
   }
 
-  function addContact(lead) {
-    allData.push(lead);
-  }
-
-  function updateContact(id, updatedFields) {
-    const index = allData.findIndex(l => l.id === id);
-    if (index !== -1) {
-      allData[index] = { ...allData[index], ...updatedFields };
-      return allData[index];
-    }
-    return null;
-  }
-
-  async function saveDataToFirebase() {
-    if (!window.database) return;
-    await window.database.ref("leads").set(allData);
-  }
-
-  async function loadDataFromFirebase() {
-    if (!window.database) return;
-    const snapshot = await window.database.ref("leads").once("value");
-    allData = snapshot.val() || [];
+  function filterBySeller(sellerName) {
+    return _dataCache.filter((c) => c.assignedTo === sellerName);
   }
 
   return {
+    fetchAllContacts,
     getAllData,
-    addContact,
-    updateContact,
-    saveDataToFirebase,
-    loadDataFromFirebase,
+    filterBySeller,
   };
 })();
-
-window.AdminData = AdminData;
