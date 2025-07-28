@@ -19,7 +19,7 @@ function getAllData() {
     } else {
         console.warn('⚠️ AdminData not available, using localStorage fallback');
         try {
-            const savedData = localStorage.getItem('allData');
+            const savedData = localStorage.getItem('ciudad_bilingue_sales_data');
             return savedData ? JSON.parse(savedData) : [];
         } catch (e) {
             console.error('Error loading fallback data:', e);
@@ -50,7 +50,7 @@ function getFilteredData() {
 function getFilteredDataFallback() {
     let allData = [];
     try {
-        const savedData = localStorage.getItem('allData');
+        const savedData = localStorage.getItem('ciudad_bilingue_sales_data');
         if (savedData) {
             allData = JSON.parse(savedData);
         }
@@ -294,9 +294,6 @@ function setupUserInterface() {
         
         updateUsersList();
         updateConveniosList();
-        
-        // Add test data button for director
-        setTimeout(addTestDataButton, 500);
         
         // Initialize GitHub integration if available
         setTimeout(initializeGitHubIntegration, 1000);
@@ -624,7 +621,7 @@ function debugData() {
     alert(debugInfo);
 }
 
-// ===== FUNCIONES NUEVAS DE SINCRONIZACIÓN =====
+// ===== FUNCIONES DE SINCRONIZACIÓN =====
 
 // Función de diagnóstico para el director
 function diagnoseDirectorData() {
@@ -776,162 +773,6 @@ function clearLocalData() {
             alert('🗑️ Todos los datos han sido eliminados del sistema');
         } else {
             alert('❌ AdminData no disponible');
-        }
-    }
-}
-
-// ===== TEST DATA GENERATOR MEJORADO =====
-function generateTestData() {
-    console.log('🧪 Generating test data...');
-    
-    if (!window.AdminData) {
-        alert('❌ AdminData not available. Please refresh the page.');
-        return;
-    }
-    
-    // Verificar integridad antes de agregar datos de prueba
-    verifyDataIntegrity();
-    
-    const testContacts = [
-        // María García's data
-        {
-            name: "Carlos Rodríguez",
-            phone: "3001234567",
-            email: "carlos.rodriguez@email.com",
-            source: "Facebook",
-            location: "Pereira",
-            notes: "Interesado en curso de inglés intensivo",
-            salesperson: "maria.garcia",
-            status: "Contactado"
-        },
-        {
-            name: "Ana Martínez",
-            phone: "3109876543",
-            email: "ana.martinez@gmail.com",
-            source: "Instagram",
-            location: "Dosquebradas", 
-            notes: "Quiere clases para su hijo de 12 años",
-            salesperson: "maria.garcia",
-            status: "Interesado"
-        },
-        {
-            name: "Luis Gómez",
-            phone: "3156789012",
-            email: "luis.gomez@hotmail.com",
-            source: "Google",
-            location: "La Virginia",
-            notes: "Necesita certificación para trabajo",
-            salesperson: "maria.garcia",
-            date: getYesterdayDate(),
-            status: "Convertido"
-        },
-        // Juan Pérez's data
-        {
-            name: "Patricia López",
-            phone: "3187654321",
-            email: "patricia.lopez@empresa.com",
-            source: "CONVENIO: Empresa de Energía",
-            location: "Pereira",
-            notes: "Curso corporativo para 5 empleados",
-            salesperson: "juan.perez",
-            status: "Negociación"
-        },
-        {
-            name: "Roberto Silva",
-            phone: "3203456789",
-            email: "roberto.silva@yahoo.com",
-            source: "Referido",
-            location: "Santa Rosa",
-            notes: "Recomendado por Ana Martínez",
-            salesperson: "juan.perez",
-            status: "Nuevo"
-        },
-        {
-            name: "Carmen Fernández",
-            phone: "3134567890",
-            email: "carmen.fernandez@gmail.com",
-            source: "Volante",
-            location: "Dosquebradas",
-            notes: "Interesada en clases nocturnas",
-            salesperson: "juan.perez",
-            date: getYesterdayDate(),
-            status: "Contactado"
-        }
-    ];
-    
-    console.log('➕ Agregando datos de prueba usando AdminData.addContact()...');
-    
-    // Add test contacts using the SAME method as real contacts
-    let addedCount = 0;
-    testContacts.forEach(contact => {
-        try {
-            const savedContact = AdminData.addContact(contact);
-            if (savedContact) {
-                addedCount++;
-                console.log(`✅ Dato de prueba agregado: ${savedContact.name} (ID: ${savedContact.id})`);
-            }
-        } catch (error) {
-            console.error('❌ Error agregando dato de prueba:', contact.name, error);
-        }
-    });
-    
-    console.log(`✅ ${addedCount} datos de prueba agregados usando AdminData.addContact()`);
-    
-    // Force immediate UI updates (same as real contacts)
-    setTimeout(() => {
-        updateAllViews();
-        if (typeof refreshPipeline === 'function') {
-            refreshPipeline();
-        }
-        
-        // Verificar integridad después de agregar
-        setTimeout(() => {
-            const isIntegre = verifyDataIntegrity();
-            console.log('🔍 Integridad post-test data:', isIntegre);
-        }, 500);
-        
-    }, 100);
-    
-    // Get updated stats
-    const teamStats = AdminData.getTeamStats();
-    
-    alert(`🧪 ¡Test data generated successfully!
-
-✅ Added ${addedCount} sample contacts usando AdminData.addContact()
-   • María García: ${testContacts.filter(c => c.salesperson === 'maria.garcia').length} contacts
-   • Juan Pérez: ${testContacts.filter(c => c.salesperson === 'juan.perez').length} contacts
-
-📊 Total in system: ${teamStats.totalContacts} contacts
-
-🎯 IMPORTANTE: Datos de prueba y datos reales ahora usan EXACTAMENTE el mismo flujo!
-
-✨ El director puede ver todos los datos inmediatamente!`);
-}
-
-function getYesterdayDate() {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    return yesterday.toISOString().split('T')[0];
-}
-
-function getTwoDaysAgoDate() {
-    const twoDaysAgo = new Date();
-    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
-    return twoDaysAgo.toISOString().split('T')[0];
-}
-
-// Add test data button for director
-function addTestDataButton() {
-    if (currentUser?.role === 'director') {
-        const userInfo = document.querySelector('.user-info');
-        if (userInfo && !document.getElementById('testDataBtn')) {
-            const button = document.createElement('button');
-            button.id = 'testDataBtn';
-            button.textContent = '🧪 Datos de Prueba';
-            button.className = 'btn btn-warning';
-            button.style.cssText = 'width: auto; padding: 0.5rem 1rem; margin-left: 1rem; font-size: 0.8rem;';
-            button.onclick = generateTestData;
-            userInfo.appendChild(button);
         }
     }
 }
