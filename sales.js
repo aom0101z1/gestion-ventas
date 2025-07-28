@@ -1,5 +1,4 @@
 // ===== CONTACTOS =====
-// 2. REEMPLAZAR LA FUNCIÓN addContact EN sales.js
 async function addContact(event) {
     event.preventDefault();
     
@@ -78,11 +77,176 @@ ${window.GitHubData && window.GitHubData.getToken() ?
     }
 }
 
+// FUNCIÓN CORREGIDA para mostrar convenios
+function handleSourceChange() {
+    const sourceSelect = document.getElementById('contactSource');
+    const convenioGroup = document.getElementById('convenioGroup');
+    const convenioSelect = document.getElementById('contactConvenio');
+    
+    console.log('🔍 Source changed to:', sourceSelect.value);
+    
+    if (sourceSelect.value === 'CONVENIO') {
+        console.log('✅ Showing convenio dropdown');
+        convenioGroup.style.display = 'block';
+        convenioSelect.required = true;
+    } else {
+        console.log('❌ Hiding convenio dropdown');
+        convenioGroup.style.display = 'none';
+        convenioSelect.required = false;
+        convenioSelect.value = '';
+    }
+}
+
+// ===== NUEVA FUNCIÓN: ELIMINAR LEAD INDIVIDUAL =====
+function deleteLead(leadId) {
+    if (!window.AdminData) {
+        alert('❌ Sistema no disponible');
+        return;
+    }
+    
+    const allData = AdminData.getAllData();
+    const lead = allData.find(l => l.id == leadId);
+    if (!lead) {
+        alert('❌ Lead no encontrado');
+        return;
+    }
+    
+    // Check permissions - salespeople can only delete their own leads
+    if (currentUser.role !== 'director' && lead.salesperson !== currentUser.username) {
+        alert('❌ Solo puedes eliminar tus propios leads');
+        return;
+    }
+    
+    if (confirm(`¿Estás seguro de eliminar el lead de "${lead.name}"?
+
+📞 Teléfono: ${lead.phone}
+📍 Fuente: ${lead.source}
+👤 Vendedor: ${getUserDisplayName(lead.salesperson)}
+
+Esta acción no se puede deshacer.`)) {
+        
+        const deleted = AdminData.deleteContact(leadId);
+        if (deleted) {
+            // También eliminar de GitHub si está configurado
+            if (window.GitHubData && window.GitHubData.getToken()) {
+                // Para GitHub necesitaríamos implementar delete, por ahora solo local
+                console.log('⚠️ GitHub delete not implemented yet');
+            }
+            
+            // Actualizar vistas
+            updateAllViews();
+            setTimeout(() => {
+                updateLeadsTable();
+                if (typeof refreshPipeline === 'function') refreshPipeline();
+            }, 200);
+            
+            alert(`✅ Lead de "${lead.name}" eliminado correctamente`);
+        } else {
+            alert('❌ Error al eliminar el lead');
+        }
+    }
+}
+
+// ===== NUEVA FUNCIÓN: LIMPIAR DATOS DE PRUEBA =====
+function clearTestData() {
+    if (!window.AdminData) {
+        alert('❌ Sistema no disponible');
+        return;
+    }
+    
+    const allData = AdminData.getAllData();
+    const testDataNames = [
+        'Carlos Rodríguez', 'Ana Martínez', 'Luis Gómez', 
+        'Patricia López', 'Roberto Silva', 'Carmen Fernández',
+        'Miguel Torres', 'Carlos Rodriguez'
+    ];
+    
+    const testData = allData.filter(contact => 
+        testDataNames.includes(contact.name) || 
+        contact.phone === '3001234567' ||
+        contact.phone === '3109876543' ||
+        contact.phone === '3156789012' ||
+        contact.phone === '3187654321' ||
+        contact.phone === '3203456789' ||
+        contact.phone === '3134567890' ||
+        contact.phone === '3145678901'
+    );
+    
+    if (testData.length === 0) {
+        alert('ℹ️ No se encontraron datos de prueba para eliminar');
+        return;
+    }
+    
+    if (confirm(`🗑️ Se encontraron ${testData.length} registros de datos de prueba.
+
+¿Quieres eliminar todos los datos de prueba?
+
+Esto incluye contactos como:
+${testData.slice(0, 3).map(d => `• ${d.name} (${d.phone})`).join('\n')}
+${testData.length > 3 ? `\n... y ${testData.length - 3} más` : ''}
+
+Esta acción no se puede deshacer.`)) {
+        
+        let deletedCount = 0;
+        testData.forEach(data => {
+            if (AdminData.deleteContact(data.id)) {
+                deletedCount++;
+            }
+        });
+        
+        updateAllViews();
+        setTimeout(() => {
+            updateLeadsTable();
+            if (typeof refreshPipeline === 'function') refreshPipeline();
+        }, 200);
+        
+        alert(`✅ ${deletedCount} datos de prueba eliminados correctamente`);
+    }
+}
+
+// ===== NUEVA FUNCIÓN: LIMPIAR MIS DATOS =====
+function clearMyData() {
+    if (!window.AdminData) {
+        alert('❌ Sistema no disponible');
+        return;
+    }
+    
+    const myData = AdminData.getDataBySalesperson(currentUser.username);
+    
+    if (myData.length === 0) {
+        alert('ℹ️ No tienes datos para eliminar');
+        return;
+    }
+    
+    if (confirm(`🗑️ ¿Estás seguro de eliminar TODOS tus ${myData.length} contactos?
+
+Esto incluye:
+${myData.slice(0, 3).map(d => `• ${d.name} (${d.phone})`).join('\n')}
+${myData.length > 3 ? `\n... y ${myData.length - 3} más` : ''}
+
+Esta acción NO se puede deshacer.`)) {
+        
+        let deletedCount = 0;
+        myData.forEach(data => {
+            if (AdminData.deleteContact(data.id)) {
+                deletedCount++;
+            }
+        });
+        
+        updateAllViews();
+        setTimeout(() => {
+            updateLeadsTable();
+            if (typeof refreshPipeline === 'function') refreshPipeline();
+        }, 200);
+        
+        alert(`✅ ${deletedCount} de tus contactos eliminados correctamente`);
+    }
+}
+
 // ===== LEADS TABLE =====
 function updateLeadsTable() {
     console.log('📋 Updating leads table for user:', currentUser?.username, currentUser?.role);
     
-    // PASO CRÍTICO: Verificar datos antes de continuar
     if (!window.AdminData) {
         console.log('❌ AdminData not available');
         const tbody = document.getElementById('leadsTable');
@@ -92,7 +256,6 @@ function updateLeadsTable() {
         return;
     }
     
-    // PASO CRÍTICO: Para director, forzar sincronización si no hay datos
     if (currentUser.role === 'director') {
         const currentDataCount = AdminData.getAllData().length;
         console.log('👑 Director - verificando datos actuales:', currentDataCount);
@@ -146,6 +309,9 @@ function updateLeadsTable() {
             ? `<td><span style="background: #667eea; color: white; padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.8rem;">${getUserDisplayName(lead.salesperson)}</span></td>`
             : '';
         
+        // Check if user can delete this lead
+        const canDelete = currentUser.role === 'director' || lead.salesperson === currentUser.username;
+        
         return `
             <tr>
                 <td style="font-weight: 500;">${lead.name}</td>
@@ -155,9 +321,10 @@ function updateLeadsTable() {
                 <td style="font-size: 0.9rem;">${formatDate(lead.date)}</td>
                 ${salespersonCell}
                 <td>
-                    <button onclick="showLeadDetails('${lead.id}')" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">
+                    <button onclick="showLeadDetails('${lead.id}')" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; margin-right: 0.25rem;">
                         📋 Ver
                     </button>
+                    ${canDelete ? `<button onclick="deleteLead('${lead.id}')" class="btn btn-warning" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; background: #ef4444;">🗑️</button>` : ''}
                 </td>
             </tr>
         `;
@@ -195,7 +362,8 @@ function showLeadDetails(leadId) {
 ${lead.notes || 'Sin notas'}
 
 ---
-Para cambiar estado: Ve al Pipeline y arrastra la tarjeta`);
+Para cambiar estado: Ve al Pipeline y arrastra la tarjeta
+Para eliminar: Usa el botón 🗑️ en la tabla de leads`);
 }
 
 // ===== MONITORING (DIRECTOR) =====
@@ -469,14 +637,22 @@ function updateTodayContacts() {
             ? `<div style="color: #667eea; font-size: 0.8rem; font-weight: 600; margin-top: 0.25rem;">👤 ${getUserDisplayName(contact.salesperson)}</div>`
             : '';
         
+        // Check if user can delete this contact
+        const canDelete = currentUser.role === 'director' || contact.salesperson === currentUser.username;
+        
         return `
             <div style="background: #f9fafb; padding: 1rem; border-radius: 5px; margin-bottom: 0.5rem; border: 1px solid #e5e7eb;">
-                <div style="font-weight: 600; color: #333;">${contact.name}</div>
-                <div style="color: #666; font-size: 0.9rem; margin-top: 0.25rem;">📞 ${contact.phone}</div>
-                <div style="color: #666; font-size: 0.9rem;">📍 ${contact.source}</div>
-                <div style="color: #888; font-size: 0.8rem; margin-top: 0.5rem;">⏰ ${contact.time}</div>
-                ${salespersonInfo}
-                ${contact.notes ? `<div style="color: #666; font-size: 0.8rem; background: #f0f9ff; padding: 0.5rem; border-radius: 4px; margin-top: 0.5rem;">💬 ${contact.notes}</div>` : ''}
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div style="flex: 1;">
+                        <div style="font-weight: 600; color: #333;">${contact.name}</div>
+                        <div style="color: #666; font-size: 0.9rem; margin-top: 0.25rem;">📞 ${contact.phone}</div>
+                        <div style="color: #666; font-size: 0.9rem;">📍 ${contact.source}</div>
+                        <div style="color: #888; font-size: 0.8rem; margin-top: 0.5rem;">⏰ ${contact.time}</div>
+                        ${salespersonInfo}
+                        ${contact.notes ? `<div style="color: #666; font-size: 0.8rem; background: #f0f9ff; padding: 0.5rem; border-radius: 4px; margin-top: 0.5rem;">💬 ${contact.notes}</div>` : ''}
+                    </div>
+                    ${canDelete ? `<button onclick="deleteLead('${contact.id}')" style="background: #ef4444; color: white; border: none; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.7rem; cursor: pointer; margin-left: 0.5rem;">🗑️</button>` : ''}
+                </div>
             </div>
         `;
     }).join('');
