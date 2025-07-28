@@ -230,7 +230,22 @@ async function setupUserInterface() {
     
     if (!currentUserProfile) {
         console.error('❌ No user profile available');
-        return;
+        
+        // Try to ensure profile exists
+        console.log('🔄 Attempting to create missing profile...');
+        const profileCreated = await ensureUserProfile();
+        
+        if (!profileCreated) {
+            alert(`❌ Error: No se pudo cargar el perfil del usuario.
+
+🔧 Soluciones:
+1. Usar "Debug Usuario" para más información
+2. Cerrar sesión y volver a iniciar
+3. Contactar al administrador
+
+El sistema puede no funcionar correctamente sin un perfil válido.`);
+            return;
+        }
     }
     
     document.getElementById('currentUserName').textContent = currentUserProfile.name;
@@ -304,8 +319,14 @@ async function setupUserInterface() {
             console.log('🔄 Iniciando carga de datos Firebase...');
             
             // Wait for AdminData to be ready
-            while (!window.AdminData.isReady) {
+            let attempts = 0;
+            while (!window.AdminData.isReady && attempts < 50) {
                 await new Promise(resolve => setTimeout(resolve, 100));
+                attempts++;
+            }
+            
+            if (!window.AdminData.isReady) {
+                console.warn('⚠️ AdminData not ready after 5 seconds, continuing anyway');
             }
             
             // Initial data load and UI update
@@ -356,12 +377,39 @@ async function addUser() {
         return;
     }
     
+    // Disable button to prevent double submission
+    const submitBtn = document.querySelector('button[onclick="addUser()"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<div class="loading-spinner" style="width: 12px; height: 12px; display: inline-block; margin-right: 0.5rem;"></div>Creando...';
+    
     try {
         // Create display name from email
         const name = email.split('@')[0].split('.').map(n => n.charAt(0).toUpperCase() + n.slice(1)).join(' ');
         
-        // Create user in Firebase
-        await saveUser(email, password, { name, role });
+        console.log('🔄 Creating Firebase user:', email);
+        
+        // Create user in Firebase Auth
+        const user = await saveUser(email, password, { name, role });
+        console.log('✅ Firebase Auth user created:', user.uid);
+        
+        // ✅ CRITICAL FIX: Ensure profile is created immediately
+        console.log('🔄 Creating user profile in database...');
+        
+        if (window.firebaseDb) {
+            const profileRef = window.firebaseDb.ref(`users/${user.uid}/profile`);
+            await profileRef.set({
+                name: name,
+                email: email,
+                role: role,
+                createdAt: new Date().toISOString(),
+                lastLogin: null,
+                updatedAt: new Date().toISOString()
+            });
+            console.log('✅ User profile created in database');
+        } else {
+            console.warn('⚠️ Firebase database not available, profile creation skipped');
+        }
         
         // Clear form
         document.getElementById('newUsername').value = '';
@@ -371,18 +419,27 @@ async function addUser() {
         await updateUsersList();
         await populateSalespersonFilter();
         
-        alert(`✅ Usuario agregado correctamente en Firebase!
+        alert(`✅ Usuario creado correctamente en Firebase!
 
 👤 Email: ${email}
 🏷️ Nombre: ${name}
 🎭 Rol: ${role === 'director' ? 'Director' : 'Vendedor'}
+🔥 Perfil: Creado automáticamente
+📊 Base de datos: Firebase Realtime Database
 
-El usuario ya puede iniciar sesión con su email y contraseña.`);
+El usuario ya puede iniciar sesión inmediatamente sin errores.`);
         
-        console.log('✅ New Firebase user added:', email);
+        console.log('✅ Complete Firebase user setup finished:', email);
     } catch (error) {
         console.error('❌ Error adding Firebase user:', error);
-        alert(`❌ Error al crear usuario: ${error.message}`);
+        alert(`❌ Error al crear usuario: ${error.message}
+
+Si el usuario se creó en Authentication pero falló el perfil, 
+puedes usar la herramienta de diagnóstico para repararlo.`);
+    } finally {
+        // Re-enable button
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
     }
 }
 
@@ -736,6 +793,197 @@ async function clearLocalData() {
     }
 }
 
+// ===== PROFILE MANAGEMENT & ERROR PREVENTION =====
+
+// Function to ensure user profile exists and create if missing
+async function ensureUserProfile() {
+    if (!window.FirebaseData || !window.FirebaseData.currentUser) {
+        console.log('No authenticated user for profile check');
+        return false;
+    }
+
+    try {
+        const user = window.FirebaseData.currentUser;
+        console.log('🔍 Checking profile for user:', user.email);
+        
+        // Try to load existing profile
+        let profile = await window.FirebaseData.loadUserProfile();
+        
+        if (!profile) {
+            console.log('⚠️ Profile not found, creating new one...');
+            
+            // Determine role based on email (temporary solution)
+            const isDirector = user.email.includes('director') || 
+                             user.email.includes('admin') || 
+                             user.email.includes('jefe');
+            const role = isDirector ? 'director' : 'vendedor';
+            
+            // Create name from email
+            const name = user.email.split('@')[0]
+                .split('.')
+                .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+                .join(' ');
+            
+            // Create profile in Firebase
+            if (window.firebaseDb) {
+                const profileRef = window.firebaseDb.ref(`users/${user.uid}/profile`);
+                await profileRef.set({
+                    name: name,
+                    email: user.email,
+                    role: role,
+                    createdAt: new Date().toISOString(),
+                    lastLogin: new Date().toISOString(),
+                    autoCreated: true
+                });
+                
+                console.log('✅ Profile auto-created:', { name, email: user.email, role });
+                
+                // Update current user profile
+                currentUserProfile = await window.FirebaseData.loadUserProfile();
+                
+                // Show success message
+                setTimeout(() => {
+                    alert(`✅ Perfil creado automáticamente!
+
+👤 Nombre: ${name}
+📧 Email: ${user.email} 
+🎭 Rol: ${role === 'director' ? 'Director' : 'Vendedor'}
+🔄 Creación: Automática
+
+Ahora puedes usar el sistema normalmente.`);
+                }, 1000);
+                
+                return true;
+            } else {
+                console.error('❌ Firebase database not available');
+                return false;
+            }
+        } else {
+            console.log('✅ Profile found:', profile);
+            currentUserProfile = profile;
+            return true;
+        }
+    } catch (error) {
+        console.error('❌ Error checking/creating profile:', error);
+        alert(`❌ Error verificando perfil: ${error.message}`);
+        return false;
+    }
+}
+
+// Function to repair missing profiles for existing users
+async function repairUserProfiles() {
+    if (!window.FirebaseData || currentUserProfile?.role !== 'director') {
+        alert('❌ Solo el director puede reparar perfiles de usuarios');
+        return;
+    }
+
+    try {
+        console.log('🔧 Starting user profile repair...');
+        
+        // Get all authenticated users
+        const authUsers = await window.firebaseDb.ref('users').once('value');
+        const authUsersData = authUsers.val() || {};
+        
+        let repairedCount = 0;
+        let totalUsers = Object.keys(authUsersData).length;
+        
+        if (totalUsers === 0) {
+            alert('ℹ️ No hay usuarios para reparar');
+            return;
+        }
+        
+        for (const [userId, userData] of Object.entries(authUsersData)) {
+            if (!userData.profile) {
+                console.log(`🔧 Repairing profile for user ${userId}`);
+                
+                // Create basic profile
+                const profileRef = window.firebaseDb.ref(`users/${userId}/profile`);
+                await profileRef.set({
+                    name: `Usuario ${userId.substring(0, 8)}`,
+                    email: `user-${userId}@ciudadbilingue.com`,
+                    role: 'vendedor',
+                    createdAt: new Date().toISOString(),
+                    repairedAt: new Date().toISOString(),
+                    needsUpdate: true
+                });
+                
+                repairedCount++;
+            }
+        }
+        
+        if (repairedCount > 0) {
+            alert(`✅ Reparación completada!
+
+🔧 Perfiles reparados: ${repairedCount}
+👥 Total usuarios: ${totalUsers}
+
+Los usuarios reparados necesitarán actualizar su información.`);
+        } else {
+            alert('✅ Todos los perfiles están en orden');
+        }
+        
+        console.log('✅ Profile repair completed');
+    } catch (error) {
+        console.error('❌ Error repairing profiles:', error);
+        alert(`❌ Error en la reparación: ${error.message}`);
+    }
+}
+
+// Function to show detailed user debug information  
+async function debugUserProfile() {
+    if (!window.FirebaseData || !window.FirebaseData.currentUser) {
+        alert('❌ No hay usuario autenticado');
+        return;
+    }
+    
+    try {
+        const user = window.FirebaseData.currentUser;
+        const profile = await window.FirebaseData.loadUserProfile();
+        
+        let debugInfo = `🔍 DEBUG INFORMACIÓN COMPLETA DEL USUARIO:
+
+🔐 Firebase Authentication:
+   - UID: ${user.uid}
+   - Email: ${user.email}
+   - Verificado: ${user.emailVerified}
+   - Proveedor: ${user.providerData[0]?.providerId || 'N/A'}
+   - Creado: ${new Date(parseInt(user.metadata.createdAt)).toLocaleString()}
+   - Último login: ${new Date(parseInt(user.metadata.lastSignInTime)).toLocaleString()}
+
+👤 Perfil en Realtime Database:
+   - Existe: ${profile ? 'SÍ ✅' : 'NO ❌'}`;
+        
+        if (profile) {
+            debugInfo += `
+   - Nombre: ${profile.name}
+   - Email: ${profile.email}
+   - Rol: ${profile.role}
+   - Creado: ${new Date(profile.createdAt).toLocaleString()}
+   - Auto-creado: ${profile.autoCreated ? 'Sí' : 'No'}
+   - Necesita actualización: ${profile.needsUpdate ? 'Sí' : 'No'}`;
+        } else {
+            debugInfo += `
+   - ⚠️ PERFIL FALTANTE
+   - Esta es la causa del error "Cannot read properties of null"`;
+        }
+        
+        debugInfo += `
+
+🔥 Estado del Sistema:
+   - Firebase conectado: ${window.firebaseApp ? 'SÍ' : 'NO'}
+   - Database disponible: ${window.firebaseDb ? 'SÍ' : 'NO'}
+   - AdminData listo: ${window.AdminData?.isReady ? 'SÍ' : 'NO'}
+
+💡 Acciones disponibles:
+   ${profile ? '- Perfil OK, sistema funcional' : '- Click "Crear Perfil Automático" para solucionar'}
+   - Use "Reparar Perfiles" si hay múltiples usuarios con problemas`;
+        
+        alert(debugInfo);
+    } catch (error) {
+        alert(`❌ Error en debug: ${error.message}`);
+    }
+}
+
 // ===== MIGRATION HELPERS =====
 
 async function migrateFromLocalStorage() {
@@ -771,35 +1019,89 @@ async function diagnoseDirectorData() {
     
     console.log('🔍 DIAGNÓSTICO COMPLETO DE DATOS FIREBASE DEL DIRECTOR');
     
-    const allData = AdminData.getAllData();
-    const filteredData = getFilteredData();
-    const usersCount = Object.keys(users).length;
-    
-    let diagnostic = `🔍 DIAGNÓSTICO FIREBASE DEL DIRECTOR\n\n`;
-    diagnostic += `👥 Usuarios en Firebase: ${usersCount}\n`;
-    diagnostic += `📊 Total contactos Firebase: ${allData.length}\n`;
-    diagnostic += `📊 Vista filtrada: ${filteredData.length}\n`;
-    diagnostic += `🔥 Firebase Ready: ${AdminData.isReady}\n`;
-    diagnostic += `🔐 Authenticated: ${!!currentUser}\n\n`;
-    
-    // Show all users and their data
-    diagnostic += `👥 DETALLES POR USUARIO:\n`;
-    Object.entries(users).forEach(([userId, user]) => {
-        const userContacts = allData.filter(d => 
-            d.salespersonId === userId || d.salesperson === userId
-        ).length;
-        diagnostic += `   - ${user.name} (${user.email}): ${userContacts} contactos\n`;
-    });
-    
-    // Firebase system status
-    const systemStatus = AdminData.getSystemStatus();
-    diagnostic += `\n🔥 ESTADO DEL SISTEMA:\n`;
-    diagnostic += `   - Source: ${systemStatus.source}\n`;
-    diagnostic += `   - Ready: ${systemStatus.isReady}\n`;
-    diagnostic += `   - Observers: ${systemStatus.observers}\n`;
-    diagnostic += `   - Last Update: ${systemStatus.lastUpdate ? new Date(systemStatus.lastUpdate).toLocaleString() : 'N/A'}\n`;
-    
-    alert(diagnostic);
+    try {
+        const allData = AdminData?.getAllData() || [];
+        const filteredData = getFilteredData();
+        const usersCount = Object.keys(users).length;
+        const systemStatus = AdminData?.getSystemStatus();
+        
+        // Check for profile issues
+        let profileIssues = 0;
+        let usersWithoutProfiles = [];
+        
+        for (const [userId, user] of Object.entries(users)) {
+            if (!user.name || !user.role || !user.email) {
+                profileIssues++;
+                usersWithoutProfiles.push(userId);
+            }
+        }
+        
+        let diagnostic = `🔍 DIAGNÓSTICO FIREBASE COMPLETO
+
+🔥 ESTADO DE FIREBASE:
+   - Conectado: ${window.firebaseApp ? 'SÍ ✅' : 'NO ❌'}
+   - Database: ${window.firebaseDb ? 'SÍ ✅' : 'NO ❌'}
+   - Auth: ${window.FirebaseData?.currentUser ? 'SÍ ✅' : 'NO ❌'}
+   - AdminData Ready: ${AdminData?.isReady ? 'SÍ ✅' : 'NO ❌'}
+
+👥 USUARIOS EN FIREBASE:
+   - Total usuarios: ${usersCount}
+   - Usuarios con problemas: ${profileIssues}
+   - Director autenticado: ${currentUser?.uid ? 'SÍ' : 'NO'}
+
+📊 DATOS DEL SISTEMA:
+   - Total contactos Firebase: ${allData.length}
+   - Vista filtrada: ${filteredData.length}
+   - Sincronización: ${systemStatus?.source || 'Unknown'}`;
+        
+        if (profileIssues > 0) {
+            diagnostic += `
+
+⚠️ PROBLEMAS DETECTADOS:
+   - ${profileIssues} usuarios con perfiles incompletos
+   - Esto puede causar errores al agregar contactos
+   - Usuarios afectados: ${usersWithoutProfiles.slice(0, 3).join(', ')}${usersWithoutProfiles.length > 3 ? '...' : ''}`;
+        }
+        
+        // Show all users and their data
+        diagnostic += `\n\n👥 DETALLES POR USUARIO:`;
+        let userIndex = 1;
+        for (const [userId, user] of Object.entries(users)) {
+            const userContacts = allData.filter(d => 
+                d.salespersonId === userId || d.salesperson === userId
+            ).length;
+            const hasCompleteProfile = user.name && user.role && user.email;
+            diagnostic += `\n   ${userIndex}. ${user.name || 'Sin nombre'} (${user.email || 'Sin email'})`;
+            diagnostic += `\n      - Rol: ${user.role || 'Sin rol'}`;
+            diagnostic += `\n      - Contactos: ${userContacts}`;
+            diagnostic += `\n      - Perfil: ${hasCompleteProfile ? 'Completo ✅' : 'Incompleto ⚠️'}`;
+            userIndex++;
+        }
+        
+        // Firebase system status
+        if (systemStatus) {
+            diagnostic += `\n\n🔥 ESTADO DEL SISTEMA:
+   - Fuente: ${systemStatus.source}
+   - Ready: ${systemStatus.isReady}
+   - Observers: ${systemStatus.observers}
+   - Última actualización: ${systemStatus.lastUpdate ? new Date(systemStatus.lastUpdate).toLocaleString() : 'N/A'}`;
+        }
+        
+        diagnostic += `\n\n🛠️ ACCIONES RECOMENDADAS:`;
+        if (profileIssues > 0) {
+            diagnostic += `\n   1. Click "Reparar Perfiles" para solucionar usuarios incompletos`;
+            diagnostic += `\n   2. Verificar que todos los usuarios puedan hacer login`;
+        } else {
+            diagnostic += `\n   ✅ Sistema funcionando correctamente`;
+        }
+        diagnostic += `\n   3. Use "Debug Usuario" para problemas específicos`;
+        diagnostic += `\n   4. Contactos se sincronizan en tiempo real`;
+        
+        alert(diagnostic);
+    } catch (error) {
+        console.error('❌ Error in diagnosis:', error);
+        alert(`❌ Error en el diagnóstico: ${error.message}`);
+    }
 }
 
 console.log('✅ Firebase Core module loaded successfully');
