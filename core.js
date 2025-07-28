@@ -776,3 +776,83 @@ function clearLocalData() {
         }
     }
 }
+// 3. AGREGAR AL FINAL DE core.js
+function showSyncNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        background: ${type === 'success' ? '#10b981' : type === 'warning' ? '#f59e0b' : '#667eea'};
+        color: white;
+        padding: 1rem 1.5rem;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        z-index: 1000;
+        animation: slideIn 0.3s ease;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        max-width: 300px;
+    `;
+    
+    notification.innerHTML = `<div>${message}</div>`;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.style.animation = 'slideOut 0.3s ease';
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 300);
+    }, 5000);
+}
+
+function forceCrossDeviceSync() {
+    if (!window.GitHubData || !window.GitHubData.getToken()) {
+        alert('⚠️ GitHub no configurado. Para sincronización cross-device, configura GitHub en la sección del director.');
+        return;
+    }
+    
+    showSyncNotification('🔄 Sincronizando...', 'info');
+    
+    window.GitHubData.getAllContacts().then(githubContacts => {
+        if (githubContacts.length > AdminData.getAllData().length) {
+            AdminData.data = githubContacts;
+            AdminData.saveData();
+            AdminData.notifyObservers();
+            updateAllViews();
+            showSyncNotification('✅ Sincronización completada', 'success');
+        } else {
+            showSyncNotification('ℹ️ No hay nuevos datos', 'info');
+        }
+    }).catch(error => {
+        showSyncNotification('❌ Error: ' + error.message, 'warning');
+    });
+}
+
+// 4. MODIFICAR setupUserInterface EN core.js - AGREGAR ESTAS LÍNEAS AL FINAL
+// DESPUÉS DE LA LÍNEA: setTimeout(() => {
+if (window.AdminData) {
+    // Habilitar auto-sync
+    setTimeout(() => {
+        if (window.AdminData.enableAutoSync) {
+            AdminData.enableAutoSync();
+        }
+    }, 2000);
+    
+    // Sincronización inicial desde GitHub
+    if (window.GitHubData && window.GitHubData.getToken()) {
+        window.GitHubData.getAllContacts().then(githubContacts => {
+            if (githubContacts.length > AdminData.getAllData().length) {
+                AdminData.data = githubContacts;
+                AdminData.saveData();
+                AdminData.notifyObservers();
+                updateAllViews();
+                showSyncNotification(`📥 ${githubContacts.length} contactos sincronizados al inicio`);
+            }
+        }).catch(error => {
+            console.log('⚠️ Sync inicial falló:', error.message);
+        });
+    }
+}
