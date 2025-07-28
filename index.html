@@ -690,10 +690,13 @@
                 <!-- Firebase Migration Section -->
                 <div id="directorConfig" class="hidden">
                     <div style="background: #dbeafe; padding: 2rem; border-radius: 10px; border-left: 4px solid #3b82f6; margin-bottom: 2rem;">
-                        <h3>🔄 Migración Firebase</h3>
-                        <p style="margin: 1rem 0; color: #1e40af;">Si tienes datos en localStorage, puedes migrarlos a Firebase automáticamente.</p>
+                        <h3>🔄 Migración & Reparación Firebase</h3>
+                        <p style="margin: 1rem 0; color: #1e40af;">Herramientas para migrar datos y reparar perfiles de usuario.</p>
                         <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
                             <button onclick="migrateFromLocalStorage()" class="btn btn-firebase">🔄 Migrar desde localStorage</button>
+                            <button onclick="repairUserProfiles()" class="btn btn-warning">🔧 Reparar Perfiles</button>
+                            <button onclick="ensureUserProfile()" class="btn btn-success">👤 Crear Perfil Automático</button>
+                            <button onclick="debugUserProfile()" class="btn btn-secondary">🔍 Debug Usuario</button>
                             <button onclick="diagnoseDirectorData()" class="btn btn-secondary">🔍 Diagnosticar Sistema</button>
                         </div>
                     </div>
@@ -922,121 +925,96 @@
         window.dispatchEvent(new Event('firebaseReady'));
     </script>
 
+    <!-- Auto Profile Creation Script -->
+    <script>
+        // Auto-ensure user profile when Firebase is ready and user authenticates
+        window.addEventListener('firebaseReady', () => {
+            console.log('🔥 Firebase ready, setting up auto-profile creation...');
+            
+            // Setup auth state listener for automatic profile creation
+            if (window.FirebaseData && window.FirebaseData.auth) {
+                window.FirebaseData.auth.onAuthStateChanged(async (user) => {
+                    if (user) {
+                        console.log('👤 User authenticated, checking profile...');
+                        
+                        // Wait a bit for the system to initialize
+                        setTimeout(async () => {
+                            try {
+                                // Check if profile exists
+                                const profile = await window.FirebaseData.loadUserProfile();
+                                
+                                if (!profile) {
+                                    console.log('⚠️ No profile found, auto-creating...');
+                                    
+                                    // Determine role based on email
+                                    const isDirector = user.email.includes('director') || 
+                                                     user.email.includes('admin') || 
+                                                     user.email.includes('jefe');
+                                    const role = isDirector ? 'director' : 'vendedor';
+                                    
+                                    // Create name from email
+                                    const name = user.email.split('@')[0]
+                                        .split('.')
+                                        .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+                                        .join(' ');
+                                    
+                                    // Create profile
+                                    const profileRef = window.firebaseDb.ref(`users/${user.uid}/profile`);
+                                    await profileRef.set({
+                                        name: name,
+                                        email: user.email,
+                                        role: role,
+                                        createdAt: new Date().toISOString(),
+                                        lastLogin: new Date().toISOString(),
+                                        autoCreated: true
+                                    });
+                                    
+                                    console.log('✅ Profile auto-created successfully');
+                                    
+                                    // Show success notification
+                                    setTimeout(() => {
+                                        const notification = document.createElement('div');
+                                        notification.style.cssText = `
+                                            position: fixed;
+                                            top: 80px;
+                                            right: 20px;
+                                            background: #10b981;
+                                            color: white;
+                                            padding: 1rem 1.5rem;
+                                            border-radius: 8px;
+                                            font-size: 0.9rem;
+                                            font-weight: 500;
+                                            z-index: 1000;
+                                            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                                        `;
+                                        notification.innerHTML = `✅ Perfil creado: ${name} (${role})`;
+                                        document.body.appendChild(notification);
+                                        
+                                        setTimeout(() => {
+                                            if (notification.parentNode) {
+                                                notification.parentNode.removeChild(notification);
+                                            }
+                                        }, 5000);
+                                    }, 1000);
+                                } else {
+                                    console.log('✅ Profile exists:', profile.name);
+                                }
+                            } catch (error) {
+                                console.error('❌ Error in auto-profile creation:', error);
+                            }
+                        }, 2000);
+                    }
+                });
+            }
+        });
+        
+        console.log('🔧 Auto-profile creation script loaded');
+    </script>
+
     <!-- Include all the JavaScript files -->
     <script src="AdminData.js"></script>
     <script src="core.js"></script>
     <script src="sales.js"></script>
     <script src="pipeline.js"></script>
-
-    <script>
-// SOLUCIÓN: Agregar este código al final de index.html antes de </body>
-
-// Función para crear perfil de usuario si no existe
-async function ensureUserProfile() {
-    if (!window.FirebaseData || !window.FirebaseData.currentUser) {
-        console.log('No hay usuario autenticado');
-        return;
-    }
-
-    try {
-        const user = window.FirebaseData.currentUser;
-        console.log('Verificando perfil para usuario:', user.email);
-        
-        // Intentar cargar el perfil existente
-        let profile = await window.FirebaseData.loadUserProfile();
-        
-        if (!profile) {
-            console.log('⚠️ Perfil no encontrado, creando uno nuevo...');
-            
-            // Determinar rol basado en email (temporal)
-            const isDirector = user.email.includes('director') || user.email.includes('admin');
-            const role = isDirector ? 'director' : 'vendedor';
-            
-            // Crear nombre a partir del email
-            const name = user.email.split('@')[0]
-                .split('.')
-                .map(part => part.charAt(0).toUpperCase() + part.slice(1))
-                .join(' ');
-            
-            // Crear perfil en Firebase
-            const profileRef = window.firebaseDb.ref(`users/${user.uid}/profile`);
-            await profileRef.set({
-                name: name,
-                email: user.email,
-                role: role,
-                createdAt: new Date().toISOString(),
-                lastLogin: new Date().toISOString()
-            });
-            
-            console.log('✅ Perfil creado:', { name, email: user.email, role });
-            
-            // Mostrar mensaje al usuario
-            alert(`✅ Perfil creado automáticamente!
-
-👤 Nombre: ${name}
-📧 Email: ${user.email} 
-🎭 Rol: ${role === 'director' ? 'Director' : 'Vendedor'}
-
-Ahora puedes usar el sistema normalmente.`);
-            
-            // Recargar la página para aplicar cambios
-            window.location.reload();
-        } else {
-            console.log('✅ Perfil encontrado:', profile);
-        }
-    } catch (error) {
-        console.error('❌ Error verificando perfil:', error);
-        alert(`❌ Error creando perfil: ${error.message}`);
-    }
-}
-
-// Función para mostrar información de debug del usuario
-function debugUserProfile() {
-    if (!window.FirebaseData || !window.FirebaseData.currentUser) {
-        alert('❌ No hay usuario autenticado');
-        return;
-    }
-    
-    const user = window.FirebaseData.currentUser;
-    window.FirebaseData.loadUserProfile().then(profile => {
-        alert(`🔍 DEBUG INFORMACIÓN DEL USUARIO:
-
-🔐 Usuario Autenticado:
-   - UID: ${user.uid}
-   - Email: ${user.email}
-   - Verificado: ${user.emailVerified}
-
-👤 Perfil en Database:
-   - Existe: ${profile ? 'SÍ' : 'NO'}
-   ${profile ? `- Nombre: ${profile.name}
-   - Rol: ${profile.role}
-   - Creado: ${profile.createdAt}` : '- ⚠️ PERFIL FALTANTE - Esta es la causa del error'}
-
-💡 Solución: ${profile ? 'Perfil OK' : 'Click "Crear Perfil" para solucionarlo'}`);
-    }).catch(error => {
-        alert(`❌ Error cargando perfil: ${error.message}`);
-    });
-}
-
-// Auto-ejecutar verificación cuando Firebase esté listo
-window.addEventListener('firebaseReady', () => {
-    setTimeout(() => {
-        if (window.FirebaseData && window.FirebaseData.currentUser) {
-            ensureUserProfile();
-        }
-    }, 2000);
-});
-
-// También verificar cuando el usuario hace login
-if (window.FirebaseData && window.FirebaseData.auth) {
-    window.FirebaseData.auth.onAuthStateChanged((user) => {
-        if (user) {
-            setTimeout(ensureUserProfile, 1000);
-        }
-    });
-}
-
-console.log('🔧 Script de reparación de perfil cargado');
-    
 </body>
 </html>
