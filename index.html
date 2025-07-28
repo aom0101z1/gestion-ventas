@@ -1,35 +1,34 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>CRM App</title>
-</head>
-<body>
-  <div id="app"></div>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Ciudad Bilingüe CRM</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+  </head>
+  <body>
+    <h1>Ciudad Bilingüe CRM</h1>
 
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js"></script>
+    <script>
+      const firebaseConfig = {
+        apiKey: "AIzaSyCuq1z8eTo9rufdEDXQFfvoxOkce-kBWOY",
+        authDomain: "ciudad-bilingue-crm.firebaseapp.com",
+        databaseURL: "https://ciudad-bilingue-crm-default-rtdb.firebaseio.com",
+        projectId: "ciudad-bilingue-crm",
+        storageBucket: "ciudad-bilingue-crm.firebasestorage.app",
+        messagingSenderId: "690594486040",
+        appId: "1:690594486040:web:e8fffcffcee68a4d94f06d"
+      };
 
-  <script>
-    const firebaseConfig = {
-  apiKey: "AIzaSyCuq1z8eTo9rufdEDXQFfvoxOkce-kBWOY",
-  authDomain: "ciudad-bilingue-crm.firebaseapp.com",
-  databaseURL: "https://ciudad-bilingue-crm-default-rtdb.firebaseio.com",
-  projectId: "ciudad-bilingue-crm",
-  storageBucket: "ciudad-bilingue-crm.firebasestorage.app",
-  messagingSenderId: "690594486040",
-  appId: "1:690594486040:web:e8fffcffcee68a4d94f06d"
-};
+      // Inicializar Firebase
+      firebase.initializeApp(firebaseConfig);
+      console.log("✅ Firebase inicializado correctamente.");
+    </script>
 
-    firebase.initializeApp(firebaseConfig);
-    const database = firebase.database();
-    window.database = database; // expone para AdminData.js
-  </script>
-
-  <script src="core.js"></script>
-  <script src="AdminData.js"></script>
-  <script src="sales.js"></script>
-  <script src="pipeline.js"></script>
-</body>
+    <!-- Carga de scripts principales -->
+    <script src="core.js"></script>
+    <script src="sales.js"></script>
+    <script src="AdminData.js"></script>
+    <script src="pipeline.js"></script>
+  </body>
 </html>
