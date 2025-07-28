@@ -1,16 +1,35 @@
+// core.js - FIXED VERSION
 // ===== VARIABLES GLOBALES =====
-const users = {
-    'director': { password: 'admin123', role: 'director', name: 'Director General' },
-    'maria.garcia': { password: 'maria123', role: 'vendedor', name: 'María García' },
-    'juan.perez': { password: 'juan123', role: 'vendedor', name: 'Juan Pérez' }
-};
-
+let users = loadUsers(); // Load from localStorage instead of hardcoded
 let convenios = JSON.parse(localStorage.getItem('convenios')) || [
     'Remigio', 'Hogar Nazaret', 'Empresa de Energía', 'Coats Cadena', 'Efigas', 'Cooperativa'
 ];
 
 let currentUser = null;
 let autoSyncEnabled = localStorage.getItem('autoSyncEnabled') !== 'false';
+
+// ===== PERSISTENT USER MANAGEMENT =====
+function loadUsers() {
+    const savedUsers = localStorage.getItem('ciudad_bilingue_users');
+    if (savedUsers) {
+        console.log('✅ Loading users from localStorage');
+        return JSON.parse(savedUsers);
+    } else {
+        console.log('🔧 Creating default users');
+        const defaultUsers = {
+            'director': { password: 'admin123', role: 'director', name: 'Director General' },
+            'maria.garcia': { password: 'maria123', role: 'vendedor', name: 'María García' },
+            'juan.perez': { password: 'juan123', role: 'vendedor', name: 'Juan Pérez' }
+        };
+        saveUsers(defaultUsers);
+        return defaultUsers;
+    }
+}
+
+function saveUsers(usersData = users) {
+    localStorage.setItem('ciudad_bilingue_users', JSON.stringify(usersData));
+    console.log('💾 Users saved to localStorage');
+}
 
 // ===== CENTRALIZED DATA ACCESS =====
 function getAllData() {
@@ -36,7 +55,18 @@ function getFilteredData() {
         return getFilteredDataFallback();
     }
     
+    // FORCE SYNC FOR DIRECTOR
     if (currentUser?.role === 'director') {
+        console.log('👑 Director detected - forcing data sync');
+        const currentCount = AdminData.getAllData().length;
+        const storageData = localStorage.getItem('ciudad_bilingue_sales_data');
+        const storageCount = storageData ? JSON.parse(storageData).length : 0;
+        
+        if (storageCount > currentCount) {
+            console.log(`🔄 Syncing ${storageCount} records from storage`);
+            AdminData.forceSyncFromStorage();
+        }
+        
         const data = AdminData.getAllData();
         console.log('👑 Director - returning ALL data:', data.length, 'records');
         return data;
@@ -68,7 +98,7 @@ function getFilteredDataFallback() {
     }
 }
 
-// ===== VERIFICACIÓN DE INTEGRIDAD DE DATOS =====
+// ===== ENHANCED DATA INTEGRITY FUNCTIONS =====
 function verifyDataIntegrity() {
     if (!window.AdminData) {
         console.error('❌ AdminData no disponible');
@@ -83,151 +113,68 @@ function verifyDataIntegrity() {
     console.log('📊 AdminData:', adminData.length, 'registros');
     console.log('📊 localStorage:', localStorage.length, 'registros');
     
-    // Verificar sincronización
+    // Auto-repair if discrepancy detected
     if (adminData.length !== localStorage.length) {
-        console.warn('⚠️ Desincronización detectada');
-        return false;
-    }
-    
-    // Verificar que los últimos IDs coinciden
-    if (adminData.length > 0 && localStorage.length > 0) {
-        const lastAdminId = Math.max(...adminData.map(d => d.id));
-        const lastLocalId = Math.max(...localStorage.map(d => d.id));
+        console.warn('⚠️ Desincronización detectada - auto-reparando...');
+        const largerDataset = localStorage.length > adminData.length ? localStorage : adminData;
         
-        console.log('🆔 Último ID AdminData:', lastAdminId);
-        console.log('🆔 Último ID localStorage:', lastLocalId);
-        
-        if (lastAdminId !== lastLocalId) {
-            console.warn('⚠️ IDs no coinciden');
-            return false;
+        if (localStorage.length > adminData.length) {
+            AdminData.importData(localStorage);
+            console.log('✅ AdminData actualizado desde localStorage');
         }
+        
+        return false;
     }
     
     console.log('✅ Integridad de datos verificada');
     return true;
 }
 
-// ===== FUNCIÓN DE DEBUG EN TIEMPO REAL =====
-function realTimeDataDebug() {
-    console.log('🔴 INICIANDO DEBUG EN TIEMPO REAL...');
+function forceFullSync() {
+    console.log('🔄 INICIANDO SINCRONIZACIÓN COMPLETA...');
     
     if (!window.AdminData) {
-        alert('❌ AdminData no disponible');
-        return;
+        console.error('❌ AdminData no disponible');
+        return false;
     }
     
-    const currentData = AdminData.getAllData();
-    const localStorage = JSON.parse(window.localStorage.getItem('ciudad_bilingue_sales_data') || '[]');
+    // Step 1: Force sync from localStorage
+    AdminData.forceSyncFromStorage();
     
-    let debugInfo = `🔍 DEBUG EN TIEMPO REAL - ${new Date().toLocaleTimeString()}\n\n`;
-    debugInfo += `👤 Usuario: ${currentUser.username} (${currentUser.role})\n`;
-    debugInfo += `📊 AdminData: ${currentData.length} registros\n`;
-    debugInfo += `📊 localStorage: ${localStorage.length} registros\n`;
-    debugInfo += `🔄 Sincronización: ${currentData.length === localStorage.length ? '✅ OK' : '❌ ERROR'}\n\n`;
-    
-    if (currentUser.role === 'director') {
-        debugInfo += `👑 VISTA DEL DIRECTOR:\n`;
-        const teamStats = AdminData.getTeamStats();
-        debugInfo += `   - Vendedores: ${teamStats.salespeople.length}\n`;
-        teamStats.salespeople.forEach(sp => {
-            debugInfo += `   - ${sp.displayName}: ${sp.stats.totalContacts} contactos\n`;
-        });
-    } else {
-        const myData = AdminData.getDataBySalesperson(currentUser.username);
-        debugInfo += `👤 MIS DATOS:\n`;
-        debugInfo += `   - Mis contactos: ${myData.length}\n`;
-        debugInfo += `   - Contactos hoy: ${myData.filter(c => c.date === new Date().toISOString().split('T')[0]).length}\n`;
-    }
-    
-    // Últimos 3 contactos agregados
-    const recentContacts = [...currentData]
-        .sort((a, b) => b.id - a.id)
-        .slice(0, 3);
-    
-    debugInfo += `\n📋 ÚLTIMOS 3 CONTACTOS:\n`;
-    recentContacts.forEach((contact, index) => {
-        debugInfo += `   ${index + 1}. ${contact.name} (${contact.salesperson}) - ID: ${contact.id}\n`;
-    });
-    
-    alert(debugInfo);
-    
-    // También log detallado en consola
-    console.log('📊 AdminData completo:', currentData);
-    console.log('📊 localStorage completo:', localStorage);
-    
-    return {
-        adminDataCount: currentData.length,
-        localStorageCount: localStorage.length,
-        synchronized: currentData.length === localStorage.length,
-        user: currentUser,
-        timestamp: new Date().toISOString()
-    };
-}
-
-// ===== FUNCIONES DE SINCRONIZACIÓN CROSS-DEVICE =====
-function showSyncNotification(message, type = 'info') {
-    const notification = document.createElement('div');
-    notification.style.cssText = `
-        position: fixed;
-        top: 80px;
-        right: 20px;
-        background: ${type === 'success' ? '#10b981' : type === 'warning' ? '#f59e0b' : '#667eea'};
-        color: white;
-        padding: 1rem 1.5rem;
-        border-radius: 8px;
-        font-size: 0.9rem;
-        font-weight: 500;
-        z-index: 1000;
-        animation: slideIn 0.3s ease;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        max-width: 300px;
-    `;
-    
-    notification.innerHTML = `<div>${message}</div>`;
-    document.body.appendChild(notification);
-    
+    // Step 2: Update all views
     setTimeout(() => {
-        notification.style.animation = 'slideOut 0.3s ease';
-        setTimeout(() => {
-            if (notification.parentNode) {
-                notification.parentNode.removeChild(notification);
-            }
-        }, 300);
-    }, 5000);
+        updateAllViews();
+        updateLeadsTable();
+        if (typeof refreshPipeline === 'function') refreshPipeline();
+    }, 200);
+    
+    // Step 3: Verify integrity
+    setTimeout(() => {
+        verifyDataIntegrity();
+    }, 500);
+    
+    console.log('✅ Sincronización completa finalizada');
+    return true;
 }
 
-function forceCrossDeviceSync() {
-    if (!window.GitHubData || !window.GitHubData.getToken()) {
-        alert('⚠️ GitHub no configurado. Para sincronización cross-device, configura GitHub en la sección del director.');
-        return;
-    }
-    
-    showSyncNotification('🔄 Sincronizando...', 'info');
-    
-    window.GitHubData.getAllContacts().then(githubContacts => {
-        if (githubContacts.length > AdminData.getAllData().length) {
-            AdminData.data = githubContacts;
-            AdminData.saveData();
-            AdminData.notifyObservers();
-            updateAllViews();
-            showSyncNotification('✅ Sincronización completada', 'success');
-        } else {
-            showSyncNotification('ℹ️ No hay nuevos datos', 'info');
-        }
-    }).catch(error => {
-        showSyncNotification('❌ Error: ' + error.message, 'warning');
-    });
-}
-
-// ===== INICIALIZACIÓN =====
+// ===== INICIALIZACIÓN MEJORADA =====
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 Initializing Ciudad Bilingue Sales System');
+    
+    // Load users first
+    users = loadUsers();
+    console.log('👥 Users loaded:', Object.keys(users).length);
     
     // Wait for AdminData to be available
     const checkAdminData = () => {
         if (window.AdminData) {
             console.log('✅ AdminData loaded successfully');
             setupAdminDataObservers();
+            
+            // Auto-repair data integrity on startup
+            setTimeout(() => {
+                verifyDataIntegrity();
+            }, 1000);
         } else {
             console.log('⏳ Waiting for AdminData...');
             setTimeout(checkAdminData, 100);
@@ -379,19 +326,22 @@ function setupUserInterface() {
     
     loadConveniosInSelect();
     
-    // CARGA DE DATOS MEJORADA CON AUTO-SYNC
+    // ENHANCED DATA LOADING WITH AUTO-SYNC
     setTimeout(() => {
         if (window.AdminData) {
-            console.log('🔄 Iniciando carga de datos con auto-sync...');
+            console.log('🔄 Iniciando carga de datos con auto-sync mejorado...');
             
-            // Habilitar auto-sync
+            // Force full synchronization
+            forceFullSync();
+            
+            // Enable auto-sync
             setTimeout(() => {
                 if (window.AdminData.enableAutoSync) {
                     AdminData.enableAutoSync();
                 }
             }, 2000);
             
-            // Sincronización inicial desde GitHub
+            // GitHub sync if available
             if (window.GitHubData && window.GitHubData.getToken()) {
                 window.GitHubData.getAllContacts().then(githubContacts => {
                     if (githubContacts.length > AdminData.getAllData().length) {
@@ -406,55 +356,25 @@ function setupUserInterface() {
                 });
             }
             
-            // Paso 1: Verificar y reparar datos
-            const wasRepaired = AdminData.verifyAndRepairData();
-            
-            // Paso 2: Forzar sincronización si es director
-            if (currentUser.role === 'director') {
-                console.log('👑 Director detectado - forzando sincronización completa');
-                const syncedCount = AdminData.forceSyncFromStorage();
-                console.log(`✅ Director sincronizado con ${syncedCount} registros`);
-            }
-            
-            // Paso 3: Cargar datos y actualizar vistas
-            loadLocalData();
-            
-            // Paso 4: Actualizar todas las vistas con delay escalonado
+            // Final setup with staggered updates
             setTimeout(() => {
                 console.log('🎯 Actualizando todas las vistas...');
                 updateAllViews();
                 
-                // Paso 5: Actualizar filtros del director
                 if (currentUser.role === 'director') {
                     populateSalespersonFilter();
-                    
-                    // Forzar actualización de la tabla de leads
                     setTimeout(() => {
                         updateLeadsTable();
                         console.log('✅ Vista del director completamente actualizada');
                     }, 300);
                 }
                 
-                // Paso 6: Refresh pipeline
                 if (typeof refreshPipeline === 'function') {
                     setTimeout(() => {
                         refreshPipeline();
                     }, 500);
                 }
-                
             }, 200);
-            
-            // Paso 7: Verificar integridad final
-            setTimeout(() => {
-                if (window.AdminData) {
-                    console.log('🔍 Verificando integridad al cargar interfaz...');
-                    const isIntegre = verifyDataIntegrity();
-                    if (!isIntegre) {
-                        console.warn('⚠️ Problemas de integridad detectados al cargar');
-                        AdminData.forceSyncFromStorage();
-                    }
-                }
-            }, 1000);
             
         } else {
             console.log('❌ AdminData no disponible, reintentando...');
@@ -479,7 +399,7 @@ async function initializeGitHubIntegration() {
     }
 }
 
-// ===== USUARIOS =====
+// ===== USUARIOS MEJORADOS =====
 function addUser() {
     if (currentUser.role !== 'director') {
         alert('❌ Solo el director puede agregar usuarios');
@@ -500,13 +420,32 @@ function addUser() {
         return;
     }
     
+    // Create display name from username
     const name = username.split('.').map(n => n.charAt(0).toUpperCase() + n.slice(1)).join(' ');
+    
+    // Add user to users object
     users[username] = { password, role, name };
     
+    // Save to localStorage
+    saveUsers(users);
+    
+    // Clear form
     document.getElementById('newUsername').value = '';
     document.getElementById('newPassword').value = '';
+    
+    // Update UI
     updateUsersList();
-    alert('✅ Usuario agregado correctamente');
+    populateSalespersonFilter(); // Update director filters
+    
+    alert(`✅ Usuario agregado correctamente!
+
+👤 Usuario: ${username}
+🏷️ Nombre: ${name}
+🎭 Rol: ${role === 'director' ? 'Director' : 'Vendedor'}
+
+El usuario ya puede iniciar sesión y aparecerá en los filtros del director.`);
+    
+    console.log('✅ New user added:', username, users[username]);
 }
 
 function deleteUser(username) {
@@ -515,10 +454,29 @@ function deleteUser(username) {
         return;
     }
     
-    if (confirm(`¿Estás seguro de eliminar al usuario ${users[username].name}?`)) {
+    if (confirm(`¿Estás seguro de eliminar al usuario ${users[username].name}?
+
+⚠️ Esta acción también eliminará todos los contactos asociados a este vendedor.`)) {
+        
+        // Remove user's data from AdminData
+        if (window.AdminData) {
+            const userData = AdminData.getDataBySalesperson(username);
+            userData.forEach(contact => {
+                AdminData.deleteContact(contact.id);
+            });
+            console.log(`🗑️ Deleted ${userData.length} contacts for user ${username}`);
+        }
+        
+        // Remove user
         delete users[username];
+        saveUsers(users);
+        
+        // Update UI
         updateUsersList();
-        alert('✅ Usuario eliminado');
+        populateSalespersonFilter();
+        updateAllViews();
+        
+        alert('✅ Usuario y sus datos eliminados correctamente');
     }
 }
 
@@ -540,6 +498,8 @@ function updateUsersList() {
             </button>
         </div>
     `).join('');
+    
+    console.log('👥 Users list updated with', Object.keys(users).length, 'users');
 }
 
 // ===== CONVENIOS =====
@@ -644,10 +604,10 @@ function showTab(tabName) {
 }
 
 function refreshData() {
-    // Refresh local data views
-    updateAllViews();
-    if (typeof refreshPipeline === 'function') refreshPipeline();
-    console.log('🔄 Data refreshed locally');
+    console.log('🔄 Refreshing all data...');
+    
+    // Force full sync
+    forceFullSync();
     
     // Sync with GitHub if available
     if (window.GitHubData && window.GitHubData.getToken() && currentUser.role === 'director') {
@@ -655,6 +615,8 @@ function refreshData() {
             console.log('GitHub sync failed during refresh:', error.message);
         });
     }
+    
+    console.log('✅ Data refresh completed');
 }
 
 function debugData() {
@@ -672,25 +634,36 @@ function debugData() {
     debugInfo += `Usuario actual: ${currentUser.username} (${currentUser.role})\n`;
     debugInfo += `Fecha de hoy: ${today}\n`;
     debugInfo += `Total contactos en AdminData: ${allData.length}\n`;
+    debugInfo += `Total usuarios en sistema: ${Object.keys(users).length}\n\n`;
+    
+    // Show all users
+    debugInfo += `👥 USUARIOS EN SISTEMA:\n`;
+    Object.entries(users).forEach(([username, user]) => {
+        const userContacts = allData.filter(d => d.salesperson === username).length;
+        debugInfo += `   - ${user.name} (${username}): ${userContacts} contactos\n`;
+    });
     
     if (currentUser.role === 'director') {
-        debugInfo += `Vista del director - viendo TODOS los contactos\n`;
+        debugInfo += `\n👑 VISTA DEL DIRECTOR:\n`;
+        debugInfo += `Viendo TODOS los contactos: ${filtered.length}\n`;
+        debugInfo += `Contactos de hoy (equipo): ${todayContacts.length}\n`;
+        
         const salespeople = [...new Set(allData.map(d => d.salesperson))].filter(s => s);
-        debugInfo += `\nVendedores en sistema: ${salespeople.length}\n`;
+        debugInfo += `\nVendedores con datos: ${salespeople.length}\n`;
         salespeople.forEach(sp => {
             const count = allData.filter(d => d.salesperson === sp).length;
-            debugInfo += `   - ${getUserDisplayName(sp)}: ${count} contactos\n`;
+            const displayName = getUserDisplayName(sp);
+            debugInfo += `   - ${displayName}: ${count} contactos\n`;
         });
     } else {
+        debugInfo += `\n👤 MI VISTA:\n`;
         debugInfo += `Mis contactos (filtrados): ${filtered.length}\n`;
-        debugInfo += `Mis contactos de hoy: ${todayContacts.length}\n\n`;
-        debugInfo += `Detalles de mis contactos de hoy:\n`;
-        debugInfo += todayContacts.map(c => `- ${c.name} (${c.time})`).join('\n') || 'Ninguno';
+        debugInfo += `Mis contactos de hoy: ${todayContacts.length}\n`;
     }
     
     // Add AdminData stats
     const teamStats = AdminData.getTeamStats();
-    debugInfo += `\n\n📊 ESTADÍSTICAS ADMINDATA:\n`;
+    debugInfo += `\n📊 ESTADÍSTICAS ADMINDATA:\n`;
     debugInfo += `Total contactos: ${teamStats.totalContacts}\n`;
     debugInfo += `Contactos hoy: ${teamStats.todayContacts}\n`;
     debugInfo += `Leads activos: ${teamStats.activeLeads}\n`;
@@ -700,9 +673,62 @@ function debugData() {
     alert(debugInfo);
 }
 
-// ===== FUNCIONES DE SINCRONIZACIÓN =====
+// ===== SINCRONIZACIÓN MEJORADA =====
 
-// Función de diagnóstico para el director
+function showSyncNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        background: ${type === 'success' ? '#10b981' : type === 'warning' ? '#f59e0b' : '#667eea'};
+        color: white;
+        padding: 1rem 1.5rem;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        z-index: 1000;
+        animation: slideIn 0.3s ease;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        max-width: 300px;
+    `;
+    
+    notification.innerHTML = `<div>${message}</div>`;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.style.animation = 'slideOut 0.3s ease';
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 300);
+    }, 5000);
+}
+
+function forceCrossDeviceSync() {
+    if (!window.GitHubData || !window.GitHubData.getToken()) {
+        alert('⚠️ GitHub no configurado. Para sincronización cross-device, configura GitHub en la sección del director.');
+        return;
+    }
+    
+    showSyncNotification('🔄 Sincronizando...', 'info');
+    
+    window.GitHubData.getAllContacts().then(githubContacts => {
+        if (githubContacts.length > AdminData.getAllData().length) {
+            AdminData.data = githubContacts;
+            AdminData.saveData();
+            AdminData.notifyObservers();
+            updateAllViews();
+            showSyncNotification('✅ Sincronización completada', 'success');
+        } else {
+            showSyncNotification('ℹ️ No hay nuevos datos', 'info');
+        }
+    }).catch(error => {
+        showSyncNotification('❌ Error: ' + error.message, 'warning');
+    });
+}
+
 function diagnoseDirectorData() {
     if (currentUser.role !== 'director') {
         alert('❌ Esta función es solo para el director');
@@ -715,34 +741,46 @@ function diagnoseDirectorData() {
     const localStorageCount = localStorageData ? JSON.parse(localStorageData).length : 0;
     const adminDataCount = window.AdminData ? AdminData.getAllData().length : 0;
     const filteredDataCount = getFilteredData().length;
+    const usersCount = Object.keys(users).length;
     
     let diagnostic = `🔍 DIAGNÓSTICO DEL DIRECTOR\n\n`;
+    diagnostic += `👥 Usuarios en sistema: ${usersCount}\n`;
     diagnostic += `📊 localStorage: ${localStorageCount} registros\n`;
     diagnostic += `📊 AdminData: ${adminDataCount} registros\n`;
     diagnostic += `📊 Vista filtrada: ${filteredDataCount} registros\n\n`;
     
+    // Show all users and their data
+    diagnostic += `👥 DETALLES POR USUARIO:\n`;
+    Object.entries(users).forEach(([username, user]) => {
+        const userContacts = adminDataCount > 0 ? 
+            AdminData.getAllData().filter(d => d.salesperson === username).length : 0;
+        diagnostic += `   - ${user.name} (${username}): ${userContacts} contactos\n`;
+    });
+    
     if (window.AdminData) {
         const teamStats = AdminData.getTeamStats();
-        diagnostic += `👥 Vendedores detectados: ${teamStats.salespeople.length}\n`;
-        teamStats.salespeople.forEach(sp => {
-            diagnostic += `   - ${sp.displayName}: ${sp.stats.totalContacts} contactos\n`;
-        });
-        
         diagnostic += `\n📈 Estadísticas del equipo:\n`;
         diagnostic += `   - Total contactos: ${teamStats.totalContacts}\n`;
         diagnostic += `   - Contactos hoy: ${teamStats.todayContacts}\n`;
         diagnostic += `   - Leads activos: ${teamStats.activeLeads}\n`;
         diagnostic += `   - Conversiones: ${teamStats.conversions}\n`;
+        
+        if (teamStats.salespeople.length > 0) {
+            diagnostic += `\n👥 Vendedores detectados por AdminData:\n`;
+            teamStats.salespeople.forEach(sp => {
+                diagnostic += `   - ${sp.displayName}: ${sp.stats.totalContacts} contactos\n`;
+            });
+        }
     }
     
     alert(diagnostic);
     
-    // También forzar una reparación de datos
-    if (window.AdminData && localStorageCount > adminDataCount) {
+    // Auto-fix if needed
+    if (localStorageCount > adminDataCount) {
         if (confirm('🔧 Se detectaron más datos en localStorage que en AdminData. ¿Quieres sincronizar?')) {
-            AdminData.forceSyncFromStorage();
-            updateAllViews();
+            forceFullSync();
             setTimeout(() => {
+                updateAllViews();
                 updateLeadsTable();
                 alert('✅ Datos sincronizados. La vista debería actualizarse ahora.');
             }, 500);
@@ -750,13 +788,7 @@ function diagnoseDirectorData() {
     }
 }
 
-// Función de sincronización forzada
 function forceDataSync() {
-    if (currentUser.role !== 'director') {
-        alert('❌ Solo el director puede usar esta función');
-        return;
-    }
-    
     if (!window.AdminData) {
         alert('❌ Sistema no disponible');
         return;
@@ -764,31 +796,21 @@ function forceDataSync() {
     
     console.log('🔄 Iniciando sincronización forzada...');
     
-    // Paso 1: Forzar carga desde localStorage
-    const syncedCount = AdminData.forceSyncFromStorage();
+    const result = forceFullSync();
     
-    // Paso 2: Actualizar todas las vistas
-    updateAllViews();
-    
-    // Paso 3: Actualizar tabla de leads específicamente
-    setTimeout(() => {
-        updateLeadsTable();
-    }, 200);
-    
-    // Paso 4: Actualizar pipeline
-    setTimeout(() => {
-        if (typeof refreshPipeline === 'function') {
-            refreshPipeline();
-        }
-    }, 400);
-    
-    alert(`✅ Sincronización forzada completada!
+    if (result) {
+        const syncedCount = AdminData.getAllData().length;
+        alert(`✅ Sincronización forzada completada!
 
-📊 Registros sincronizados: ${syncedCount}
+📊 Registros en sistema: ${syncedCount}
+👥 Usuarios: ${Object.keys(users).length}
 🔄 Vistas actualizadas
-📋 Tabla de leads refrescada
+📋 Tablas refrescadas
 
-Si aún no ves los datos, verifica que los vendedores hayan guardado correctamente los contactos.`);
+Si aún no ves los datos, verifica que los vendedores hayan guardado correctamente los contactos y que tengan los roles apropiados.`);
+    } else {
+        alert('❌ Error durante la sincronización');
+    }
 }
 
 function updateAllViews() {
@@ -813,16 +835,19 @@ function updateAllViews() {
 
 function populateSalespersonFilter() {
     const filter = document.getElementById('salespersonFilter');
-    if (!filter || !window.AdminData) return;
+    if (!filter) return;
     
-    const allData = AdminData.getAllData();
-    const salespeople = [...new Set(allData.map(d => d.salesperson))].filter(s => s);
+    // Use the users object instead of deriving from data
+    const salespeople = Object.entries(users)
+        .filter(([username, user]) => user.role === 'vendedor')
+        .map(([username, user]) => ({ username, name: user.name }));
+    
     filter.innerHTML = '<option value="">Todos los vendedores</option>';
     
-    salespeople.forEach(salesperson => {
+    salespeople.forEach(sp => {
         const option = document.createElement('option');
-        option.value = salesperson;
-        option.textContent = getUserDisplayName(salesperson);
+        option.value = sp.username;
+        option.textContent = sp.name;
         filter.appendChild(option);
     });
     
