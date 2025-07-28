@@ -782,9 +782,13 @@
 
         // Initialize Firebase
         const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+        const auth = getAuth(app);
+        
+        // Make available globally
         window.firebaseApp = app;
-        window.firebaseDb = getDatabase(app);
-        window.firebaseAuth = getAuth(app);
+        window.firebaseDb = database;
+        window.firebaseAuth = auth;
 
         // Update Firebase status
         const statusEl = document.getElementById('firebaseStatus');
@@ -796,8 +800,8 @@
         // Initialize Firebase Data Manager
         class SimpleFirebaseManager {
             constructor() {
-                this.database = window.firebaseDb;
-                this.auth = window.firebaseAuth;
+                this.database = database;
+                this.auth = auth;
                 this.currentUser = null;
                 this.observers = [];
                 
@@ -959,8 +963,8 @@
                                         .join(' ');
                                     
                                     // Create profile
-                                    const profileRef = window.firebaseDb.ref(`users/${user.uid}/profile`);
-                                    await profileRef.set({
+                                    const profileRef = ref(database, `users/${user.uid}/profile`);
+                                    await set(profileRef, {
                                         name: name,
                                         email: user.email,
                                         role: role,
