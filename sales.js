@@ -1,19 +1,12 @@
 // ===== CONTACTOS =====
+// 2. REEMPLAZAR LA FUNCIÓN addContact EN sales.js
 async function addContact(event) {
     event.preventDefault();
     
-    console.log('🚀 INICIANDO PROCESO DE AGREGAR CONTACTO REAL...');
-    console.log('   - Usuario actual:', currentUser.username, '(' + currentUser.role + ')');
-    
     if (!window.AdminData) {
-        console.error('❌ AdminData no disponible');
         alert('❌ Sistema no disponible. Recarga la página.');
         return;
     }
-    
-    // Verificar estado de AdminData antes de agregar
-    const datosAntes = AdminData.getAllData().length;
-    console.log('📊 Datos en AdminData ANTES de agregar:', datosAntes);
     
     let source = document.getElementById('contactSource').value;
     if (source === 'CONVENIO') {
@@ -38,115 +31,50 @@ async function addContact(event) {
         status: 'Nuevo'
     };
     
-    console.log('📝 Contacto a agregar:', contact);
-    
     try {
-        // PASO CRÍTICO: Usar AdminData.addContact (igual que los datos de prueba)
-        console.log('➕ Agregando contacto a AdminData...');
+        // Guardar en AdminData
         const savedContact = AdminData.addContact(contact);
         
-        // Verificar que se agregó correctamente
-        const datosDespues = AdminData.getAllData().length;
-        console.log('📊 Datos en AdminData DESPUÉS de agregar:', datosDespues);
-        console.log('✅ Incremento de datos:', datosDespues - datosAntes);
-        
-        if (!savedContact) {
-            throw new Error('AdminData.addContact devolvió null');
-        }
-        
-        console.log('✅ Contacto guardado en AdminData con ID:', savedContact.id);
-        
-        // Verificar que el contacto está realmente en AdminData
-        const verification = AdminData.getAllData().find(c => c.id === savedContact.id);
-        if (!verification) {
-            throw new Error('Contacto no encontrado en verificación');
-        }
-        console.log('✅ Verificación exitosa: contacto existe en AdminData');
-        
-        // Save to GitHub if available (opcional)
+        // AUTO-SYNC INMEDIATO A GITHUB
         if (window.GitHubData && window.GitHubData.getToken()) {
             try {
                 await window.GitHubData.addContact(savedContact);
-                console.log('✅ Contacto también guardado en GitHub');
+                console.log('✅ Auto-sincronizado a GitHub');
             } catch (error) {
-                console.log('⚠️ GitHub save failed, pero contacto guardado localmente:', error.message);
+                console.log('⚠️ GitHub sync falló:', error.message);
             }
         }
         
-        // Clear form
+        // Limpiar formulario
         event.target.reset();
         document.getElementById('convenioGroup').style.display = 'none';
         document.getElementById('contactConvenio').required = false;
         
-        console.log('🔄 INICIANDO ACTUALIZACIÓN DE VISTAS...');
-        
-        // FORZAR ACTUALIZACIÓN INMEDIATA de todas las vistas
-        // Usar el mismo patrón que los datos de prueba
+        // Actualizar vistas
         setTimeout(() => {
-            console.log('🎯 Actualizando todas las vistas...');
             updateAllViews();
-            
-            // Forzar actualización específica para directores
-            if (typeof refreshPipeline === 'function') {
-                refreshPipeline();
-            }
-            
-            // Actualización específica de tabla de leads
-            setTimeout(() => {
-                updateLeadsTable();
-                console.log('✅ Vista de leads actualizada');
-            }, 200);
-            
+            if (typeof refreshPipeline === 'function') refreshPipeline();
+            setTimeout(() => updateLeadsTable(), 200);
         }, 100);
         
-        // Get updated stats
+        // Estadísticas
         const stats = AdminData.getSalespersonStats(currentUser.username);
-        const teamStats = AdminData.getTeamStats();
+        const syncStatus = window.GitHubData && window.GitHubData.getToken() ? 
+            '✅ Auto-sincronizado a GitHub' : '⚠️ Solo guardado localmente';
         
-        console.log('📊 Stats actualizados:', stats);
-        console.log('🏢 Team stats:', teamStats);
-        
-        // NOTIFICACIÓN DETALLADA
-        alert(`✅ ¡Contacto registrado exitosamente!
+        alert(`✅ ¡Contacto registrado!
 
-👤 Contacto: ${savedContact.name}
-🆔 ID: ${savedContact.id}
-📊 Tus estadísticas:
-   • Total contactos: ${stats.totalContacts}
-   • Contactos hoy: ${stats.todayContacts}
-   • Conversiones: ${stats.conversions}
+👤 ${savedContact.name}
+🔄 ${syncStatus}
+📊 Total contactos: ${stats.totalContacts}
 
-🏢 Sistema total: ${teamStats.totalContacts} contactos
-
-✨ Los datos están disponibles INMEDIATAMENTE para el director!
-
-🔍 DEBUG INFO:
-   • AdminData: ${AdminData.getAllData().length} registros
-   • Fecha: ${savedContact.date}
-   • Hora: ${savedContact.time}`);
+${window.GitHubData && window.GitHubData.getToken() ? 
+'✨ Disponible inmediatamente para el director!' :
+'⚠️ Para sync cross-device, configura GitHub.'}`);
         
     } catch (error) {
-        console.error('❌ ERROR AL AGREGAR CONTACTO:', error);
-        alert(`❌ Error al guardar contacto: ${error.message}
-
-🔍 Para debug:
-1. Abre la consola del navegador (F12)
-2. Mira los logs detallados
-3. Verifica que AdminData esté funcionando`);
-    }
-}
-
-function handleSourceChange() {
-    const sourceSelect = document.getElementById('contactSource');
-    const convenioGroup = document.getElementById('convenioGroup');
-    
-    if (sourceSelect.value === 'CONVENIO') {
-        convenioGroup.style.display = 'block';
-        document.getElementById('contactConvenio').required = true;
-    } else {
-        convenioGroup.style.display = 'none';
-        document.getElementById('contactConvenio').required = false;
-        document.getElementById('contactConvenio').value = '';
+        console.error('❌ Error:', error);
+        alert(`❌ Error: ${error.message}`);
     }
 }
 
