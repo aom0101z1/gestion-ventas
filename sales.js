@@ -1,27 +1,42 @@
-async function addContact(event) {
-  event.preventDefault();
+// sales.js
 
-  const name = document.getElementById("contactName").value;
-  const phone = document.getElementById("contactPhone").value;
-  const source = document.getElementById("contactSource").value;
-  const notes = document.getElementById("contactNotes").value;
+document.addEventListener("DOMContentLoaded", function () {
+  const form = document.getElementById("contactForm");
 
-  const newLead = {
-    id: Date.now().toString(),
-    name,
-    phone,
-    source,
-    notes,
-    status: "Nuevo",
-    date: new Date().toISOString().split("T")[0],
-    time: new Date().toLocaleTimeString(),
-    salesperson: currentUser.username
-  };
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
 
-  AdminData.addContact(newLead);
-  await AdminData.saveDataToFirebase();
+    const name = document.getElementById("contactName").value.trim();
+    const phone = document.getElementById("contactPhone").value.trim();
+    const email = document.getElementById("contactEmail").value.trim();
+    const source = document.getElementById("contactSource").value.trim();
+    const assignedTo = document.getElementById("assignedTo").value.trim();
 
-  alert("✅ Contacto agregado correctamente");
-  document.getElementById("contactForm").reset();
-  refreshPipeline();
-}
+    if (!name || !phone || !email || !source || !assignedTo) {
+      alert("Todos los campos son obligatorios.");
+      return;
+    }
+
+    const newContactRef = firebase.database().ref("contacts").push();
+    const contactData = {
+      id: newContactRef.key,
+      name,
+      phone,
+      email,
+      source,
+      assignedTo,
+      createdAt: new Date().toISOString()
+    };
+
+    newContactRef
+      .set(contactData)
+      .then(() => {
+        alert("Contacto agregado correctamente");
+        form.reset();
+      })
+      .catch((error) => {
+        console.error("Error al agregar contacto:", error);
+        alert("Hubo un error al guardar el contacto.");
+      });
+  });
+});
