@@ -1,81 +1,38 @@
 // ===== CONTACTOS =====
 async function addContact(event) {
     event.preventDefault();
-    
-    if (!window.AdminData) {
-        alert('❌ Sistema no disponible. Recarga la página.');
-        return;
-    }
-    
-    let source = document.getElementById('contactSource').value;
-    if (source === 'CONVENIO') {
-        const convenio = document.getElementById('contactConvenio').value;
-        if (!convenio) {
-            alert('⚠️ Selecciona un convenio');
-            return;
-        }
-        source = `CONVENIO: ${convenio}`;
-    }
-    
+
     const contact = {
         name: document.getElementById('contactName').value,
         phone: document.getElementById('contactPhone').value,
-        email: document.getElementById('contactEmail').value,
-        source: source,
-        location: document.getElementById('contactLocation').value,
-        notes: document.getElementById('contactNotes').value,
-        salesperson: currentUser.username,
-        date: new Date().toISOString().split('T')[0],
-        time: new Date().toLocaleTimeString(),
-        status: 'Nuevo'
+        source: document.getElementById('contactSource').value,
+        status: 'Nuevo',
+        date: new Date().toLocaleDateString('es-CO')
     };
-    
-    try {
-        // Guardar en AdminData
-        const savedContact = AdminData.addContact(contact);
-        
-        // AUTO-SYNC INMEDIATO A GITHUB
-        if (window.GitHubData && window.GitHubData.getToken()) {
-            try {
-                await window.GitHubData.addContact(savedContact);
-                console.log('✅ Auto-sincronizado a GitHub');
-            } catch (error) {
-                console.log('⚠️ GitHub sync falló:', error.message);
-            }
+
+    const newContact = AdminData.addContact(contact);
+
+    // === NUEVO BLOQUE: sincronizar con GitHub si está conectado ===
+    if (window.GitHubData && window.GitHubData.getToken()) {
+        try {
+            await GitHubData.addContact(newContact);
+            console.log('✅ Contacto subido a GitHub');
+            showSyncNotification('✅ Contacto sincronizado con GitHub', 'success');
+        } catch (err) {
+            console.error('❌ Error al subir a GitHub:', err.message);
+            showSyncNotification('❌ Error al subir contacto a GitHub', 'warning');
         }
-        
-        // Limpiar formulario
-        event.target.reset();
-        document.getElementById('convenioGroup').style.display = 'none';
-        document.getElementById('contactConvenio').required = false;
-        
-        // Actualizar vistas
-        setTimeout(() => {
-            updateAllViews();
-            if (typeof refreshPipeline === 'function') refreshPipeline();
-            setTimeout(() => updateLeadsTable(), 200);
-        }, 100);
-        
-        // Estadísticas
-        const stats = AdminData.getSalespersonStats(currentUser.username);
-        const syncStatus = window.GitHubData && window.GitHubData.getToken() ? 
-            '✅ Auto-sincronizado a GitHub' : '⚠️ Solo guardado localmente';
-        
-        alert(`✅ ¡Contacto registrado!
-
-👤 ${savedContact.name}
-🔄 ${syncStatus}
-📊 Total contactos: ${stats.totalContacts}
-
-${window.GitHubData && window.GitHubData.getToken() ? 
-'✨ Disponible inmediatamente para el director!' :
-'⚠️ Para sync cross-device, configura GitHub.'}`);
-        
-    } catch (error) {
-        console.error('❌ Error:', error);
-        alert(`❌ Error: ${error.message}`);
     }
+
+    // Limpia los campos del formulario
+    document.getElementById('contactName').value = '';
+    document.getElementById('contactPhone').value = '';
+    document.getElementById('contactSource').value = '';
+
+    // Recargar la tabla de contactos
+    displayContacts(AdminData.getMyContacts());
 }
+
 
 // FUNCIÓN CORREGIDA para mostrar convenios
 function handleSourceChange() {
