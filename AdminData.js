@@ -397,3 +397,25 @@ AdminData.addObserver((data) => {
 
 console.log('✅ AdminData module loaded successfully');
 console.log('📊 Current data summary:', AdminData.getTeamStats());
+// 1. AGREGAR AL FINAL DE AdminData.js
+AdminData.enableAutoSync = function() {
+    console.log('🔄 Habilitando auto-sincronización...');
+    
+    if (window.GitHubData && window.GitHubData.getToken()) {
+        setInterval(async () => {
+            try {
+                const githubContacts = await window.GitHubData.getAllContacts();
+                if (githubContacts.length > this.data.length) {
+                    console.log(`📥 Nuevos datos: ${githubContacts.length} vs ${this.data.length}`);
+                    this.data = githubContacts;
+                    this.saveData();
+                    this.notifyObservers();
+                    showSyncNotification(`📥 ${githubContacts.length - this.data.length} nuevos contactos`);
+                }
+            } catch (error) {
+                console.log('⚠️ Auto-sync failed:', error.message);
+            }
+        }, 30000);
+        console.log('✅ Auto-sync habilitado (cada 30 segundos)');
+    }
+};
