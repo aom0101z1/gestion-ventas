@@ -367,25 +367,7 @@ function getAdminFilteredData(userRole, username) {
 }
 
 function addContactToAdminData(contact) {
-    const newContact = AdminData.addContact(contact);
-
-    // 🔁 Sincroniza los datos actualizados con localStorage global
-    try {
-        const allData = AdminData.getAllData();
-        localStorage.setItem('ciudad_bilingue_sales_data', JSON.stringify(allData));
-        console.log('🔄 Datos sincronizados en localStorage global:', allData.length);
-    } catch (error) {
-        console.error('❌ Error sincronizando con localStorage:', error);
-    }
-
-    // (Opcional) También puedes empujar a GitHub si tienes token configurado
-    if (window.GitHubData?.getToken) {
-        window.GitHubData.pushAllLocalData()
-            .then(() => console.log('📤 Datos empujados a GitHub'))
-            .catch(err => console.warn('⚠️ Error al empujar a GitHub:', err));
-    }
-
-    return newContact;
+    return AdminData.addContact(contact);
 }
 
 
