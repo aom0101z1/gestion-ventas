@@ -927,5 +927,48 @@
     <script src="core.js"></script>
     <script src="sales.js"></script>
     <script src="pipeline.js"></script>
+
+    <script>
+// SOLUCIÓN AUTOMÁTICA - Crear perfil si no existe
+async function ensureUserProfile() {
+    if (!window.FirebaseData || !window.FirebaseData.currentUser) return;
+
+    try {
+        const user = window.FirebaseData.currentUser;
+        let profile = await window.FirebaseData.loadUserProfile();
+        
+        if (!profile) {
+            console.log('⚠️ Creando perfil faltante...');
+            
+            const isDirector = user.email.includes('director') || user.email.includes('admin');
+            const role = isDirector ? 'director' : 'vendedor';
+            const name = user.email.split('@')[0].split('.').map(part => 
+                part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
+            
+            const profileRef = window.firebaseDb.ref(`users/${user.uid}/profile`);
+            await profileRef.set({
+                name: name,
+                email: user.email,
+                role: role,
+                createdAt: new Date().toISOString(),
+                lastLogin: new Date().toISOString()
+            });
+            
+            alert(`✅ Perfil creado: ${name} (${role})`);
+            window.location.reload();
+        }
+    } catch (error) {
+        console.error('❌ Error:', error);
+    }
+}
+
+// Auto-ejecutar cuando Firebase esté listo
+window.addEventListener('firebaseReady', () => {
+    setTimeout(() => {
+        if (window.FirebaseData?.currentUser) ensureUserProfile();
+    }, 2000);
+});
+</script>
+    
 </body>
 </html>
