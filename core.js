@@ -397,8 +397,9 @@ async function addUser() {
         console.log('🔄 Creating user profile in database...');
         
         if (window.firebaseDb) {
-            const profileRef = window.firebaseDb.ref(`users/${user.uid}/profile`);
-            await profileRef.set({
+            const { ref, set } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js');
+            const profileRef = ref(window.firebaseDb, `users/${user.uid}/profile`);
+            await set(profileRef, {
                 name: name,
                 email: email,
                 role: role,
@@ -826,8 +827,9 @@ async function ensureUserProfile() {
             
             // Create profile in Firebase
             if (window.firebaseDb) {
-                const profileRef = window.firebaseDb.ref(`users/${user.uid}/profile`);
-                await profileRef.set({
+                const { ref, set } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js');
+                const profileRef = ref(window.firebaseDb, `users/${user.uid}/profile`);
+                await set(profileRef, {
                     name: name,
                     email: user.email,
                     role: role,
@@ -881,7 +883,8 @@ async function repairUserProfiles() {
         console.log('🔧 Starting user profile repair...');
         
         // Get all authenticated users
-        const authUsers = await window.firebaseDb.ref('users').once('value');
+        const { ref, get, set } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js');
+        const authUsers = await get(ref(window.firebaseDb, 'users'));
         const authUsersData = authUsers.val() || {};
         
         let repairedCount = 0;
@@ -897,8 +900,8 @@ async function repairUserProfiles() {
                 console.log(`🔧 Repairing profile for user ${userId}`);
                 
                 // Create basic profile
-                const profileRef = window.firebaseDb.ref(`users/${userId}/profile`);
-                await profileRef.set({
+                const profileRef = ref(window.firebaseDb, `users/${userId}/profile`);
+                await set(profileRef, {
                     name: `Usuario ${userId.substring(0, 8)}`,
                     email: `user-${userId}@ciudadbilingue.com`,
                     role: 'vendedor',
