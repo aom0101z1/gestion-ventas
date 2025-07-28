@@ -913,5 +913,304 @@
     <script src="core.js"></script>
     <script src="sales.js"></script>
     <script src="pipeline.js"></script>
+
+    <script>
+// CRITICAL FIX: Director Data Synchronization
+// Add this to your core.js file or run in console
+
+// Enhanced getFilteredData function with forced director sync
+function getFilteredData() {
+    console.log('🔍 Getting filtered data for:', currentUser?.role, currentUser?.username);
+    
+    if (!window.AdminData) {
+        console.log('⚠️ AdminData not available, using localStorage fallback');
+        return getFilteredDataFallback();
+    }
+    
+    // CRITICAL FIX: Force data sync for director EVERY TIME
+    if (currentUser?.role === 'director') {
+        console.log('👑 DIRECTOR DETECTED - FORCING COMPLETE DATA SYNC');
+        
+        // Step 1: Get current AdminData count
+        const currentAdminCount = AdminData.getAllData().length;
+        console.log('📊 Current AdminData count:', currentAdminCount);
+        
+        // Step 2: Get localStorage count
+        const localStorageData = localStorage.getItem('ciudad_bilingue_sales_data');
+        const localStorageCount = localStorageData ? JSON.parse(localStorageData).length : 0;
+        console.log('📊 localStorage count:', localStorageCount);
+        
+        // Step 3: Force sync if localStorage has more data OR if AdminData is empty
+        if (localStorageCount > currentAdminCount || currentAdminCount === 0) {
+            console.log('🔄 FORCING SYNC: localStorage has more data or AdminData is empty');
+            AdminData.forceSyncFromStorage();
+            
+            // Verify sync worked
+            const newCount = AdminData.getAllData().length;
+            console.log('✅ After sync - AdminData count:', newCount);
+        }
+        
+        // Step 4: Always return ALL data for director
+        const allData = AdminData.getAllData();
+        console.log('👑 Director returning ALL data:', allData.length, 'records');
+        
+        // Debug: Show what data director sees
+        if (allData.length > 0) {
+            console.log('📋 Director data breakdown:');
+            const salespeople = [...new Set(allData.map(d => d.salesperson))];
+            salespeople.forEach(sp => {
+                const count = allData.filter(d => d.salesperson === sp).length;
+                console.log(`   - ${sp}: ${count} contacts`);
+            });
+        }
+        
+        return allData;
+    } else {
+        // For salespeople, return only their data
+        const data = AdminData.getDataBySalesperson(currentUser.username);
+        console.log('👤 Salesperson - filtered data:', data.length, 'records');
+        return data;
+    }
+}
+
+// Enhanced updateLeadsTable specifically for director data issues
+function updateLeadsTable() {
+    console.log('📋 ENHANCED updateLeadsTable for user:', currentUser?.username, currentUser?.role);
+    
+    if (!window.AdminData) {
+        console.log('❌ AdminData not available');
+        const tbody = document.getElementById('leadsTable');
+        if (tbody) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #dc2626; padding: 2rem;">❌ Sistema no disponible</td></tr>';
+        }
+        return;
+    }
+    
+    // CRITICAL: Force sync for director before updating table
+    if (currentUser.role === 'director') {
+        console.log('👑 DIRECTOR TABLE UPDATE - Forcing data sync first...');
+        
+        // Force sync from localStorage
+        const syncedCount = AdminData.forceSyncFromStorage();
+        console.log('🔄 Synced', syncedCount, 'records for director table');
+        
+        // Small delay to ensure sync completes
+        setTimeout(() => {
+            updateLeadsTableActual();
+        }, 100);
+    } else {
+        updateLeadsTableActual();
+    }
+}
+
+function updateLeadsTableActual() {
+    let data = getFilteredData();
+    console.log('📊 Table data count:', data.length);
+    
+    // Apply director filters if director is logged in
+    if (currentUser.role === 'director') {
+        const salespersonFilter = document.getElementById('salespersonFilter');
+        const statusFilter = document.getElementById('statusFilter');
+        
+        if (salespersonFilter && salespersonFilter.value) {
+            data = data.filter(lead => lead.salesperson === salespersonFilter.value);
+            console.log('🔍 Filtered by salesperson:', data.length, 'records');
+        }
+        if (statusFilter && statusFilter.value) {
+            data = data.filter(lead => lead.status === statusFilter.value);
+            console.log('🔍 Filtered by status:', data.length, 'records');
+        }
+    }
+    
+    const tbody = document.getElementById('leadsTable');
+    if (!tbody) {
+        console.log('❌ Leads table not found');
+        return;
+    }
+    
+    if (data.length === 0) {
+        const colSpan = currentUser.role === 'director' ? '7' : '6';
+        let message;
+        
+        if (currentUser.role === 'director') {
+            // Enhanced diagnostic message for director
+            const allDataCount = AdminData.getAllData().length;
+            const localStorageData = localStorage.getItem('ciudad_bilingue_sales_data');
+            const localStorageCount = localStorageData ? JSON.parse(localStorageData).length : 0;
+            
+            message = `⚠️ No se muestran leads del equipo
+            
+            <div style="margin-top: 1rem; font-size: 0.9rem; color: #666; text-align: left;">
+                <strong>Diagnóstico:</strong><br>
+                📊 AdminData: ${allDataCount} registros<br>
+                💾 localStorage: ${localStorageCount} registros<br>
+                👥 Usuarios: ${Object.keys(users || {}).length}<br><br>
+                
+                <strong>Posibles causas:</strong><br>
+                • Los vendedores no han agregado contactos<br>
+                • Problema de sincronización entre sesiones<br>
+                • Datos guardados en sesión diferente
+            </div>
+            
+            <div style="margin-top: 1rem;">
+                <button onclick="forceDirectorSync()" style="background: #10b981; color: white; border: none; padding: 0.5rem 1rem; border-radius: 5px; margin-right: 0.5rem; cursor: pointer;">🔄 Forzar Sincronización</button>
+                <button onclick="diagnoseDirectorData()" style="background: #667eea; color: white; border: none; padding: 0.5rem 1rem; border-radius: 5px; cursor: pointer;">🔍 Diagnóstico Completo</button>
+            </div>`;
+        } else {
+            message = 'No tienes leads registrados. Agrega contactos en la pestaña "Mis Contactos".';
+        }
+        
+        tbody.innerHTML = `<tr><td colspan="${colSpan}" style="text-align: center; color: #666; padding: 2rem;">${message}</td></tr>`;
+        return;
+    }
+    
+    // Sort by date (newest first)
+    data.sort((a, b) => {
+        const dateA = new Date(a.date + ' ' + (a.time || '00:00:00'));
+        const dateB = new Date(b.date + ' ' + (b.time || '00:00:00'));
+        return dateB - dateA;
+    });
+    
+    tbody.innerHTML = data.map(lead => {
+        const salespersonCell = currentUser.role === 'director' 
+            ? `<td><span style="background: #667eea; color: white; padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.8rem;">${getUserDisplayName(lead.salesperson)}</span></td>`
+            : '';
+        
+        const canDelete = currentUser.role === 'director' || lead.salesperson === currentUser.username;
+        
+        return `
+            <tr>
+                <td style="font-weight: 500;">${lead.name}</td>
+                <td>${lead.phone}</td>
+                <td style="font-size: 0.9rem;">${(lead.source || '').length > 30 ? (lead.source || '').substring(0, 30) + '...' : (lead.source || '')}</td>
+                <td><span class="status-badge status-${(lead.status || 'nuevo').toLowerCase().replace(' ', '').replace('ó', 'o')}">${lead.status || 'Nuevo'}</span></td>
+                <td style="font-size: 0.9rem;">${formatDate(lead.date)}</td>
+                ${salespersonCell}
+                <td>
+                    <button onclick="showLeadDetails('${lead.id}')" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; margin-right: 0.25rem;">
+                        📋 Ver
+                    </button>
+                    ${canDelete ? `<button onclick="deleteLead('${lead.id}')" class="btn btn-warning" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; background: #ef4444;">🗑️</button>` : ''}
+                </td>
+            </tr>
+        `;
+    }).join('');
+    
+    console.log('✅ Leads table updated with', data.length, 'records');
+    
+    // Debug info for director
+    if (currentUser.role === 'director' && data.length > 0) {
+        const salespeople = [...new Set(data.map(d => d.salesperson))];
+        console.log('👑 Director table shows data from:', salespeople);
+        salespeople.forEach(sp => {
+            const count = data.filter(d => d.salesperson === sp).length;
+            console.log(`   - ${getUserDisplayName(sp)}: ${count} leads in table`);
+        });
+    }
+}
+
+// New function: Force director synchronization
+function forceDirectorSync() {
+    if (currentUser?.role !== 'director') {
+        alert('❌ Esta función es solo para el director');
+        return;
+    }
+    
+    console.log('🔄 FORCING DIRECTOR SYNCHRONIZATION...');
+    
+    if (!window.AdminData) {
+        alert('❌ AdminData no disponible');
+        return;
+    }
+    
+    // Step 1: Force sync from localStorage
+    const beforeCount = AdminData.getAllData().length;
+    const syncedCount = AdminData.forceSyncFromStorage();
+    const afterCount = AdminData.getAllData().length;
+    
+    console.log(`📊 Sync results: ${beforeCount} -> ${afterCount} (synced: ${syncedCount})`);
+    
+    // Step 2: Force UI updates
+    setTimeout(() => {
+        updateAllViews();
+        setTimeout(() => {
+            updateLeadsTable();
+            if (typeof refreshPipeline === 'function') refreshPipeline();
+            if (typeof populateSalespersonFilter === 'function') populateSalespersonFilter();
+        }, 200);
+    }, 100);
+    
+    // Step 3: Show results
+    const finalData = AdminData.getAllData();
+    const salespeople = [...new Set(finalData.map(d => d.salesperson))].filter(s => s);
+    
+    let message = `🔄 SINCRONIZACIÓN FORZADA COMPLETADA\n\n`;
+    message += `📊 Registros antes: ${beforeCount}\n`;
+    message += `📊 Registros después: ${afterCount}\n`;
+    message += `🔄 Registros sincronizados: ${syncedCount}\n\n`;
+    
+    if (salespeople.length > 0) {
+        message += `👥 VENDEDORES CON DATOS:\n`;
+        salespeople.forEach(sp => {
+            const count = finalData.filter(d => d.salesperson === sp).length;
+            message += `   • ${getUserDisplayName(sp)}: ${count} contactos\n`;
+        });
+    } else {
+        message += `⚠️ No se encontraron vendedores con datos\n`;
+        message += `\nPosibles causas:\n`;
+        message += `• Los vendedores no han agregado contactos realmente\n`;
+        message += `• Los datos están en una sesión/pestaña diferente\n`;
+        message += `• Hay un problema con localStorage`;
+    }
+    
+    alert(message);
+    
+    return {
+        before: beforeCount,
+        after: afterCount,
+        synced: syncedCount,
+        salespeople: salespeople.length
+    };
+}
+
+// Enhanced login function that forces sync for director
+function enhancedShowMainApp() {
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('mainApp').classList.remove('hidden');
+    
+    // If director, force immediate sync
+    if (currentUser?.role === 'director') {
+        console.log('👑 Director login detected - forcing immediate sync...');
+        setTimeout(() => {
+            if (window.AdminData) {
+                AdminData.forceSyncFromStorage();
+                updateAllViews();
+                setTimeout(() => {
+                    updateLeadsTable();
+                }, 300);
+            }
+        }, 500);
+    }
+    
+    setupUserInterface();
+}
+
+// Replace the original functions
+window.getFilteredData = getFilteredData;
+window.updateLeadsTable = updateLeadsTable;
+window.forceDirectorSync = forceDirectorSync;
+
+// If showMainApp exists, enhance it
+if (typeof showMainApp === 'function') {
+    window.originalShowMainApp = showMainApp;
+    window.showMainApp = enhancedShowMainApp;
+}
+
+console.log('🔧 Director Data Sync Fix applied successfully');
+console.log('Available functions:');
+console.log('  - forceDirectorSync() - Force sync for director');
+console.log('  - Enhanced getFilteredData() - Better data filtering');
+console.log('  - Enhanced updateLeadsTable() - Better table updates');
+</script>
 </body>
 </html>
