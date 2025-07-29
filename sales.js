@@ -1,5 +1,5 @@
-// sales.js - FIREBASE INTEGRATED VERSION
-// ===== FIREBASE CONTACTOS =====
+// sales.js - FIREBASE INTEGRATED VERSION - FIXED
+// ===== FIREBASE CONTACTOS CORREGIDO =====
 async function addContact(event) {
     event.preventDefault();
     
@@ -45,36 +45,21 @@ async function addContact(event) {
         
         console.log('📤 Saving contact to Firebase:', contact);
         
-        // Save to Firebase
+        // Save to Firebase ONLY
         const savedContact = await window.FirebaseData.addContact(contact);
         console.log('✅ Contact saved to Firebase:', savedContact);
-        
-        // Also save to AdminData if available (for compatibility)
-        if (window.AdminData && window.AdminData.isReady) {
-            try {
-                await AdminData.addContact(savedContact);
-                console.log('✅ Contact also saved to AdminData');
-            } catch (error) {
-                console.log('⚠️ AdminData save failed, but Firebase succeeded:', error);
-            }
-        }
         
         // Clear form
         event.target.reset();
         document.getElementById('convenioGroup').style.display = 'none';
         document.getElementById('contactConvenio').required = false;
         
-        // Force immediate UI update
-        setTimeout(async () => {
-            await updateAllViews();
-            
-            setTimeout(() => {
-                updateLeadsTable();
-                if (typeof refreshPipeline === 'function') refreshPipeline();
-            }, 200);
-        }, 100);
+        // 🔧 FIX: Single UI update call only
+        setTimeout(() => {
+            updateAllViews();
+        }, 500);
         
-        // Get user stats for success message
+        // Get stats for success message
         const userProfile = await window.FirebaseData.loadUserProfile();
         const allContacts = await window.FirebaseData.getFilteredContacts();
         const todayContacts = allContacts.filter(c => c.date === new Date().toISOString().split('T')[0]);
@@ -154,23 +139,10 @@ Esta acción no se puede deshacer y se eliminará de Firebase.`)) {
             await window.FirebaseData.deleteContact(leadId);
             console.log('✅ Lead deleted from Firebase:', leadId);
             
-            // Also delete from AdminData if available
-            if (window.AdminData && window.AdminData.isReady) {
-                try {
-                    await AdminData.deleteContact(leadId);
-                } catch (error) {
-                    console.log('⚠️ AdminData delete failed, but Firebase succeeded');
-                }
-            }
-            
             // Force immediate UI update
-            setTimeout(async () => {
-                await updateAllViews();
-                setTimeout(() => {
-                    updateLeadsTable();
-                    if (typeof refreshPipeline === 'function') refreshPipeline();
-                }, 200);
-            }, 100);
+            setTimeout(() => {
+                updateAllViews();
+            }, 500);
             
             alert(`✅ Lead de "${lead.name}" eliminado de Firebase correctamente`);
         }
@@ -239,13 +211,9 @@ Esta acción no se puede deshacer.`)) {
             }
             
             // Force UI update
-            setTimeout(async () => {
-                await updateAllViews();
-                setTimeout(() => {
-                    updateLeadsTable();
-                    if (typeof refreshPipeline === 'function') refreshPipeline();
-                }, 200);
-            }, 100);
+            setTimeout(() => {
+                updateAllViews();
+            }, 500);
             
             alert(`✅ ${deletedCount} datos de prueba eliminados de Firebase correctamente`);
         }
@@ -288,13 +256,9 @@ Esta acción NO se puede deshacer.`)) {
             }
             
             // Force UI update
-            setTimeout(async () => {
-                await updateAllViews();
-                setTimeout(() => {
-                    updateLeadsTable();
-                    if (typeof refreshPipeline === 'function') refreshPipeline();
-                }, 200);
-            }, 100);
+            setTimeout(() => {
+                updateAllViews();
+            }, 500);
             
             alert(`✅ ${deletedCount} de tus contactos eliminados de Firebase correctamente`);
         }
@@ -457,6 +421,179 @@ ${lead.notes || 'Sin notas'}
         console.error('❌ Error showing lead details:', error);
         alert(`❌ Error al mostrar detalles: ${error.message}`);
     }
+}
+
+// ===== CONTACTOS HOY COMPACTOS CORREGIDO =====
+async function updateTodayContacts() {
+    if (!window.FirebaseData || !window.FirebaseData.currentUser) {
+        console.log('❌ Firebase not available for today contacts');
+        return;
+    }
+    
+    try {
+        const todayContacts = await window.FirebaseData.getFilteredContacts();
+        const today = new Date().toISOString().split('T')[0];
+        const todayFiltered = todayContacts.filter(c => c.date === today);
+        
+        console.log('📅 Updating today contacts with Firebase');
+        console.log(`   - Today contacts: ${todayFiltered.length}`);
+        
+        const container = document.getElementById('todayContacts');
+        if (!container) {
+            console.log('❌ Today contacts container not found');
+            return;
+        }
+        
+        // 🔧 FIX: Use compact rendering
+        await renderTodayContactsCompact(todayFiltered);
+        
+        console.log('✅ Today contacts updated with Firebase');
+    } catch (error) {
+        console.error('❌ Error updating today contacts:', error);
+        const container = document.getElementById('todayContacts');
+        if (container) {
+            container.innerHTML = `<p style="color: #dc2626; text-align: center; padding: 2rem;">❌ Error: ${error.message}</p>`;
+        }
+    }
+}
+
+// ===== CONTACTOS COMPACTOS =====
+async function renderTodayContactsCompact(contacts) {
+    const container = document.getElementById('todayContacts');
+    
+    if (!contacts || contacts.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 3rem 1rem; color: #6b7280;">
+                <div style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;">📝</div>
+                <p>No hay contactos registrados hoy</p>
+                <small>Los nuevos contactos aparecerán aquí automáticamente</small>
+            </div>
+        `;
+        return;
+    }
+
+    // Filtrar contactos de hoy
+    const today = new Date().toDateString();
+    const todayContacts = contacts.filter(contact => {
+        const contactDate = new Date(contact.date || contact.createdAt).toDateString();
+        return contactDate === today;
+    });
+
+    if (todayContacts.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 3rem 1rem; color: #6b7280;">
+                <div style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;">📅</div>
+                <p>No hay contactos nuevos hoy</p>
+                <small>¡Comienza agregando tu primer contacto del día!</small>
+            </div>
+        `;
+        return;
+    }
+
+    // Ordenar por hora más reciente
+    todayContacts.sort((a, b) => {
+        const timeA = new Date(a.createdAt || a.date).getTime();
+        const timeB = new Date(b.createdAt || b.date).getTime();
+        return timeB - timeA;
+    });
+
+    const contactsHTML = await Promise.all(todayContacts.map(async (contact) => {
+        const time = new Date(contact.createdAt || contact.date).toLocaleTimeString('es-ES', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        const userProfile = await window.FirebaseData.loadUserProfile();
+        const canDelete = userProfile.role === 'director' || contact.salespersonId === window.FirebaseData.currentUser.uid;
+
+        return `
+            <div class="contact-item" style="background: white; border-radius: 8px; margin-bottom: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-left: 3px solid #667eea; overflow: hidden; transition: all 0.2s ease;">
+                <div class="contact-header" onclick="toggleContactDetails('${contact.id}')" style="padding: 0.75rem 1rem; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: white;">
+                    <div style="display: flex; align-items: center; gap: 0.75rem; flex: 1;">
+                        <div>
+                            <div style="font-weight: 600; color: #1f2937;">${contact.name}</div>
+                            <div style="color: #10b981; font-size: 0.9rem;">📞 ${contact.phone}</div>
+                        </div>
+                        <span style="background: #e0e7ff; color: #3730a3; padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.8rem;">${contact.source || 'Sin fuente'}</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="color: #6b7280; font-size: 0.8rem;">${time}</span>
+                        <button style="background: none; border: none; color: #6b7280; cursor: pointer; padding: 0.25rem; border-radius: 4px; transition: all 0.2s ease;" id="expand-${contact.id}">
+                            ⌄
+                        </button>
+                    </div>
+                </div>
+                <div class="contact-details" id="details-${contact.id}" style="padding: 0 1rem 1rem 1rem; background: #f8fafc; border-top: 1px solid #e5e7eb; display: none;">
+                    ${contact.email ? `
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.9rem;">
+                            <span style="color: #6b7280; font-weight: 500;">Email:</span>
+                            <span style="color: #1f2937;">${contact.email}</span>
+                        </div>
+                    ` : ''}
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.9rem;">
+                        <span style="color: #6b7280; font-weight: 500;">Ubicación:</span>
+                        <span style="color: #1f2937;">${contact.location || 'No especificada'}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.9rem;">
+                        <span style="color: #6b7280; font-weight: 500;">Estado:</span>
+                        <span style="color: #1f2937;">
+                            <span class="status-badge status-${(contact.status || 'nuevo').toLowerCase()}">${contact.status || 'Nuevo'}</span>
+                        </span>
+                    </div>
+                    ${contact.convenio ? `
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.9rem;">
+                            <span style="color: #6b7280; font-weight: 500;">Convenio:</span>
+                            <span style="color: #1f2937;">${contact.convenio}</span>
+                        </div>
+                    ` : ''}
+                    ${contact.notes ? `
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.9rem;">
+                            <span style="color: #6b7280; font-weight: 500;">Notas:</span>
+                            <span style="color: #1f2937;">${contact.notes}</span>
+                        </div>
+                    ` : ''}
+                    <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #e5e7eb;">
+                        <button onclick="editContact('${contact.id}')" style="padding: 0.4rem 0.8rem; border: none; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s ease; background: #dbeafe; color: #1e40af;">
+                            ✏️ Editar
+                        </button>
+                        <button onclick="openWhatsApp('${contact.phone}', '${contact.name}')" style="padding: 0.4rem 0.8rem; border: none; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s ease; background: #dcfce7; color: #166534;">
+                            💬 WhatsApp
+                        </button>
+                        ${canDelete ? `<button onclick="deleteLead('${contact.id}')" style="padding: 0.4rem 0.8rem; border: none; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s ease; background: #fee2e2; color: #dc2626;">🗑️ Eliminar</button>` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    }));
+
+    container.innerHTML = contactsHTML.join('');
+}
+
+// Función para toggle de detalles de contacto
+function toggleContactDetails(contactId) {
+    const details = document.getElementById(`details-${contactId}`);
+    const expandBtn = document.getElementById(`expand-${contactId}`);
+    
+    if (details.style.display === 'block') {
+        details.style.display = 'none';
+        expandBtn.style.transform = 'rotate(0deg)';
+    } else {
+        details.style.display = 'block';
+        expandBtn.style.transform = 'rotate(180deg)';
+    }
+}
+
+// Función para abrir WhatsApp
+function openWhatsApp(phone, name) {
+    const cleanPhone = phone.replace(/\D/g, '');
+    const message = `Hola ${name}, te contacto desde Ciudad Bilingüe. ¿Cómo estás?`;
+    const url = `https://wa.me/57${cleanPhone}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+}
+
+// Función para editar contacto (implementar según tu lógica actual)
+function editContact(contactId) {
+    alert(`Funcionalidad de editar contacto: ${contactId}\n\nPuedes implementar esta función según tus necesidades.`);
 }
 
 // ===== FIREBASE MONITORING (DIRECTOR) =====
@@ -741,89 +878,6 @@ async function updateStats() {
         console.log(`   - Total: ${allContacts.length}, Active: ${activeLeads.length}, Conversions: ${conversions.length}, Today: ${todayContacts.length}`);
     } catch (error) {
         console.error('❌ Error updating Firebase stats:', error);
-    }
-}
-
-async function updateTodayContacts() {
-    if (!window.FirebaseData || !window.FirebaseData.currentUser) {
-        console.log('❌ Firebase not available for today contacts');
-        return;
-    }
-    
-    try {
-        const todayContacts = await window.FirebaseData.getFilteredContacts();
-        const today = new Date().toISOString().split('T')[0];
-        const todayFiltered = todayContacts.filter(c => c.date === today);
-        
-        console.log('📅 Updating today contacts with Firebase');
-        console.log(`   - Today contacts: ${todayFiltered.length}`);
-        
-        const container = document.getElementById('todayContacts');
-        if (!container) {
-            console.log('❌ Today contacts container not found');
-            return;
-        }
-        
-        if (todayFiltered.length === 0) {
-            const userProfile = await window.FirebaseData.loadUserProfile();
-            let message;
-            if (userProfile.role === 'director') {
-                const allUsers = await window.FirebaseData.getAllUsers();
-                message = `No hay contactos registrados hoy por el equipo en Firebase
-                <div style="margin-top: 1rem; font-size: 0.9rem; color: #666;">
-                    👥 ${Object.keys(allUsers).length} usuarios en Firebase<br>
-                    📊 ${todayContacts.length} contactos totales<br>
-                    📅 0 contactos hoy<br>
-                    🔥 Base de datos: Firebase Realtime Database
-                </div>`;
-            } else {
-                message = 'No tienes contactos registrados hoy en Firebase. ¡Agrega algunos en el formulario de arriba!';
-            }
-            container.innerHTML = `<p style="color: #666; text-align: center; padding: 2rem;">${message}</p>`;
-            return;
-        }
-        
-        // Sort by time (newest first)
-        todayFiltered.sort((a, b) => {
-            const timeA = a.time || '00:00:00';
-            const timeB = b.time || '00:00:00';
-            return timeB.localeCompare(timeA);
-        });
-        
-        container.innerHTML = await Promise.all(todayFiltered.map(async (contact) => {
-            const userProfile = await window.FirebaseData.loadUserProfile();
-            const salespersonInfo = userProfile.role === 'director' 
-                ? `<div style="color: #667eea; font-size: 0.8rem; font-weight: 600; margin-top: 0.25rem;">👤 ${await getUserDisplayNameFirebase(contact.salespersonId)}</div>`
-                : '';
-            
-            // Check if user can delete this contact
-            const canDelete = userProfile.role === 'director' || contact.salespersonId === window.FirebaseData.currentUser.uid;
-            
-            return `
-                <div style="background: #f9fafb; padding: 1rem; border-radius: 5px; margin-bottom: 0.5rem; border: 1px solid #e5e7eb; border-left: 3px solid #ff6b35;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                        <div style="flex: 1;">
-                            <div style="font-weight: 600; color: #333;">${contact.name}</div>
-                            <div style="color: #666; font-size: 0.9rem; margin-top: 0.25rem;">📞 ${contact.phone}</div>
-                            <div style="color: #666; font-size: 0.9rem;">📍 ${contact.source}</div>
-                            <div style="color: #888; font-size: 0.8rem; margin-top: 0.5rem;">⏰ ${contact.time}</div>
-                            ${salespersonInfo}
-                            ${contact.notes ? `<div style="color: #666; font-size: 0.8rem; background: #f0f9ff; padding: 0.5rem; border-radius: 4px; margin-top: 0.5rem;">💬 ${contact.notes}</div>` : ''}
-                            <div style="font-size: 0.7rem; color: #ff6b35; margin-top: 0.5rem;">🔥 Firebase: ${contact.id}</div>
-                        </div>
-                        ${canDelete ? `<button onclick="deleteLead('${contact.id}')" style="background: #ef4444; color: white; border: none; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.7rem; cursor: pointer; margin-left: 0.5rem;">🗑️</button>` : ''}
-                    </div>
-                </div>
-            `;
-        })).then(items => items.join(''));
-        
-        console.log('✅ Today contacts updated with Firebase');
-    } catch (error) {
-        console.error('❌ Error updating today contacts:', error);
-        const container = document.getElementById('todayContacts');
-        if (container) {
-            container.innerHTML = `<p style="color: #dc2626; text-align: center; padding: 2rem;">❌ Error: ${error.message}</p>`;
-        }
     }
 }
 
