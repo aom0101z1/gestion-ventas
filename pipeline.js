@@ -1,5 +1,17 @@
 // pipeline.js - COMPLETE FIXED VERSION WITH ALL FUNCTIONS
 // ===== PIPELINE CONFIGURATION =====
+
+// ===== DEBUG HEADER - Add this at the VERY TOP of your pipeline.js =====
+console.log('🚨 PIPELINE.JS LOADING STARTED');
+console.log('📁 File: pipeline.js');
+console.log('⏰ Time:', new Date().toLocaleTimeString());
+
+// Test immediate execution
+window.pipelineFileLoaded = true;
+alert('🔥 Pipeline.js is loading!');
+
+// Continue with your existing code below...
+// pipeline.js - COMPLETE FIXED VERSION WITH ALL FUNCTIONS
 const PIPELINE_STAGES = [
     { 
         id: 'nuevo', 
