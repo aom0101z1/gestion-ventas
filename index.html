@@ -1269,7 +1269,151 @@
         
         console.log('🔧 Auto-profile creation script loaded');
     </script>
+<!-- Add this enhanced script AFTER Part 29 and BEFORE Part 30 -->
+<script>
+// ===== ENHANCED FIREBASE INTEGRATION & PIPELINE PREPARATION =====
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('🚀 Enhanced DOM ready, preparing pipeline environment...');
+    
+    // Ensure pipeline functions are available
+    window.addEventListener('firebaseReady', () => {
+        console.log('🔥 Firebase ready event received');
+        
+        // Wait for all scripts to load
+        setTimeout(() => {
+            console.log('🔧 Checking pipeline readiness...');
+            
+            // Check if essential functions exist
+            const requiredFunctions = [
+                'refreshPipeline',
+                'showPipelineDebug',
+                'initializePipeline'
+            ];
+            
+            const missingFunctions = requiredFunctions.filter(func => typeof window[func] !== 'function');
+            
+            if (missingFunctions.length > 0) {
+                console.log('⚠️ Missing pipeline functions:', missingFunctions);
+                
+                // Create fallback functions
+                if (typeof window.refreshPipeline !== 'function') {
+                    window.refreshPipeline = function() {
+                        console.log('🔄 Fallback refreshPipeline called');
+                        const container = document.getElementById('pipelineContainer');
+                        if (container) {
+                            container.innerHTML = `
+                                <div style="text-align: center; padding: 3rem; color: #ef4444;">
+                                    <div style="font-size: 3rem; margin-bottom: 1rem;">⚠️</div>
+                                    <h3>Pipeline Script Error</h3>
+                                    <p>pipeline.js no se cargó correctamente.</p>
+                                    <button onclick="location.reload()" style="background: #3b82f6; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-top: 1rem;">
+                                        🔄 Recargar Página
+                                    </button>
+                                </div>
+                            `;
+                        }
+                    };
+                }
+                
+                if (typeof window.showPipelineDebug !== 'function') {
+                    window.showPipelineDebug = function() {
+                        alert(`🔍 PIPELINE DEBUG (Fallback):
 
+❌ pipeline.js no se cargó correctamente
+📂 Scripts esperados:
+- AdminData.js: ${typeof window.FirebaseData !== 'undefined' ? '✅' : '❌'}
+- core.js: ${typeof login !== 'undefined' ? '✅' : '❌'}
+- sales.js: ${typeof addContact !== 'undefined' ? '✅' : '❌'}  
+- pipeline.js: ❌
+
+🔧 Solución: Verifica que pipeline.js existe y se está cargando correctamente.`);
+                    };
+                }
+            } else {
+                console.log('✅ All pipeline functions available');
+            }
+            
+            // Auto-initialize pipeline if user is authenticated
+            if (window.FirebaseData && window.FirebaseData.currentUser) {
+                console.log('👤 User authenticated, auto-initializing pipeline...');
+                if (typeof window.initializePipeline === 'function') {
+                    setTimeout(() => {
+                        window.initializePipeline();
+                    }, 2000);
+                }
+            }
+            
+        }, 3000); // Wait 3 seconds for all scripts to load
+    });
+});
+
+// 29b ===== ENHANCED FIREBASE DATA COMPATIBILITY =====
+// Ensure compatibility between SimpleFirebaseManager and pipeline.js expectations
+window.addEventListener('firebaseReady', () => {
+    if (window.FirebaseData) {
+        // Add any missing methods that pipeline.js might expect
+        if (!window.FirebaseData.contacts) {
+            window.FirebaseData.contacts = {};
+        }
+        
+        // Enhance the manager with additional methods if needed
+        const originalGetFilteredContacts = window.FirebaseData.getFilteredContacts;
+        window.FirebaseData.getFilteredContacts = async function() {
+            try {
+                return await originalGetFilteredContacts.call(this);
+            } catch (error) {
+                console.error('Error in getFilteredContacts:', error);
+                return [];
+            }
+        };
+        
+        console.log('🔧 Firebase Data compatibility enhanced');
+    }
+});
+
+// ===== PIPELINE TAB ACTIVATION HANDLER =====
+// Ensure pipeline initializes when tab is activated
+function showTab(tabName) {
+    // Call the original showTab function if it exists
+    if (typeof window.originalShowTab === 'function') {
+        window.originalShowTab(tabName);
+    } else {
+        // Basic tab switching if original function doesn't exist
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.classList.add('hidden');
+        });
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.classList.remove('active');
+        });
+        
+        const targetContent = document.getElementById(tabName);
+        const targetTab = document.getElementById(tabName + 'Tab');
+        
+        if (targetContent) targetContent.classList.remove('hidden');
+        if (targetTab) targetTab.classList.add('active');
+    }
+    
+    // Special handling for pipeline tab
+    if (tabName === 'pipeline') {
+        console.log('🎯 Pipeline tab activated');
+        setTimeout(() => {
+            if (typeof window.initializePipeline === 'function') {
+                window.initializePipeline();
+            } else if (typeof window.refreshPipeline === 'function') {
+                window.refreshPipeline();
+            }
+        }, 500);
+    }
+}
+
+// Make the enhanced showTab globally available
+window.originalShowTab = window.showTab;
+window.showTab = showTab;
+
+console.log('✅ Enhanced pipeline preparation script loaded');
+</script>
+
+    
 <!-- ========================================= -->
 <!-- PARTE 30: SCRIPTS EXTERNOS -->
 <!-- ========================================= -->
