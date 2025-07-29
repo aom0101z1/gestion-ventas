@@ -1,83 +1,43 @@
-// ===== ENHANCED PIPELINE INITIALIZATION WITH BETTER ERROR HANDLING =====
+// ===== PIPELINE ENHANCED WITH DEBUGGING =====
 
-// ===== PIPELINE STATE =====
-let pipelineData = [];
-let currentUserProfile = null;
-let isDirector = false;
-let isLoading = false;
+// Add this to your pipeline.js file - replace the problematic functions
 
-// ===== ENHANCED INITIALIZATION WITH TIMEOUT =====
+// ===== ENHANCED INITIALIZATION WITH DEBUG ALERTS =====
 async function initializePipeline() {
     console.log('🎯 Initializing Firebase Pipeline...');
     
-    // Prevent multiple initializations
-    if (isLoading) {
-        console.log('⚠️ Pipeline already loading, skipping...');
-        return;
-    }
-    
-    isLoading = true;
-    
     try {
-        // Check Firebase availability with timeout
-        await waitForFirebase(10000); // 10 second timeout
+        // Step 1: Check Firebase
+        if (!window.FirebaseData || !window.FirebaseData.currentUser) {
+            throw new Error('Firebase not available or user not authenticated');
+        }
         
-        console.log('🔥 Firebase available, loading user profile...');
-        
-        // Get user profile with timeout
-        currentUserProfile = await Promise.race([
-            window.FirebaseData.loadUserProfile(),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('User profile timeout')), 8000))
-        ]);
-        
+        // Step 2: Get user profile
+        console.log('👤 Loading user profile...');
+        currentUserProfile = await window.FirebaseData.loadUserProfile();
         isDirector = currentUserProfile?.role === 'director';
         
-        console.log('👤 Pipeline user:', currentUserProfile?.name, '- Role:', currentUserProfile?.role);
+        console.log('✅ User loaded:', currentUserProfile?.name, '- Role:', currentUserProfile?.role);
         
-        // Load and render pipeline with timeout
-        await Promise.race([
-            loadPipelineData(),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Data loading timeout')), 10000))
-        ]);
+        // Step 3: Load data
+        console.log('📊 Loading pipeline data...');
+        await loadPipelineData();
         
+        console.log('✅ Data loaded:', pipelineData.length, 'contacts');
+        
+        // Step 4: Render
+        console.log('🎨 Rendering pipeline...');
         renderPipeline();
         
         console.log('✅ Pipeline initialized successfully');
         
     } catch (error) {
         console.error('❌ Error initializing pipeline:', error);
-        showPipelineError(error.message);
-    } finally {
-        isLoading = false;
+        showPipelineError(`Error de inicialización: ${error.message}`);
     }
 }
 
-// ===== WAIT FOR FIREBASE FUNCTION =====
-function waitForFirebase(timeout = 10000) {
-    return new Promise((resolve, reject) => {
-        const startTime = Date.now();
-        
-        function checkFirebase() {
-            if (window.FirebaseData && window.FirebaseData.currentUser) {
-                console.log('✅ Firebase ready!');
-                resolve();
-                return;
-            }
-            
-            if (Date.now() - startTime > timeout) {
-                reject(new Error('Firebase timeout - not available after ' + timeout + 'ms'));
-                return;
-            }
-            
-            console.log('⏳ Waiting for Firebase...');
-            setTimeout(checkFirebase, 500);
-        }
-        
-        checkFirebase();
-    });
-}
-
-// ===== ENHANCED DATA LOADING WITH BETTER ERROR HANDLING =====
+// ===== ENHANCED DATA LOADING =====
 async function loadPipelineData() {
     try {
         console.log('📊 Loading pipeline data from Firebase...');
@@ -86,45 +46,41 @@ async function loadPipelineData() {
             throw new Error('Firebase not available');
         }
         
-        if (!window.FirebaseData.currentUser) {
-            throw new Error('User not authenticated');
-        }
+        let allContacts = [];
         
-        // Check if getFilteredContacts function exists
-        if (typeof window.FirebaseData.getFilteredContacts !== 'function') {
-            console.log('⚠️ getFilteredContacts not available, trying alternative methods...');
+        // Try multiple methods to get contacts
+        if (typeof window.FirebaseData.getFilteredContacts === 'function') {
+            console.log('✅ Using getFilteredContacts()');
+            allContacts = await window.FirebaseData.getFilteredContacts();
+        } else if (window.FirebaseData.contacts) {
+            console.log('✅ Using direct contacts access');
+            allContacts = Object.entries(window.FirebaseData.contacts).map(([id, contact]) => ({
+                id,
+                ...contact
+            }));
             
-            // Alternative: try to get contacts directly
-            if (window.FirebaseData.contacts) {
-                const allContacts = Object.entries(window.FirebaseData.contacts).map(([id, contact]) => ({
-                    id,
-                    ...contact
-                }));
-                
-                // Filter by user if not director
-                if (!isDirector && currentUserProfile) {
-                    pipelineData = allContacts.filter(contact => 
-                        contact.salespersonId === window.FirebaseData.currentUser.uid
-                    );
-                } else {
-                    pipelineData = allContacts;
-                }
-            } else {
-                throw new Error('No contacts data available');
+            // Filter by user if not director
+            if (!isDirector && currentUserProfile && window.FirebaseData.currentUser) {
+                allContacts = allContacts.filter(contact => 
+                    contact.salespersonId === window.FirebaseData.currentUser.uid
+                );
             }
         } else {
-            // Use the getFilteredContacts function
-            const allContacts = await window.FirebaseData.getFilteredContacts();
-            pipelineData = allContacts;
+            throw new Error('No contacts data available');
         }
         
-        // Normalize status for all contacts
-        pipelineData = pipelineData.map(contact => ({
+        // Normalize status
+        pipelineData = allContacts.map(contact => ({
             ...contact,
             status: normalizeStatus(contact.status || 'Nuevo')
         }));
         
         console.log(`✅ Loaded ${pipelineData.length} contacts for pipeline`);
+        
+        // Debug: show first contact
+        if (pipelineData.length > 0) {
+            console.log('📋 Sample contact:', pipelineData[0]);
+        }
         
     } catch (error) {
         console.error('❌ Error loading pipeline data:', error);
@@ -133,213 +89,197 @@ async function loadPipelineData() {
     }
 }
 
-// ===== ENHANCED REFRESH WITH BETTER FEEDBACK =====
-async function refreshPipeline() {
-    console.log('🔄 Refreshing pipeline...');
-    
+// ===== ENHANCED RENDERING WITH ERROR HANDLING =====
+function renderPipeline() {
     const container = document.getElementById('pipelineContainer');
     if (!container) {
         console.error('❌ Pipeline container not found');
+        showPipelineError('Container #pipelineContainer no encontrado');
         return;
     }
     
-    // Show loading with timeout indicator
-    container.innerHTML = `
-        <div style="text-align: center; padding: 3rem;">
-            <div class="loading-spinner"></div>
-            <br>
-            <div style="margin-top: 1rem;">Actualizando pipeline...</div>
-            <div style="margin-top: 0.5rem; font-size: 0.8rem; color: #6b7280;">
-                Si tarda más de 30 segundos, 
-                <button onclick="forceRefreshPipeline()" style="background: none; border: none; color: #3b82f6; cursor: pointer; text-decoration: underline;">
-                    haz clic aquí
-                </button>
-            </div>
-        </div>
-    `;
-    
     try {
-        // Add timeout to refresh
-        await Promise.race([
-            (async () => {
-                await loadPipelineData();
-                renderPipeline();
-            })(),
-            new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Refresh timeout after 30 seconds')), 30000)
-            )
-        ]);
+        console.log('🎨 Rendering pipeline with', pipelineData.length, 'contacts');
         
-        console.log('✅ Pipeline refreshed successfully');
+        if (pipelineData.length === 0) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 3rem; color: #6b7280;">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">📋</div>
+                    <h3>No hay contactos disponibles</h3>
+                    <p>Agrega algunos contactos en la pestaña "Leads" para verlos aquí.</p>
+                    <button onclick="refreshPipeline()" class="btn btn-primary" style="margin-top: 1rem;">
+                        🔄 Actualizar
+                    </button>
+                </div>
+            `;
+            return;
+        }
+        
+        // Create pipeline columns
+        const pipelineHTML = PIPELINE_STAGES.map(stage => {
+            const stageContacts = pipelineData.filter(contact => 
+                normalizeStatus(contact.status) === stage.id
+            );
+            
+            console.log(`📊 Stage ${stage.name}: ${stageContacts.length} contacts`);
+            
+            return `
+                <div class="pipeline-column" data-stage="${stage.id}">
+                    <div class="pipeline-header" style="background: ${stage.color}; color: ${stage.textColor};">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span>${stage.icon}</span>
+                            <span style="font-weight: 600;">${stage.name}</span>
+                        </div>
+                        <span style="background: rgba(0,0,0,0.1); padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.8rem;">
+                            ${stageContacts.length}
+                        </span>
+                    </div>
+                    <div class="pipeline-cards" id="cards-${stage.id}">
+                        ${stageContacts.map(contact => renderPipelineCard(contact)).join('')}
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        container.innerHTML = pipelineHTML;
+        
+        // Setup drag and drop
+        setupDragAndDrop();
+        
+        console.log('✅ Pipeline rendered successfully');
+        console.log('📊 Columns created:', document.querySelectorAll('.pipeline-column').length);
+        console.log('📋 Cards created:', document.querySelectorAll('.pipeline-card').length);
         
     } catch (error) {
-        console.error('❌ Error refreshing pipeline:', error);
-        showPipelineError(`Error al actualizar: ${error.message}`);
+        console.error('❌ Error rendering pipeline:', error);
+        showPipelineError(`Error al renderizar: ${error.message}`);
     }
 }
 
-// ===== FORCE REFRESH FUNCTION =====
-async function forceRefreshPipeline() {
-    console.log('🚨 Force refreshing pipeline...');
+// ===== ENHANCED ERROR DISPLAY =====
+function showPipelineError(message) {
+    const container = document.getElementById('pipelineContainer');
+    if (container) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 3rem;">
+                <div style="background: #fee2e2; border: 1px solid #fecaca; border-radius: 8px; padding: 2rem; color: #dc2626; max-width: 500px; margin: 0 auto;">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">⚠️</div>
+                    <h3 style="margin-bottom: 1rem;">Error en Pipeline</h3>
+                    <p style="margin-bottom: 1.5rem;">${message}</p>
+                    
+                    <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+                        <button onclick="refreshPipeline()" style="background: #3b82f6; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;">
+                            🔄 Reintentar
+                        </button>
+                        <button onclick="showDebugInfo()" style="background: #6b7280; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;">
+                            🔍 Ver Info
+                        </button>
+                        <button onclick="forceReload()" style="background: #ef4444; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;">
+                            🚨 Forzar Recarga
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+}
+
+// ===== DEBUG INFO FUNCTION =====
+function showDebugInfo() {
+    const info = `🔍 INFORMACIÓN DE DEBUG
+
+📊 DATOS:
+- Contactos cargados: ${pipelineData.length}
+- Usuario: ${currentUserProfile?.name || 'No disponible'}
+- Rol: ${currentUserProfile?.role || 'No disponible'}
+- Es Director: ${isDirector ? 'SÍ' : 'NO'}
+
+🔥 FIREBASE:
+- Firebase disponible: ${window.FirebaseData ? 'SÍ' : 'NO'}
+- Usuario autenticado: ${window.FirebaseData?.currentUser ? 'SÍ' : 'NO'}
+- Email: ${window.FirebaseData?.currentUser?.email || 'No disponible'}
+
+📋 CONTACTOS:
+${PIPELINE_STAGES.map(stage => {
+    const count = pipelineData.filter(c => normalizeStatus(c.status) === stage.id).length;
+    return `- ${stage.name}: ${count}`;
+}).join('\n')}
+
+🎯 DOM:
+- Container encontrado: ${document.getElementById('pipelineContainer') ? 'SÍ' : 'NO'}
+- Columnas renderizadas: ${document.querySelectorAll('.pipeline-column').length}
+
+🚨 POSIBLES PROBLEMAS:
+${pipelineData.length === 0 ? '⚠️ No hay contactos\n' : ''}
+${!window.FirebaseData ? '⚠️ Firebase no disponible\n' : ''}
+${!currentUserProfile ? '⚠️ Perfil de usuario no cargado\n' : ''}
+${!document.getElementById('pipelineContainer') ? '⚠️ Container no encontrado\n' : ''}`;
+
+    alert(info);
+}
+
+// ===== FORCE RELOAD FUNCTION =====
+function forceReload() {
+    if (confirm('¿Estás seguro de que quieres recargar la página? Esto puede solucionar problemas de sincronización.')) {
+        window.location.reload();
+    }
+}
+
+// ===== ENHANCED REFRESH =====
+async function refreshPipeline() {
+    console.log('🔄 Refreshing pipeline...');
     
     const container = document.getElementById('pipelineContainer');
     if (container) {
         container.innerHTML = `
             <div style="text-align: center; padding: 3rem;">
-                <div style="font-size: 1.2rem; margin-bottom: 1rem;">🔄 Reiniciando sistema...</div>
                 <div class="loading-spinner"></div>
-                <div style="margin-top: 1rem; font-size: 0.9rem; color: #6b7280;">
-                    Verificando conexión con Firebase...
+                <br>
+                <div style="margin-top: 1rem;">Actualizando pipeline...</div>
+                <div style="margin-top: 0.5rem; font-size: 0.8rem; color: #6b7280;">
+                    Cargando ${pipelineData.length} contactos...
                 </div>
             </div>
         `;
     }
     
     try {
-        // Reset state
-        pipelineData = [];
-        currentUserProfile = null;
-        isDirector = false;
-        isLoading = false;
-        
-        // Wait a bit and try again
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        await initializePipeline();
-        
+        await loadPipelineData();
+        renderPipeline();
+        console.log('✅ Pipeline refreshed successfully');
     } catch (error) {
-        console.error('❌ Force refresh failed:', error);
-        showPipelineError(`Fuerza de refresco falló: ${error.message}`);
+        console.error('❌ Error refreshing pipeline:', error);
+        showPipelineError(`Error al actualizar: ${error.message}`);
     }
 }
 
-// ===== DIAGNOSTIC FUNCTION =====
-async function diagnosePipelineIssues() {
-    console.log('🔍 DIAGNOSING PIPELINE ISSUES...');
+// ===== MAKE FUNCTIONS AVAILABLE =====
+window.refreshPipeline = refreshPipeline;
+window.showDebugInfo = showDebugInfo;
+window.forceReload = forceReload;
+
+// ===== INITIALIZATION WITH BETTER TIMING =====
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('🚀 DOM ready, initializing pipeline...');
     
-    const diagnosis = {
-        timestamp: new Date().toISOString(),
-        firebase: {},
-        user: {},
-        data: {},
-        dom: {}
+    // Multiple initialization attempts
+    const tryInit = async () => {
+        if (window.FirebaseData && window.FirebaseData.currentUser) {
+            await initializePipeline();
+        } else {
+            console.log('⏳ Firebase not ready, waiting...');
+            setTimeout(tryInit, 2000);
+        }
     };
     
-    // Check Firebase
-    diagnosis.firebase.available = !!window.FirebaseData;
-    diagnosis.firebase.authenticated = !!(window.FirebaseData?.currentUser);
-    diagnosis.firebase.userId = window.FirebaseData?.currentUser?.uid || null;
-    diagnosis.firebase.functions = {};
+    // Start trying immediately
+    setTimeout(tryInit, 1000);
     
-    if (window.FirebaseData) {
-        diagnosis.firebase.functions.loadUserProfile = typeof window.FirebaseData.loadUserProfile === 'function';
-        diagnosis.firebase.functions.getFilteredContacts = typeof window.FirebaseData.getFilteredContacts === 'function';
-        diagnosis.firebase.functions.contacts = !!window.FirebaseData.contacts;
-        diagnosis.firebase.contactsCount = window.FirebaseData.contacts ? Object.keys(window.FirebaseData.contacts).length : 0;
-    }
-    
-    // Check User
-    diagnosis.user.profile = currentUserProfile;
-    diagnosis.user.isDirector = isDirector;
-    diagnosis.user.isLoading = isLoading;
-    
-    // Check Data
-    diagnosis.data.pipelineDataLength = pipelineData.length;
-    diagnosis.data.sampleContact = pipelineData[0] || null;
-    
-    // Check DOM
-    diagnosis.dom.container = !!document.getElementById('pipelineContainer');
-    diagnosis.dom.columns = document.querySelectorAll('.pipeline-column').length;
-    diagnosis.dom.cards = document.querySelectorAll('.pipeline-card').length;
-    
-    console.log('📋 DIAGNOSIS RESULTS:', diagnosis);
-    
-    // Show user-friendly summary
-    const issues = [];
-    const solutions = [];
-    
-    if (!diagnosis.firebase.available) {
-        issues.push('Firebase no está disponible');
-        solutions.push('Verifica que Firebase esté cargado correctamente');
-    }
-    
-    if (!diagnosis.firebase.authenticated) {
-        issues.push('Usuario no autenticado');
-        solutions.push('Inicia sesión nuevamente');
-    }
-    
-    if (!diagnosis.firebase.functions.getFilteredContacts && !diagnosis.firebase.functions.contacts) {
-        issues.push('Funciones de datos no disponibles');
-        solutions.push('Verifica la configuración de Firebase');
-    }
-    
-    if (diagnosis.firebase.contactsCount === 0) {
-        issues.push('No hay contactos en la base de datos');
-        solutions.push('Agrega algunos contactos primero');
-    }
-    
-    if (!diagnosis.dom.container) {
-        issues.push('Contenedor del pipeline no encontrado');
-        solutions.push('Verifica que el HTML tenga el elemento #pipelineContainer');
-    }
-    
-    const summary = `🔍 DIAGNÓSTICO DEL PIPELINE
-
-❌ PROBLEMAS ENCONTRADOS:
-${issues.length > 0 ? issues.map(issue => `- ${issue}`).join('\n') : '✅ No se encontraron problemas obvios'}
-
-💡 SOLUCIONES SUGERIDAS:
-${solutions.length > 0 ? solutions.map(sol => `- ${sol}`).join('\n') : '✅ Todo parece estar bien'}
-
-📊 DATOS TÉCNICOS:
-- Firebase disponible: ${diagnosis.firebase.available ? 'SÍ' : 'NO'}
-- Usuario autenticado: ${diagnosis.firebase.authenticated ? 'SÍ' : 'NO'}
-- Contactos en DB: ${diagnosis.firebase.contactsCount}
-- Contactos en pipeline: ${diagnosis.data.pipelineDataLength}
-- Columnas renderizadas: ${diagnosis.dom.columns}
-
-🔧 ACCIONES RECOMENDADAS:
-1. ${!diagnosis.firebase.available ? 'Recarga la página' : 'Firebase OK'}
-2. ${!diagnosis.firebase.authenticated ? 'Vuelve a iniciar sesión' : 'Autenticación OK'}
-3. ${diagnosis.firebase.contactsCount === 0 ? 'Agrega contactos en la pestaña Leads' : 'Datos OK'}
-4. ${diagnosis.dom.columns === 0 ? 'Usa forceRefreshPipeline()' : 'Render OK'}`;
-
-    alert(summary);
-    
-    return diagnosis;
-}
-
-// ===== MAKE FUNCTIONS GLOBALLY AVAILABLE =====
-window.refreshPipeline = refreshPipeline;
-window.forceRefreshPipeline = forceRefreshPipeline;
-window.diagnosePipelineIssues = diagnosePipelineIssues;
-window.initializePipeline = initializePipeline;
-
-// ===== AUTO-INITIALIZATION =====
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('🚀 DOM ready, checking for Firebase...');
-    
-    // Try immediate initialization
-    if (window.FirebaseData && window.FirebaseData.currentUser) {
-        setTimeout(initializePipeline, 1000);
-    } else {
-        // Wait for Firebase ready event
-        window.addEventListener('firebaseReady', () => {
-            console.log('🔥 Firebase ready event received');
-            setTimeout(initializePipeline, 1000);
-        });
-        
-        // Fallback: keep checking for Firebase every 2 seconds
-        const checkInterval = setInterval(() => {
-            if (window.FirebaseData && window.FirebaseData.currentUser) {
-                clearInterval(checkInterval);
-                setTimeout(initializePipeline, 1000);
-            }
-        }, 2000);
-        
-        // Stop checking after 30 seconds
-        setTimeout(() => clearInterval(checkInterval), 30000);
-    }
+    // Also listen for firebase ready event
+    window.addEventListener('firebaseReady', () => {
+        console.log('🔥 Firebase ready event received');
+        setTimeout(initializePipeline, 500);
+    });
 });
 
-console.log('✅ Enhanced Pipeline module loaded successfully');
+console.log('✅ Enhanced Pipeline with debug loaded');
