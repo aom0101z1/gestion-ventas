@@ -1,10 +1,18 @@
+<!-- ========================================= -->
+<!-- PARTE 1: DOCTYPE Y HEAD BÁSICO -->
+<!-- ========================================= -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🏫 Ciudad Bilingue - CRM</title>
+
+<!-- ========================================= -->
+<!-- PARTE 2-15: CSS COMPLETO -->
+<!-- ========================================= -->
     <style>
+        /* ===== PARTE 2: RESET Y CONFIGURACIÓN BÁSICA ===== */
         * {
             margin: 0;
             padding: 0;
@@ -18,6 +26,7 @@
             line-height: 1.6;
         }
         
+        /* ===== PARTE 3: HEADER Y LAYOUT ===== */
         .header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -31,8 +40,8 @@
             margin: 0 auto;
             padding: 2rem;
         }
-        
-        /* Login Styles */
+
+        /* ===== PARTE 4: LOGIN STYLES ===== */
         .login-container {
             max-width: 400px;
             margin: 5rem auto;
@@ -52,8 +61,8 @@
         .login-form { 
             padding: 2rem; 
         }
-        
-        /* Firebase Status Indicator */
+
+        /* ===== PARTE 5: FIREBASE STATUS INDICATOR ===== */
         .firebase-status {
             position: fixed;
             top: 10px;
@@ -77,8 +86,8 @@
         .firebase-status.connecting {
             background: #f59e0b;
         }
-        
-        /* Form Styles */
+
+        /* ===== PARTE 6: FORM STYLES ===== */
         .form-group { 
             margin-bottom: 1.5rem; 
         }
@@ -103,8 +112,8 @@
             outline: none;
             border-color: #667eea;
         }
-        
-        /* Button Styles */
+
+        /* ===== PARTE 7: BUTTON STYLES ===== */
         .btn {
             padding: 0.75rem 1.5rem;
             border: none;
@@ -130,8 +139,8 @@
         .btn-secondary:hover:not(:disabled) { background: #4b5563; }
         .btn-firebase { background: #ff6b35; color: white; }
         .btn-firebase:hover:not(:disabled) { background: #e55a31; }
-        
-        /* User Info */
+
+        /* ===== PARTE 8: USER INFO & STATS ===== */
         .user-info {
             background: white;
             padding: 1rem;
@@ -143,7 +152,6 @@
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
         
-        /* Stats */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -164,8 +172,8 @@
             font-weight: bold;
             margin-bottom: 0.5rem;
         }
-        
-        /* Tabs */
+
+        /* ===== PARTE 9: TABS ===== */
         .tabs {
             display: flex;
             background: white;
@@ -196,8 +204,8 @@
             padding: 2rem;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
-        
-        /* Table */
+
+        /* ===== PARTE 10: TABLE ===== */
         .table {
             width: 100%;
             border-collapse: collapse;
@@ -214,8 +222,8 @@
             background: #f9fafb;
             font-weight: 600;
         }
-        
-        /* Status badges */
+
+        /* ===== PARTE 11: STATUS BADGES ===== */
         .status-badge {
             padding: 0.25rem 0.75rem;
             border-radius: 20px;
@@ -229,8 +237,8 @@
         .status-convertido { background: #dcfce7; color: #166534; }
         .status-negociacion { background: #fed7aa; color: #c2410c; }
         .status-perdido { background: #fee2e2; color: #dc2626; }
-        
-        /* User Card Styles */
+
+        /* ===== PARTE 12: USER CARDS & CONVENIOS ===== */
         .user-card {
             background: #f9fafb;
             padding: 1rem;
@@ -252,8 +260,8 @@
             align-items: center;
             border-left: 3px solid #10b981;
         }
-        
-        /* Pipeline Styles */
+
+        /* ===== PARTE 13: PIPELINE STYLES ===== */
         .pipeline-container {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -308,8 +316,8 @@
             opacity: 0.5;
             transform: rotate(5deg);
         }
-        
-        /* Loading Spinner */
+
+        /* ===== PARTE 14: LOADING SPINNER Y UTILIDADES ===== */
         .loading-spinner {
             display: inline-block;
             width: 20px;
@@ -325,7 +333,6 @@
             100% { transform: rotate(360deg); }
         }
         
-        /* Utilities */
         .hidden { display: none !important; }
         .error-message {
             background: #fee2e2;
@@ -353,8 +360,8 @@
             margin-bottom: 1rem;
             border-left: 4px solid #3b82f6;
         }
-        
-        /* Responsive */
+
+        /* ===== PARTE 15: RESPONSIVE Y ANIMACIONES + CONTACTOS COMPACTOS ===== */
         @media (max-width: 768px) {
             .container { padding: 1rem; }
             .stats-grid { grid-template-columns: 1fr; }
@@ -363,7 +370,6 @@
             .tabs { flex-direction: column; }
         }
         
-        /* Firebase Connection Animations */
         @keyframes pulse {
             0% { opacity: 1; }
             50% { opacity: 0.5; }
@@ -373,8 +379,165 @@
         .connecting {
             animation: pulse 1.5s infinite;
         }
+
+        /* ===== CONTACTOS COMPACTOS (NUEVO) ===== */
+        .contact-item {
+            background: white;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border-left: 3px solid #667eea;
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .contact-item:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+
+        .contact-header {
+            padding: 0.75rem 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            background: white;
+            transition: background 0.2s ease;
+        }
+
+        .contact-header:hover {
+            background: #f8fafc;
+        }
+
+        .contact-main-info {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            flex: 1;
+        }
+
+        .contact-name {
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .contact-phone {
+            color: #10b981;
+            font-size: 0.9rem;
+        }
+
+        .contact-source {
+            background: #e0e7ff;
+            color: #3730a3;
+            padding: 0.2rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+        }
+
+        .contact-time {
+            color: #6b7280;
+            font-size: 0.8rem;
+        }
+
+        .expand-btn {
+            background: none;
+            border: none;
+            color: #6b7280;
+            cursor: pointer;
+            padding: 0.25rem;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+
+        .expand-btn:hover {
+            background: #f3f4f6;
+            color: #374151;
+        }
+
+        .contact-details {
+            padding: 0 1rem 1rem 1rem;
+            background: #f8fafc;
+            border-top: 1px solid #e5e7eb;
+            display: none;
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .detail-label {
+            color: #6b7280;
+            font-weight: 500;
+        }
+
+        .detail-value {
+            color: #1f2937;
+        }
+
+        .contact-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .action-btn {
+            padding: 0.4rem 0.8rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .action-btn.edit {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .action-btn.edit:hover {
+            background: #bfdbfe;
+        }
+
+        .action-btn.whatsapp {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .action-btn.whatsapp:hover {
+            background: #bbf7d0;
+        }
+
+        .action-btn.delete {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        .action-btn.delete:hover {
+            background: #fecaca;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: #6b7280;
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
     </style>
 </head>
+
+<!-- ========================================= -->
+<!-- PARTE 16: BODY Y FIREBASE STATUS -->
+<!-- ========================================= -->
 <body>
     <!-- Firebase Status Indicator -->
     <div id="firebaseStatus" class="firebase-status connecting">
@@ -382,6 +545,9 @@
         Conectando a Firebase...
     </div>
 
+<!-- ========================================= -->
+<!-- PARTE 17: PANTALLA DE LOGIN -->
+<!-- ========================================= -->
     <!-- Login Screen -->
     <div id="loginScreen">
         <div class="login-container">
@@ -420,6 +586,9 @@
         </div>
     </div>
 
+<!-- ========================================= -->
+<!-- PARTE 18: HEADER APLICACIÓN PRINCIPAL -->
+<!-- ========================================= -->
     <!-- Main Application -->
     <div id="mainApp" class="hidden">
         <div class="header">
@@ -449,6 +618,9 @@
                 </div>
             </div>
 
+<!-- ========================================= -->
+<!-- PARTE 19: ESTADÍSTICAS -->
+<!-- ========================================= -->
             <!-- Stats -->
             <div class="stats-grid">
                 <div class="stat-card">
@@ -473,6 +645,9 @@
                 </div>
             </div>
 
+<!-- ========================================= -->
+<!-- PARTE 20: NAVEGACIÓN DE PESTAÑAS -->
+<!-- ========================================= -->
             <!-- Tabs -->
             <div class="tabs">
                 <button class="tab active" onclick="showTab('contacts')" id="contactsTab">📞 Contactos</button>
@@ -483,6 +658,9 @@
                 <button class="tab" onclick="showTab('config')" id="configTab" style="display: none;">⚙️ Config</button>
             </div>
 
+<!-- ========================================= -->
+<!-- PARTE 21: TAB CONTACTOS -->
+<!-- ========================================= -->
             <!-- Tab: Contacts -->
             <div id="contacts" class="tab-content">
                 <h2 id="contactsTitle">📞 Registrar Contactos</h2>
@@ -561,6 +739,9 @@
                 </div>
             </div>
 
+<!-- ========================================= -->
+<!-- PARTE 22: TAB LEADS -->
+<!-- ========================================= -->
             <!-- Tab: Leads -->
             <div id="leads" class="tab-content hidden">
                 <h2 id="leadsTitle">👥 Gestión de Leads</h2>
@@ -607,6 +788,9 @@
                 </table>
             </div>
 
+<!-- ========================================= -->
+<!-- PARTE 23: TAB PIPELINE -->
+<!-- ========================================= -->
             <!-- Tab: Pipeline -->
             <div id="pipeline" class="tab-content hidden">
                 <h2>🎯 Pipeline de Ventas</h2>
@@ -622,6 +806,9 @@
                 </div>
             </div>
 
+<!-- ========================================= -->
+<!-- PARTE 24: TAB REPORTES -->
+<!-- ========================================= -->
             <!-- Tab: Reports -->
             <div id="reports" class="tab-content hidden">
                 <h2 id="reportsTitle">📊 Reportes</h2>
@@ -661,6 +848,9 @@
                 </div>
             </div>
 
+<!-- ========================================= -->
+<!-- PARTE 25: TAB MONITOREO (DIRECTOR) -->
+<!-- ========================================= -->
             <!-- Tab: Monitoring (Director Only) -->
             <div id="monitoring" class="tab-content hidden">
                 <h2>👀 Monitoreo del Equipo</h2>
@@ -683,6 +873,9 @@
                 </div>
             </div>
 
+<!-- ========================================= -->
+<!-- PARTE 26: TAB CONFIGURACIÓN (DIRECTOR) -->
+<!-- ========================================= -->
             <!-- Tab: Config (Director Only) -->
             <div id="config" class="tab-content hidden">
                 <h2>⚙️ Configuración del Sistema</h2>
@@ -762,6 +955,9 @@
         </div>
     </div>
 
+<!-- ========================================= -->
+<!-- PARTE 27: FIREBASE SDK PRINCIPAL -->
+<!-- ========================================= -->
     <!-- Firebase SDK -->
     <script type="module">
         // Import Firebase modules
@@ -797,7 +993,7 @@
 
         console.log('✅ Firebase initialized successfully');
 
-        // Initialize Firebase Data Manager
+        // PARTE 28: FIREBASE DATA MANAGER
         class SimpleFirebaseManager {
             constructor() {
                 this.database = database;
@@ -929,6 +1125,9 @@
         window.dispatchEvent(new Event('firebaseReady'));
     </script>
 
+<!-- ========================================= -->
+<!-- PARTE 29: AUTO PROFILE CREATION -->
+<!-- ========================================= -->
     <!-- Auto Profile Creation Script -->
     <script>
         // Auto-ensure user profile when Firebase is ready and user authenticates
@@ -1015,6 +1214,9 @@
         console.log('🔧 Auto-profile creation script loaded');
     </script>
 
+<!-- ========================================= -->
+<!-- PARTE 30: SCRIPTS EXTERNOS -->
+<!-- ========================================= -->
     <!-- Include all the JavaScript files -->
     <script src="AdminData.js"></script>
     <script src="core.js"></script>
