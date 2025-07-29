@@ -320,166 +320,257 @@ ${lead.notes || 'Sin notas'}
 // SECTION C: TODAY'S CONTACTS FUNCTIONS
 // ================================================================================
 
-// ===== FUNCTION 6: UPDATE TODAY'S CONTACTS =====
+// ===== FUNCTION 6: UPDATE TODAY'S CONTACTS - ENHANCED =====
 async function updateTodayContacts() {
-    if (!window.FirebaseData || !window.FirebaseData.currentUser) {
-        console.log('❌ Firebase not available for today contacts');
+    console.log('📅 Updating today contacts...');
+    
+    const container = document.getElementById('todayContacts');
+    if (!container) {
+        console.log('❌ Today contacts container not found');
         return;
     }
     
     try {
-        const todayContacts = await window.FirebaseData.getFilteredContacts();
-        const today = new Date().toISOString().split('T')[0];
-        const todayFiltered = todayContacts.filter(c => c.date === today);
+        // Show loading state first
+        container.innerHTML = `
+            <div style="text-align: center; padding: 2rem; color: #6b7280;">
+                <div class="loading-spinner"></div>
+                <br>Cargando desde Firebase...
+            </div>
+        `;
         
-        console.log('📅 Updating today contacts with Firebase');
-        console.log(`   - Today contacts: ${todayFiltered.length}`);
+        // Get user profile to determine role
+        const userProfile = await window.FirebaseData.loadUserProfile();
+        const isDirector = userProfile?.role === 'director';
         
-        const container = document.getElementById('todayContacts');
-        if (!container) {
-            console.log('❌ Today contacts container not found');
-            return;
+        // Get filtered contacts based on user role
+        let allContacts = [];
+        if (window.FirebaseData.contacts) {
+            // Use cached contacts if available
+            allContacts = Object.values(window.FirebaseData.contacts);
+        } else {
+            // Load fresh contacts
+            allContacts = await window.FirebaseData.getFilteredContacts();
         }
         
-        // 🔧 FIX: Use compact rendering
-        await renderTodayContactsCompact(todayFiltered);
+        console.log('📊 All contacts loaded:', allContacts.length);
         
-        console.log('✅ Today contacts updated with Firebase');
+        // Filter for today's contacts
+        const today = new Date();
+        const todayString = today.toDateString();
+        
+        const todaysContacts = allContacts.filter(contact => {
+            if (!contact.date && !contact.createdAt) return false;
+            
+            const contactDate = new Date(contact.date || contact.createdAt);
+            return contactDate.toDateString() === todayString;
+        });
+        
+        console.log('📅 Today\'s contacts found:', todaysContacts.length);
+        
+        // Update the container
+        if (todaysContacts.length === 0) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 3rem; color: #6b7280;">
+                    <div style="font-size: 2rem; margin-bottom: 1rem;">📅</div>
+                    <h4 style="margin-bottom: 0.5rem;">No hay contactos de hoy</h4>
+                    <p style="font-size: 0.9rem;">Los nuevos contactos aparecerán aquí</p>
+                </div>
+            `;
+        } else {
+            // Render compact contact cards
+            container.innerHTML = renderTodayContactsCompact(todaysContacts, isDirector);
+        }
+        
+        console.log('✅ Today contacts updated successfully');
+        
     } catch (error) {
         console.error('❌ Error updating today contacts:', error);
-        const container = document.getElementById('todayContacts');
-        if (container) {
-            container.innerHTML = `<p style="color: #dc2626; text-align: center; padding: 2rem;">❌ Error: ${error.message}</p>`;
+        container.innerHTML = `
+            <div style="text-align: center; padding: 2rem;">
+                <div style="background: #fee2e2; border: 1px solid #fecaca; border-radius: 8px; padding: 1.5rem; color: #dc2626;">
+                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">⚠️</div>
+                    <h4>Error al cargar contactos</h4>
+                    <p style="font-size: 0.9rem; margin: 0.5rem 0;">${error.message}</p>
+                    <button onclick="updateTodayContacts()" style="background: #dc2626; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-top: 0.5rem;">
+                        🔄 Reintentar
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+}
+
+// ===== FUNCTION 7: RENDER TODAY'S CONTACTS COMPACT - ENHANCED =====
+function renderTodayContactsCompact(contacts, isDirector = false) {
+    if (!contacts || contacts.length === 0) {
+        return `
+            <div style="text-align: center; padding: 2rem; color: #6b7280;">
+                <div style="font-size: 2rem; margin-bottom: 1rem;">📅</div>
+                <p>No hay contactos de hoy</p>
+            </div>
+        `;
+    }
+    
+    return `
+        <div style="margin-bottom: 1rem;">
+            <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 1rem;">
+                <span style="font-weight: 500; color: #374151;">📅 Contactos de Hoy (${contacts.length})</span>
+                <button onclick="updateTodayContacts()" style="background: #f3f4f6; border: none; border-radius: 4px; padding: 0.25rem 0.5rem; font-size: 0.8rem; cursor: pointer;">
+                    🔄
+                </button>
+            </div>
+        </div>
+        
+        <div style="max-height: 400px; overflow-y: auto;">
+            ${contacts.map(contact => {
+                const timeAgo = getTimeAgo(contact.date || contact.createdAt);
+                const salespersonName = isDirector ? getSalespersonDisplayName(contact.salespersonId) : '';
+                
+                return `
+                    <div class="contact-item" style="margin-bottom: 0.75rem;">
+                        <div class="contact-header" onclick="toggleContactDetails('${contact.id}')">
+                            <div class="contact-main-info">
+                                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                                    <div class="contact-name">${contact.name}</div>
+                                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                        <span class="contact-phone">📞 ${contact.phone}</span>
+                                        <span class="contact-source">${(contact.source || 'Sin fuente').length > 15 ? (contact.source || 'Sin fuente').substring(0, 15) + '...' : (contact.source || 'Sin fuente')}</span>
+                                    </div>
+                                    ${isDirector && salespersonName ? `
+                                        <div style="font-size: 0.8rem; color: #667eea;">👤 ${salespersonName}</div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                            <div style="display: flex; flex-direction: column; align-items: end; gap: 0.25rem;">
+                                <span class="contact-time">${timeAgo}</span>
+                                <span class="expand-btn">⌄</span>
+                            </div>
+                        </div>
+                        <div id="details-${contact.id}" class="contact-details">
+                            <div class="detail-row">
+                                <span class="detail-label">Email:</span>
+                                <span class="detail-value">${contact.email || 'No proporcionado'}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Ubicación:</span>
+                                <span class="detail-value">${contact.location || 'No especificada'}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Estado:</span>
+                                <span class="detail-value">
+                                    <span class="status-badge status-${(contact.status || 'nuevo').toLowerCase().replace(' ', '-')}">${contact.status || 'Nuevo'}</span>
+                                </span>
+                            </div>
+                            ${contact.notes ? `
+                                <div class="detail-row">
+                                    <span class="detail-label">Notas:</span>
+                                    <span class="detail-value">${contact.notes}</span>
+                                </div>
+                            ` : ''}
+                            
+                            <div class="contact-actions">
+                                <button class="action-btn whatsapp" onclick="openWhatsApp('${contact.phone}', '${contact.name}')">
+                                    💬 WhatsApp
+                                </button>
+                                <button class="action-btn edit" onclick="editContact('${contact.id}')">
+                                    ✏️ Editar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('')}
+        </div>
+    `;
+}
+// ===== FUNCTION 8: TOGGLE CONTACT DETAILS - ENHANCED =====
+function toggleContactDetails(contactId) {
+    const detailsElement = document.getElementById(`details-${contactId}`);
+    if (detailsElement) {
+        const isVisible = detailsElement.style.display === 'block';
+        detailsElement.style.display = isVisible ? 'none' : 'block';
+        
+        // Update arrow
+        const expandBtn = detailsElement.previousElementSibling.querySelector('.expand-btn');
+        if (expandBtn) {
+            expandBtn.textContent = isVisible ? '⌄' : '⌃';
         }
     }
 }
+// ===== FUNCTION 8.1: GET TIME AGO =====
+function getTimeAgo(dateString) {
+    if (!dateString) return 'Sin fecha';
+    
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInMinutes = Math.floor((now - date) / (1000 * 60));
+    
+    if (diffInMinutes < 1) return 'Hace un momento';
+    if (diffInMinutes < 60) return `Hace ${diffInMinutes}m`;
+    
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    if (diffInHours < 24) return `Hace ${diffInHours}h`;
+    
+    const diffInDays = Math.floor(diffInHours / 24);
+    return `Hace ${diffInDays} días`;
+}
 
-// ===== FUNCTION 7: RENDER TODAY'S CONTACTS COMPACT =====
-async function renderTodayContactsCompact(contacts) {
+// ===== FUNCTION 8.2: GET SALESPERSON DISPLAY NAME =====
+function getSalespersonDisplayName(salespersonId) {
+    try {
+        // Try to get from current user data
+        if (window.FirebaseData && window.FirebaseData.usersData) {
+            const user = window.FirebaseData.usersData[salespersonId];
+            if (user && user.name) return user.name;
+        }
+        
+        // Fallback
+        return 'Vendedor';
+    } catch (error) {
+        return 'Vendedor';
+    }
+}
+
+// ===== FUNCTION 8.3: DEBUG TODAY'S CONTACTS =====
+function debugTodayContacts() {
+    console.log('🔍 DEBUGGING TODAY\'S CONTACTS');
+    
     const container = document.getElementById('todayContacts');
+    console.log('Container found:', !!container);
     
-    if (!contacts || contacts.length === 0) {
-        container.innerHTML = `
-            <div style="text-align: center; padding: 3rem 1rem; color: #6b7280;">
-                <div style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;">📝</div>
-                <p>No hay contactos registrados hoy</p>
-                <small>Los nuevos contactos aparecerán aquí automáticamente</small>
-            </div>
-        `;
-        return;
-    }
-
-    // Filtrar contactos de hoy
-    const today = new Date().toDateString();
-    const todayContacts = contacts.filter(contact => {
-        const contactDate = new Date(contact.date || contact.createdAt).toDateString();
-        return contactDate === today;
-    });
-
-    if (todayContacts.length === 0) {
-        container.innerHTML = `
-            <div style="text-align: center; padding: 3rem 1rem; color: #6b7280;">
-                <div style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;">📅</div>
-                <p>No hay contactos nuevos hoy</p>
-                <small>¡Comienza agregando tu primer contacto del día!</small>
-            </div>
-        `;
-        return;
-    }
-
-    // Ordenar por hora más reciente
-    todayContacts.sort((a, b) => {
-        const timeA = new Date(a.createdAt || a.date).getTime();
-        const timeB = new Date(b.createdAt || b.date).getTime();
-        return timeB - timeA;
-    });
-
-    const contactsHTML = await Promise.all(todayContacts.map(async (contact) => {
-        const time = new Date(contact.createdAt || contact.date).toLocaleTimeString('es-ES', {
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-
-        const userProfile = await window.FirebaseData.loadUserProfile();
-        const canDelete = userProfile.role === 'director' || contact.salespersonId === window.FirebaseData.currentUser.uid;
-
-        return `
-            <div class="contact-item" style="background: white; border-radius: 8px; margin-bottom: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-left: 3px solid #667eea; overflow: hidden; transition: all 0.2s ease;">
-                <div class="contact-header" onclick="toggleContactDetails('${contact.id}')" style="padding: 0.75rem 1rem; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: white;">
-                    <div style="display: flex; align-items: center; gap: 0.75rem; flex: 1;">
-                        <div>
-                            <div style="font-weight: 600; color: #1f2937;">${contact.name}</div>
-                            <div style="color: #10b981; font-size: 0.9rem;">📞 ${contact.phone}</div>
-                        </div>
-                        <span style="background: #e0e7ff; color: #3730a3; padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.8rem;">${contact.source || 'Sin fuente'}</span>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <span style="color: #6b7280; font-size: 0.8rem;">${time}</span>
-                        <button style="background: none; border: none; color: #6b7280; cursor: pointer; padding: 0.25rem; border-radius: 4px; transition: all 0.2s ease;" id="expand-${contact.id}">
-                            ⌄
-                        </button>
-                    </div>
-                </div>
-                <div class="contact-details" id="details-${contact.id}" style="padding: 0 1rem 1rem 1rem; background: #f8fafc; border-top: 1px solid #e5e7eb; display: none;">
-                    ${contact.email ? `
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.9rem;">
-                            <span style="color: #6b7280; font-weight: 500;">Email:</span>
-                            <span style="color: #1f2937;">${contact.email}</span>
-                        </div>
-                    ` : ''}
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.9rem;">
-                        <span style="color: #6b7280; font-weight: 500;">Ubicación:</span>
-                        <span style="color: #1f2937;">${contact.location || 'No especificada'}</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.9rem;">
-                        <span style="color: #6b7280; font-weight: 500;">Estado:</span>
-                        <span style="color: #1f2937;">
-                            <span class="status-badge status-${(contact.status || 'nuevo').toLowerCase()}">${contact.status || 'Nuevo'}</span>
-                        </span>
-                    </div>
-                    ${contact.convenio ? `
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.9rem;">
-                            <span style="color: #6b7280; font-weight: 500;">Convenio:</span>
-                            <span style="color: #1f2937;">${contact.convenio}</span>
-                        </div>
-                    ` : ''}
-                    ${contact.notes ? `
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.9rem;">
-                            <span style="color: #6b7280; font-weight: 500;">Notas:</span>
-                            <span style="color: #1f2937;">${contact.notes}</span>
-                        </div>
-                    ` : ''}
-                    <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #e5e7eb;">
-                        <button onclick="editContact('${contact.id}')" style="padding: 0.4rem 0.8rem; border: none; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s ease; background: #dbeafe; color: #1e40af;">
-                            ✏️ Editar
-                        </button>
-                        <button onclick="openWhatsApp('${contact.phone}', '${contact.name}')" style="padding: 0.4rem 0.8rem; border: none; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s ease; background: #dcfce7; color: #166534;">
-                            💬 WhatsApp
-                        </button>
-                        ${canDelete ? `<button onclick="deleteLead('${contact.id}')" style="padding: 0.4rem 0.8rem; border: none; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s ease; background: #fee2e2; color: #dc2626;">🗑️ Eliminar</button>` : ''}
-                    </div>
-                </div>
-            </div>
-        `;
-    }));
-
-    container.innerHTML = contactsHTML.join('');
-}
-
-// ===== FUNCTION 8: TOGGLE CONTACT DETAILS =====
-function toggleContactDetails(contactId) {
-    const details = document.getElementById(`details-${contactId}`);
-    const expandBtn = document.getElementById(`expand-${contactId}`);
-    
-    if (details.style.display === 'block') {
-        details.style.display = 'none';
-        expandBtn.style.transform = 'rotate(0deg)';
+    if (window.FirebaseData) {
+        console.log('Firebase available:', true);
+        console.log('Current user:', window.FirebaseData.currentUser?.email);
+        
+        if (window.FirebaseData.contacts) {
+            const contacts = Object.values(window.FirebaseData.contacts);
+            console.log('Total contacts:', contacts.length);
+            
+            const today = new Date().toDateString();
+            const todaysContacts = contacts.filter(contact => {
+                const contactDate = new Date(contact.date || contact.createdAt);
+                return contactDate.toDateString() === today;
+            });
+            
+            console.log('Today\'s contacts:', todaysContacts.length);
+            console.log('Today\'s contacts data:', todaysContacts);
+        } else {
+            console.log('No contacts in Firebase cache');
+        }
     } else {
-        details.style.display = 'block';
-        expandBtn.style.transform = 'rotate(180deg)';
+        console.log('Firebase not available');
     }
-}
+    
+    alert(`🔍 DEBUG INFO:
 
+Container: ${!!container ? 'Found' : 'NOT FOUND'}
+Firebase: ${!!window.FirebaseData ? 'Available' : 'NOT AVAILABLE'}
+User: ${window.FirebaseData?.currentUser?.email || 'Not authenticated'}
+Contacts: ${window.FirebaseData?.contacts ? Object.keys(window.FirebaseData.contacts).length : 0}
+
+Check console for detailed logs.`);
+}
 // ================================================================================
 // SECTION D: UTILITY FUNCTIONS
 // ================================================================================
