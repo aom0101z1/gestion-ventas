@@ -1,5 +1,9 @@
-// sales.js - FIREBASE INTEGRATED VERSION - FIXED
-// ===== FIREBASE CONTACTOS CORREGIDO =====
+// sales.js - FIREBASE INTEGRATED VERSION - ORGANIZED WITH FUNCTION NUMBERS
+// ================================================================================
+// SECTION A: CONTACT MANAGEMENT FUNCTIONS
+// ================================================================================
+
+// ===== FUNCTION 1: ADD CONTACT =====
 async function addContact(event) {
     event.preventDefault();
     
@@ -84,7 +88,7 @@ async function addContact(event) {
     }
 }
 
-// FUNCIÓN para mostrar convenios
+// ===== FUNCTION 2: HANDLE SOURCE CHANGE =====
 function handleSourceChange() {
     const sourceSelect = document.getElementById('contactSource');
     const convenioGroup = document.getElementById('convenioGroup');
@@ -104,7 +108,11 @@ function handleSourceChange() {
     }
 }
 
-// ===== ENHANCED FIREBASE LEAD DELETION =====
+// ================================================================================
+// SECTION B: LEAD MANAGEMENT FUNCTIONS
+// ================================================================================
+
+// ===== FUNCTION 3: DELETE LEAD =====
 async function deleteLead(leadId) {
     if (!window.FirebaseData || !window.FirebaseData.currentUser) {
         alert('❌ Firebase no disponible');
@@ -152,123 +160,7 @@ Esta acción no se puede deshacer y se eliminará de Firebase.`)) {
     }
 }
 
-// ===== FIREBASE DATA CLEANUP FUNCTIONS =====
-async function clearTestData() {
-    if (!window.FirebaseData || !window.FirebaseData.currentUser) {
-        alert('❌ Firebase no disponible');
-        return;
-    }
-    
-    try {
-        const userProfile = await window.FirebaseData.loadUserProfile();
-        if (userProfile.role !== 'director') {
-            alert('❌ Solo el director puede limpiar datos de prueba');
-            return;
-        }
-        
-        const allContacts = await window.FirebaseData.getAllContacts();
-        const testDataNames = [
-            'Carlos Rodríguez', 'Ana Martínez', 'Luis Gómez', 
-            'Patricia López', 'Roberto Silva', 'Carmen Fernández',
-            'Miguel Torres', 'Carlos Rodriguez', 'Test User', 'Usuario Prueba'
-        ];
-        
-        const testDataPhones = [
-            '3001234567', '3109876543', '3156789012', '3187654321', 
-            '3203456789', '3134567890', '3145678901', '1234567890'
-        ];
-        
-        const testData = allContacts.filter(contact => 
-            testDataNames.includes(contact.name) || 
-            testDataPhones.includes(contact.phone) ||
-            contact.notes?.toLowerCase().includes('test') ||
-            contact.notes?.toLowerCase().includes('prueba')
-        );
-        
-        if (testData.length === 0) {
-            alert('ℹ️ No se encontraron datos de prueba para eliminar en Firebase');
-            return;
-        }
-        
-        if (confirm(`🗑️ Se encontraron ${testData.length} registros de datos de prueba en Firebase.
-
-¿Quieres eliminar todos los datos de prueba?
-
-Esto incluye contactos como:
-${testData.slice(0, 3).map(d => `• ${d.name} (${d.phone})`).join('\n')}
-${testData.length > 3 ? `\n... y ${testData.length - 3} más` : ''}
-
-Esta acción no se puede deshacer.`)) {
-            
-            let deletedCount = 0;
-            for (const data of testData) {
-                try {
-                    await window.FirebaseData.deleteContact(data.id);
-                    deletedCount++;
-                } catch (error) {
-                    console.error('Error deleting test data:', error);
-                }
-            }
-            
-            // Force UI update
-            setTimeout(() => {
-                updateAllViews();
-            }, 500);
-            
-            alert(`✅ ${deletedCount} datos de prueba eliminados de Firebase correctamente`);
-        }
-    } catch (error) {
-        console.error('❌ Error clearing test data:', error);
-        alert(`❌ Error al limpiar datos de prueba: ${error.message}`);
-    }
-}
-
-async function clearMyData() {
-    if (!window.FirebaseData || !window.FirebaseData.currentUser) {
-        alert('❌ Firebase no disponible');
-        return;
-    }
-    
-    try {
-        const myContacts = await window.FirebaseData.getFilteredContacts();
-        
-        if (myContacts.length === 0) {
-            alert('ℹ️ No tienes datos para eliminar en Firebase');
-            return;
-        }
-        
-        if (confirm(`🗑️ ¿Estás seguro de eliminar TODOS tus ${myContacts.length} contactos de Firebase?
-
-Esto incluye:
-${myContacts.slice(0, 3).map(d => `• ${d.name} (${d.phone})`).join('\n')}
-${myContacts.length > 3 ? `\n... y ${myContacts.length - 3} más` : ''}
-
-Esta acción NO se puede deshacer.`)) {
-            
-            let deletedCount = 0;
-            for (const contact of myContacts) {
-                try {
-                    await window.FirebaseData.deleteContact(contact.id);
-                    deletedCount++;
-                } catch (error) {
-                    console.error('Error deleting contact:', error);
-                }
-            }
-            
-            // Force UI update
-            setTimeout(() => {
-                updateAllViews();
-            }, 500);
-            
-            alert(`✅ ${deletedCount} de tus contactos eliminados de Firebase correctamente`);
-        }
-    } catch (error) {
-        console.error('❌ Error clearing my data:', error);
-        alert(`❌ Error al eliminar tus datos: ${error.message}`);
-    }
-}
-
-// ===== ENHANCED FIREBASE LEADS TABLE =====
+// ===== FUNCTION 4: UPDATE LEADS TABLE =====
 async function updateLeadsTable() {
     console.log('📋 Updating Firebase leads table');
     
@@ -381,6 +273,7 @@ async function updateLeadsTable() {
     }
 }
 
+// ===== FUNCTION 5: SHOW LEAD DETAILS =====
 async function showLeadDetails(leadId) {
     if (!window.FirebaseData || !window.FirebaseData.currentUser) {
         alert('❌ Firebase no disponible');
@@ -423,7 +316,11 @@ ${lead.notes || 'Sin notas'}
     }
 }
 
-// ===== CONTACTOS HOY COMPACTOS CORREGIDO =====
+// ================================================================================
+// SECTION C: TODAY'S CONTACTS FUNCTIONS
+// ================================================================================
+
+// ===== FUNCTION 6: UPDATE TODAY'S CONTACTS =====
 async function updateTodayContacts() {
     if (!window.FirebaseData || !window.FirebaseData.currentUser) {
         console.log('❌ Firebase not available for today contacts');
@@ -457,7 +354,7 @@ async function updateTodayContacts() {
     }
 }
 
-// ===== CONTACTOS COMPACTOS =====
+// ===== FUNCTION 7: RENDER TODAY'S CONTACTS COMPACT =====
 async function renderTodayContactsCompact(contacts) {
     const container = document.getElementById('todayContacts');
     
@@ -569,7 +466,7 @@ async function renderTodayContactsCompact(contacts) {
     container.innerHTML = contactsHTML.join('');
 }
 
-// Función para toggle de detalles de contacto
+// ===== FUNCTION 8: TOGGLE CONTACT DETAILS =====
 function toggleContactDetails(contactId) {
     const details = document.getElementById(`details-${contactId}`);
     const expandBtn = document.getElementById(`expand-${contactId}`);
@@ -583,7 +480,11 @@ function toggleContactDetails(contactId) {
     }
 }
 
-// Función para abrir WhatsApp
+// ================================================================================
+// SECTION D: UTILITY FUNCTIONS
+// ================================================================================
+
+// ===== FUNCTION 9: OPEN WHATSAPP =====
 function openWhatsApp(phone, name) {
     const cleanPhone = phone.replace(/\D/g, '');
     const message = `Hola ${name}, te contacto desde Ciudad Bilingüe. ¿Cómo estás?`;
@@ -591,12 +492,161 @@ function openWhatsApp(phone, name) {
     window.open(url, '_blank');
 }
 
-// Función para editar contacto (implementar según tu lógica actual)
+// ===== FUNCTION 10: EDIT CONTACT =====
 function editContact(contactId) {
     alert(`Funcionalidad de editar contacto: ${contactId}\n\nPuedes implementar esta función según tus necesidades.`);
 }
 
-// ===== FIREBASE MONITORING (DIRECTOR) =====
+// ===== FUNCTION 11: GET USER DISPLAY NAME FIREBASE =====
+async function getUserDisplayNameFirebase(userId) {
+    try {
+        if (!userId) return 'Unknown User';
+        
+        const allUsers = await window.FirebaseData.getAllUsers();
+        const user = allUsers[userId];
+        
+        if (user && user.name) {
+            return user.name;
+        }
+        
+        // Fallback to email if available
+        if (user && user.email) {
+            return user.email.split('@')[0];
+        }
+        
+        return 'Unknown User';
+    } catch (error) {
+        console.error('❌ Error getting user display name:', error);
+        return 'Unknown User';
+    }
+}
+
+// ================================================================================
+// SECTION E: DATA CLEANUP FUNCTIONS
+// ================================================================================
+
+// ===== FUNCTION 12: CLEAR TEST DATA =====
+async function clearTestData() {
+    if (!window.FirebaseData || !window.FirebaseData.currentUser) {
+        alert('❌ Firebase no disponible');
+        return;
+    }
+    
+    try {
+        const userProfile = await window.FirebaseData.loadUserProfile();
+        if (userProfile.role !== 'director') {
+            alert('❌ Solo el director puede limpiar datos de prueba');
+            return;
+        }
+        
+        const allContacts = await window.FirebaseData.getAllContacts();
+        const testDataNames = [
+            'Carlos Rodríguez', 'Ana Martínez', 'Luis Gómez', 
+            'Patricia López', 'Roberto Silva', 'Carmen Fernández',
+            'Miguel Torres', 'Carlos Rodriguez', 'Test User', 'Usuario Prueba'
+        ];
+        
+        const testDataPhones = [
+            '3001234567', '3109876543', '3156789012', '3187654321', 
+            '3203456789', '3134567890', '3145678901', '1234567890'
+        ];
+        
+        const testData = allContacts.filter(contact => 
+            testDataNames.includes(contact.name) || 
+            testDataPhones.includes(contact.phone) ||
+            contact.notes?.toLowerCase().includes('test') ||
+            contact.notes?.toLowerCase().includes('prueba')
+        );
+        
+        if (testData.length === 0) {
+            alert('ℹ️ No se encontraron datos de prueba para eliminar en Firebase');
+            return;
+        }
+        
+        if (confirm(`🗑️ Se encontraron ${testData.length} registros de datos de prueba en Firebase.
+
+¿Quieres eliminar todos los datos de prueba?
+
+Esto incluye contactos como:
+${testData.slice(0, 3).map(d => `• ${d.name} (${d.phone})`).join('\n')}
+${testData.length > 3 ? `\n... y ${testData.length - 3} más` : ''}
+
+Esta acción no se puede deshacer.`)) {
+            
+            let deletedCount = 0;
+            for (const data of testData) {
+                try {
+                    await window.FirebaseData.deleteContact(data.id);
+                    deletedCount++;
+                } catch (error) {
+                    console.error('Error deleting test data:', error);
+                }
+            }
+            
+            // Force UI update
+            setTimeout(() => {
+                updateAllViews();
+            }, 500);
+            
+            alert(`✅ ${deletedCount} datos de prueba eliminados de Firebase correctamente`);
+        }
+    } catch (error) {
+        console.error('❌ Error clearing test data:', error);
+        alert(`❌ Error al limpiar datos de prueba: ${error.message}`);
+    }
+}
+
+// ===== FUNCTION 13: CLEAR MY DATA =====
+async function clearMyData() {
+    if (!window.FirebaseData || !window.FirebaseData.currentUser) {
+        alert('❌ Firebase no disponible');
+        return;
+    }
+    
+    try {
+        const myContacts = await window.FirebaseData.getFilteredContacts();
+        
+        if (myContacts.length === 0) {
+            alert('ℹ️ No tienes datos para eliminar en Firebase');
+            return;
+        }
+        
+        if (confirm(`🗑️ ¿Estás seguro de eliminar TODOS tus ${myContacts.length} contactos de Firebase?
+
+Esto incluye:
+${myContacts.slice(0, 3).map(d => `• ${d.name} (${d.phone})`).join('\n')}
+${myContacts.length > 3 ? `\n... y ${myContacts.length - 3} más` : ''}
+
+Esta acción NO se puede deshacer.`)) {
+            
+            let deletedCount = 0;
+            for (const contact of myContacts) {
+                try {
+                    await window.FirebaseData.deleteContact(contact.id);
+                    deletedCount++;
+                } catch (error) {
+                    console.error('Error deleting contact:', error);
+                }
+            }
+            
+            // Force UI update
+            setTimeout(() => {
+                updateAllViews();
+            }, 500);
+            
+            alert(`✅ ${deletedCount} de tus contactos eliminados de Firebase correctamente`);
+        }
+    } catch (error) {
+        console.error('❌ Error clearing my data:', error);
+        alert(`❌ Error al eliminar tus datos: ${error.message}`);
+    }
+}
+
+// ================================================================================
+// SECTION F: MONITORING FUNCTIONS (DIRECTOR)
+// ================================================================================
+
+// ===== FUNCTION 14: REFRESH MONITORING =====
 async function refreshMonitoring() {
     if (!window.FirebaseData || !window.FirebaseData.currentUser) {
         alert('❌ Firebase no disponible');
@@ -621,6 +671,7 @@ async function refreshMonitoring() {
     }
 }
 
+// ===== FUNCTION 15: UPDATE TEAM ACTIVITY OVERVIEW =====
 async function updateTeamActivityOverview() {
     if (!window.FirebaseData) return;
     
@@ -682,6 +733,7 @@ async function updateTeamActivityOverview() {
     }
 }
 
+// ===== FUNCTION 16: UPDATE INDIVIDUAL SALESPEOPLE ACTIVITY =====
 async function updateIndividualSalespeopleActivity() {
     if (!window.FirebaseData) return;
     
@@ -784,6 +836,7 @@ async function updateIndividualSalespeopleActivity() {
     }
 }
 
+// ===== FUNCTION 17: UPDATE RECENT TEAM ACTIVITY =====
 async function updateRecentTeamActivity() {
     if (!window.FirebaseData) return;
     
@@ -845,7 +898,11 @@ async function updateRecentTeamActivity() {
     }
 }
 
-// ===== ENHANCED FIREBASE STATS & REPORTS =====
+// ================================================================================
+// SECTION G: STATS AND REPORTS FUNCTIONS
+// ================================================================================
+
+// ===== FUNCTION 18: UPDATE STATS =====
 async function updateStats() {
     if (!window.FirebaseData || !window.FirebaseData.currentUser) {
         console.log('❌ Firebase not available for stats');
@@ -881,6 +938,7 @@ async function updateStats() {
     }
 }
 
+// ===== FUNCTION 19: UPDATE REPORTS =====
 async function updateReports() {
     try {
         const userProfile = await window.FirebaseData.loadUserProfile();
@@ -898,6 +956,7 @@ async function updateReports() {
     }
 }
 
+// ===== FUNCTION 20: UPDATE PERSONAL REPORTS =====
 async function updatePersonalReports() {
     if (!window.FirebaseData) return;
     
@@ -958,6 +1017,7 @@ async function updatePersonalReports() {
     }
 }
 
+// ===== FUNCTION 21: UPDATE DIRECTOR REPORTS =====
 async function updateDirectorReports() {
     if (!window.FirebaseData) return;
     
@@ -1072,31 +1132,11 @@ async function updateDirectorReports() {
     }
 }
 
-// ===== FIREBASE UTILITIES =====
-async function getUserDisplayNameFirebase(userId) {
-    try {
-        if (!userId) return 'Unknown User';
-        
-        const allUsers = await window.FirebaseData.getAllUsers();
-        const user = allUsers[userId];
-        
-        if (user && user.name) {
-            return user.name;
-        }
-        
-        // Fallback to email if available
-        if (user && user.email) {
-            return user.email.split('@')[0];
-        }
-        
-        return 'Unknown User';
-    } catch (error) {
-        console.error('❌ Error getting user display name:', error);
-        return 'Unknown User';
-    }
-}
+// ================================================================================
+// SECTION H: EXPORT AND FINAL FUNCTIONS
+// ================================================================================
 
-// ===== FIREBASE EXPORT =====
+// ===== FUNCTION 22: EXPORT TODAY'S CONTACTS =====
 async function exportTodayContacts() {
     if (!window.FirebaseData || !window.FirebaseData.currentUser) {
         alert('❌ Firebase no disponible');
@@ -1164,3 +1204,9 @@ ${copyText}`);
         alert(`❌ Error al exportar desde Firebase: ${error.message}`);
     }
 }
+
+// ================================================================================
+// END OF SALES.JS - ALL FUNCTIONS ORGANIZED AND NUMBERED
+// ================================================================================
+
+console.log('✅ Sales.js loaded with 22 organized functions');
