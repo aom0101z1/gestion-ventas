@@ -261,118 +261,100 @@
             border-left: 3px solid #10b981;
         }
 
-/* ===== PARTE 13: ENHANCED PIPELINE STYLES ===== */
-<style>
-#pipelineContainer {
-    display: flex;
-    gap: 1rem;
-    padding: 1rem;
-    overflow-x: auto;
-    min-height: 70vh;
-    background: #f8fafc;
-    border-radius: 8px;
-}
+        /* ===== PARTE 13: ENHANCED PIPELINE STYLES ===== */
+        #pipelineContainer {
+            display: flex;
+            gap: 1rem;
+            padding: 1rem;
+            overflow-x: auto;
+            min-height: 70vh;
+            background: #f8fafc;
+            border-radius: 8px;
+        }
 
-.pipeline-column {
-    min-width: 280px;
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    transition: all 0.3s ease;
-    flex-shrink: 0;
-}
+        .pipeline-column {
+            min-width: 280px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+            flex-shrink: 0;
+        }
 
-.pipeline-column.drag-over {
-    transform: scale(1.02);
-    box-shadow: 0 4px 20px rgba(59, 130, 246, 0.3);
-    border: 2px dashed #3b82f6;
-}
+        .pipeline-column.drag-over {
+            transform: scale(1.02);
+            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.3);
+            border: 2px dashed #3b82f6;
+        }
 
-.pipeline-header {
-    padding: 1rem;
-    border-radius: 12px 12px 0 0;
-    font-weight: 600;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
+        .pipeline-header {
+            padding: 1rem;
+            border-radius: 12px 12px 0 0;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
 
-.pipeline-cards {
-    padding: 0.5rem;
-    min-height: 400px;
-    max-height: 60vh;
-    overflow-y: auto;
-}
+        .pipeline-cards {
+            padding: 0.5rem;
+            min-height: 400px;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
 
-.pipeline-card {
-    background: white;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    padding: 1rem;
-    margin-bottom: 0.75rem;
-    cursor: move;
-    transition: all 0.2s ease;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
+        .pipeline-card {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            cursor: move;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
 
-.pipeline-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    border-color: #3b82f6;
-}
+        .pipeline-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            border-color: #3b82f6;
+        }
 
-.pipeline-card.dragging {
-    opacity: 0.5;
-    transform: rotate(5deg);
-    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-}
+        .pipeline-card.dragging {
+            opacity: 0.5;
+            transform: rotate(5deg);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
 
-.pipeline-card:last-child {
-    margin-bottom: 0;
-}
+        .pipeline-card:last-child {
+            margin-bottom: 0;
+        }
 
-/* ===== STATUS SPECIFIC STYLING ===== */
-.pipeline-column[data-stage="nuevo"] .pipeline-card {
-    border-left: 4px solid #fbbf24;
-}
+        /* ===== STATUS SPECIFIC STYLING ===== */
+        .pipeline-column[data-stage="nuevo"] .pipeline-card {
+            border-left: 4px solid #fbbf24;
+        }
 
-.pipeline-column[data-stage="contactado"] .pipeline-card {
-    border-left: 4px solid #3b82f6;
-}
+        .pipeline-column[data-stage="contactado"] .pipeline-card {
+            border-left: 4px solid #3b82f6;
+        }
 
-.pipeline-column[data-stage="interesado"] .pipeline-card {
-    border-left: 4px solid #10b981;
-}
+        .pipeline-column[data-stage="interesado"] .pipeline-card {
+            border-left: 4px solid #10b981;
+        }
 
-.pipeline-column[data-stage="negociacion"] .pipeline-card {
-    border-left: 4px solid #f97316;
-}
+        .pipeline-column[data-stage="negociacion"] .pipeline-card {
+            border-left: 4px solid #f97316;
+        }
 
-.pipeline-column[data-stage="convertido"] .pipeline-card {
-    border-left: 4px solid #22c55e;
-}
+        .pipeline-column[data-stage="convertido"] .pipeline-card {
+            border-left: 4px solid #22c55e;
+        }
 
-.pipeline-column[data-stage="perdido"] .pipeline-card {
-    border-left: 4px solid #ef4444;
-}
+        .pipeline-column[data-stage="perdido"] .pipeline-card {
+            border-left: 4px solid #ef4444;
+        }
 
-/* ===== RESPONSIVE DESIGN ===== */
-@media (max-width: 768px) {
-    #pipelineContainer {
-        flex-direction: column;
-        gap: 0.5rem;
-    }
-
-    .pipeline-column {
-        min-width: 100%;
-        max-height: 300px;
-    }
-
-    .pipeline-cards {
-        max-height: 200px;
-    }
-}
-</style>
         /* ===== PARTE 14: LOADING SPINNER Y UTILIDADES ===== */
         .loading-spinner {
             display: inline-block;
@@ -422,7 +404,9 @@
             .container { padding: 1rem; }
             .stats-grid { grid-template-columns: 1fr; }
             .user-info { flex-direction: column; gap: 1rem; }
-            .pipeline-container { grid-template-columns: 1fr; }
+            #pipelineContainer { flex-direction: column; gap: 0.5rem; }
+            .pipeline-column { min-width: 100%; max-height: 300px; }
+            .pipeline-cards { max-height: 200px; }
             .tabs { flex-direction: column; }
         }
         
@@ -1269,55 +1253,58 @@
         
         console.log('🔧 Auto-profile creation script loaded');
     </script>
-<!-- Add this enhanced script AFTER Part 29 and BEFORE Part 30 -->
-<script>
-// ===== ENHANCED FIREBASE INTEGRATION & PIPELINE PREPARATION =====
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('🚀 Enhanced DOM ready, preparing pipeline environment...');
-    
-    // Ensure pipeline functions are available
-    window.addEventListener('firebaseReady', () => {
-        console.log('🔥 Firebase ready event received');
-        
-        // Wait for all scripts to load
-        setTimeout(() => {
-            console.log('🔧 Checking pipeline readiness...');
+
+<!-- ========================================= -->
+<!-- PARTE 29.5: ENHANCED FIREBASE INTEGRATION & PIPELINE PREPARATION -->
+<!-- ========================================= -->
+    <script>
+        // ===== ENHANCED FIREBASE INTEGRATION & PIPELINE PREPARATION =====
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('🚀 Enhanced DOM ready, preparing pipeline environment...');
             
-            // Check if essential functions exist
-            const requiredFunctions = [
-                'refreshPipeline',
-                'showPipelineDebug',
-                'initializePipeline'
-            ];
-            
-            const missingFunctions = requiredFunctions.filter(func => typeof window[func] !== 'function');
-            
-            if (missingFunctions.length > 0) {
-                console.log('⚠️ Missing pipeline functions:', missingFunctions);
+            // Ensure pipeline functions are available
+            window.addEventListener('firebaseReady', () => {
+                console.log('🔥 Firebase ready event received');
                 
-                // Create fallback functions
-                if (typeof window.refreshPipeline !== 'function') {
-                    window.refreshPipeline = function() {
-                        console.log('🔄 Fallback refreshPipeline called');
-                        const container = document.getElementById('pipelineContainer');
-                        if (container) {
-                            container.innerHTML = `
-                                <div style="text-align: center; padding: 3rem; color: #ef4444;">
-                                    <div style="font-size: 3rem; margin-bottom: 1rem;">⚠️</div>
-                                    <h3>Pipeline Script Error</h3>
-                                    <p>pipeline.js no se cargó correctamente.</p>
-                                    <button onclick="location.reload()" style="background: #3b82f6; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-top: 1rem;">
-                                        🔄 Recargar Página
-                                    </button>
-                                </div>
-                            `;
+                // Wait for all scripts to load
+                setTimeout(() => {
+                    console.log('🔧 Checking pipeline readiness...');
+                    
+                    // Check if essential functions exist
+                    const requiredFunctions = [
+                        'refreshPipeline',
+                        'showPipelineDebug',
+                        'initializePipeline'
+                    ];
+                    
+                    const missingFunctions = requiredFunctions.filter(func => typeof window[func] !== 'function');
+                    
+                    if (missingFunctions.length > 0) {
+                        console.log('⚠️ Missing pipeline functions:', missingFunctions);
+                        
+                        // Create fallback functions
+                        if (typeof window.refreshPipeline !== 'function') {
+                            window.refreshPipeline = function() {
+                                console.log('🔄 Fallback refreshPipeline called');
+                                const container = document.getElementById('pipelineContainer');
+                                if (container) {
+                                    container.innerHTML = `
+                                        <div style="text-align: center; padding: 3rem; color: #ef4444;">
+                                            <div style="font-size: 3rem; margin-bottom: 1rem;">⚠️</div>
+                                            <h3>Pipeline Script Error</h3>
+                                            <p>pipeline.js no se cargó correctamente.</p>
+                                            <button onclick="location.reload()" style="background: #3b82f6; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-top: 1rem;">
+                                                🔄 Recargar Página
+                                            </button>
+                                        </div>
+                                    `;
+                                }
+                            };
                         }
-                    };
-                }
-                
-                if (typeof window.showPipelineDebug !== 'function') {
-                    window.showPipelineDebug = function() {
-                        alert(`🔍 PIPELINE DEBUG (Fallback):
+                        
+                        if (typeof window.showPipelineDebug !== 'function') {
+                            window.showPipelineDebug = function() {
+                                alert(`🔍 PIPELINE DEBUG (Fallback):
 
 ❌ pipeline.js no se cargó correctamente
 📂 Scripts esperados:
@@ -1327,93 +1314,92 @@ document.addEventListener('DOMContentLoaded', () => {
 - pipeline.js: ❌
 
 🔧 Solución: Verifica que pipeline.js existe y se está cargando correctamente.`);
-                    };
+                            };
+                        }
+                    } else {
+                        console.log('✅ All pipeline functions available');
+                    }
+                    
+                    // Auto-initialize pipeline if user is authenticated
+                    if (window.FirebaseData && window.FirebaseData.currentUser) {
+                        console.log('👤 User authenticated, auto-initializing pipeline...');
+                        if (typeof window.initializePipeline === 'function') {
+                            setTimeout(() => {
+                                window.initializePipeline();
+                            }, 2000);
+                        }
+                    }
+                    
+                }, 3000); // Wait 3 seconds for all scripts to load
+            });
+        });
+
+        // ===== ENHANCED FIREBASE DATA COMPATIBILITY =====
+        // Ensure compatibility between SimpleFirebaseManager and pipeline.js expectations
+        window.addEventListener('firebaseReady', () => {
+            if (window.FirebaseData) {
+                // Add any missing methods that pipeline.js might expect
+                if (!window.FirebaseData.contacts) {
+                    window.FirebaseData.contacts = {};
                 }
+                
+                // Enhance the manager with additional methods if needed
+                const originalGetFilteredContacts = window.FirebaseData.getFilteredContacts;
+                window.FirebaseData.getFilteredContacts = async function() {
+                    try {
+                        return await originalGetFilteredContacts.call(this);
+                    } catch (error) {
+                        console.error('Error in getFilteredContacts:', error);
+                        return [];
+                    }
+                };
+                
+                console.log('🔧 Firebase Data compatibility enhanced');
+            }
+        });
+
+        // ===== PIPELINE TAB ACTIVATION HANDLER =====
+        // Ensure pipeline initializes when tab is activated
+        function showTab(tabName) {
+            // Call the original showTab function if it exists
+            if (typeof window.originalShowTab === 'function') {
+                window.originalShowTab(tabName);
             } else {
-                console.log('✅ All pipeline functions available');
+                // Basic tab switching if original function doesn't exist
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.add('hidden');
+                });
+                document.querySelectorAll('.tab').forEach(tab => {
+                    tab.classList.remove('active');
+                });
+                
+                const targetContent = document.getElementById(tabName);
+                const targetTab = document.getElementById(tabName + 'Tab');
+                
+                if (targetContent) targetContent.classList.remove('hidden');
+                if (targetTab) targetTab.classList.add('active');
             }
             
-            // Auto-initialize pipeline if user is authenticated
-            if (window.FirebaseData && window.FirebaseData.currentUser) {
-                console.log('👤 User authenticated, auto-initializing pipeline...');
-                if (typeof window.initializePipeline === 'function') {
-                    setTimeout(() => {
+            // Special handling for pipeline tab
+            if (tabName === 'pipeline') {
+                console.log('🎯 Pipeline tab activated');
+                setTimeout(() => {
+                    if (typeof window.initializePipeline === 'function') {
                         window.initializePipeline();
-                    }, 2000);
-                }
+                    } else if (typeof window.refreshPipeline === 'function') {
+                        window.refreshPipeline();
+                    }
+                }, 500);
             }
-            
-        }, 3000); // Wait 3 seconds for all scripts to load
-    });
-});
-
-// 29b ===== ENHANCED FIREBASE DATA COMPATIBILITY =====
-// Ensure compatibility between SimpleFirebaseManager and pipeline.js expectations
-window.addEventListener('firebaseReady', () => {
-    if (window.FirebaseData) {
-        // Add any missing methods that pipeline.js might expect
-        if (!window.FirebaseData.contacts) {
-            window.FirebaseData.contacts = {};
         }
-        
-        // Enhance the manager with additional methods if needed
-        const originalGetFilteredContacts = window.FirebaseData.getFilteredContacts;
-        window.FirebaseData.getFilteredContacts = async function() {
-            try {
-                return await originalGetFilteredContacts.call(this);
-            } catch (error) {
-                console.error('Error in getFilteredContacts:', error);
-                return [];
-            }
-        };
-        
-        console.log('🔧 Firebase Data compatibility enhanced');
-    }
-});
 
-// ===== PIPELINE TAB ACTIVATION HANDLER =====
-// Ensure pipeline initializes when tab is activated
-function showTab(tabName) {
-    // Call the original showTab function if it exists
-    if (typeof window.originalShowTab === 'function') {
-        window.originalShowTab(tabName);
-    } else {
-        // Basic tab switching if original function doesn't exist
-        document.querySelectorAll('.tab-content').forEach(content => {
-            content.classList.add('hidden');
-        });
-        document.querySelectorAll('.tab').forEach(tab => {
-            tab.classList.remove('active');
-        });
-        
-        const targetContent = document.getElementById(tabName);
-        const targetTab = document.getElementById(tabName + 'Tab');
-        
-        if (targetContent) targetContent.classList.remove('hidden');
-        if (targetTab) targetTab.classList.add('active');
-    }
-    
-    // Special handling for pipeline tab
-    if (tabName === 'pipeline') {
-        console.log('🎯 Pipeline tab activated');
-        setTimeout(() => {
-            if (typeof window.initializePipeline === 'function') {
-                window.initializePipeline();
-            } else if (typeof window.refreshPipeline === 'function') {
-                window.refreshPipeline();
-            }
-        }, 500);
-    }
-}
+        // Make the enhanced showTab globally available
+        window.originalShowTab = window.showTab;
+        window.showTab = showTab;
 
-// Make the enhanced showTab globally available
-window.originalShowTab = window.showTab;
-window.showTab = showTab;
+        console.log('✅ Enhanced pipeline preparation script loaded');
+    </script>
 
-console.log('✅ Enhanced pipeline preparation script loaded');
-</script>
-
-    
 <!-- ========================================= -->
 <!-- PARTE 30: SCRIPTS EXTERNOS -->
 <!-- ========================================= -->
