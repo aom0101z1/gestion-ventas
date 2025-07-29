@@ -261,62 +261,118 @@
             border-left: 3px solid #10b981;
         }
 
-        /* ===== PARTE 13: PIPELINE STYLES ===== */
-        .pipeline-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1rem;
-            margin-top: 2rem;
-        }
-        
-        .pipeline-column {
-            background: #f8fafc;
-            border-radius: 8px;
-            padding: 1rem;
-            min-height: 400px;
-        }
-        
-        .pipeline-column.drag-over {
-            background: #e0e7ff;
-            border: 2px dashed #667eea;
-        }
-        
-        .pipeline-header {
-            padding: 0.75rem;
-            margin-bottom: 1rem;
-            border-radius: 6px;
-            background: white;
-            font-weight: 600;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .pipeline-cards {
-            min-height: 300px;
-        }
-        
-        .pipeline-card {
-            background: white;
-            padding: 1rem;
-            margin-bottom: 0.75rem;
-            border-radius: 6px;
-            border-left: 3px solid #667eea;
-            cursor: move;
-            transition: all 0.2s ease;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        
-        .pipeline-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        }
-        
-        .pipeline-card.dragging {
-            opacity: 0.5;
-            transform: rotate(5deg);
-        }
+/* ===== PARTE 13: ENHANCED PIPELINE STYLES ===== */
+<style>
+#pipelineContainer {
+    display: flex;
+    gap: 1rem;
+    padding: 1rem;
+    overflow-x: auto;
+    min-height: 70vh;
+    background: #f8fafc;
+    border-radius: 8px;
+}
 
+.pipeline-column {
+    min-width: 280px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    transition: all 0.3s ease;
+    flex-shrink: 0;
+}
+
+.pipeline-column.drag-over {
+    transform: scale(1.02);
+    box-shadow: 0 4px 20px rgba(59, 130, 246, 0.3);
+    border: 2px dashed #3b82f6;
+}
+
+.pipeline-header {
+    padding: 1rem;
+    border-radius: 12px 12px 0 0;
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.pipeline-cards {
+    padding: 0.5rem;
+    min-height: 400px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.pipeline-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    cursor: move;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.pipeline-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    border-color: #3b82f6;
+}
+
+.pipeline-card.dragging {
+    opacity: 0.5;
+    transform: rotate(5deg);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+.pipeline-card:last-child {
+    margin-bottom: 0;
+}
+
+/* ===== STATUS SPECIFIC STYLING ===== */
+.pipeline-column[data-stage="nuevo"] .pipeline-card {
+    border-left: 4px solid #fbbf24;
+}
+
+.pipeline-column[data-stage="contactado"] .pipeline-card {
+    border-left: 4px solid #3b82f6;
+}
+
+.pipeline-column[data-stage="interesado"] .pipeline-card {
+    border-left: 4px solid #10b981;
+}
+
+.pipeline-column[data-stage="negociacion"] .pipeline-card {
+    border-left: 4px solid #f97316;
+}
+
+.pipeline-column[data-stage="convertido"] .pipeline-card {
+    border-left: 4px solid #22c55e;
+}
+
+.pipeline-column[data-stage="perdido"] .pipeline-card {
+    border-left: 4px solid #ef4444;
+}
+
+/* ===== RESPONSIVE DESIGN ===== */
+@media (max-width: 768px) {
+    #pipelineContainer {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .pipeline-column {
+        min-width: 100%;
+        max-height: 300px;
+    }
+
+    .pipeline-cards {
+        max-height: 200px;
+    }
+}
+</style>
         /* ===== PARTE 14: LOADING SPINNER Y UTILIDADES ===== */
         .loading-spinner {
             display: inline-block;
