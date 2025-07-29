@@ -1,17 +1,5 @@
-// pipeline.js - COMPLETE FIXED VERSION WITH ALL FUNCTIONS
+// pipeline.js - FIXED VERSION - Variable Conflict Resolution
 // ===== PIPELINE CONFIGURATION =====
-
-// ===== DEBUG HEADER - Add this at the VERY TOP of your pipeline.js =====
-console.log('🚨 PIPELINE.JS LOADING STARTED');
-console.log('📁 File: pipeline.js');
-console.log('⏰ Time:', new Date().toLocaleTimeString());
-
-// Test immediate execution
-window.pipelineFileLoaded = true;
-alert('🔥 Pipeline.js is loading!');
-
-// Continue with your existing code below...
-// pipeline.js - COMPLETE FIXED VERSION WITH ALL FUNCTIONS
 const PIPELINE_STAGES = [
     { 
         id: 'nuevo', 
@@ -57,10 +45,10 @@ const PIPELINE_STAGES = [
     }
 ];
 
-// ===== PIPELINE STATE =====
+// ===== PIPELINE STATE (RENAMED VARIABLES TO AVOID CONFLICTS) =====
 let pipelineData = [];
-let currentUserProfile = null;
-let isDirector = false;
+let pipelineUserProfile = null;  // RENAMED from currentUserProfile
+let pipelineIsDirector = false;  // RENAMED from isDirector
 
 // ===== STATUS NORMALIZATION =====
 function normalizeStatus(status) {
@@ -90,10 +78,10 @@ async function initializePipeline() {
         }
         
         // Get user profile
-        currentUserProfile = await window.FirebaseData.loadUserProfile();
-        isDirector = currentUserProfile?.role === 'director';
+        pipelineUserProfile = await window.FirebaseData.loadUserProfile();
+        pipelineIsDirector = pipelineUserProfile?.role === 'director';
         
-        console.log('👤 Pipeline user:', currentUserProfile?.name, '- Role:', currentUserProfile?.role);
+        console.log('👤 Pipeline user:', pipelineUserProfile?.name, '- Role:', pipelineUserProfile?.role);
         
         // Load and render pipeline
         await loadPipelineData();
@@ -130,7 +118,7 @@ async function loadPipelineData() {
             }));
             
             // Filter by user if not director
-            if (!isDirector && currentUserProfile && window.FirebaseData.currentUser) {
+            if (!pipelineIsDirector && pipelineUserProfile && window.FirebaseData.currentUser) {
                 allContacts = allContacts.filter(contact => 
                     contact.salespersonId === window.FirebaseData.currentUser.uid
                 );
@@ -171,7 +159,7 @@ function renderPipeline() {
                 <div style="text-align: center; padding: 3rem; color: #6b7280;">
                     <div style="font-size: 3rem; margin-bottom: 1rem;">📋</div>
                     <h3>No hay contactos disponibles</h3>
-                    <p>Agrega algunos contactos en la pestaña "Leads" para verlos aquí.</p>
+                    <p>Agrega algunos contactos en la pestaña "Contactos" para verlos aquí.</p>
                     <button onclick="refreshPipeline()" class="btn btn-primary" style="margin-top: 1rem;">
                         🔄 Actualizar
                     </button>
@@ -220,7 +208,7 @@ function renderPipeline() {
 // ===== PIPELINE CARD RENDERING =====
 function renderPipelineCard(contact) {
     const timeAgo = getTimeAgo(contact.date || contact.createdAt);
-    const salespersonName = isDirector ? getSalespersonName(contact.salespersonId) : '';
+    const salespersonName = pipelineIsDirector ? getSalespersonName(contact.salespersonId) : '';
     
     return `
         <div class="pipeline-card" 
@@ -459,7 +447,7 @@ async function showContactDetails(contactId) {
             return;
         }
         
-        const salespersonName = isDirector ? getSalespersonName(contact.salespersonId) : 'Tu contacto';
+        const salespersonName = pipelineIsDirector ? getSalespersonName(contact.salespersonId) : 'Tu contacto';
         
         alert(`📋 DETALLES DEL CONTACTO
 
@@ -469,7 +457,7 @@ async function showContactDetails(contactId) {
 📍 Fuente: ${contact.source || 'No especificada'}
 🏘️ Ubicación: ${contact.location || 'No especificada'}
 📝 Estado: ${contact.status}
-${isDirector ? `👨‍💼 Vendedor: ${salespersonName}` : ''}
+${pipelineIsDirector ? `👨‍💼 Vendedor: ${salespersonName}` : ''}
 📅 Fecha: ${new Date(contact.date || contact.createdAt).toLocaleDateString()}
 ⏰ Última actualización: ${contact.updatedAt ? new Date(contact.updatedAt).toLocaleString() : 'N/A'}
 
@@ -556,7 +544,7 @@ function showPipelineError(message) {
                         <button onclick="refreshPipeline()" style="background: #3b82f6; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;">
                             🔄 Reintentar
                         </button>
-                        <button onclick="showDebugInfo()" style="background: #6b7280; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;">
+                        <button onclick="showPipelineDebug()" style="background: #6b7280; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;">
                             🔍 Ver Info
                         </button>
                     </div>
@@ -567,14 +555,14 @@ function showPipelineError(message) {
 }
 
 // ===== DEBUG INFO FUNCTION =====
-function showDebugInfo() {
+function showPipelineDebug() {
     const info = `🔍 INFORMACIÓN DE DEBUG
 
 📊 DATOS:
 - Contactos cargados: ${pipelineData.length}
-- Usuario: ${currentUserProfile?.name || 'No disponible'}
-- Rol: ${currentUserProfile?.role || 'No disponible'}
-- Es Director: ${isDirector ? 'SÍ' : 'NO'}
+- Usuario: ${pipelineUserProfile?.name || 'No disponible'}
+- Rol: ${pipelineUserProfile?.role || 'No disponible'}
+- Es Director: ${pipelineIsDirector ? 'SÍ' : 'NO'}
 
 🔥 FIREBASE:
 - Firebase disponible: ${window.FirebaseData ? 'SÍ' : 'NO'}
@@ -620,8 +608,8 @@ async function refreshPipeline() {
 
 // ===== MAKE FUNCTIONS GLOBALLY AVAILABLE =====
 window.refreshPipeline = refreshPipeline;
-window.showPipelineDebug = showDebugInfo;
-window.showDebugInfo = showDebugInfo;
+window.showPipelineDebug = showPipelineDebug;
+window.initializePipeline = initializePipeline;
 
 // ===== INITIALIZATION =====
 // Auto-initialize when DOM is ready and Firebase is available
