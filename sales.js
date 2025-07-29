@@ -321,12 +321,25 @@ ${lead.notes || 'Sin notas'}
 // ================================================================================
 
 // ===== FUNCTION 6: UPDATE TODAY'S CONTACTS - ENHANCED =====
+// ===== FUNCTION 6: UPDATE TODAY'S CONTACTS - FIXED =====
 async function updateTodayContacts() {
     console.log('📅 Updating today contacts...');
     
     const container = document.getElementById('todayContacts');
     if (!container) {
         console.log('❌ Today contacts container not found');
+        return;
+    }
+    
+    if (!window.FirebaseData || !window.FirebaseData.currentUser) {
+        console.log('❌ Firebase not available for today contacts');
+        container.innerHTML = `
+            <div style="text-align: center; padding: 2rem; color: #dc2626;">
+                <div style="font-size: 2rem; margin-bottom: 1rem;">❌</div>
+                <h4>Firebase no disponible</h4>
+                <p>Recarga la página</p>
+            </div>
+        `;
         return;
     }
     
@@ -343,30 +356,23 @@ async function updateTodayContacts() {
         const userProfile = await window.FirebaseData.loadUserProfile();
         const isDirector = userProfile?.role === 'director';
         
-        // Get filtered contacts based on user role
-        let allContacts = [];
-        if (window.FirebaseData.contacts) {
-            // Use cached contacts if available
-            allContacts = Object.values(window.FirebaseData.contacts);
-        } else {
-            // Load fresh contacts
-            allContacts = await window.FirebaseData.getFilteredContacts();
-        }
+        console.log('👤 User profile for today contacts:', userProfile?.role, userProfile?.email);
         
-        console.log('📊 All contacts loaded:', allContacts.length);
+        // 🔧 FIX: Use same method as updateStats for consistency
+        let allContacts = await window.FirebaseData.getFilteredContacts();
+        console.log('📊 All filtered contacts loaded:', allContacts.length);
         
-        // Filter for today's contacts
-        const today = new Date();
-        const todayString = today.toDateString();
+        // Filter for today's contacts with consistent date logic
+        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+        console.log('📅 Filtering for today:', today);
         
         const todaysContacts = allContacts.filter(contact => {
-            if (!contact.date && !contact.createdAt) return false;
-            
-            const contactDate = new Date(contact.date || contact.createdAt);
-            return contactDate.toDateString() === todayString;
+            // Use same date field as other functions
+            return contact.date === today;
         });
         
         console.log('📅 Today\'s contacts found:', todaysContacts.length);
+        console.log('📅 Today\'s contacts data:', todaysContacts.map(c => ({name: c.name, date: c.date})));
         
         // Update the container
         if (todaysContacts.length === 0) {
@@ -375,11 +381,14 @@ async function updateTodayContacts() {
                     <div style="font-size: 2rem; margin-bottom: 1rem;">📅</div>
                     <h4 style="margin-bottom: 0.5rem;">No hay contactos de hoy</h4>
                     <p style="font-size: 0.9rem;">Los nuevos contactos aparecerán aquí</p>
+                    <div style="font-size: 0.8rem; color: #999; margin-top: 1rem;">
+                        Total en Firebase: ${allContacts.length} | Fecha: ${today}
+                    </div>
                 </div>
             `;
         } else {
-            // Render compact contact cards
-            container.innerHTML = renderTodayContactsCompact(todaysContacts, isDirector);
+            // 🔧 FIX: Use async version of compact renderer
+            container.innerHTML = await renderTodayContactsCompact(todaysContacts, isDirector);
         }
         
         console.log('✅ Today contacts updated successfully');
@@ -402,7 +411,8 @@ async function updateTodayContacts() {
 }
 
 // ===== FUNCTION 7: RENDER TODAY'S CONTACTS COMPACT - ENHANCED =====
-function renderTodayContactsCompact(contacts, isDirector = false) {
+// ===== FUNCTION 7: RENDER TODAY'S CONTACTS COMPACT - FIXED ASYNC =====
+async function renderTodayContactsCompact(contacts, isDirector = false) {
     if (!contacts || contacts.length === 0) {
         return `
             <div style="text-align: center; padding: 2rem; color: #6b7280;">
@@ -412,9 +422,89 @@ function renderTodayContactsCompact(contacts, isDirector = false) {
         `;
     }
     
+    // Sort contacts by time (most recent first)
+    const sortedContacts = [...contacts].sort((a, b) => {
+        const timeA = new Date(a.date + ' ' + (a.time || '00:00:00'));
+        const timeB = new Date(b.date + ' ' + (b.time || '00:00:00'));
+        return timeB - timeA;
+    });
+    
+    const contactsHTML = await Promise.all(sortedContacts.map(async (contact) => {
+        const timeAgo = getTimeAgo(contact.date, contact.time);
+        let salespersonName = '';
+        
+        if (isDirector && contact.salespersonId) {
+            try {
+                salespersonName = await getUserDisplayNameFirebase(contact.salespersonId);
+            } catch (error) {
+                salespersonName = 'Vendedor';
+            }
+        }
+        
+        // Check if current user can delete this contact
+        const userProfile = await window.FirebaseData.loadUserProfile();
+        const canDelete = userProfile.role === 'director' || contact.salespersonId === window.FirebaseData.currentUser.uid;
+        
+        return `
+            <div class="contact-item" style="background: white; border-radius: 8px; margin-bottom: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-left: 3px solid #667eea; overflow: hidden; transition: all 0.2s ease;">
+                <div class="contact-header" onclick="toggleContactDetails('${contact.id}')" style="padding: 0.75rem 1rem; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: white;">
+                    <div style="display: flex; align-items: center; gap: 0.75rem; flex: 1;">
+                        <div>
+                            <div style="font-weight: 600; color: #1f2937;">${contact.name}</div>
+                            <div style="color: #10b981; font-size: 0.9rem;">📞 ${contact.phone}</div>
+                            ${isDirector && salespersonName ? `
+                                <div style="font-size: 0.8rem; color: #667eea;">👤 ${salespersonName}</div>
+                            ` : ''}
+                        </div>
+                        <span style="background: #e0e7ff; color: #3730a3; padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.8rem;">${(contact.source || 'Sin fuente').length > 15 ? (contact.source || 'Sin fuente').substring(0, 15) + '...' : (contact.source || 'Sin fuente')}</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="color: #6b7280; font-size: 0.8rem;">${timeAgo}</span>
+                        <button style="background: none; border: none; color: #6b7280; cursor: pointer; padding: 0.25rem; border-radius: 4px; transition: all 0.2s ease;" id="expand-${contact.id}">
+                            ⌄
+                        </button>
+                    </div>
+                </div>
+                <div class="contact-details" id="details-${contact.id}" style="padding: 0 1rem 1rem 1rem; background: #f8fafc; border-top: 1px solid #e5e7eb; display: none;">
+                    ${contact.email ? `
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.9rem;">
+                            <span style="color: #6b7280; font-weight: 500;">Email:</span>
+                            <span style="color: #1f2937;">${contact.email}</span>
+                        </div>
+                    ` : ''}
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.9rem;">
+                        <span style="color: #6b7280; font-weight: 500;">Ubicación:</span>
+                        <span style="color: #1f2937;">${contact.location || 'No especificada'}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.9rem;">
+                        <span style="color: #6b7280; font-weight: 500;">Estado:</span>
+                        <span style="color: #1f2937;">
+                            <span class="status-badge status-${(contact.status || 'nuevo').toLowerCase().replace(' ', '').replace('ó', 'o')}">${contact.status || 'Nuevo'}</span>
+                        </span>
+                    </div>
+                    ${contact.notes ? `
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.9rem;">
+                            <span style="color: #6b7280; font-weight: 500;">Notas:</span>
+                            <span style="color: #1f2937;">${contact.notes}</span>
+                        </div>
+                    ` : ''}
+                    <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #e5e7eb;">
+                        <button onclick="editContact('${contact.id}')" style="padding: 0.4rem 0.8rem; border: none; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s ease; background: #dbeafe; color: #1e40af;">
+                            ✏️ Editar
+                        </button>
+                        <button onclick="openWhatsApp('${contact.phone}', '${contact.name}')" style="padding: 0.4rem 0.8rem; border: none; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s ease; background: #dcfce7; color: #166534;">
+                            💬 WhatsApp
+                        </button>
+                        ${canDelete ? `<button onclick="deleteLead('${contact.id}')" style="padding: 0.4rem 0.8rem; border: none; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s ease; background: #fee2e2; color: #dc2626;">🗑️ Eliminar</button>` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    }));
+    
     return `
         <div style="margin-bottom: 1rem;">
-            <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <span style="font-weight: 500; color: #374151;">📅 Contactos de Hoy (${contacts.length})</span>
                 <button onclick="updateTodayContacts()" style="background: #f3f4f6; border: none; border-radius: 4px; padding: 0.25rem 0.5rem; font-size: 0.8rem; cursor: pointer;">
                     🔄
@@ -423,64 +513,7 @@ function renderTodayContactsCompact(contacts, isDirector = false) {
         </div>
         
         <div style="max-height: 400px; overflow-y: auto;">
-            ${contacts.map(contact => {
-                const timeAgo = getTimeAgo(contact.date || contact.createdAt);
-                const salespersonName = isDirector ? getSalespersonDisplayName(contact.salespersonId) : '';
-                
-                return `
-                    <div class="contact-item" style="margin-bottom: 0.75rem;">
-                        <div class="contact-header" onclick="toggleContactDetails('${contact.id}')">
-                            <div class="contact-main-info">
-                                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-                                    <div class="contact-name">${contact.name}</div>
-                                    <div style="display: flex; gap: 0.5rem; align-items: center;">
-                                        <span class="contact-phone">📞 ${contact.phone}</span>
-                                        <span class="contact-source">${(contact.source || 'Sin fuente').length > 15 ? (contact.source || 'Sin fuente').substring(0, 15) + '...' : (contact.source || 'Sin fuente')}</span>
-                                    </div>
-                                    ${isDirector && salespersonName ? `
-                                        <div style="font-size: 0.8rem; color: #667eea;">👤 ${salespersonName}</div>
-                                    ` : ''}
-                                </div>
-                            </div>
-                            <div style="display: flex; flex-direction: column; align-items: end; gap: 0.25rem;">
-                                <span class="contact-time">${timeAgo}</span>
-                                <span class="expand-btn">⌄</span>
-                            </div>
-                        </div>
-                        <div id="details-${contact.id}" class="contact-details">
-                            <div class="detail-row">
-                                <span class="detail-label">Email:</span>
-                                <span class="detail-value">${contact.email || 'No proporcionado'}</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="detail-label">Ubicación:</span>
-                                <span class="detail-value">${contact.location || 'No especificada'}</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="detail-label">Estado:</span>
-                                <span class="detail-value">
-                                    <span class="status-badge status-${(contact.status || 'nuevo').toLowerCase().replace(' ', '-')}">${contact.status || 'Nuevo'}</span>
-                                </span>
-                            </div>
-                            ${contact.notes ? `
-                                <div class="detail-row">
-                                    <span class="detail-label">Notas:</span>
-                                    <span class="detail-value">${contact.notes}</span>
-                                </div>
-                            ` : ''}
-                            
-                            <div class="contact-actions">
-                                <button class="action-btn whatsapp" onclick="openWhatsApp('${contact.phone}', '${contact.name}')">
-                                    💬 WhatsApp
-                                </button>
-                                <button class="action-btn edit" onclick="editContact('${contact.id}')">
-                                    ✏️ Editar
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }).join('')}
+            ${contactsHTML.join('')}
         </div>
     `;
 }
@@ -498,22 +531,38 @@ function toggleContactDetails(contactId) {
         }
     }
 }
-// ===== FUNCTION 8.1: GET TIME AGO =====
-function getTimeAgo(dateString) {
+// ===== FUNCTION 8.1: GET TIME AGO - FIXED =====
+function getTimeAgo(dateString, timeString) {
     if (!dateString) return 'Sin fecha';
     
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInMinutes = Math.floor((now - date) / (1000 * 60));
-    
-    if (diffInMinutes < 1) return 'Hace un momento';
-    if (diffInMinutes < 60) return `Hace ${diffInMinutes}m`;
-    
-    const diffInHours = Math.floor(diffInMinutes / 60);
-    if (diffInHours < 24) return `Hace ${diffInHours}h`;
-    
-    const diffInDays = Math.floor(diffInHours / 24);
-    return `Hace ${diffInDays} días`;
+    try {
+        // Combine date and time for accurate calculation
+        const fullDateTime = timeString ? `${dateString} ${timeString}` : dateString;
+        const date = new Date(fullDateTime);
+        const now = new Date();
+        
+        // Check if date is valid
+        if (isNaN(date.getTime())) {
+            return 'Fecha inválida';
+        }
+        
+        const diffInMinutes = Math.floor((now - date) / (1000 * 60));
+        
+        if (diffInMinutes < 1) return 'Hace un momento';
+        if (diffInMinutes < 60) return `Hace ${diffInMinutes}m`;
+        
+        const diffInHours = Math.floor(diffInMinutes / 60);
+        if (diffInHours < 24) return `Hace ${diffInHours}h`;
+        
+        const diffInDays = Math.floor(diffInHours / 24);
+        if (diffInDays === 0) return 'Hoy';
+        if (diffInDays === 1) return 'Ayer';
+        
+        return `Hace ${diffInDays} días`;
+    } catch (error) {
+        console.error('Error calculating time ago:', error);
+        return 'Sin fecha';
+    }
 }
 
 // ===== FUNCTION 8.2: GET SALESPERSON DISPLAY NAME =====
