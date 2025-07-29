@@ -1,4 +1,4 @@
-// core.js - FIREBASE INTEGRATED VERSION
+// core.js - FIREBASE INTEGRATED VERSION - FIXED
 // ===== FIREBASE VARIABLES GLOBALES =====
 let users = {}; // Will be loaded from Firebase
 let convenios = []; // Will be loaded from Firebase
@@ -259,6 +259,7 @@ El sistema puede no funcionar correctamente sin un perfil válido.`);
         document.getElementById('reportsTab').textContent = '📊 Dashboard Ejecutivo';
         document.getElementById('reportsTitle').textContent = '📊 Dashboard Ejecutivo';
         document.getElementById('monitoringTab').style.display = 'block';
+        document.getElementById('configTab').style.display = 'block';
         
         // Update tab labels for director
         document.getElementById('contactsTab').textContent = '📞 Todos los Contactos';
@@ -291,6 +292,7 @@ El sistema puede no funcionar correctamente sin un perfil válido.`);
         document.getElementById('reportsTab').textContent = '📊 Mi Dashboard';
         document.getElementById('reportsTitle').textContent = '📊 Mi Dashboard Personal';
         document.getElementById('monitoringTab').style.display = 'none';
+        document.getElementById('configTab').style.display = 'none';
         document.getElementById('leadsFilters').style.display = 'none';
         
         // Reset tab labels for vendedor
@@ -627,57 +629,68 @@ async function loadConveniosInSelect() {
     console.log('✅ Firebase convenios cargados en select:', convenios.length);
 }
 
-// ===== UTILIDADES =====
-function getUserDisplayName(userId) {
-    if (users[userId]) {
-        return users[userId].name;
-    }
-    
-    // Fallback for legacy format
-    if (userId && userId.includes('.')) {
-        return userId.split('.').map(n => n.charAt(0).toUpperCase() + n.slice(1)).join(' ');
-    }
-    
-    return userId || 'Unknown User';
-}
-
-function formatDate(date) {
-    return new Date(date).toLocaleDateString('es-CO');
-}
-
-function showTab(tabName) {
-    document.querySelectorAll('.tab-content').forEach(tab => {
-        tab.classList.add('hidden');
-    });
-    document.querySelectorAll('.tab').forEach(btn => {
-        btn.classList.remove('active');
-    });
-    document.getElementById(tabName).classList.remove('hidden');
-    event.target.classList.add('active');
-    
-    // Force refresh specific views when tabs are shown
-    setTimeout(() => {
-        if (tabName === 'pipeline') {
-            if (typeof refreshPipeline === 'function') refreshPipeline();
-        } else if (tabName === 'monitoring' && currentUserProfile?.role === 'director') {
-            if (typeof refreshMonitoring === 'function') refreshMonitoring();
-        } else if (tabName === 'leads') {
-            updateLeadsTable();
-        } else if (tabName === 'reports') {
-            updateReports();
-        }
-    }, 100);
-}
-
+// ===== REFRESH DATA CORREGIDO =====
 async function refreshData() {
     console.log('🔄 Refreshing Firebase data...');
     
-    if (window.AdminData && window.AdminData.isReady) {
-        await AdminData.loadData();
-        updateAllViews();
-    }
+    // Show loading indicator
+    const indicators = document.querySelectorAll('.loading-spinner');
+    indicators.forEach(indicator => {
+        if (indicator.parentElement) {
+            indicator.parentElement.innerHTML = '<div class="loading-spinner"></div> Actualizando...';
+        }
+    });
     
-    console.log('✅ Firebase data refresh completed');
+    try {
+        if (window.AdminData && window.AdminData.isReady) {
+            // Reload data from Firebase
+            await AdminData.loadData();
+            
+            // 🔧 FIX: Single update call with proper timing
+            setTimeout(() => {
+                updateAllViews();
+                console.log('✅ Firebase data refresh completed');
+            }, 300);
+            
+        } else if (window.FirebaseData && window.FirebaseData.currentUser) {
+            // Direct Firebase approach if AdminData not ready
+            console.log('🔄 AdminData not ready, using direct Firebase calls');
+            
+            setTimeout(() => {
+                updateAllViews();
+                console.log('✅ Direct Firebase refresh completed');
+            }, 300);
+            
+        } else {
+            console.warn('⚠️ Neither AdminData nor FirebaseData available');
+            
+            // Update UI to show no data state
+            const todayContainer = document.getElementById('todayContacts');
+            if (todayContainer) {
+                todayContainer.innerHTML = `
+                    <p style="color: #ef4444; text-align: center; padding: 2rem;">
+                        ❌ Firebase no disponible<br>
+                        <small>Recarga la página o revisa tu conexión</small>
+                    </p>
+                `;
+            }
+        }
+        
+    } catch (error) {
+        console.error('❌ Error in refresh:', error);
+        
+        // Show error in UI
+        const todayContainer = document.getElementById('todayContacts');
+        if (todayContainer) {
+            todayContainer.innerHTML = `
+                <p style="color: #ef4444; text-align: center; padding: 2rem;">
+                    ❌ Error al actualizar datos<br>
+                    <small>${error.message}</small><br>
+                    <button onclick="refreshData()" class="btn btn-primary" style="margin-top: 1rem;">🔄 Reintentar</button>
+                </p>
+            `;
+        }
+    }
 }
 
 function debugData() {
@@ -727,26 +740,81 @@ function debugData() {
     alert(debugInfo);
 }
 
-// ===== UTILIDADES ADICIONALES =====
-
-function updateAllViews() {
-    console.log('🔄 Updating all Firebase views...');
-    if (typeof updateStats === 'function') updateStats();
-    if (typeof updateTodayContacts === 'function') updateTodayContacts();
-    if (typeof updateLeadsTable === 'function') updateLeadsTable();
-    if (typeof updateReports === 'function') updateReports();
-    
-    // Director-specific updates
-    if (currentUserProfile && currentUserProfile.role === 'director') {
-        populateSalespersonFilter();
-        // Update monitoring if the tab is currently active
-        const monitoringTab = document.getElementById('monitoring');
-        if (monitoringTab && !monitoringTab.classList.contains('hidden')) {
-            if (typeof refreshMonitoring === 'function') refreshMonitoring();
-        }
+// ===== UTILIDADES =====
+function getUserDisplayName(userId) {
+    if (users[userId]) {
+        return users[userId].name;
     }
     
-    console.log('✅ All Firebase views updated');
+    // Fallback for legacy format
+    if (userId && userId.includes('.')) {
+        return userId.split('.').map(n => n.charAt(0).toUpperCase() + n.slice(1)).join(' ');
+    }
+    
+    return userId || 'Unknown User';
+}
+
+function formatDate(date) {
+    return new Date(date).toLocaleDateString('es-CO');
+}
+
+function showTab(tabName) {
+    document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.add('hidden');
+    });
+    document.querySelectorAll('.tab').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    document.getElementById(tabName).classList.remove('hidden');
+    event.target.classList.add('active');
+    
+    // Force refresh specific views when tabs are shown
+    setTimeout(() => {
+        if (tabName === 'pipeline') {
+            if (typeof refreshPipeline === 'function') refreshPipeline();
+        } else if (tabName === 'monitoring' && currentUserProfile?.role === 'director') {
+            if (typeof refreshMonitoring === 'function') refreshMonitoring();
+        } else if (tabName === 'leads') {
+            updateLeadsTable();
+        } else if (tabName === 'reports') {
+            updateReports();
+        }
+    }, 100);
+}
+
+// ===== UPDATE ALL VIEWS CORREGIDO =====
+function updateAllViews() {
+    console.log('🔄 Updating all Firebase views...');
+    
+    try {
+        // Update stats
+        if (typeof updateStats === 'function') updateStats();
+        
+        // Update today contacts with new compact function
+        if (typeof updateTodayContacts === 'function') updateTodayContacts();
+        
+        // Update leads table
+        if (typeof updateLeadsTable === 'function') updateLeadsTable();
+        
+        // Update reports
+        if (typeof updateReports === 'function') updateReports();
+        
+        // Director-specific updates
+        if (currentUserProfile && currentUserProfile.role === 'director') {
+            populateSalespersonFilter();
+            
+            // Update monitoring if the tab is currently active
+            const monitoringTab = document.getElementById('monitoring');
+            if (monitoringTab && !monitoringTab.classList.contains('hidden')) {
+                if (typeof refreshMonitoring === 'function') refreshMonitoring();
+            }
+        }
+        
+        console.log('✅ All Firebase views updated');
+        
+    } catch (error) {
+        console.error('❌ Error updating views:', error);
+    }
 }
 
 async function populateSalespersonFilter() {
