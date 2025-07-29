@@ -1,369 +1,448 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pipeline CSS + JS Fixes</title>
-    <style>
-        /* ===== PIPELINE STYLES ===== */
-        #pipelineContainer {
-            display: flex;
-            gap: 1rem;
-            padding: 1rem;
-            overflow-x: auto;
-            min-height: 70vh;
-            background: #f8fafc;
+// ===== PIPELINE MANAGEMENT =====
+
+// Pipeline stages
+const pipelineStages = [
+    { id: 'nuevo', name: 'Nuevo', color: '#f59e0b', status: 'Nuevo' },
+    { id: 'contactado', name: 'Contactado', color: '#3b82f6', status: 'Contactado' },
+    { id: 'interesado', name: 'Interesado', color: '#8b5cf6', status: 'Interesado' },
+    { id: 'negociacion', name: 'Negociación', color: '#f97316', status: 'Negociación' },
+    { id: 'convertido', name: 'Convertido', color: '#10b981', status: 'Convertido' },
+    { id: 'perdido', name: 'Perdido', color: '#ef4444', status: 'Perdido' }
+];
+
+// Drag and drop variables
+let draggedCard = null;
+
+// ===== PIPELINE FUNCTIONS =====
+function refreshPipeline() {
+    console.log('🎯 Refreshing pipeline for user:', currentUser?.username, currentUser?.role);
+    
+    if (!window.AdminData) {
+        console.log('❌ AdminData not available, cannot refresh pipeline');
+        return;
+    }
+    
+    createPipelineBoard();
+    loadPipelineData();
+    setupDragAndDrop();
+    
+    console.log('✅ Pipeline refreshed successfully');
+}
+
+function createPipelineBoard() {
+    const container = document.getElementById('pipelineContainer');
+    if (!container) {
+        console.log('❌ Pipeline container not found');
+        return;
+    }
+
+    console.log('🏗️ Creating pipeline board');
+    container.innerHTML = pipelineStages.map(stage => `
+        <div class="pipeline-column" id="column-${stage.id}" data-stage="${stage.id}">
+            <div class="pipeline-header" style="border-left: 4px solid ${stage.color};">
+                <strong>${stage.name}</strong>
+                <span id="count-${stage.id}" style="background: ${stage.color}; color: white; padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.8rem; margin-left: 0.5rem;">0</span>
+            </div>
+            <div class="pipeline-cards" id="cards-${stage.id}"></div>
+        </div>
+    `).join('');
+    
+    console.log('✅ Pipeline board created');
+}
+
+function loadPipelineData() {
+    if (!window.AdminData) {
+        console.log('❌ AdminData not available for pipeline data loading');
+        return;
+    }
+    
+    console.log('📊 Loading pipeline data from AdminData');
+    
+    // Get filtered data based on user role
+    const data = getFilteredData();
+    
+    console.log(`   - Total leads for pipeline: ${data.length}`);
+    console.log(`   - User: ${currentUser.role} (${currentUser.username})`);
+    
+    // Clear all containers first
+    pipelineStages.forEach(stage => {
+        const container = document.getElementById(`cards-${stage.id}`);
+        if (container) container.innerHTML = '';
+    });
+
+    // Add leads to appropriate stages
+    data.forEach(lead => {
+        const stageId = getStageIdFromStatus(lead.status);
+        const container = document.getElementById(`cards-${stageId}`);
+        if (container) {
+            const card = createLeadCard(lead);
+            container.appendChild(card);
+        } else {
+            console.warn('⚠️ Container not found for stage:', stageId);
         }
+    });
 
-        .pipeline-column {
-            min-width: 280px;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            transition: all 0.3s ease;
-            flex-shrink: 0;
+    updatePipelineCounters();
+    
+    console.log('✅ Pipeline data loaded from AdminData');
+    
+    // Debug: Show leads per stage
+    pipelineStages.forEach(stage => {
+        const container = document.getElementById(`cards-${stage.id}`);
+        const count = container ? container.children.length : 0;
+        console.log(`   - ${stage.name}: ${count} leads`);
+    });
+}
+
+function createLeadCard(lead) {
+    const card = document.createElement('div');
+    card.className = 'pipeline-card';
+    card.dataset.leadId = lead.id;
+    card.draggable = true;
+    
+    const daysSinceContact = getDaysSinceContact(lead.date);
+    const urgencyColor = daysSinceContact > 3 ? '#ef4444' : daysSinceContact > 1 ? '#f59e0b' : '#10b981';
+    
+    // Show salesperson info only for directors
+    const salespersonInfo = currentUser.role === 'director' 
+        ? `<div style="font-size: 0.7rem; color: #667eea; margin-bottom: 0.5rem; font-weight: 600;">👤 ${getUserDisplayName(lead.salesperson)}</div>`
+        : '';
+    
+    card.innerHTML = `
+        ${salespersonInfo}
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
+            <strong style="font-size: 0.9rem; line-height: 1.2;">${lead.name}</strong>
+            <span style="background: ${urgencyColor}; color: white; padding: 0.1rem 0.3rem; border-radius: 8px; font-size: 0.7rem;">
+                ${daysSinceContact}d
+            </span>
+        </div>
+        <div style="font-size: 0.8rem; color: #666; margin-bottom: 0.5rem;">📞 ${lead.phone}</div>
+        <div style="font-size: 0.8rem; color: #666; margin-bottom: 0.5rem;">📍 ${lead.source.length > 20 ? lead.source.substring(0, 20) + '...' : lead.source}</div>
+        ${lead.notes ? `<div style="font-size: 0.75rem; color: #888; background: #f9fafb; padding: 0.3rem; border-radius: 4px; margin-top: 0.5rem;">💬 ${lead.notes.substring(0, 50)}${lead.notes.length > 50 ? '...' : ''}</div>` : ''}
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem; font-size: 0.7rem; color: #888;">
+            <span>📅 ${formatDate(lead.date)}</span>
+            <span>⏰ ${lead.time || '00:00'}</span>
+        </div>
+    `;
+    return card;
+}
+
+// ===== DRAG & DROP FUNCTIONS =====
+function setupDragAndDrop() {
+    console.log('🖱️ Setting up drag & drop');
+    
+    // Add drag event listeners to all cards
+    document.querySelectorAll('.pipeline-card').forEach(card => {
+        card.addEventListener('dragstart', handleDragStart);
+        card.addEventListener('dragend', handleDragEnd);
+    });
+
+    // Add drop event listeners to all columns
+    document.querySelectorAll('.pipeline-column').forEach(column => {
+        column.addEventListener('dragover', handleDragOver);
+        column.addEventListener('drop', handleDrop);
+        column.addEventListener('dragenter', handleDragEnter);
+        column.addEventListener('dragleave', handleDragLeave);
+    });
+    
+    console.log('✅ Drag & drop configured');
+}
+
+function handleDragStart(e) {
+    draggedCard = this;
+    this.classList.add('dragging');
+    console.log('🖱️ Drag started for lead:', this.dataset.leadId);
+    
+    // Store the lead ID for transfer
+    e.dataTransfer.setData('text/plain', this.dataset.leadId);
+    e.dataTransfer.effectAllowed = 'move';
+}
+
+function handleDragEnd(e) {
+    this.classList.remove('dragging');
+    draggedCard = null;
+    console.log('🖱️ Drag ended');
+}
+
+function handleDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+}
+
+function handleDragEnter(e) {
+    if (e.target.classList.contains('pipeline-column') || e.target.classList.contains('pipeline-cards')) {
+        const column = e.target.classList.contains('pipeline-column') ? e.target : e.target.closest('.pipeline-column');
+        if (column) {
+            column.classList.add('drag-over');
         }
+    }
+}
 
-        .pipeline-column.drag-over {
-            transform: scale(1.02);
-            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.3);
-            border: 2px dashed #3b82f6;
-        }
+function handleDragLeave(e) {
+    // Only remove drag-over if we're leaving the column entirely
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+        e.currentTarget.classList.remove('drag-over');
+    }
+}
 
-        .pipeline-header {
-            padding: 1rem;
-            border-radius: 12px 12px 0 0;
-            font-weight: 600;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+function handleDrop(e) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('drag-over');
+    
+    const leadId = e.dataTransfer.getData('text/plain');
+    const column = e.currentTarget;
+    const newStage = column.dataset.stage;
+    
+    console.log('🎯 Drop detected - Lead ID:', leadId, 'New stage:', newStage);
+    
+    if (leadId && newStage) {
+        updateLeadStatus(leadId, newStage);
+    }
+}
 
-        .pipeline-cards {
-            padding: 0.5rem;
-            min-height: 400px;
-            max-height: 60vh;
-            overflow-y: auto;
-        }
+function updateLeadStatus(leadId, newStageId) {
+    console.log('🔄 Updating lead status in AdminData:', leadId, 'to stage:', newStageId);
+    
+    if (!window.AdminData) {
+        console.error('❌ AdminData not available');
+        alert('❌ Sistema no disponible');
+        return;
+    }
+    
+    // Find the lead in AdminData
+    const allData = AdminData.getAllData();
+    const lead = allData.find(lead => lead.id == leadId);
+    if (!lead) {
+        console.error('❌ Lead not found:', leadId);
+        return;
+    }
 
-        .pipeline-card {
-            background: white;
-            border: 1px solid #e5e7eb;
-            border-radius: 8px;
-            padding: 1rem;
-            margin-bottom: 0.75rem;
-            cursor: move;
-            transition: all 0.2s ease;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
+    // Check permissions - salespeople can only update their own leads
+    if (currentUser.role !== 'director' && lead.salesperson !== currentUser.username) {
+        alert('❌ Solo puedes modificar tus propios leads');
+        refreshPipeline(); // Refresh to restore original position
+        return;
+    }
 
-        .pipeline-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            border-color: #3b82f6;
-        }
+    // Get new status from stage
+    const stage = pipelineStages.find(s => s.id === newStageId);
+    if (!stage) {
+        console.error('❌ Stage not found:', newStageId);
+        return;
+    }
 
-        .pipeline-card.dragging {
-            opacity: 0.5;
-            transform: rotate(5deg);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-        }
-
-        .pipeline-card:last-child {
-            margin-bottom: 0;
-        }
-
-        /* ===== LOADING SPINNER ===== */
-        .loading-spinner {
-            border: 3px solid #f3f4f6;
-            border-top: 3px solid #3b82f6;
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        /* ===== RESPONSIVE DESIGN ===== */
-        @media (max-width: 768px) {
-            #pipelineContainer {
-                flex-direction: column;
-                gap: 0.5rem;
-            }
-
-            .pipeline-column {
-                min-width: 100%;
-                max-height: 300px;
-            }
-
-            .pipeline-cards {
-                max-height: 200px;
-            }
-        }
-
-        /* ===== BUTTONS IN CARDS ===== */
-        .pipeline-card button {
-            transition: all 0.2s ease;
-        }
-
-        .pipeline-card button:hover {
-            transform: scale(1.1);
-        }
-
-        /* ===== STATUS SPECIFIC STYLING ===== */
-        .pipeline-column[data-stage="nuevo"] .pipeline-card {
-            border-left: 4px solid #fbbf24;
-        }
-
-        .pipeline-column[data-stage="contactado"] .pipeline-card {
-            border-left: 4px solid #3b82f6;
-        }
-
-        .pipeline-column[data-stage="interesado"] .pipeline-card {
-            border-left: 4px solid #10b981;
-        }
-
-        .pipeline-column[data-stage="negociacion"] .pipeline-card {
-            border-left: 4px solid #f97316;
-        }
-
-        .pipeline-column[data-stage="convertido"] .pipeline-card {
-            border-left: 4px solid #22c55e;
-        }
-
-        .pipeline-column[data-stage="perdido"] .pipeline-card {
-            border-left: 4px solid #ef4444;
-        }
-    </style>
-</head>
-<body>
-    <div id="pipelineContainer">
-        <!-- Pipeline will be rendered here -->
-    </div>
-
-    <script>
-        // ===== ENHANCED getSalespersonName FUNCTION =====
-        function getSalespersonName(salespersonId) {
-            try {
-                // Try to get from Firebase user data
-                if (window.FirebaseData && window.FirebaseData.usersData) {
-                    const user = window.FirebaseData.usersData[salespersonId];
-                    if (user && user.profile && user.profile.name) {
-                        return user.profile.name;
-                    }
-                }
-                
-                // Fallback to localStorage cached data
-                const cachedUsers = localStorage.getItem('cachedUsers');
-                if (cachedUsers) {
-                    const users = JSON.parse(cachedUsers);
-                    const user = users[salespersonId];
-                    if (user && user.name) {
-                        return user.name;
-                    }
-                }
-                
-                // Default fallback
-                return 'Vendedor';
-                
-            } catch (error) {
-                console.log('Error getting salesperson name:', error);
-                return 'Vendedor';
-            }
-        }
-
-        // ===== ENHANCED CONTACT DETAILS FUNCTION =====
-        async function showContactDetails(contactId) {
-            try {
-                const contact = pipelineData.find(c => c.id === contactId);
-                if (!contact) {
-                    alert('❌ Contacto no encontrado');
-                    return;
-                }
-                
-                const salespersonName = isDirector ? getSalespersonName(contact.salespersonId) : 'Tu contacto';
-                
-                // Create a nice modal-style alert
-                const details = `📋 DETALLES DEL CONTACTO
-
-👤 Nombre: ${contact.name}
-📞 Teléfono: ${contact.phone}
-📧 Email: ${contact.email || 'No proporcionado'}
-📍 Fuente: ${contact.source}
-🏘️ Ubicación: ${contact.location || 'No especificada'}
-📝 Estado: ${contact.status}
-${isDirector ? `👨‍💼 Vendedor: ${salespersonName}` : ''}
-📅 Fecha: ${new Date(contact.date || contact.createdAt).toLocaleDateString('es-ES')}
-⏰ Última actualización: ${contact.updatedAt ? new Date(contact.updatedAt).toLocaleString('es-ES') : 'N/A'}
-
-💬 Notas:
-${contact.notes || 'Sin notas'}
-
-💡 Tip: Arrastra la tarjeta a otra columna para cambiar el estado
-📝 Tip: Haz clic en "✏️" para editar o "💬" para WhatsApp`;
-
-                alert(details);
-                
-            } catch (error) {
-                console.error('❌ Error showing contact details:', error);
-                alert(`❌ Error al mostrar detalles: ${error.message}`);
-            }
-        }
-
-        // ===== ENHANCED EDIT FUNCTION =====
-        function editContactInPipeline(contactId) {
-            const contact = pipelineData.find(c => c.id === contactId);
-            if (!contact) {
-                alert('❌ Contacto no encontrado');
-                return;
-            }
-
-            // Try to switch to leads tab and highlight the contact
-            if (typeof showSection === 'function') {
-                showSection('leads');
-                
-                // Give time for the section to load, then try to find and highlight the contact
-                setTimeout(() => {
-                    const contactRow = document.querySelector(`tr[data-contact-id="${contactId}"]`);
-                    if (contactRow) {
-                        contactRow.style.background = '#fef3c7';
-                        contactRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        
-                        // Remove highlight after 3 seconds
-                        setTimeout(() => {
-                            contactRow.style.background = '';
-                        }, 3000);
-                    }
-                }, 500);
-            } else {
-                // Fallback alert
-                alert(`✏️ Para editar: ${contact.name}
-                
-ID: ${contactId}
-Teléfono: ${contact.phone}
-
-💡 Ve a la pestaña "Leads" para editar este contacto o usa el panel de administración.`);
-            }
-        }
-
-        // ===== ENHANCED WHATSAPP FUNCTION =====
-        function openWhatsAppFromPipeline(phone, name) {
-            try {
-                const cleanPhone = phone.replace(/\D/g, '');
-                let finalPhone = cleanPhone;
-                
-                // Add Colombia country code if not present
-                if (!cleanPhone.startsWith('57') && cleanPhone.length === 10) {
-                    finalPhone = '57' + cleanPhone;
-                }
-                
-                const message = `Hola ${name}, te contacto desde Ciudad Bilingüe 🎓
-                
-¿Cómo va todo? Quería seguir con la información sobre nuestros cursos de inglés.
-
-¿Tienes alguna pregunta o te gustaría agendar una reunión? 😊`;
-                
-                const url = `https://wa.me/${finalPhone}?text=${encodeURIComponent(message)}`;
-                window.open(url, '_blank');
-                
-                // Optional: Log the WhatsApp interaction
-                if (window.FirebaseData && window.FirebaseData.logInteraction) {
-                    window.FirebaseData.logInteraction(contactId, 'whatsapp_clicked', {
-                        timestamp: new Date().toISOString(),
-                        platform: 'pipeline'
-                    });
-                }
-                
-            } catch (error) {
-                console.error('Error opening WhatsApp:', error);
-                alert('❌ Error al abrir WhatsApp. Verifica el número de teléfono.');
-            }
-        }
-
-        // ===== PIPELINE STATISTICS =====
-        function getPipelineStats() {
-            const stats = {
-                total: pipelineData.length,
-                byStatus: {},
-                conversionRate: 0,
-                todayContacts: 0
-            };
-
-            PIPELINE_STAGES.forEach(stage => {
-                const count = pipelineData.filter(contact => 
-                    normalizeStatus(contact.status) === stage.id
-                ).length;
-                stats.byStatus[stage.id] = count;
+    // Update the lead status using AdminData
+    const oldStatus = lead.status;
+    const updatedLead = AdminData.updateContact(leadId, { status: stage.status });
+    
+    if (updatedLead) {
+        console.log(`✅ Status updated in AdminData from "${oldStatus}" to "${stage.status}"`);
+        
+        // Save to GitHub if available
+        if (window.GitHubData && window.GitHubData.getToken()) {
+            window.GitHubData.updateContact(leadId, { status: stage.status }).catch(error => {
+                console.log('⚠️ GitHub update failed, but local update succeeded:', error.message);
             });
-
-            // Calculate conversion rate
-            const converted = stats.byStatus.convertido || 0;
-            stats.conversionRate = stats.total > 0 ? ((converted / stats.total) * 100).toFixed(1) : 0;
-
-            // Count today's contacts
-            const today = new Date().toDateString();
-            stats.todayContacts = pipelineData.filter(contact => {
-                const contactDate = new Date(contact.date || contact.createdAt).toDateString();
-                return contactDate === today;
-            }).length;
-
-            return stats;
         }
+        
+        // Refresh pipeline to show updated positions
+        setTimeout(() => {
+            refreshPipeline();
+            // Also update other views
+            if (typeof updateAllViews === 'function') {
+                updateAllViews();
+            }
+        }, 100);
+        
+        // Show notification
+        showNotification(`✅ ${updatedLead.name} → ${stage.name}`, 'success');
+    } else {
+        console.error('❌ Failed to update lead status');
+        refreshPipeline(); // Refresh to restore original position
+        alert('❌ Error al actualizar el estado del lead');
+    }
+}
 
-        // ===== ENHANCED DEBUG FUNCTION =====
-        function showPipelineDebug() {
-            const stats = getPipelineStats();
+// ===== UTILITY FUNCTIONS =====
+function getStageIdFromStatus(status) {
+    const mapping = {
+        'Nuevo': 'nuevo',
+        'Contactado': 'contactado', 
+        'Interesado': 'interesado',
+        'Negociación': 'negociacion',
+        'Convertido': 'convertido',
+        'Perdido': 'perdido'
+    };
+    return mapping[status] || 'nuevo';
+}
+
+function getDaysSinceContact(dateString) {
+    const contactDate = new Date(dateString);
+    const today = new Date();
+    const diffTime = Math.abs(today - contactDate);
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+}
+
+function updatePipelineCounters() {
+    pipelineStages.forEach(stage => {
+        const container = document.getElementById(`cards-${stage.id}`);
+        const counter = document.getElementById(`count-${stage.id}`);
+        if (container && counter) {
+            counter.textContent = container.children.length;
+        }
+    });
+}
+
+function showNotification(message, type = 'info') {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        background: ${type === 'success' ? '#10b981' : '#667eea'};
+        color: white;
+        padding: 0.75rem 1rem;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        z-index: 1000;
+        animation: slideIn 0.3s ease;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    `;
+    
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    
+    // Remove after 3 seconds
+    setTimeout(() => {
+        notification.style.animation = 'slideOut 0.3s ease';
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 300);
+    }, 3000);
+}
+
+// ===== DEBUGGING =====
+function debugPipeline() {
+    console.log('🔍 PIPELINE DEBUG INFO WITH ADMINDATA:');
+    console.log(`   - Usuario: ${currentUser.role} (${currentUser.username})`);
+    
+    if (!window.AdminData) {
+        console.log('❌ AdminData not available');
+        return;
+    }
+    
+    const allData = AdminData.getAllData();
+    console.log(`   - Total leads en AdminData: ${allData.length}`);
+    
+    const filtered = getFilteredData();
+    console.log(`   - Leads filtrados para usuario: ${filtered.length}`);
+    
+    // Show leads by status
+    pipelineStages.forEach(stage => {
+        const leadsInStage = filtered.filter(l => l.status === stage.status);
+        console.log(`   - ${stage.name}: ${leadsInStage.length} leads`);
+        leadsInStage.forEach(lead => {
+            console.log(`     * ${lead.name} (${lead.salesperson})`);
+        });
+    });
+    
+    // Show salespeople data if director
+    if (currentUser.role === 'director') {
+        const teamStats = AdminData.getTeamStats();
+        console.log(`   - Vendedores en AdminData: ${teamStats.salespeople.length}`);
+        teamStats.salespeople.forEach(sp => {
+            console.log(`     * ${sp.displayName}: ${sp.stats.totalContacts} leads totales`);
+        });
+    }
+    
+    // Show AdminData stats
+    const stats = currentUser.role === 'director' 
+        ? AdminData.getTeamStats() 
+        : AdminData.getSalespersonStats(currentUser.username);
+    console.log('📊 AdminData Stats:', stats);
+    
+    // Return debug info for alert
+    return {
+        user: currentUser,
+        totalInAdmin: allData.length,
+        filteredForUser: filtered.length,
+        stageBreakdown: pipelineStages.map(stage => ({
+            stage: stage.name,
+            count: filtered.filter(l => l.status === stage.status).length
+        })),
+        stats: stats
+    };
+}
+
+// Add a manual debug function that can be called from the UI
+function showPipelineDebug() {
+    const debugInfo = debugPipeline();
+    if (debugInfo) {
+        let message = `🔍 PIPELINE DEBUG\n\n`;
+        message += `Usuario: ${debugInfo.user.username} (${debugInfo.user.role})\n`;
+        message += `Total en AdminData: ${debugInfo.totalInAdmin}\n`;
+        message += `Filtrado para usuario: ${debugInfo.filteredForUser}\n\n`;
+        message += `Distribución por etapa:\n`;
+        debugInfo.stageBreakdown.forEach(item => {
+            message += `• ${item.stage}: ${item.count}\n`;
+        });
+        message += `\nEstadísticas:\n`;
+        message += `• Total contactos: ${debugInfo.stats.totalContacts}\n`;
+        message += `• Contactos hoy: ${debugInfo.stats.todayContacts}\n`;
+        message += `• Leads activos: ${debugInfo.stats.activeLeads}\n`;
+        message += `• Conversiones: ${debugInfo.stats.conversions}\n`;
+        
+        alert(message);
+    }
+}
+
+// ===== MOBILE SUPPORT =====
+function setupMobileTouch() {
+    // Add touch support for mobile devices
+    document.querySelectorAll('.pipeline-card').forEach(card => {
+        let isDragging = false;
+        let startY = 0;
+        let startX = 0;
+        
+        card.addEventListener('touchstart', (e) => {
+            isDragging = true;
+            startY = e.touches[0].clientY;
+            startX = e.touches[0].clientX;
+            card.classList.add('dragging');
+        });
+        
+        card.addEventListener('touchmove', (e) => {
+            if (!isDragging) return;
+            e.preventDefault();
             
-            const debugInfo = `🔍 PIPELINE DEBUG INFO:
-
-📊 Estadísticas:
-- Total contactos: ${stats.total}
-- Contactos de hoy: ${stats.todayContacts}
-- Tasa de conversión: ${stats.conversionRate}%
-
-📋 Distribución por estado:
-${PIPELINE_STAGES.map(stage => 
-    `- ${stage.icon} ${stage.name}: ${stats.byStatus[stage.id] || 0} contactos`
-).join('\n')}
-
-👤 Usuario:
-- Nombre: ${currentUserProfile?.name || 'No disponible'}
-- Email: ${currentUserProfile?.email || 'No disponible'}
-- Rol: ${currentUserProfile?.role || 'No disponible'}
-- Es Director: ${isDirector ? 'SÍ' : 'NO'}
-
-🔥 Firebase:
-- FirebaseData disponible: ${window.FirebaseData ? 'SÍ' : 'NO'}
-- Usuario autenticado: ${window.FirebaseData?.currentUser ? 'SÍ' : 'NO'}
-- Contacts loaded: ${window.FirebaseData?.contacts ? Object.keys(window.FirebaseData.contacts).length : 0}
-
-🎯 Pipeline DOM:
-- Columnas renderizadas: ${document.querySelectorAll('.pipeline-column').length}
-- Cards arrastrables: ${document.querySelectorAll('.pipeline-card[draggable="true"]').length}
-- Eventos drag configurados: ${document.querySelectorAll('.pipeline-card[draggable="true"]').length > 0 ? 'SÍ' : 'NO'}
-
-🐛 Problemas potenciales:
-${stats.total === 0 ? '⚠️ No hay contactos cargados\n' : ''}
-${!window.FirebaseData ? '⚠️ Firebase no disponible\n' : ''}
-${document.querySelectorAll('.pipeline-column').length === 0 ? '⚠️ Pipeline no renderizado\n' : ''}`;
-
-            alert(debugInfo);
-        }
-
-        // Make functions globally available
-        window.getSalespersonName = getSalespersonName;
-        window.showContactDetails = showContactDetails;
-        window.editContactInPipeline = editContactInPipeline;
-        window.openWhatsAppFromPipeline = openWhatsAppFromPipeline;
-        window.getPipelineStats = getPipelineStats;
-        window.showPipelineDebug = showPipelineDebug;
-
-        console.log('✅ Pipeline enhancements loaded successfully');
-    </script>
-</body>
-</html>
+            const touch = e.touches[0];
+            const deltaY = touch.clientY - startY;
+            const deltaX = touch.clientX - startX;
+            
+            card.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+        });
+        
+        card.addEventListener('touchend', (e) => {
+            if (!isDragging) return;
+            isDragging = false;
+            
+            card.classList.remove('dragging');
+            card.style.transform = '';
+            
+            // Find column under touch point
+            const touch = e.changedTouches[0];
+            const elementBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+            const column = elementBelow?.closest('.pipeline-column');
+            
+            if (column && column.dataset.stage) {
+                const leadId = card.dataset.leadId;
+                const newStage = column.dataset.stage;
+                updateLeadStatus(leadId, newStage);
+            }
+        });
+    });
+}
