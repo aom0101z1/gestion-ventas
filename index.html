@@ -9,10 +9,10 @@
     <title>🏫 Ciudad Bilingue - CRM</title>
 
 <!-- ========================================= -->
-<!-- PARTE 2: CSS ESTILOS GENERALES -->
+<!-- PARTE 2-15: CSS COMPLETO -->
 <!-- ========================================= -->
     <style>
-        /* ===== RESET Y CONFIGURACIÓN BÁSICA ===== */
+        /* ===== PARTE 2: RESET Y CONFIGURACIÓN BÁSICA ===== */
         * {
             margin: 0;
             padding: 0;
@@ -25,11 +25,8 @@
             color: #333;
             line-height: 1.6;
         }
-
-<!-- ========================================= -->
-<!-- PARTE 3: CSS HEADER Y LAYOUT -->
-<!-- ========================================= -->
-        /* ===== HEADER Y LAYOUT ===== */
+        
+        /* ===== PARTE 3: HEADER Y LAYOUT ===== */
         .header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -44,10 +41,7 @@
             padding: 2rem;
         }
 
-<!-- ========================================= -->
-<!-- PARTE 4: CSS LOGIN SCREEN -->
-<!-- ========================================= -->
-        /* ===== LOGIN STYLES ===== */
+        /* ===== PARTE 4: LOGIN STYLES ===== */
         .login-container {
             max-width: 400px;
             margin: 5rem auto;
@@ -68,10 +62,7 @@
             padding: 2rem; 
         }
 
-<!-- ========================================= -->
-<!-- PARTE 5: CSS FIREBASE STATUS -->
-<!-- ========================================= -->
-        /* ===== FIREBASE STATUS INDICATOR ===== */
+        /* ===== PARTE 5: FIREBASE STATUS INDICATOR ===== */
         .firebase-status {
             position: fixed;
             top: 10px;
@@ -96,10 +87,7 @@
             background: #f59e0b;
         }
 
-<!-- ========================================= -->
-<!-- PARTE 6: CSS FORMULARIOS -->
-<!-- ========================================= -->
-        /* ===== FORM STYLES ===== */
+        /* ===== PARTE 6: FORM STYLES ===== */
         .form-group { 
             margin-bottom: 1.5rem; 
         }
@@ -125,10 +113,7 @@
             border-color: #667eea;
         }
 
-<!-- ========================================= -->
-<!-- PARTE 7: CSS BOTONES -->
-<!-- ========================================= -->
-        /* ===== BUTTON STYLES ===== */
+        /* ===== PARTE 7: BUTTON STYLES ===== */
         .btn {
             padding: 0.75rem 1.5rem;
             border: none;
@@ -155,10 +140,7 @@
         .btn-firebase { background: #ff6b35; color: white; }
         .btn-firebase:hover:not(:disabled) { background: #e55a31; }
 
-<!-- ========================================= -->
-<!-- PARTE 8: CSS USER INFO Y STATS -->
-<!-- ========================================= -->
-        /* ===== USER INFO & STATS ===== */
+        /* ===== PARTE 8: USER INFO & STATS ===== */
         .user-info {
             background: white;
             padding: 1rem;
@@ -191,10 +173,7 @@
             margin-bottom: 0.5rem;
         }
 
-<!-- ========================================= -->
-<!-- PARTE 9: CSS TABS Y NAVEGACIÓN -->
-<!-- ========================================= -->
-        /* ===== TABS ===== */
+        /* ===== PARTE 9: TABS ===== */
         .tabs {
             display: flex;
             background: white;
@@ -226,10 +205,7 @@
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
 
-<!-- ========================================= -->
-<!-- PARTE 10: CSS TABLAS -->
-<!-- ========================================= -->
-        /* ===== TABLE ===== */
+        /* ===== PARTE 10: TABLE ===== */
         .table {
             width: 100%;
             border-collapse: collapse;
@@ -247,10 +223,7 @@
             font-weight: 600;
         }
 
-<!-- ========================================= -->
-<!-- PARTE 11: CSS STATUS BADGES -->
-<!-- ========================================= -->
-        /* ===== STATUS BADGES ===== */
+        /* ===== PARTE 11: STATUS BADGES ===== */
         .status-badge {
             padding: 0.25rem 0.75rem;
             border-radius: 20px;
@@ -265,10 +238,7 @@
         .status-negociacion { background: #fed7aa; color: #c2410c; }
         .status-perdido { background: #fee2e2; color: #dc2626; }
 
-<!-- ========================================= -->
-<!-- PARTE 12: CSS CARDS Y CONVENIOS -->
-<!-- ========================================= -->
-        /* ===== USER CARDS & CONVENIOS ===== */
+        /* ===== PARTE 12: USER CARDS & CONVENIOS ===== */
         .user-card {
             background: #f9fafb;
             padding: 1rem;
@@ -291,10 +261,7 @@
             border-left: 3px solid #10b981;
         }
 
-<!-- ========================================= -->
-<!-- PARTE 13: CSS PIPELINE -->
-<!-- ========================================= -->
-        /* ===== PIPELINE STYLES ===== */
+        /* ===== PARTE 13: PIPELINE STYLES ===== */
         .pipeline-container {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -350,10 +317,7 @@
             transform: rotate(5deg);
         }
 
-<!-- ========================================= -->
-<!-- PARTE 14: CSS LOADING Y UTILIDADES -->
-<!-- ========================================= -->
-        /* ===== LOADING SPINNER ===== */
+        /* ===== PARTE 14: LOADING SPINNER Y UTILIDADES ===== */
         .loading-spinner {
             display: inline-block;
             width: 20px;
@@ -369,7 +333,6 @@
             100% { transform: rotate(360deg); }
         }
         
-        /* ===== UTILITIES ===== */
         .hidden { display: none !important; }
         .error-message {
             background: #fee2e2;
@@ -398,10 +361,7 @@
             border-left: 4px solid #3b82f6;
         }
 
-<!-- ========================================= -->
-<!-- PARTE 15: CSS RESPONSIVE Y ANIMACIONES -->
-<!-- ========================================= -->
-        /* ===== RESPONSIVE ===== */
+        /* ===== PARTE 15: RESPONSIVE Y ANIMACIONES ===== */
         @media (max-width: 768px) {
             .container { padding: 1rem; }
             .stats-grid { grid-template-columns: 1fr; }
@@ -410,7 +370,6 @@
             .tabs { flex-direction: column; }
         }
         
-        /* ===== FIREBASE CONNECTION ANIMATIONS ===== */
         @keyframes pulse {
             0% { opacity: 1; }
             50% { opacity: 0.5; }
