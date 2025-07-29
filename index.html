@@ -1,18 +1,10 @@
-<!-- ========================================= -->
-<!-- PARTE 1: DOCTYPE Y HEAD BÁSICO -->
-<!-- ========================================= -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🏫 Ciudad Bilingue - CRM</title>
-
-<!-- ========================================= -->
-<!-- PARTE 2-15: CSS COMPLETO -->
-<!-- ========================================= -->
     <style>
-        /* ===== PARTE 2: RESET Y CONFIGURACIÓN BÁSICA ===== */
         * {
             margin: 0;
             padding: 0;
@@ -26,7 +18,6 @@
             line-height: 1.6;
         }
         
-        /* ===== PARTE 3: HEADER Y LAYOUT ===== */
         .header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -40,8 +31,8 @@
             margin: 0 auto;
             padding: 2rem;
         }
-
-        /* ===== PARTE 4: LOGIN STYLES ===== */
+        
+        /* Login Styles */
         .login-container {
             max-width: 400px;
             margin: 5rem auto;
@@ -61,8 +52,8 @@
         .login-form { 
             padding: 2rem; 
         }
-
-        /* ===== PARTE 5: FIREBASE STATUS INDICATOR ===== */
+        
+        /* Firebase Status Indicator */
         .firebase-status {
             position: fixed;
             top: 10px;
@@ -86,8 +77,8 @@
         .firebase-status.connecting {
             background: #f59e0b;
         }
-
-        /* ===== PARTE 6: FORM STYLES ===== */
+        
+        /* Form Styles */
         .form-group { 
             margin-bottom: 1.5rem; 
         }
@@ -112,8 +103,8 @@
             outline: none;
             border-color: #667eea;
         }
-
-        /* ===== PARTE 7: BUTTON STYLES ===== */
+        
+        /* Button Styles */
         .btn {
             padding: 0.75rem 1.5rem;
             border: none;
@@ -139,8 +130,8 @@
         .btn-secondary:hover:not(:disabled) { background: #4b5563; }
         .btn-firebase { background: #ff6b35; color: white; }
         .btn-firebase:hover:not(:disabled) { background: #e55a31; }
-
-        /* ===== PARTE 8: USER INFO & STATS ===== */
+        
+        /* User Info */
         .user-info {
             background: white;
             padding: 1rem;
@@ -152,6 +143,7 @@
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
         
+        /* Stats */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -172,8 +164,8 @@
             font-weight: bold;
             margin-bottom: 0.5rem;
         }
-
-        /* ===== PARTE 9: TABS ===== */
+        
+        /* Tabs */
         .tabs {
             display: flex;
             background: white;
@@ -204,8 +196,8 @@
             padding: 2rem;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
-
-        /* ===== PARTE 10: TABLE ===== */
+        
+        /* Table */
         .table {
             width: 100%;
             border-collapse: collapse;
@@ -222,8 +214,8 @@
             background: #f9fafb;
             font-weight: 600;
         }
-
-        /* ===== PARTE 11: STATUS BADGES ===== */
+        
+        /* Status badges */
         .status-badge {
             padding: 0.25rem 0.75rem;
             border-radius: 20px;
@@ -237,8 +229,8 @@
         .status-convertido { background: #dcfce7; color: #166534; }
         .status-negociacion { background: #fed7aa; color: #c2410c; }
         .status-perdido { background: #fee2e2; color: #dc2626; }
-
-        /* ===== PARTE 12: USER CARDS & CONVENIOS ===== */
+        
+        /* User Card Styles */
         .user-card {
             background: #f9fafb;
             padding: 1rem;
@@ -260,8 +252,8 @@
             align-items: center;
             border-left: 3px solid #10b981;
         }
-
-        /* ===== PARTE 13: PIPELINE STYLES ===== */
+        
+        /* Pipeline Styles */
         .pipeline-container {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -316,8 +308,8 @@
             opacity: 0.5;
             transform: rotate(5deg);
         }
-
-        /* ===== PARTE 14: LOADING SPINNER Y UTILIDADES ===== */
+        
+        /* Loading Spinner */
         .loading-spinner {
             display: inline-block;
             width: 20px;
@@ -333,6 +325,7 @@
             100% { transform: rotate(360deg); }
         }
         
+        /* Utilities */
         .hidden { display: none !important; }
         .error-message {
             background: #fee2e2;
@@ -360,8 +353,8 @@
             margin-bottom: 1rem;
             border-left: 4px solid #3b82f6;
         }
-
-        /* ===== PARTE 15: RESPONSIVE Y ANIMACIONES ===== */
+        
+        /* Responsive */
         @media (max-width: 768px) {
             .container { padding: 1rem; }
             .stats-grid { grid-template-columns: 1fr; }
@@ -370,6 +363,7 @@
             .tabs { flex-direction: column; }
         }
         
+        /* Firebase Connection Animations */
         @keyframes pulse {
             0% { opacity: 1; }
             50% { opacity: 0.5; }
@@ -381,10 +375,6 @@
         }
     </style>
 </head>
-
-<!-- ========================================= -->
-<!-- PARTE 16: BODY Y FIREBASE STATUS -->
-<!-- ========================================= -->
 <body>
     <!-- Firebase Status Indicator -->
     <div id="firebaseStatus" class="firebase-status connecting">
@@ -392,9 +382,6 @@
         Conectando a Firebase...
     </div>
 
-<!-- ========================================= -->
-<!-- PARTE 17: PANTALLA DE LOGIN -->
-<!-- ========================================= -->
     <!-- Login Screen -->
     <div id="loginScreen">
         <div class="login-container">
@@ -433,9 +420,6 @@
         </div>
     </div>
 
-<!-- ========================================= -->
-<!-- PARTE 18: HEADER APLICACIÓN PRINCIPAL -->
-<!-- ========================================= -->
     <!-- Main Application -->
     <div id="mainApp" class="hidden">
         <div class="header">
@@ -465,9 +449,6 @@
                 </div>
             </div>
 
-<!-- ========================================= -->
-<!-- PARTE 19: ESTADÍSTICAS -->
-<!-- ========================================= -->
             <!-- Stats -->
             <div class="stats-grid">
                 <div class="stat-card">
@@ -492,9 +473,6 @@
                 </div>
             </div>
 
-<!-- ========================================= -->
-<!-- PARTE 20: NAVEGACIÓN DE PESTAÑAS -->
-<!-- ========================================= -->
             <!-- Tabs -->
             <div class="tabs">
                 <button class="tab active" onclick="showTab('contacts')" id="contactsTab">📞 Contactos</button>
@@ -505,9 +483,6 @@
                 <button class="tab" onclick="showTab('config')" id="configTab" style="display: none;">⚙️ Config</button>
             </div>
 
-<!-- ========================================= -->
-<!-- PARTE 21: TAB CONTACTOS -->
-<!-- ========================================= -->
             <!-- Tab: Contacts -->
             <div id="contacts" class="tab-content">
                 <h2 id="contactsTitle">📞 Registrar Contactos</h2>
@@ -586,9 +561,6 @@
                 </div>
             </div>
 
-<!-- ========================================= -->
-<!-- PARTE 22: TAB LEADS -->
-<!-- ========================================= -->
             <!-- Tab: Leads -->
             <div id="leads" class="tab-content hidden">
                 <h2 id="leadsTitle">👥 Gestión de Leads</h2>
@@ -635,9 +607,6 @@
                 </table>
             </div>
 
-<!-- ========================================= -->
-<!-- PARTE 23: TAB PIPELINE -->
-<!-- ========================================= -->
             <!-- Tab: Pipeline -->
             <div id="pipeline" class="tab-content hidden">
                 <h2>🎯 Pipeline de Ventas</h2>
@@ -653,9 +622,6 @@
                 </div>
             </div>
 
-<!-- ========================================= -->
-<!-- PARTE 24: TAB REPORTES -->
-<!-- ========================================= -->
             <!-- Tab: Reports -->
             <div id="reports" class="tab-content hidden">
                 <h2 id="reportsTitle">📊 Reportes</h2>
@@ -695,9 +661,6 @@
                 </div>
             </div>
 
-<!-- ========================================= -->
-<!-- PARTE 25: TAB MONITOREO (DIRECTOR) -->
-<!-- ========================================= -->
             <!-- Tab: Monitoring (Director Only) -->
             <div id="monitoring" class="tab-content hidden">
                 <h2>👀 Monitoreo del Equipo</h2>
@@ -720,9 +683,6 @@
                 </div>
             </div>
 
-<!-- ========================================= -->
-<!-- PARTE 26: TAB CONFIGURACIÓN (DIRECTOR) -->
-<!-- ========================================= -->
             <!-- Tab: Config (Director Only) -->
             <div id="config" class="tab-content hidden">
                 <h2>⚙️ Configuración del Sistema</h2>
@@ -802,9 +762,6 @@
         </div>
     </div>
 
-<!-- ========================================= -->
-<!-- PARTE 27: FIREBASE SDK PRINCIPAL -->
-<!-- ========================================= -->
     <!-- Firebase SDK -->
     <script type="module">
         // Import Firebase modules
@@ -840,7 +797,6 @@
 
         console.log('✅ Firebase initialized successfully');
 
-        // PARTE 28: FIREBASE DATA MANAGER
         // Initialize Firebase Data Manager
         class SimpleFirebaseManager {
             constructor() {
@@ -973,9 +929,6 @@
         window.dispatchEvent(new Event('firebaseReady'));
     </script>
 
-<!-- ========================================= -->
-<!-- PARTE 29: AUTO PROFILE CREATION -->
-<!-- ========================================= -->
     <!-- Auto Profile Creation Script -->
     <script>
         // Auto-ensure user profile when Firebase is ready and user authenticates
@@ -1062,9 +1015,6 @@
         console.log('🔧 Auto-profile creation script loaded');
     </script>
 
-<!-- ========================================= -->
-<!-- PARTE 30: SCRIPTS EXTERNOS -->
-<!-- ========================================= -->
     <!-- Include all the JavaScript files -->
     <script src="AdminData.js"></script>
     <script src="core.js"></script>
