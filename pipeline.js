@@ -1,392 +1,195 @@
-// pipeline.js - FIREBASE INTEGRATED VERSION WITH DRAG & DROP
-// ===== PIPELINE CONFIGURATION =====
-const PIPELINE_STAGES = [
-    { 
-        id: 'nuevo', 
-        name: 'Nuevo', 
-        color: '#fef3c7', 
-        textColor: '#92400e',
-        icon: '📋'
-    },
-    { 
-        id: 'contactado', 
-        name: 'Contactado', 
-        color: '#dbeafe', 
-        textColor: '#1e40af',
-        icon: '📞'
-    },
-    { 
-        id: 'interesado', 
-        name: 'Interesado', 
-        color: '#d1fae5', 
-        textColor: '#065f46',
-        icon: '👍'
-    },
-    { 
-        id: 'negociacion', 
-        name: 'Negociación', 
-        color: '#fed7aa', 
-        textColor: '#c2410c',
-        icon: '🤝'
-    },
-    { 
-        id: 'convertido', 
-        name: 'Convertido', 
-        color: '#dcfce7', 
-        textColor: '#166534',
-        icon: '✅'
-    },
-    { 
-        id: 'perdido', 
-        name: 'Perdido', 
-        color: '#fee2e2', 
-        textColor: '#dc2626',
-        icon: '❌'
-    }
-];
-
-// ===== PIPELINE STATE =====
-let pipelineData = [];
-let currentUserProfile = null;
-let isDirector = false;
-
-// ===== PIPELINE INITIALIZATION =====
-async function initializePipeline() {
-    console.log('🎯 Initializing Firebase Pipeline...');
-    
-    if (!window.FirebaseData || !window.FirebaseData.currentUser) {
-        console.log('❌ Firebase not available for pipeline');
-        return;
-    }
-    
-    try {
-        // Get user profile
-        currentUserProfile = await window.FirebaseData.loadUserProfile();
-        isDirector = currentUserProfile?.role === 'director';
-        
-        console.log('👤 Pipeline user:', currentUserProfile?.name, '- Role:', currentUserProfile?.role);
-        
-        // Load and render pipeline
-        await loadPipelineData();
-        renderPipeline();
-        
-        console.log('✅ Pipeline initialized successfully');
-    } catch (error) {
-        console.error('❌ Error initializing pipeline:', error);
-        showPipelineError(error.message);
-    }
-}
-
-// ===== DATA LOADING =====
-async function loadPipelineData() {
-    try {
-        console.log('📊 Loading pipeline data from Firebase...');
-        
-        if (!window.FirebaseData) {
-            throw new Error('Firebase not available');
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pipeline CSS + JS Fixes</title>
+    <style>
+        /* ===== PIPELINE STYLES ===== */
+        #pipelineContainer {
+            display: flex;
+            gap: 1rem;
+            padding: 1rem;
+            overflow-x: auto;
+            min-height: 70vh;
+            background: #f8fafc;
         }
-        
-        // Get filtered contacts based on user role
-        const allContacts = await window.FirebaseData.getFilteredContacts();
-        
-        // Filter out contacts without proper status
-        pipelineData = allContacts.map(contact => ({
-            ...contact,
-            status: normalizeStatus(contact.status || 'Nuevo')
-        }));
-        
-        console.log(`✅ Loaded ${pipelineData.length} contacts for pipeline`);
-        
-    } catch (error) {
-        console.error('❌ Error loading pipeline data:', error);
-        pipelineData = [];
-        throw error;
-    }
-}
 
-// ===== STATUS NORMALIZATION =====
-function normalizeStatus(status) {
-    const statusMap = {
-        'nuevo': 'nuevo',
-        'contactado': 'contactado', 
-        'interesado': 'interesado',
-        'negociacion': 'negociacion',
-        'negociación': 'negociacion',
-        'convertido': 'convertido',
-        'perdido': 'perdido'
-    };
-    
-    return statusMap[status.toLowerCase()] || 'nuevo';
-}
-
-// ===== PIPELINE RENDERING =====
-function renderPipeline() {
-    const container = document.getElementById('pipelineContainer');
-    if (!container) {
-        console.log('❌ Pipeline container not found');
-        return;
-    }
-    
-    try {
-        console.log('🎨 Rendering pipeline with', pipelineData.length, 'contacts');
-        
-        // Create pipeline columns
-        const pipelineHTML = PIPELINE_STAGES.map(stage => {
-            const stageContacts = pipelineData.filter(contact => 
-                normalizeStatus(contact.status) === stage.id
-            );
-            
-            return `
-                <div class="pipeline-column" data-stage="${stage.id}">
-                    <div class="pipeline-header" style="background: ${stage.color}; color: ${stage.textColor};">
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <span>${stage.icon}</span>
-                            <span style="font-weight: 600;">${stage.name}</span>
-                        </div>
-                        <span style="background: rgba(0,0,0,0.1); padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.8rem;">
-                            ${stageContacts.length}
-                        </span>
-                    </div>
-                    <div class="pipeline-cards" id="cards-${stage.id}">
-                        ${stageContacts.map(contact => renderPipelineCard(contact)).join('')}
-                    </div>
-                </div>
-            `;
-        }).join('');
-        
-        container.innerHTML = pipelineHTML;
-        
-        // Setup drag and drop
-        setupDragAndDrop();
-        
-        console.log('✅ Pipeline rendered successfully');
-        
-    } catch (error) {
-        console.error('❌ Error rendering pipeline:', error);
-        showPipelineError('Error al renderizar pipeline');
-    }
-}
-
-// ===== PIPELINE CARD RENDERING =====
-function renderPipelineCard(contact) {
-    const timeAgo = getTimeAgo(contact.date || contact.createdAt);
-    const salespersonName = isDirector ? getSalespersonName(contact.salespersonId) : '';
-    
-    return `
-        <div class="pipeline-card" 
-             draggable="true" 
-             data-contact-id="${contact.id}"
-             data-current-status="${normalizeStatus(contact.status)}">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
-                <div style="font-weight: 600; color: #1f2937; flex: 1;">${contact.name}</div>
-                <button onclick="showContactDetails('${contact.id}')" 
-                        style="background: none; border: none; color: #6b7280; cursor: pointer; padding: 0.2rem;">
-                    ⋯
-                </button>
-            </div>
-            
-            <div style="font-size: 0.9rem; color: #6b7280; margin-bottom: 0.5rem;">
-                📞 ${contact.phone}
-            </div>
-            
-            <div style="font-size: 0.8rem; color: #6b7280; margin-bottom: 0.5rem;">
-                📍 ${contact.source.length > 25 ? contact.source.substring(0, 25) + '...' : contact.source}
-            </div>
-            
-            ${salespersonName ? `
-                <div style="font-size: 0.8rem; color: #667eea; margin-bottom: 0.5rem;">
-                    👤 ${salespersonName}
-                </div>
-            ` : ''}
-            
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem;">
-                <span style="font-size: 0.7rem; color: #9ca3af;">${timeAgo}</span>
-                <div style="display: flex; gap: 0.25rem;">
-                    <button onclick="editContactInPipeline('${contact.id}')" 
-                            style="background: #f3f4f6; border: none; border-radius: 4px; padding: 0.2rem 0.4rem; font-size: 0.7rem; cursor: pointer;"
-                            title="Editar">
-                        ✏️
-                    </button>
-                    <button onclick="openWhatsAppFromPipeline('${contact.phone}', '${contact.name}')" 
-                            style="background: #dcfce7; border: none; border-radius: 4px; padding: 0.2rem 0.4rem; font-size: 0.7rem; cursor: pointer;"
-                            title="WhatsApp">
-                        💬
-                    </button>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-// ===== DRAG AND DROP SETUP =====
-function setupDragAndDrop() {
-    console.log('🔄 Setting up drag and drop...');
-    
-    // Setup draggable cards
-    const cards = document.querySelectorAll('.pipeline-card[draggable="true"]');
-    cards.forEach(card => {
-        card.addEventListener('dragstart', handleDragStart);
-        card.addEventListener('dragend', handleDragEnd);
-    });
-    
-    // Setup drop zones
-    const columns = document.querySelectorAll('.pipeline-column');
-    columns.forEach(column => {
-        column.addEventListener('dragover', handleDragOver);
-        column.addEventListener('drop', handleDrop);
-        column.addEventListener('dragenter', handleDragEnter);
-        column.addEventListener('dragleave', handleDragLeave);
-    });
-    
-    console.log('✅ Drag and drop setup complete');
-}
-
-// ===== DRAG AND DROP HANDLERS =====
-let draggedElement = null;
-
-function handleDragStart(e) {
-    draggedElement = e.target;
-    e.target.classList.add('dragging');
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/html', e.target.outerHTML);
-}
-
-function handleDragEnd(e) {
-    e.target.classList.remove('dragging');
-    draggedElement = null;
-}
-
-function handleDragOver(e) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-}
-
-function handleDragEnter(e) {
-    e.preventDefault();
-    if (e.target.classList.contains('pipeline-column')) {
-        e.target.classList.add('drag-over');
-    }
-}
-
-function handleDragLeave(e) {
-    if (e.target.classList.contains('pipeline-column')) {
-        e.target.classList.remove('drag-over');
-    }
-}
-
-async function handleDrop(e) {
-    e.preventDefault();
-    
-    const column = e.target.closest('.pipeline-column');
-    if (!column || !draggedElement) return;
-    
-    column.classList.remove('drag-over');
-    
-    const newStage = column.dataset.stage;
-    const contactId = draggedElement.dataset.contactId;
-    const currentStatus = draggedElement.dataset.currentStatus;
-    
-    // Don't update if dropped in same column
-    if (newStage === currentStatus) return;
-    
-    try {
-        console.log(`🔄 Moving contact ${contactId} from ${currentStatus} to ${newStage}`);
-        
-        // Update in Firebase
-        await updateContactStatus(contactId, newStage);
-        
-        // Update local data
-        const contact = pipelineData.find(c => c.id === contactId);
-        if (contact) {
-            contact.status = capitalizeStatus(newStage);
+        .pipeline-column {
+            min-width: 280px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+            flex-shrink: 0;
         }
-        
-        // Re-render pipeline
-        renderPipeline();
-        
-        // Show success notification
-        showStatusUpdateNotification(newStage);
-        
-        console.log('✅ Contact status updated successfully');
-        
-    } catch (error) {
-        console.error('❌ Error updating contact status:', error);
-        alert(`❌ Error al actualizar estado: ${error.message}`);
-        
-        // Revert on error
-        renderPipeline();
-    }
-}
 
-// ===== STATUS UPDATES =====
-async function updateContactStatus(contactId, newStatus) {
-    if (!window.FirebaseData) {
-        throw new Error('Firebase not available');
-    }
-    
-    const statusMap = {
-        'nuevo': 'Nuevo',
-        'contactado': 'Contactado',
-        'interesado': 'Interesado', 
-        'negociacion': 'Negociación',
-        'convertido': 'Convertido',
-        'perdido': 'Perdido'
-    };
-    
-    const updates = {
-        status: statusMap[newStatus] || 'Nuevo',
-        updatedAt: new Date().toISOString(),
-        lastStatusChange: new Date().toISOString()
-    };
-    
-    await window.FirebaseData.updateContact(contactId, updates);
-}
-
-function capitalizeStatus(status) {
-    const statusMap = {
-        'nuevo': 'Nuevo',
-        'contactado': 'Contactado',
-        'interesado': 'Interesado',
-        'negociacion': 'Negociación', 
-        'convertido': 'Convertido',
-        'perdido': 'Perdido'
-    };
-    
-    return statusMap[status] || 'Nuevo';
-}
-
-// ===== UTILITY FUNCTIONS =====
-function getTimeAgo(dateString) {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInHours = Math.floor((now - date) / (1000 * 60 * 60));
-    
-    if (diffInHours < 1) return 'Hace minutos';
-    if (diffInHours < 24) return `Hace ${diffInHours}h`;
-    if (diffInHours < 48) return 'Ayer';
-    
-    const diffInDays = Math.floor(diffInHours / 24);
-    return `Hace ${diffInDays} días`;
-}
-
-function getSalespersonName(salespersonId) {
-    // This would need to be implemented based on your user management
-    // For now, return a placeholder
-    return 'Vendedor';
-}
-
-// ===== PIPELINE ACTIONS =====
-async function showContactDetails(contactId) {
-    try {
-        const contact = pipelineData.find(c => c.id === contactId);
-        if (!contact) {
-            alert('❌ Contacto no encontrado');
-            return;
+        .pipeline-column.drag-over {
+            transform: scale(1.02);
+            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.3);
+            border: 2px dashed #3b82f6;
         }
-        
-        const salespersonName = isDirector ? getSalespersonName(contact.salespersonId) : 'Tu contacto';
-        
-        alert(`📋 DETALLES DEL CONTACTO
+
+        .pipeline-header {
+            padding: 1rem;
+            border-radius: 12px 12px 0 0;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .pipeline-cards {
+            padding: 0.5rem;
+            min-height: 400px;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+
+        .pipeline-card {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            cursor: move;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .pipeline-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            border-color: #3b82f6;
+        }
+
+        .pipeline-card.dragging {
+            opacity: 0.5;
+            transform: rotate(5deg);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .pipeline-card:last-child {
+            margin-bottom: 0;
+        }
+
+        /* ===== LOADING SPINNER ===== */
+        .loading-spinner {
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* ===== RESPONSIVE DESIGN ===== */
+        @media (max-width: 768px) {
+            #pipelineContainer {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+
+            .pipeline-column {
+                min-width: 100%;
+                max-height: 300px;
+            }
+
+            .pipeline-cards {
+                max-height: 200px;
+            }
+        }
+
+        /* ===== BUTTONS IN CARDS ===== */
+        .pipeline-card button {
+            transition: all 0.2s ease;
+        }
+
+        .pipeline-card button:hover {
+            transform: scale(1.1);
+        }
+
+        /* ===== STATUS SPECIFIC STYLING ===== */
+        .pipeline-column[data-stage="nuevo"] .pipeline-card {
+            border-left: 4px solid #fbbf24;
+        }
+
+        .pipeline-column[data-stage="contactado"] .pipeline-card {
+            border-left: 4px solid #3b82f6;
+        }
+
+        .pipeline-column[data-stage="interesado"] .pipeline-card {
+            border-left: 4px solid #10b981;
+        }
+
+        .pipeline-column[data-stage="negociacion"] .pipeline-card {
+            border-left: 4px solid #f97316;
+        }
+
+        .pipeline-column[data-stage="convertido"] .pipeline-card {
+            border-left: 4px solid #22c55e;
+        }
+
+        .pipeline-column[data-stage="perdido"] .pipeline-card {
+            border-left: 4px solid #ef4444;
+        }
+    </style>
+</head>
+<body>
+    <div id="pipelineContainer">
+        <!-- Pipeline will be rendered here -->
+    </div>
+
+    <script>
+        // ===== ENHANCED getSalespersonName FUNCTION =====
+        function getSalespersonName(salespersonId) {
+            try {
+                // Try to get from Firebase user data
+                if (window.FirebaseData && window.FirebaseData.usersData) {
+                    const user = window.FirebaseData.usersData[salespersonId];
+                    if (user && user.profile && user.profile.name) {
+                        return user.profile.name;
+                    }
+                }
+                
+                // Fallback to localStorage cached data
+                const cachedUsers = localStorage.getItem('cachedUsers');
+                if (cachedUsers) {
+                    const users = JSON.parse(cachedUsers);
+                    const user = users[salespersonId];
+                    if (user && user.name) {
+                        return user.name;
+                    }
+                }
+                
+                // Default fallback
+                return 'Vendedor';
+                
+            } catch (error) {
+                console.log('Error getting salesperson name:', error);
+                return 'Vendedor';
+            }
+        }
+
+        // ===== ENHANCED CONTACT DETAILS FUNCTION =====
+        async function showContactDetails(contactId) {
+            try {
+                const contact = pipelineData.find(c => c.id === contactId);
+                if (!contact) {
+                    alert('❌ Contacto no encontrado');
+                    return;
+                }
+                
+                const salespersonName = isDirector ? getSalespersonName(contact.salespersonId) : 'Tu contacto';
+                
+                // Create a nice modal-style alert
+                const details = `📋 DETALLES DEL CONTACTO
 
 👤 Nombre: ${contact.name}
 📞 Teléfono: ${contact.phone}
@@ -395,154 +198,172 @@ async function showContactDetails(contactId) {
 🏘️ Ubicación: ${contact.location || 'No especificada'}
 📝 Estado: ${contact.status}
 ${isDirector ? `👨‍💼 Vendedor: ${salespersonName}` : ''}
-📅 Fecha: ${new Date(contact.date || contact.createdAt).toLocaleDateString()}
-⏰ Última actualización: ${contact.updatedAt ? new Date(contact.updatedAt).toLocaleString() : 'N/A'}
+📅 Fecha: ${new Date(contact.date || contact.createdAt).toLocaleDateString('es-ES')}
+⏰ Última actualización: ${contact.updatedAt ? new Date(contact.updatedAt).toLocaleString('es-ES') : 'N/A'}
 
 💬 Notas:
 ${contact.notes || 'Sin notas'}
 
-💡 Tip: Arrastra la tarjeta a otra columna para cambiar el estado`);
-        
-    } catch (error) {
-        console.error('❌ Error showing contact details:', error);
-        alert(`❌ Error al mostrar detalles: ${error.message}`);
-    }
-}
+💡 Tip: Arrastra la tarjeta a otra columna para cambiar el estado
+📝 Tip: Haz clic en "✏️" para editar o "💬" para WhatsApp`;
 
-function editContactInPipeline(contactId) {
-    alert(`✏️ Funcionalidad de edición
-    
-Contacto ID: ${contactId}
-
-Para editar este contacto:
-1. Ve a la pestaña "Leads" 
-2. Busca el contacto en la tabla
-3. Usa el botón "Ver" para más opciones
-
-O implementa la función de edición según tus necesidades.`);
-}
-
-function openWhatsAppFromPipeline(phone, name) {
-    const cleanPhone = phone.replace(/\D/g, '');
-    const message = `Hola ${name}, te contacto desde Ciudad Bilingüe. ¿Cómo va todo?`;
-    const url = `https://wa.me/57${cleanPhone}?text=${encodeURIComponent(message)}`;
-    window.open(url, '_blank');
-}
-
-// ===== NOTIFICATIONS =====
-function showStatusUpdateNotification(newStatus) {
-    const statusNames = {
-        'nuevo': 'Nuevo',
-        'contactado': 'Contactado', 
-        'interesado': 'Interesado',
-        'negociacion': 'Negociación',
-        'convertido': 'Convertido',
-        'perdido': 'Perdido'
-    };
-    
-    // Create notification element
-    const notification = document.createElement('div');
-    notification.style.cssText = `
-        position: fixed;
-        top: 80px;
-        right: 20px;
-        background: #10b981;
-        color: white;
-        padding: 1rem 1.5rem;
-        border-radius: 8px;
-        font-size: 0.9rem;
-        font-weight: 500;
-        z-index: 1000;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    `;
-    notification.innerHTML = `✅ Estado actualizado: ${statusNames[newStatus]}`;
-    document.body.appendChild(notification);
-    
-    // Remove after 3 seconds
-    setTimeout(() => {
-        if (notification.parentNode) {
-            notification.parentNode.removeChild(notification);
+                alert(details);
+                
+            } catch (error) {
+                console.error('❌ Error showing contact details:', error);
+                alert(`❌ Error al mostrar detalles: ${error.message}`);
+            }
         }
-    }, 3000);
-}
 
-// ===== ERROR HANDLING =====
-function showPipelineError(message) {
-    const container = document.getElementById('pipelineContainer');
-    if (container) {
-        container.innerHTML = `
-            <div style="text-align: center; padding: 3rem; color: #ef4444;">
-                <div style="font-size: 3rem; margin-bottom: 1rem;">⚠️</div>
-                <h3>Error en Pipeline</h3>
-                <p>${message}</p>
-                <button onclick="refreshPipeline()" class="btn btn-primary" style="margin-top: 1rem;">
-                    🔄 Reintentar
-                </button>
-            </div>
-        `;
-    }
-}
+        // ===== ENHANCED EDIT FUNCTION =====
+        function editContactInPipeline(contactId) {
+            const contact = pipelineData.find(c => c.id === contactId);
+            if (!contact) {
+                alert('❌ Contacto no encontrado');
+                return;
+            }
 
-// ===== PUBLIC FUNCTIONS =====
-async function refreshPipeline() {
-    console.log('🔄 Refreshing pipeline...');
-    
-    const container = document.getElementById('pipelineContainer');
-    if (container) {
-        container.innerHTML = '<div style="text-align: center; padding: 2rem;"><div class="loading-spinner"></div><br>Actualizando pipeline...</div>';
-    }
-    
-    try {
-        await loadPipelineData();
-        renderPipeline();
-        console.log('✅ Pipeline refreshed successfully');
-    } catch (error) {
-        console.error('❌ Error refreshing pipeline:', error);
-        showPipelineError(error.message);
-    }
-}
+            // Try to switch to leads tab and highlight the contact
+            if (typeof showSection === 'function') {
+                showSection('leads');
+                
+                // Give time for the section to load, then try to find and highlight the contact
+                setTimeout(() => {
+                    const contactRow = document.querySelector(`tr[data-contact-id="${contactId}"]`);
+                    if (contactRow) {
+                        contactRow.style.background = '#fef3c7';
+                        contactRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        
+                        // Remove highlight after 3 seconds
+                        setTimeout(() => {
+                            contactRow.style.background = '';
+                        }, 3000);
+                    }
+                }, 500);
+            } else {
+                // Fallback alert
+                alert(`✏️ Para editar: ${contact.name}
+                
+ID: ${contactId}
+Teléfono: ${contact.phone}
 
-function showPipelineDebug() {
-    const debugInfo = `🔍 PIPELINE DEBUG INFO:
+💡 Ve a la pestaña "Leads" para editar este contacto o usa el panel de administración.`);
+            }
+        }
 
-📊 Datos:
-- Total contactos: ${pipelineData.length}
-- Usuario: ${currentUserProfile?.name || 'No disponible'}
-- Rol: ${currentUserProfile?.role || 'No disponible'}
-- Es Director: ${isDirector}
+        // ===== ENHANCED WHATSAPP FUNCTION =====
+        function openWhatsAppFromPipeline(phone, name) {
+            try {
+                const cleanPhone = phone.replace(/\D/g, '');
+                let finalPhone = cleanPhone;
+                
+                // Add Colombia country code if not present
+                if (!cleanPhone.startsWith('57') && cleanPhone.length === 10) {
+                    finalPhone = '57' + cleanPhone;
+                }
+                
+                const message = `Hola ${name}, te contacto desde Ciudad Bilingüe 🎓
+                
+¿Cómo va todo? Quería seguir con la información sobre nuestros cursos de inglés.
+
+¿Tienes alguna pregunta o te gustaría agendar una reunión? 😊`;
+                
+                const url = `https://wa.me/${finalPhone}?text=${encodeURIComponent(message)}`;
+                window.open(url, '_blank');
+                
+                // Optional: Log the WhatsApp interaction
+                if (window.FirebaseData && window.FirebaseData.logInteraction) {
+                    window.FirebaseData.logInteraction(contactId, 'whatsapp_clicked', {
+                        timestamp: new Date().toISOString(),
+                        platform: 'pipeline'
+                    });
+                }
+                
+            } catch (error) {
+                console.error('Error opening WhatsApp:', error);
+                alert('❌ Error al abrir WhatsApp. Verifica el número de teléfono.');
+            }
+        }
+
+        // ===== PIPELINE STATISTICS =====
+        function getPipelineStats() {
+            const stats = {
+                total: pipelineData.length,
+                byStatus: {},
+                conversionRate: 0,
+                todayContacts: 0
+            };
+
+            PIPELINE_STAGES.forEach(stage => {
+                const count = pipelineData.filter(contact => 
+                    normalizeStatus(contact.status) === stage.id
+                ).length;
+                stats.byStatus[stage.id] = count;
+            });
+
+            // Calculate conversion rate
+            const converted = stats.byStatus.convertido || 0;
+            stats.conversionRate = stats.total > 0 ? ((converted / stats.total) * 100).toFixed(1) : 0;
+
+            // Count today's contacts
+            const today = new Date().toDateString();
+            stats.todayContacts = pipelineData.filter(contact => {
+                const contactDate = new Date(contact.date || contact.createdAt).toDateString();
+                return contactDate === today;
+            }).length;
+
+            return stats;
+        }
+
+        // ===== ENHANCED DEBUG FUNCTION =====
+        function showPipelineDebug() {
+            const stats = getPipelineStats();
+            
+            const debugInfo = `🔍 PIPELINE DEBUG INFO:
+
+📊 Estadísticas:
+- Total contactos: ${stats.total}
+- Contactos de hoy: ${stats.todayContacts}
+- Tasa de conversión: ${stats.conversionRate}%
 
 📋 Distribución por estado:
-${PIPELINE_STAGES.map(stage => {
-    const count = pipelineData.filter(c => normalizeStatus(c.status) === stage.id).length;
-    return `- ${stage.name}: ${count} contactos`;
-}).join('\n')}
+${PIPELINE_STAGES.map(stage => 
+    `- ${stage.icon} ${stage.name}: ${stats.byStatus[stage.id] || 0} contactos`
+).join('\n')}
+
+👤 Usuario:
+- Nombre: ${currentUserProfile?.name || 'No disponible'}
+- Email: ${currentUserProfile?.email || 'No disponible'}
+- Rol: ${currentUserProfile?.role || 'No disponible'}
+- Es Director: ${isDirector ? 'SÍ' : 'NO'}
 
 🔥 Firebase:
 - FirebaseData disponible: ${window.FirebaseData ? 'SÍ' : 'NO'}
 - Usuario autenticado: ${window.FirebaseData?.currentUser ? 'SÍ' : 'NO'}
+- Contacts loaded: ${window.FirebaseData?.contacts ? Object.keys(window.FirebaseData.contacts).length : 0}
 
-🎯 Pipeline:
+🎯 Pipeline DOM:
 - Columnas renderizadas: ${document.querySelectorAll('.pipeline-column').length}
-- Cards arrastrables: ${document.querySelectorAll('.pipeline-card[draggable="true"]').length}`;
+- Cards arrastrables: ${document.querySelectorAll('.pipeline-card[draggable="true"]').length}
+- Eventos drag configurados: ${document.querySelectorAll('.pipeline-card[draggable="true"]').length > 0 ? 'SÍ' : 'NO'}
 
-    alert(debugInfo);
-}
+🐛 Problemas potenciales:
+${stats.total === 0 ? '⚠️ No hay contactos cargados\n' : ''}
+${!window.FirebaseData ? '⚠️ Firebase no disponible\n' : ''}
+${document.querySelectorAll('.pipeline-column').length === 0 ? '⚠️ Pipeline no renderizado\n' : ''}`;
 
-// ===== INITIALIZATION =====
-// Auto-initialize when DOM is ready and Firebase is available
-document.addEventListener('DOMContentLoaded', () => {
-    // Wait for Firebase to be ready
-    if (window.FirebaseData) {
-        setTimeout(initializePipeline, 1000);
-    } else {
-        window.addEventListener('firebaseReady', () => {
-            setTimeout(initializePipeline, 1000);
-        });
-    }
-});
+            alert(debugInfo);
+        }
 
-// Export functions for global access
-window.refreshPipeline = refreshPipeline;
-window.showPipelineDebug = showPipelineDebug;
+        // Make functions globally available
+        window.getSalespersonName = getSalespersonName;
+        window.showContactDetails = showContactDetails;
+        window.editContactInPipeline = editContactInPipeline;
+        window.openWhatsAppFromPipeline = openWhatsAppFromPipeline;
+        window.getPipelineStats = getPipelineStats;
+        window.showPipelineDebug = showPipelineDebug;
 
-console.log('✅ Pipeline module loaded successfully');
+        console.log('✅ Pipeline enhancements loaded successfully');
+    </script>
+</body>
+</html>
