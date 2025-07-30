@@ -2392,7 +2392,7 @@ ${diagnostics.dataError ? `❌ Error: ${diagnostics.dataError}` : '✅ Sistema f
                     </div>
                 `;
                 
-                console.log('✅ Sales ranking loaded successfully');
+console.log('✅ Sales ranking loaded successfully');
                 
             } catch (error) {
                 console.error('❌ Error loading sales ranking:', error);
@@ -2407,20 +2407,7 @@ ${diagnostics.dataError ? `❌ Error: ${diagnostics.dataError}` : '✅ Sistema f
             }
         }
 
-        // Make functions globally available
-        window.showNotification = showNotification;
-        window.showLeadDetails = showLeadDetails;
-        window.getUserDisplayNameFirebase = getUserDisplayNameFirebase;
-        window.runSystemDiagnostic = runSystemDiagnostic;
-        window.loadMonitoringData = loadMonitoringData;
-        window.loadReportsData = loadReportsData;
-        window.loadDirectorReports = loadDirectorReports;
-
-        console.log('✅ All critical fixes applied successfully');
-
-    </script>
-</body>
-</html>
+        console.log('✅ Complete CRM System loaded successfully');
     </script>
     <script src="fixes.js"></script>
 </body>
