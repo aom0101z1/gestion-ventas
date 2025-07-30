@@ -1,642 +1,1046 @@
-// pipeline.js - FIXED VERSION - Variable Conflict Resolution
-// ===== PIPELINE CONFIGURATION =====
-const PIPELINE_STAGES = [
-    { 
-        id: 'nuevo', 
-        name: 'Nuevo', 
-        color: '#fef3c7', 
-        textColor: '#92400e',
-        icon: '📋'
-    },
-    { 
-        id: 'contactado', 
-        name: 'Contactado', 
-        color: '#dbeafe', 
-        textColor: '#1e40af',
-        icon: '📞'
-    },
-    { 
-        id: 'interesado', 
-        name: 'Interesado', 
-        color: '#d1fae5', 
-        textColor: '#065f46',
-        icon: '👍'
-    },
-    { 
-        id: 'negociacion', 
-        name: 'Negociación', 
-        color: '#fed7aa', 
-        textColor: '#c2410c',
-        icon: '🤝'
-    },
-    { 
-        id: 'convertido', 
-        name: 'Convertido', 
-        color: '#dcfce7', 
-        textColor: '#166534',
-        icon: '✅'
-    },
-    { 
-        id: 'perdido', 
-        name: 'Perdido', 
-        color: '#fee2e2', 
-        textColor: '#dc2626',
-        icon: '❌'
-    }
-];
+// pipeline.js - PIPELINE MANAGEMENT MODULE - COMPLETE VERSION
+// ===== SALES PIPELINE AND LEAD MANAGEMENT =====
 
-// ===== PIPELINE STATE (RENAMED VARIABLES TO AVOID CONFLICTS) =====
+// Global variables for pipeline module
 let pipelineData = [];
-let pipelineUserProfile = null;  // RENAMED from currentUserProfile
-let pipelineIsDirector = false;  // RENAMED from isDirector
+let pipelineInitialized = false;
+let draggedLead = null;
+let pipelineStats = {};
 
-// ===== STATUS NORMALIZATION =====
-function normalizeStatus(status) {
-    if (!status) return 'nuevo';
-    
-    const statusMap = {
-        'nuevo': 'nuevo',
-        'contactado': 'contactado', 
-        'interesado': 'interesado',
-        'negociacion': 'negociacion',
-        'negociación': 'negociacion',
-        'convertido': 'convertido',
-        'perdido': 'perdido'
-    };
-    
-    return statusMap[status.toLowerCase()] || 'nuevo';
-}
-
-// ===== PIPELINE INITIALIZATION =====
-async function initializePipeline() {
-    console.log('🎯 Initializing Firebase Pipeline...');
-    
-    try {
-        // Check Firebase availability
-        if (!window.FirebaseData || !window.FirebaseData.currentUser) {
-            throw new Error('Firebase not available or user not authenticated');
-        }
-        
-        // Get user profile
-        pipelineUserProfile = await window.FirebaseData.loadUserProfile();
-        pipelineIsDirector = pipelineUserProfile?.role === 'director';
-        
-        console.log('👤 Pipeline user:', pipelineUserProfile?.name, '- Role:', pipelineUserProfile?.role);
-        
-        // Load and render pipeline
-        await loadPipelineData();
-        renderPipeline();
-        
-        console.log('✅ Pipeline initialized successfully');
-        
-    } catch (error) {
-        console.error('❌ Error initializing pipeline:', error);
-        showPipelineError(error.message);
+// Pipeline configuration
+const PIPELINE_STAGES = {
+    'Nuevo': { 
+        color: '#fbbf24', 
+        emoji: '🟡', 
+        description: 'Leads recién ingresados',
+        order: 1
+    },
+    'Contactado': { 
+        color: '#3b82f6', 
+        emoji: '🔵', 
+        description: 'Primer contacto realizado',
+        order: 2
+    },
+    'Interesado': { 
+        color: '#10b981', 
+        emoji: '🟢', 
+        description: 'Mostraron interés en el servicio',
+        order: 3
+    },
+    'Negociación': { 
+        color: '#f97316', 
+        emoji: '🟠', 
+        description: 'En proceso de negociación',
+        order: 4
+    },
+    'Convertido': { 
+        color: '#22c55e', 
+        emoji: '✅', 
+        description: 'Clientes convertidos exitosamente',
+        order: 5
+    },
+    'Perdido': { 
+        color: '#ef4444', 
+        emoji: '❌', 
+        description: 'Leads perdidos o no interesados',
+        order: 6
     }
-}
+};
 
-// ===== DATA LOADING =====
+// ===== MAIN PIPELINE LOADING FUNCTION =====
 async function loadPipelineData() {
     try {
-        console.log('📊 Loading pipeline data from Firebase...');
+        console.log('🎯 Loading pipeline data');
         
-        if (!window.FirebaseData) {
-            throw new Error('Firebase not available');
+        const container = document.getElementById('pipelineContainer');
+        if (!container) {
+            console.error('❌ Pipeline container not found');
+            return;
         }
         
-        let allContacts = [];
+        // Show loading state
+        showPipelineLoading();
         
-        // Try multiple methods to get contacts
-        if (typeof window.FirebaseData.getFilteredContacts === 'function') {
-            console.log('✅ Using getFilteredContacts()');
-            allContacts = await window.FirebaseData.getFilteredContacts();
-        } else if (window.FirebaseData.contacts) {
-            console.log('✅ Using direct contacts access');
-            allContacts = Object.entries(window.FirebaseData.contacts).map(([id, contact]) => ({
-                id,
-                ...contact
-            }));
-            
-            // Filter by user if not director
-            if (!pipelineIsDirector && pipelineUserProfile && window.FirebaseData.currentUser) {
-                allContacts = allContacts.filter(contact => 
-                    contact.salespersonId === window.FirebaseData.currentUser.uid
-                );
-            }
-        } else {
-            throw new Error('No contacts data available');
+        if (!window.FirebaseData || !window.FirebaseData.currentUser) {
+            showPipelineError('Firebase no disponible');
+            return;
         }
         
-        // Filter out contacts without proper status and normalize
-        pipelineData = allContacts.map(contact => ({
-            ...contact,
-            status: normalizeStatus(contact.status || 'Nuevo')
-        }));
+        // Load contacts from Firebase
+        const allContacts = await window.FirebaseData.getFilteredContacts();
+        pipelineData = allContacts;
         
-        console.log(`✅ Loaded ${pipelineData.length} contacts for pipeline`);
+        if (allContacts.length === 0) {
+            showEmptyPipeline();
+            return;
+        }
+        
+        // Calculate pipeline statistics
+        calculatePipelineStats(allContacts);
+        
+        // Render pipeline view
+        renderPipelineView(allContacts);
+        
+        // Initialize drag and drop if supported
+        initializeDragAndDrop();
+        
+        console.log('✅ Pipeline data loaded successfully');
         
     } catch (error) {
         console.error('❌ Error loading pipeline data:', error);
-        pipelineData = [];
-        throw error;
+        showPipelineError(`Error cargando pipeline: ${error.message}`);
     }
 }
 
 // ===== PIPELINE RENDERING =====
-function renderPipeline() {
+function renderPipelineView(contacts) {
     const container = document.getElementById('pipelineContainer');
-    if (!container) {
-        console.log('❌ Pipeline container not found');
-        showPipelineError('Container #pipelineContainer no encontrado en el HTML');
-        return;
-    }
+    if (!container) return;
     
-    try {
-        console.log('🎨 Rendering pipeline with', pipelineData.length, 'contacts');
+    // Group contacts by status
+    const statusGroups = groupContactsByStatus(contacts);
+    
+    container.innerHTML = `
+        <div class="pipeline-grid" style="
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        ">
+            ${Object.entries(PIPELINE_STAGES).map(([status, config]) => 
+                renderPipelineColumn(status, config, statusGroups[status] || [])
+            ).join('')}
+        </div>
         
-        if (pipelineData.length === 0) {
-            container.innerHTML = `
-                <div style="text-align: center; padding: 3rem; color: #6b7280;">
-                    <div style="font-size: 3rem; margin-bottom: 1rem;">📋</div>
-                    <h3>No hay contactos disponibles</h3>
-                    <p>Agrega algunos contactos en la pestaña "Contactos" para verlos aquí.</p>
-                    <button onclick="refreshPipeline()" class="btn btn-primary" style="margin-top: 1rem;">
-                        🔄 Actualizar
-                    </button>
-                </div>
-            `;
-            return;
-        }
+        ${renderPipelineSummary(contacts)}
         
-        // Create pipeline columns
-        const pipelineHTML = PIPELINE_STAGES.map(stage => {
-            const stageContacts = pipelineData.filter(contact => 
-                normalizeStatus(contact.status) === stage.id
-            );
-            
-            return `
-                <div class="pipeline-column" data-stage="${stage.id}">
-                    <div class="pipeline-header" style="background: ${stage.color}; color: ${stage.textColor};">
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <span>${stage.icon}</span>
-                            <span style="font-weight: 600;">${stage.name}</span>
-                        </div>
-                        <span style="background: rgba(0,0,0,0.1); padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.8rem;">
-                            ${stageContacts.length}
-                        </span>
-                    </div>
-                    <div class="pipeline-cards" id="cards-${stage.id}">
-                        ${stageContacts.map(contact => renderPipelineCard(contact)).join('')}
-                    </div>
-                </div>
-            `;
-        }).join('');
-        
-        container.innerHTML = pipelineHTML;
-        
-        // Setup drag and drop
-        setupDragAndDrop();
-        
-        console.log('✅ Pipeline rendered successfully');
-        
-    } catch (error) {
-        console.error('❌ Error rendering pipeline:', error);
-        showPipelineError('Error al renderizar pipeline');
-    }
+        ${renderPipelineControls()}
+    `;
+    
+    // Add event listeners after rendering
+    setupPipelineEventListeners();
 }
 
-// ===== PIPELINE CARD RENDERING =====
-function renderPipelineCard(contact) {
-    const timeAgo = getTimeAgo(contact.date || contact.createdAt);
-    const salespersonName = pipelineIsDirector ? getSalespersonName(contact.salespersonId) : '';
+function renderPipelineColumn(status, config, leads) {
+    const leadCount = leads.length;
     
     return `
-        <div class="pipeline-card" 
-             draggable="true" 
-             data-contact-id="${contact.id}"
-             data-current-status="${normalizeStatus(contact.status)}">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
-                <div style="font-weight: 600; color: #1f2937; flex: 1;">${contact.name}</div>
-                <button onclick="showContactDetails('${contact.id}')" 
-                        style="background: none; border: none; color: #6b7280; cursor: pointer; padding: 0.2rem;">
-                    ⋯
+        <div class="pipeline-column" 
+             data-status="${status}"
+             style="
+                 background: white;
+                 border-radius: 12px;
+                 box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+                 overflow: hidden;
+                 border-top: 4px solid ${config.color};
+                 min-height: 400px;
+                 transition: all 0.3s ease;
+             "
+             ondragover="handleDragOver(event)"
+             ondrop="handleDrop(event, '${status}')">
+            
+            <!-- Column Header -->
+            <div class="pipeline-header" style="
+                background: ${config.color}15;
+                padding: 1.25rem;
+                text-align: center;
+                border-bottom: 1px solid #e5e7eb;
+            ">
+                <div style="
+                    font-size: 1.3rem;
+                    margin-bottom: 0.5rem;
+                    font-weight: 600;
+                    color: #374151;
+                ">
+                    ${config.emoji} ${status}
+                </div>
+                <div style="
+                    background: ${config.color};
+                    color: white;
+                    display: inline-block;
+                    padding: 0.4rem 1rem;
+                    border-radius: 20px;
+                    font-weight: 600;
+                    font-size: 0.9rem;
+                    margin-bottom: 0.5rem;
+                ">
+                    ${leadCount} leads
+                </div>
+                <div style="
+                    font-size: 0.8rem;
+                    color: #6b7280;
+                    line-height: 1.3;
+                ">
+                    ${config.description}
+                </div>
+            </div>
+            
+            <!-- Column Body -->
+            <div class="pipeline-body" style="
+                padding: 1rem;
+                max-height: 450px;
+                overflow-y: auto;
+                min-height: 300px;
+            ">
+                ${leadCount === 0 ? renderEmptyColumn(status, config.color) : leads.map(lead => renderLeadCard(lead, config.color)).join('')}
+            </div>
+            
+            <!-- Column Footer -->
+            <div style="
+                padding: 0.75rem 1rem;
+                border-top: 1px solid #e5e7eb;
+                background: #f9fafb;
+                text-align: center;
+            ">
+                <button onclick="addNewLeadToStage('${status}')" 
+                        class="add-lead-btn"
+                        style="
+                            background: ${config.color};
+                            color: white;
+                            border: none;
+                            padding: 0.5rem 1rem;
+                            border-radius: 6px;
+                            font-size: 0.8rem;
+                            cursor: pointer;
+                            transition: all 0.2s ease;
+                        "
+                        onmouseover="this.style.opacity='0.8'"
+                        onmouseout="this.style.opacity='1'">
+                    ➕ Agregar Lead
                 </button>
             </div>
+        </div>
+    `;
+}
+
+function renderLeadCard(lead, stageColor) {
+    const priorityColor = getPriorityColor(lead.priority || 'Medium');
+    const sourceIcon = getSourceIcon(lead.source);
+    const timeAgo = getTimeAgo(lead.date, lead.time);
+    
+    return `
+        <div class="lead-card" 
+             data-lead-id="${lead.id}"
+             draggable="true"
+             style="
+                 background: #f9fafb;
+                 border: 1px solid #e5e7eb;
+                 border-radius: 8px;
+                 padding: 1rem;
+                 margin-bottom: 0.75rem;
+                 cursor: pointer;
+                 transition: all 0.2s ease;
+                 position: relative;
+                 border-left: 3px solid ${priorityColor};
+             "
+             onclick="showLeadDetails('${lead.id}')"
+             ondragstart="handleDragStart(event, '${lead.id}')"
+             onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,0.12)'; this.style.transform='translateY(-2px)'"
+             onmouseout="this.style.boxShadow='none'; this.style.transform='translateY(0)'">
             
-            <div style="font-size: 0.9rem; color: #6b7280; margin-bottom: 0.5rem;">
-                📞 ${contact.phone}
-            </div>
-            
-            <div style="font-size: 0.8rem; color: #6b7280; margin-bottom: 0.5rem;">
-                📍 ${contact.source && contact.source.length > 25 ? contact.source.substring(0, 25) + '...' : contact.source || 'Sin fuente'}
-            </div>
-            
-            ${salespersonName ? `
-                <div style="font-size: 0.8rem; color: #667eea; margin-bottom: 0.5rem;">
-                    👤 ${salespersonName}
+            <!-- Lead Header -->
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
+                <div style="flex: 1; min-width: 0;">
+                    <div style="
+                        font-weight: 600;
+                        color: #374151;
+                        margin-bottom: 0.25rem;
+                        font-size: 0.95rem;
+                        white-space: nowrap;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                    " title="${lead.name || 'Sin nombre'}">
+                        ${lead.name || 'Sin nombre'}
+                    </div>
+                    <div style="
+                        font-size: 0.8rem;
+                        color: #6b7280;
+                        display: flex;
+                        align-items: center;
+                        gap: 0.25rem;
+                    ">
+                        ${sourceIcon} ${(lead.source || 'No especificado').length > 20 ? (lead.source || 'No especificado').substring(0, 20) + '...' : (lead.source || 'No especificado')}
+                    </div>
                 </div>
-            ` : ''}
+                <div style="
+                    background: ${priorityColor};
+                    width: 8px;
+                    height: 8px;
+                    border-radius: 50%;
+                    margin-top: 0.25rem;
+                " title="Prioridad: ${lead.priority || 'Medium'}"></div>
+            </div>
             
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem;">
-                <span style="font-size: 0.7rem; color: #9ca3af;">${timeAgo}</span>
-                <div style="display: flex; gap: 0.25rem;">
-                    <button onclick="editContactInPipeline('${contact.id}')" 
-                            style="background: #f3f4f6; border: none; border-radius: 4px; padding: 0.2rem 0.4rem; font-size: 0.7rem; cursor: pointer;"
-                            title="Editar">
-                        ✏️
-                    </button>
-                    <button onclick="openWhatsAppFromPipeline('${contact.phone}', '${contact.name}')" 
-                            style="background: #dcfce7; border: none; border-radius: 4px; padding: 0.2rem 0.4rem; font-size: 0.7rem; cursor: pointer;"
-                            title="WhatsApp">
-                        💬
-                    </button>
+            <!-- Lead Details -->
+            <div style="margin-bottom: 0.75rem;">
+                <div style="
+                    font-size: 0.85rem;
+                    color: #10b981;
+                    margin-bottom: 0.25rem;
+                    font-weight: 500;
+                ">
+                    📞 ${lead.phone || 'Sin teléfono'}
+                </div>
+                ${lead.email ? `
+                    <div style="
+                        font-size: 0.8rem;
+                        color: #6b7280;
+                        margin-bottom: 0.25rem;
+                    ">
+                        ✉️ ${lead.email}
+                    </div>
+                ` : ''}
+                <div style="
+                    font-size: 0.8rem;
+                    color: #6b7280;
+                ">
+                    📍 ${lead.location || 'Sin ubicación'}
+                </div>
+            </div>
+            
+            <!-- Lead Score and Time -->
+            <div style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                font-size: 0.75rem;
+                color: #6b7280;
+            ">
+                <div style="
+                    background: ${stageColor}20;
+                    color: ${stageColor};
+                    padding: 0.2rem 0.5rem;
+                    border-radius: 12px;
+                    font-weight: 500;
+                ">
+                    🎯 ${lead.score || 50}/100
+                </div>
+                <div>
+                    ⏰ ${timeAgo}
+                </div>
+            </div>
+            
+            <!-- Quick Actions -->
+            <div style="
+                position: absolute;
+                top: 0.5rem;
+                right: 0.5rem;
+                opacity: 0;
+                transition: opacity 0.2s ease;
+                display: flex;
+                gap: 0.25rem;
+            " class="quick-actions">
+                <button onclick="event.stopPropagation(); openWhatsApp('${lead.phone}', '${lead.name}')" 
+                        style="
+                            background: #25d366;
+                            border: none;
+                            border-radius: 4px;
+                            width: 24px;
+                            height: 24px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            cursor: pointer;
+                            font-size: 0.7rem;
+                        " title="WhatsApp">
+                    💬
+                </button>
+                <button onclick="event.stopPropagation(); editLeadQuick('${lead.id}')" 
+                        style="
+                            background: #3b82f6;
+                            border: none;
+                            border-radius: 4px;
+                            width: 24px;
+                            height: 24px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            cursor: pointer;
+                            font-size: 0.7rem;
+                            color: white;
+                        " title="Editar">
+                    ✏️
+                </button>
+            </div>
+        </div>
+        
+        <style>
+            .lead-card:hover .quick-actions {
+                opacity: 1 !important;
+            }
+        </style>
+    `;
+}
+
+function renderEmptyColumn(status, color) {
+    return `
+        <div style="
+            text-align: center;
+            color: #6b7280;
+            padding: 3rem 1rem;
+            border: 2px dashed #e5e7eb;
+            border-radius: 8px;
+            margin: 1rem 0;
+        ">
+            <div style="font-size: 2rem; margin-bottom: 1rem; opacity: 0.5;">
+                ${PIPELINE_STAGES[status].emoji}
+            </div>
+            <div style="font-size: 0.9rem; margin-bottom: 0.5rem;">
+                No hay leads en esta etapa
+            </div>
+            <div style="font-size: 0.8rem; opacity: 0.7;">
+                Arrastra leads aquí o agrega nuevos
+            </div>
+        </div>
+    `;
+}
+
+function renderPipelineSummary(contacts) {
+    const conversionRate = contacts.length > 0 ? 
+        ((contacts.filter(c => c.status === 'Convertido').length / contacts.length) * 100).toFixed(1) : 0;
+    
+    const averageScore = contacts.length > 0 ? 
+        (contacts.reduce((sum, c) => sum + (c.score || 50), 0) / contacts.length).toFixed(1) : 50;
+    
+    const activeLeads = contacts.filter(c => !['Convertido', 'Perdido'].includes(c.status)).length;
+    
+    return `
+        <div class="pipeline-summary" style="
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            margin-bottom: 2rem;
+        ">
+            <h3 style="
+                margin: 0 0 1.5rem 0;
+                color: #374151;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+            ">
+                📊 Resumen del Pipeline
+                <span style="
+                    background: #f3f4f6;
+                    color: #6b7280;
+                    padding: 0.25rem 0.5rem;
+                    border-radius: 12px;
+                    font-size: 0.8rem;
+                    font-weight: normal;
+                ">
+                    Actualizado ahora
+                </span>
+            </h3>
+            
+            <div style="
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 1.5rem;
+            ">
+                <div class="summary-card" style="
+                    text-align: center;
+                    padding: 1.5rem;
+                    background: linear-gradient(135deg, #3b82f6, #1e40af);
+                    color: white;
+                    border-radius: 12px;
+                ">
+                    <div style="font-size: 2.5rem; font-weight: bold; margin-bottom: 0.5rem;">
+                        ${contacts.length}
+                    </div>
+                    <div style="opacity: 0.9;">Total Leads</div>
+                </div>
+                
+                <div class="summary-card" style="
+                    text-align: center;
+                    padding: 1.5rem;
+                    background: linear-gradient(135deg, #10b981, #059669);
+                    color: white;
+                    border-radius: 12px;
+                ">
+                    <div style="font-size: 2.5rem; font-weight: bold; margin-bottom: 0.5rem;">
+                        ${contacts.filter(c => c.status === 'Convertido').length}
+                    </div>
+                    <div style="opacity: 0.9;">Convertidos</div>
+                </div>
+                
+                <div class="summary-card" style="
+                    text-align: center;
+                    padding: 1.5rem;
+                    background: linear-gradient(135deg, #f59e0b, #d97706);
+                    color: white;
+                    border-radius: 12px;
+                ">
+                    <div style="font-size: 2.5rem; font-weight: bold; margin-bottom: 0.5rem;">
+                        ${conversionRate}%
+                    </div>
+                    <div style="opacity: 0.9;">Tasa Conversión</div>
+                </div>
+                
+                <div class="summary-card" style="
+                    text-align: center;
+                    padding: 1.5rem;
+                    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+                    color: white;
+                    border-radius: 12px;
+                ">
+                    <div style="font-size: 2.5rem; font-weight: bold; margin-bottom: 0.5rem;">
+                        ${activeLeads}
+                    </div>
+                    <div style="opacity: 0.9;">Leads Activos</div>
+                </div>
+            </div>
+            
+            <!-- Pipeline Health Indicator -->
+            <div style="
+                margin-top: 2rem;
+                padding: 1rem;
+                background: ${getPipelineHealthColor(conversionRate)}15;
+                border-left: 4px solid ${getPipelineHealthColor(conversionRate)};
+                border-radius: 8px;
+            ">
+                <div style="
+                    font-weight: 600;
+                    color: ${getPipelineHealthColor(conversionRate)};
+                    margin-bottom: 0.5rem;
+                ">
+                    ${getPipelineHealthStatus(conversionRate)}
+                </div>
+                <div style="
+                    font-size: 0.9rem;
+                    color: #374151;
+                    line-height: 1.4;
+                ">
+                    ${getPipelineHealthMessage(conversionRate, activeLeads)}
                 </div>
             </div>
         </div>
     `;
 }
 
-// ===== DRAG AND DROP SETUP =====
-function setupDragAndDrop() {
-    console.log('🔄 Setting up drag and drop...');
-    
-    // Setup draggable cards
-    const cards = document.querySelectorAll('.pipeline-card[draggable="true"]');
-    cards.forEach(card => {
-        card.addEventListener('dragstart', handleDragStart);
-        card.addEventListener('dragend', handleDragEnd);
-    });
-    
-    // Setup drop zones
-    const columns = document.querySelectorAll('.pipeline-column');
-    columns.forEach(column => {
-        column.addEventListener('dragover', handleDragOver);
-        column.addEventListener('drop', handleDrop);
-        column.addEventListener('dragenter', handleDragEnter);
-        column.addEventListener('dragleave', handleDragLeave);
-    });
-    
-    console.log('✅ Drag and drop setup complete');
-}
-
-// ===== DRAG AND DROP HANDLERS =====
-let draggedElement = null;
-
-function handleDragStart(e) {
-    draggedElement = e.target;
-    e.target.classList.add('dragging');
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/html', e.target.outerHTML);
-}
-
-function handleDragEnd(e) {
-    e.target.classList.remove('dragging');
-    draggedElement = null;
-}
-
-function handleDragOver(e) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-}
-
-function handleDragEnter(e) {
-    e.preventDefault();
-    if (e.target.classList.contains('pipeline-column')) {
-        e.target.classList.add('drag-over');
-    }
-}
-
-function handleDragLeave(e) {
-    if (e.target.classList.contains('pipeline-column')) {
-        e.target.classList.remove('drag-over');
-    }
-}
-
-async function handleDrop(e) {
-    e.preventDefault();
-    
-    const column = e.target.closest('.pipeline-column');
-    if (!column || !draggedElement) return;
-    
-    column.classList.remove('drag-over');
-    
-    const newStage = column.dataset.stage;
-    const contactId = draggedElement.dataset.contactId;
-    const currentStatus = draggedElement.dataset.currentStatus;
-    
-    // Don't update if dropped in same column
-    if (newStage === currentStatus) return;
-    
-    try {
-        console.log(`🔄 Moving contact ${contactId} from ${currentStatus} to ${newStage}`);
-        
-        // Update in Firebase
-        await updateContactStatus(contactId, newStage);
-        
-        // Update local data
-        const contact = pipelineData.find(c => c.id === contactId);
-        if (contact) {
-            contact.status = capitalizeStatus(newStage);
-        }
-        
-        // Re-render pipeline
-        renderPipeline();
-        
-        // Show success notification
-        showStatusUpdateNotification(newStage);
-        
-        console.log('✅ Contact status updated successfully');
-        
-    } catch (error) {
-        console.error('❌ Error updating contact status:', error);
-        alert(`❌ Error al actualizar estado: ${error.message}`);
-        
-        // Revert on error
-        renderPipeline();
-    }
-}
-
-// ===== STATUS UPDATES =====
-async function updateContactStatus(contactId, newStatus) {
-    if (!window.FirebaseData) {
-        throw new Error('Firebase not available');
-    }
-    
-    const statusMap = {
-        'nuevo': 'Nuevo',
-        'contactado': 'Contactado',
-        'interesado': 'Interesado', 
-        'negociacion': 'Negociación',
-        'convertido': 'Convertido',
-        'perdido': 'Perdido'
-    };
-    
-    const updates = {
-        status: statusMap[newStatus] || 'Nuevo',
-        updatedAt: new Date().toISOString(),
-        lastStatusChange: new Date().toISOString()
-    };
-    
-    await window.FirebaseData.updateContact(contactId, updates);
-}
-
-function capitalizeStatus(status) {
-    const statusMap = {
-        'nuevo': 'Nuevo',
-        'contactado': 'Contactado',
-        'interesado': 'Interesado',
-        'negociacion': 'Negociación', 
-        'convertido': 'Convertido',
-        'perdido': 'Perdido'
-    };
-    
-    return statusMap[status] || 'Nuevo';
+function renderPipelineControls() {
+    return `
+        <div class="pipeline-controls" style="
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        ">
+            <div style="display: flex; gap: 1rem; align-items: center;">
+                <button onclick="refreshPipeline()" 
+                        class="btn btn-primary"
+                        style="padding: 0.75rem 1.5rem;">
+                    🔄 Actualizar Pipeline
+                </button>
+                
+                <button onclick="showPipelineFilters()" 
+                        class="btn btn-secondary"
+                        style="padding: 0.75rem 1.5rem;">
+                    🔍 Filtros
+                </button>
+                
+                <button onclick="exportPipelineData()" 
+                        class="btn btn-success"
+                        style="padding: 0.75rem 1.5rem;">
+                    📥 Exportar
+                </button>
+            </div>
+            
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <span style="font-size: 0.9rem; color: #6b7280;">Vista:</span>
+                <button onclick="togglePipelineView('kanban')" 
+                        class="view-toggle active"
+                        style="
+                            padding: 0.5rem 1rem;
+                            border: 1px solid #e5e7eb;
+                            background: #3b82f6;
+                            color: white;
+                            border-radius: 6px;
+                            cursor: pointer;
+                            font-size: 0.8rem;
+                        ">
+                    📋 Kanban
+                </button>
+                <button onclick="togglePipelineView('list')" 
+                        class="view-toggle"
+                        style="
+                            padding: 0.5rem 1rem;
+                            border: 1px solid #e5e7eb;
+                            background: white;
+                            color: #374151;
+                            border-radius: 6px;
+                            cursor: pointer;
+                            font-size: 0.8rem;
+                        ">
+                    📄 Lista
+                </button>
+            </div>
+        </div>
+    `;
 }
 
 // ===== UTILITY FUNCTIONS =====
-function getTimeAgo(dateString) {
-    if (!dateString) return 'Sin fecha';
+function groupContactsByStatus(contacts) {
+    const groups = {};
     
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInHours = Math.floor((now - date) / (1000 * 60 * 60));
+    // Initialize all stages
+    Object.keys(PIPELINE_STAGES).forEach(stage => {
+        groups[stage] = [];
+    });
     
-    if (diffInHours < 1) return 'Hace minutos';
-    if (diffInHours < 24) return `Hace ${diffInHours}h`;
-    if (diffInHours < 48) return 'Ayer';
+    // Group contacts
+    contacts.forEach(contact => {
+        const status = contact.status || 'Nuevo';
+        if (groups[status]) {
+            groups[status].push(contact);
+        } else {
+            groups['Nuevo'].push(contact);
+        }
+    });
     
-    const diffInDays = Math.floor(diffInHours / 24);
-    return `Hace ${diffInDays} días`;
+    return groups;
 }
 
-function getSalespersonName(salespersonId) {
+function calculatePipelineStats(contacts) {
+    pipelineStats = {
+        total: contacts.length,
+        byStage: {},
+        conversionRate: 0,
+        averageScore: 0,
+        topSources: {}
+    };
+    
+    // Count by stage
+    Object.keys(PIPELINE_STAGES).forEach(stage => {
+        pipelineStats.byStage[stage] = contacts.filter(c => (c.status || 'Nuevo') === stage).length;
+    });
+    
+    // Calculate conversion rate
+    if (contacts.length > 0) {
+        const converted = contacts.filter(c => c.status === 'Convertido').length;
+        pipelineStats.conversionRate = (converted / contacts.length * 100).toFixed(1);
+    }
+    
+    // Calculate average score
+    if (contacts.length > 0) {
+        const totalScore = contacts.reduce((sum, c) => sum + (c.score || 50), 0);
+        pipelineStats.averageScore = (totalScore / contacts.length).toFixed(1);
+    }
+    
+    // Top sources
+    contacts.forEach(contact => {
+        const source = contact.source || 'No especificado';
+        pipelineStats.topSources[source] = (pipelineStats.topSources[source] || 0) + 1;
+    });
+    
+    console.log('📊 Pipeline stats calculated:', pipelineStats);
+}
+
+function getPriorityColor(priority) {
+    const colors = {
+        'High': '#ef4444',
+        'Medium': '#f59e0b',
+        'Low': '#6b7280'
+    };
+    return colors[priority] || colors['Medium'];
+}
+
+function getSourceIcon(source) {
+    if (!source) return '📍';
+    
+    const icons = {
+        'Facebook': '📘',
+        'Instagram': '📸',
+        'Google': '🔍',
+        'Referido': '👥',
+        'Volante': '📄',
+        'Pasando por la sede': '🏢'
+    };
+    
+    if (source.includes('CONVENIO')) return '🤝';
+    return icons[source] || '📍';
+}
+
+function getTimeAgo(dateString, timeString = null) {
     try {
-        // Try to get from Firebase user data
-        if (window.FirebaseData && window.FirebaseData.usersData) {
-            const user = window.FirebaseData.usersData[salespersonId];
-            if (user && user.profile && user.profile.name) {
-                return user.profile.name;
-            }
-        }
+        const fullDateTime = timeString ? `${dateString} ${timeString}` : dateString;
+        const date = new Date(fullDateTime);
+        const now = new Date();
         
-        // Fallback to localStorage cached data
-        const cachedUsers = localStorage.getItem('cachedUsers');
-        if (cachedUsers) {
-            const users = JSON.parse(cachedUsers);
-            const user = users[salespersonId];
-            if (user && user.name) {
-                return user.name;
-            }
-        }
+        if (isNaN(date.getTime())) return 'Fecha inválida';
         
-        // Default fallback
-        return 'Vendedor';
+        const diffInSeconds = Math.floor((now - date) / 1000);
+        
+        if (diffInSeconds < 60) return 'Ahora';
+        if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m`;
+        if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h`;
+        if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)}d`;
+        return `${Math.floor(diffInSeconds / 2592000)}mes`;
         
     } catch (error) {
-        console.log('Error getting salesperson name:', error);
-        return 'Vendedor';
+        return 'Error';
     }
+}
+
+function getPipelineHealthColor(conversionRate) {
+    if (conversionRate >= 20) return '#10b981';
+    if (conversionRate >= 10) return '#f59e0b';
+    return '#ef4444';
+}
+
+function getPipelineHealthStatus(conversionRate) {
+    if (conversionRate >= 20) return '🟢 Pipeline Saludable';
+    if (conversionRate >= 10) return '🟡 Pipeline Regular';
+    return '🔴 Pipeline Necesita Atención';
+}
+
+function getPipelineHealthMessage(conversionRate, activeLeads) {
+    if (conversionRate >= 20) {
+        return `Excelente tasa de conversión del ${conversionRate}%. Continúa con el buen trabajo y mantén el seguimiento de los ${activeLeads} leads activos.`;
+    } else if (conversionRate >= 10) {
+        return `Tasa de conversión del ${conversionRate}% es aceptable, pero hay oportunidad de mejora. Enfócate en los ${activeLeads} leads activos para aumentar las conversiones.`;
+    } else {
+        return `La tasa de conversión del ${conversionRate}% está por debajo del objetivo. Revisa las estrategias de seguimiento y considera capacitación adicional.`;
+    }
+}
+
+// ===== DRAG AND DROP FUNCTIONALITY =====
+function initializeDragAndDrop() {
+    console.log('🖱️ Initializing drag and drop for pipeline');
+    
+    // Add drag and drop styles
+    const style = document.createElement('style');
+    style.textContent = `
+        .lead-card.dragging {
+            opacity: 0.5;
+            transform: rotate(5deg);
+        }
+        
+        .pipeline-column.drag-over {
+            background: #f0f9ff !important;
+            border: 2px dashed #3b82f6 !important;
+        }
+        
+        .pipeline-column.drag-over .pipeline-header {
+            background: #dbeafe !important;
+        }
+    `;
+    
+    if (!document.getElementById('pipeline-drag-styles')) {
+        style.id = 'pipeline-drag-styles';
+        document.head.appendChild(style);
+    }
+}
+
+function handleDragStart(event, leadId) {
+    console.log('🖱️ Drag started for lead:', leadId);
+    
+    draggedLead = leadId;
+    event.dataTransfer.setData('text/plain', leadId);
+    event.target.classList.add('dragging');
+    
+    // Add visual feedback to columns
+    document.querySelectorAll('.pipeline-column').forEach(col => {
+        col.style.transition = 'all 0.3s ease';
+    });
+}
+
+function handleDragOver(event) {
+    event.preventDefault();
+    event.currentTarget.classList.add('drag-over');
+}
+
+function handleDragLeave(event) {
+    event.currentTarget.classList.remove('drag-over');
+}
+
+async function handleDrop(event, newStatus) {
+    event.preventDefault();
+    
+    const leadId = event.dataTransfer.getData('text/plain');
+    const column = event.currentTarget;
+    
+    // Remove visual feedback
+    column.classList.remove('drag-over');
+    document.querySelectorAll('.lead-card').forEach(card => {
+        card.classList.remove('dragging');
+    });
+    
+    if (!leadId || !newStatus) {
+        console.error('❌ Invalid drop operation');
+        return;
+    }
+    
+    try {
+        console.log('🎯 Updating lead status:', leadId, 'to', newStatus);
+        
+        // Update in Firebase
+        await window.FirebaseData.updateContact(leadId, { status: newStatus });
+        
+        // Show success feedback
+        showNotification(`✅ Lead movido a "${newStatus}"`, 'success', 2000);
+        
+        // Refresh pipeline
+        setTimeout(() => {
+            loadPipelineData();
+        }, 500);
+        
+    } catch (error) {
+        console.error('❌ Error updating lead status:', error);
+        showNotification(`❌ Error al mover lead: ${error.message}`, 'error');
+    }
+    
+    draggedLead = null;
 }
 
 // ===== PIPELINE ACTIONS =====
-async function showContactDetails(contactId) {
+async function refreshPipeline() {
+    console.log('🔄 Refreshing pipeline');
+    
+    // Show loading state
+    const container = document.getElementById('pipelineContainer');
+    if (container) {
+        container.style.opacity = '0.6';
+    }
+    
     try {
-        const contact = pipelineData.find(c => c.id === contactId);
-        if (!contact) {
-            alert('❌ Contacto no encontrado');
-            return;
+        await loadPipelineData();
+        
+        if (typeof showNotification === 'function') {
+            showNotification('✅ Pipeline actualizado', 'success', 2000);
         }
-        
-        const salespersonName = pipelineIsDirector ? getSalespersonName(contact.salespersonId) : 'Tu contacto';
-        
-        alert(`📋 DETALLES DEL CONTACTO
-
-👤 Nombre: ${contact.name}
-📞 Teléfono: ${contact.phone}
-📧 Email: ${contact.email || 'No proporcionado'}
-📍 Fuente: ${contact.source || 'No especificada'}
-🏘️ Ubicación: ${contact.location || 'No especificada'}
-📝 Estado: ${contact.status}
-${pipelineIsDirector ? `👨‍💼 Vendedor: ${salespersonName}` : ''}
-📅 Fecha: ${new Date(contact.date || contact.createdAt).toLocaleDateString()}
-⏰ Última actualización: ${contact.updatedAt ? new Date(contact.updatedAt).toLocaleString() : 'N/A'}
-
-💬 Notas:
-${contact.notes || 'Sin notas'}
-
-💡 Tip: Arrastra la tarjeta a otra columna para cambiar el estado`);
-        
     } catch (error) {
-        console.error('❌ Error showing contact details:', error);
-        alert(`❌ Error al mostrar detalles: ${error.message}`);
+        if (typeof showNotification === 'function') {
+            showNotification('❌ Error al actualizar pipeline', 'error');
+        }
+    } finally {
+        if (container) {
+            container.style.opacity = '1';
+        }
     }
 }
 
-function editContactInPipeline(contactId) {
-    alert(`✏️ Funcionalidad de edición
+async function addNewLeadToStage(stage) {
+    console.log('➕ Adding new lead to stage:', stage);
     
-Contacto ID: ${contactId}
-
-Para editar este contacto:
-1. Ve a la pestaña "Leads" 
-2. Busca el contacto en la tabla
-3. Usa el botón "Ver" para más opciones
-
-O implementa la función de edición según tus necesidades.`);
+    // For now, just redirect to contacts tab
+    if (typeof switchTab === 'function') {
+        switchTab('contacts');
+        showNotification(`ℹ️ Agrega un nuevo contacto y se ubicará en "${stage}"`, 'info', 3000);
+    } else {
+        alert(`➕ Para agregar un lead a "${stage}", ve a la pestaña de Contactos`);
+    }
 }
 
-function openWhatsAppFromPipeline(phone, name) {
-    const cleanPhone = phone.replace(/\D/g, '');
-    const message = `Hola ${name}, te contacto desde Ciudad Bilingüe. ¿Cómo va todo?`;
-    const url = `https://wa.me/57${cleanPhone}?text=${encodeURIComponent(message)}`;
-    window.open(url, '_blank');
+function showPipelineFilters() {
+    // Implementation for pipeline filters
+    alert('🔍 Filtros de pipeline - Funcionalidad por implementar');
 }
 
-// ===== NOTIFICATIONS =====
-function showStatusUpdateNotification(newStatus) {
-    const statusNames = {
-        'nuevo': 'Nuevo',
-        'contactado': 'Contactado', 
-        'interesado': 'Interesado',
-        'negociacion': 'Negociación',
-        'convertido': 'Convertido',
-        'perdido': 'Perdido'
-    };
-    
-    // Create notification element
-    const notification = document.createElement('div');
-    notification.style.cssText = `
-        position: fixed;
-        top: 80px;
-        right: 20px;
-        background: #10b981;
-        color: white;
-        padding: 1rem 1.5rem;
-        border-radius: 8px;
-        font-size: 0.9rem;
-        font-weight: 500;
-        z-index: 1000;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    `;
-    notification.innerHTML = `✅ Estado actualizado: ${statusNames[newStatus]}`;
-    document.body.appendChild(notification);
-    
-    // Remove after 3 seconds
-    setTimeout(() => {
-        if (notification.parentNode) {
-            notification.parentNode.removeChild(notification);
+function exportPipelineData() {
+    try {
+        if (!pipelineData || pipelineData.length === 0) {
+            alert('⚠️ No hay datos de pipeline para exportar');
+            return;
         }
-    }, 3000);
+        
+        // Create CSV content
+        const headers = ['ID', 'Nombre', 'Teléfono', 'Email', 'Fuente', 'Estado', 'Fecha', 'Prioridad', 'Score'];
+        const csvContent = [
+            headers.join(','),
+            ...pipelineData.map(lead => [
+                lead.id || '',
+                `"${lead.name || ''}"`,
+                lead.phone || '',
+                lead.email || '',
+                `"${lead.source || ''}"`,
+                lead.status || '',
+                lead.date || '',
+                lead.priority || 'Medium',
+                lead.score || 50
+            ].join(','))
+        ].join('\n');
+        
+        // Download file
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `pipeline_${new Date().toISOString().split('T')[0]}.csv`;
+        link.click();
+        
+        console.log('📥 Pipeline data exported');
+        showNotification('📥 Pipeline exportado correctamente', 'success');
+        
+    } catch (error) {
+        console.error('❌ Error exporting pipeline:', error);
+        showNotification('❌ Error al exportar pipeline', 'error');
+    }
 }
 
-// ===== ERROR HANDLING =====
-function showPipelineError(message) {
+function togglePipelineView(viewType) {
+    console.log('👁️ Toggling pipeline view to:', viewType);
+    
+    // Update button states
+    document.querySelectorAll('.view-toggle').forEach(btn => {
+        btn.style.background = 'white';
+        btn.style.color = '#374151';
+    });
+    
+    event.target.style.background = '#3b82f6';
+    event.target.style.color = 'white';
+    
+    if (viewType === 'list') {
+        // Would implement list view
+        alert('📄 Vista de lista - Funcionalidad por implementar');
+    }
+    // Kanban view is already implemented
+}
+
+// ===== LEAD ACTIONS =====
+function editLeadQuick(leadId) {
+    console.log('✏️ Quick edit for lead:', leadId);
+    
+    // For now, show lead details
+    if (typeof showLeadDetails === 'function') {
+        showLeadDetails(leadId);
+    } else {
+        alert(`✏️ Editar lead ${leadId} - Funcionalidad por implementar`);
+    }
+}
+
+// ===== LOADING AND ERROR STATES =====
+function showPipelineLoading() {
     const container = document.getElementById('pipelineContainer');
     if (container) {
         container.innerHTML = `
-            <div style="text-align: center; padding: 3rem;">
-                <div style="background: #fee2e2; border: 1px solid #fecaca; border-radius: 8px; padding: 2rem; color: #dc2626; max-width: 500px; margin: 0 auto;">
-                    <div style="font-size: 3rem; margin-bottom: 1rem;">⚠️</div>
-                    <h3 style="margin-bottom: 1rem;">Error en Pipeline</h3>
-                    <p style="margin-bottom: 1.5rem;">${message}</p>
-                    
-                    <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
-                        <button onclick="refreshPipeline()" style="background: #3b82f6; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;">
-                            🔄 Reintentar
-                        </button>
-                        <button onclick="showPipelineDebug()" style="background: #6b7280; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;">
-                            🔍 Ver Info
-                        </button>
-                    </div>
+            <div style="
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 400px;
+                color: #6b7280;
+            ">
+                <div style="text-align: center;">
+                    <div class="loading-spinner" style="width: 32px; height: 32px; margin: 0 auto 1rem;"></div>
+                    <div>Cargando pipeline desde Firebase...</div>
                 </div>
             </div>
         `;
     }
 }
 
-// ===== DEBUG INFO FUNCTION =====
-function showPipelineDebug() {
-    const info = `🔍 INFORMACIÓN DE DEBUG
-
-📊 DATOS:
-- Contactos cargados: ${pipelineData.length}
-- Usuario: ${pipelineUserProfile?.name || 'No disponible'}
-- Rol: ${pipelineUserProfile?.role || 'No disponible'}
-- Es Director: ${pipelineIsDirector ? 'SÍ' : 'NO'}
-
-🔥 FIREBASE:
-- Firebase disponible: ${window.FirebaseData ? 'SÍ' : 'NO'}
-- Usuario autenticado: ${window.FirebaseData?.currentUser ? 'SÍ' : 'NO'}
-- Email: ${window.FirebaseData?.currentUser?.email || 'No disponible'}
-
-📋 CONTACTOS POR ESTADO:
-${PIPELINE_STAGES.map(stage => {
-    const count = pipelineData.filter(c => normalizeStatus(c.status) === stage.id).length;
-    return `- ${stage.name}: ${count}`;
-}).join('\n')}
-
-🎯 DOM:
-- Container encontrado: ${document.getElementById('pipelineContainer') ? 'SÍ' : 'NO'}
-- Columnas renderizadas: ${document.querySelectorAll('.pipeline-column').length}
-
-🚨 FUNCIONES:
-- normalizeStatus: ${typeof normalizeStatus}
-- PIPELINE_STAGES: ${typeof PIPELINE_STAGES}
-- renderPipelineCard: ${typeof renderPipelineCard}`;
-
-    alert(info);
-}
-
-// ===== PUBLIC FUNCTIONS =====
-async function refreshPipeline() {
-    console.log('🔄 Refreshing pipeline...');
-    
+function showPipelineError(message) {
     const container = document.getElementById('pipelineContainer');
     if (container) {
-        container.innerHTML = '<div style="text-align: center; padding: 2rem;"><div class="loading-spinner"></div><br>Actualizando pipeline...</div>';
+        container.innerHTML = `
+            <div style="
+                text-align: center;
+                color: #dc2626;
+                padding: 3rem;
+                background: white;
+                border-radius: 12px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            ">
+                <div style="font-size: 2rem; margin-bottom: 1rem;">⚠️</div>
+                <h3 style="margin: 0 0 1rem 0;">Error en Pipeline</h3>
+                <p style="margin: 0 0 1rem 0; color: #6b7280;">${message}</p>
+                <button onclick="loadPipelineData()" class="btn btn-primary">
+                    🔄 Reintentar
+                </button>
+            </div>
+        `;
+    }
+}
+
+function showEmptyPipeline() {
+    const container = document.getElementById('pipelineContainer');
+    if (container) {
+        container.innerHTML = `
+            <div style="
+                text-align: center;
+                color: #6b7280;
+                padding: 4rem;
+                background: white;
+                border-radius: 12px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            ">
+                <div style="font-size: 3rem; margin-bottom: 1.5rem;">🎯</div>
+                <h3 style="margin: 0 0 1rem 0; color: #374151;">Pipeline Vacío</h3>
+                <p style="margin: 0 0 2rem 0; max-width: 400px; margin-left: auto; margin-right: auto; line-height: 1.5;">
+                    No hay leads en tu pipeline. Comienza agregando contactos para verlos organizados por etapas.
+                </p>
+                <button onclick="if (typeof switchTab === 'function') switchTab('contacts')" 
+                        class="btn btn-primary" 
+                        style="padding: 1rem 2rem; font-size: 1.1rem;">
+                    ➕ Agregar Primer Contacto
+                </button>
+            </div>
+        `;
+    }
+}
+
+function setupPipelineEventListeners() {
+    // Add global event listeners for drag and drop
+    document.querySelectorAll('.pipeline-column').forEach(column => {
+        column.addEventListener('dragleave', handleDragLeave);
+    });
+    
+    console.log('🎧 Pipeline event listeners setup complete');
+}
+
+// ===== MODULE INITIALIZATION =====
+function initializePipelineModule() {
+    console.log('🚀 Initializing pipeline module');
+    
+    if (pipelineInitialized) {
+        console.log('⚠️ Pipeline module already initialized');
+        return;
     }
     
     try {
-        await loadPipelineData();
-        renderPipeline();
-        console.log('✅ Pipeline refreshed successfully');
+        // Initialize drag and drop
+        initializeDragAndDrop();
+        
+        // Set initialization flag
+        pipelineInitialized = true;
+        
+        console.log('✅ Pipeline module initialized successfully');
+        
     } catch (error) {
-        console.error('❌ Error refreshing pipeline:', error);
-        showPipelineError(error.message);
+        console.error('❌ Error initializing pipeline module:', error);
     }
 }
 
-// ===== MAKE FUNCTIONS GLOBALLY AVAILABLE =====
-window.refreshPipeline = refreshPipeline;
-window.showPipelineDebug = showPipelineDebug;
-window.initializePipeline = initializePipeline;
-
-// ===== INITIALIZATION =====
-// Auto-initialize when DOM is ready and Firebase is available
+// ===== EVENT LISTENERS =====
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🚀 DOM ready, initializing pipeline...');
+    console.log('🎯 Pipeline module DOM ready');
     
-    // Try immediate initialization
-    if (window.FirebaseData && window.FirebaseData.currentUser) {
-        setTimeout(initializePipeline, 1000);
+    // Initialize when Firebase is ready
+    if (window.FirebaseData) {
+        initializePipelineModule();
     } else {
-        // Wait for Firebase ready event
-        window.addEventListener('firebaseReady', () => {
-            console.log('🔥 Firebase ready event received');
-            setTimeout(initializePipeline, 1000);
-        });
-        
-        // Fallback: keep checking for Firebase
-        const checkFirebase = () => {
-            if (window.FirebaseData && window.FirebaseData.currentUser) {
-                setTimeout(initializePipeline, 1000);
-            } else {
-                setTimeout(checkFirebase, 2000);
-            }
-        };
-        
-        setTimeout(checkFirebase, 2000);
+        window.addEventListener('firebaseReady', initializePipelineModule);
     }
 });
 
-console.log('✅ Complete Pipeline module loaded successfully');
+// ===== MODULE EXPORTS =====
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        loadPipelineData,
+        refreshPipeline,
+        handleDragStart,
+        handleDragOver,
+        handleDrop,
+        addNewLeadToStage,
+        exportPipelineData,
+        togglePipelineView,
+        PIPELINE_STAGES,
+        pipelineStats
+    };
+}
+
+console.log('✅ Pipeline.js module loaded successfully');
