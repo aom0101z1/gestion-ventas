@@ -572,6 +572,99 @@
             margin-bottom: 1rem;
             opacity: 0.5;
         }
+
+        /* ===== CONTACT CARDS CSS - ADD TO index.html <style> section ===== */
+
+/* Contact item hover effects */
+.contact-item {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.contact-item:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
+}
+
+/* Contact header cursor and hover */
+.contact-header {
+    transition: background-color 0.2s ease;
+}
+
+.contact-header:hover {
+    background-color: #f9fafb !important;
+}
+
+/* Status badges */
+.status-badge {
+    padding: 0.2rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.status-nuevo {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.status-contactado {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.status-interesado {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.status-negociacion {
+    background: #fde2e8;
+    color: #be185d;
+}
+
+.status-convertido {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.status-perdido {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+/* Contact details animation */
+.contact-details {
+    transition: all 0.3s ease;
+}
+
+/* Button hover effects */
+button {
+    transition: all 0.2s ease;
+}
+
+button:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.1);
+}
+
+/* Custom scrollbar for contact list */
+div[style*="overflow-y: auto"]::-webkit-scrollbar {
+    width: 4px;
+}
+
+div[style*="overflow-y: auto"]::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 2px;
+}
+
+div[style*="overflow-y: auto"]::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 2px;
+}
+
+div[style*="overflow-y: auto"]::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
     </style>
 </head>
 
