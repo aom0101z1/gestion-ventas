@@ -778,7 +778,7 @@ async function handleDrop(event, newStatus) {
     try {
         console.log('🎯 Updating lead status:', leadId, 'to', newStatus);
         
-        // Update in Firebase
+        // Update in Firebase - THIS WAS THE ISSUE - Line was incomplete
         await window.FirebaseData.updateContact(leadId, { status: newStatus });
         
         // Show success feedback
