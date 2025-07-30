@@ -2658,34 +2658,6 @@ ${results.globalError ? `❌ ERROR GLOBAL: ${results.globalError}` : ''}`;
     return results;
 }
 
-// Agregar botón de prueba al DOM
-document.addEventListener('DOMContentLoaded', () => {
-    // Buscar un lugar donde agregar el botón (ej: en config tab)
-    const configTab = document.getElementById('config');
-    if (configTab) {
-        const testButton = document.createElement('div');
-        testButton.innerHTML = `
-            <div style="background: #fff7ed; padding: 1.5rem; border-radius: 10px; border-left: 4px solid #ff6b35; margin-bottom: 2rem;">
-                <h3>🧪 Diagnóstico de Sistema</h3>
-                <p style="margin: 1rem 0; color: #9a3412;">Herramientas para diagnosticar problemas de permisos.</p>
-                <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-                    <button onclick="testSystemPermissions()" class="btn btn-firebase">
-                        🧪 Probar Permisos
-                    </button>
-                    <button onclick="loadMonitoringData()" class="btn btn-primary">
-                        👀 Test Monitoreo  
-                    </button>
-                    <button onclick="loadReportsData()" class="btn btn-success">
-                        📊 Test Reportes
-                    </button>
-                </div>
-            </div>
-        `;
-        configTab.insertBefore(testButton, configTab.firstChild);
-    }
-});
-
-console.log('✅ Sistema de pruebas de permisos cargado');
-    
+  
 </body>
 </html>
