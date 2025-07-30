@@ -1,6 +1,3 @@
-<!-- ========================================= -->
-<!-- PARTE 1: DOCTYPE Y HEAD BÁSICO -->
-<!-- ========================================= -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -8,11 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🏫 Ciudad Bilingue - CRM</title>
 
-<!-- ========================================= -->
-<!-- PARTE 2-15: CSS COMPLETO Y ARREGLADO -->
-<!-- ========================================= -->
     <style>
-        /* ===== PARTE 2: RESET Y CONFIGURACIÓN BÁSICA ===== */
+        /* ===== RESET Y CONFIGURACIÓN BÁSICA ===== */
         * {
             margin: 0;
             padding: 0;
@@ -26,7 +20,7 @@
             line-height: 1.6;
         }
         
-        /* ===== PARTE 3: HEADER Y LAYOUT ===== */
+        /* ===== HEADER Y LAYOUT ===== */
         .header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -41,7 +35,7 @@
             padding: 2rem;
         }
 
-        /* ===== PARTE 4: LOGIN STYLES ===== */
+        /* ===== LOGIN STYLES ===== */
         .login-container {
             max-width: 400px;
             margin: 5rem auto;
@@ -62,7 +56,7 @@
             padding: 2rem; 
         }
 
-        /* ===== PARTE 5: FIREBASE STATUS INDICATOR ===== */
+        /* ===== FIREBASE STATUS INDICATOR ===== */
         .firebase-status {
             position: fixed;
             top: 10px;
@@ -87,7 +81,7 @@
             background: #f59e0b;
         }
 
-        /* ===== PARTE 6: FORM STYLES ===== */
+        /* ===== FORM STYLES ===== */
         .form-group { 
             margin-bottom: 1.5rem; 
         }
@@ -113,7 +107,7 @@
             border-color: #667eea;
         }
 
-        /* ===== PARTE 7: BUTTON STYLES ===== */
+        /* ===== BUTTON STYLES ===== */
         .btn {
             padding: 0.75rem 1.5rem;
             border: none;
@@ -140,7 +134,7 @@
         .btn-firebase { background: #ff6b35; color: white; }
         .btn-firebase:hover:not(:disabled) { background: #e55a31; }
 
-        /* ===== PARTE 8: USER INFO & STATS ===== */
+        /* ===== USER INFO & STATS ===== */
         .user-info {
             background: white;
             padding: 1rem;
@@ -159,6 +153,13 @@
             margin-bottom: 2rem;
         }
         
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
         
         .stat-number {
             font-size: 2rem;
@@ -166,7 +167,7 @@
             margin-bottom: 0.5rem;
         }
 
-        /* ===== PARTE 9: TABS ===== */
+        /* ===== TABS ===== */
         .tabs {
             display: flex;
             background: white;
@@ -198,7 +199,7 @@
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
 
-        /* ===== PARTE 10: TABLE ===== */
+        /* ===== TABLE ===== */
         .table {
             width: 100%;
             border-collapse: collapse;
@@ -216,7 +217,7 @@
             font-weight: 600;
         }
 
-        /* ===== PARTE 11: STATUS BADGES ===== */
+        /* ===== STATUS BADGES ===== */
         .status-badge {
             padding: 0.25rem 0.75rem;
             border-radius: 20px;
@@ -231,7 +232,7 @@
         .status-negociacion { background: #fed7aa; color: #c2410c; }
         .status-perdido { background: #fee2e2; color: #dc2626; }
 
-        /* ===== PARTE 12: USER CARDS & CONVENIOS ===== */
+        /* ===== USER CARDS & CONVENIOS ===== */
         .user-card {
             background: #f9fafb;
             padding: 1rem;
@@ -254,7 +255,7 @@
             border-left: 3px solid #10b981;
         }
 
-        /* ===== PARTE 13: ENHANCED PIPELINE STYLES ===== */
+        /* ===== PIPELINE STYLES ===== */
         #pipelineContainer {
             display: flex;
             gap: 1rem;
@@ -348,7 +349,7 @@
             border-left: 4px solid #ef4444;
         }
 
-        /* ===== PARTE 14: LOADING SPINNER Y UTILIDADES ===== */
+        /* ===== LOADING SPINNER Y UTILIDADES ===== */
         .loading-spinner {
             display: inline-block;
             width: 20px;
@@ -392,162 +393,7 @@
             border-left: 4px solid #3b82f6;
         }
 
-        /* ===== PARTE 15: CONTACTOS COMPACTOS MEJORADOS ===== */
-        .contact-item {
-            background: white;
-            border-radius: 8px;
-            margin-bottom: 0.5rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            border-left: 3px solid #667eea;
-            overflow: hidden;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-
-        .contact-item:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-        }
-
-        .contact-header {
-            padding: 0.75rem 1rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: pointer;
-            background: white;
-            transition: background-color 0.2s ease;
-        }
-
-        .contact-header:hover {
-            background-color: #f9fafb;
-        }
-
-        .contact-main-info {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            flex: 1;
-        }
-
-        .contact-name {
-            font-weight: 600;
-            color: #1f2937;
-        }
-
-        .contact-phone {
-            color: #10b981;
-            font-size: 0.9rem;
-        }
-
-        .contact-source {
-            background: #e0e7ff;
-            color: #3730a3;
-            padding: 0.2rem 0.5rem;
-            border-radius: 12px;
-            font-size: 0.8rem;
-        }
-
-        .contact-time {
-            color: #6b7280;
-            font-size: 0.8rem;
-        }
-
-        .expand-btn {
-            background: none;
-            border: none;
-            color: #6b7280;
-            cursor: pointer;
-            padding: 0.25rem;
-            border-radius: 4px;
-            transition: all 0.2s ease;
-        }
-
-        .expand-btn:hover {
-            background: #f3f4f6;
-            color: #374151;
-        }
-
-        .contact-details {
-            padding: 0 1rem 1rem 1rem;
-            background: #f8fafc;
-            border-top: 1px solid #e5e7eb;
-            display: none;
-            transition: all 0.3s ease;
-        }
-
-        .detail-row {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 0.5rem;
-            font-size: 0.9rem;
-        }
-
-        .detail-label {
-            color: #6b7280;
-            font-weight: 500;
-        }
-
-        .detail-value {
-            color: #1f2937;
-        }
-
-        .contact-actions {
-            display: flex;
-            gap: 0.5rem;
-            margin-top: 0.75rem;
-            padding-top: 0.75rem;
-            border-top: 1px solid #e5e7eb;
-        }
-
-        .action-btn {
-            padding: 0.4rem 0.8rem;
-            border: none;
-            border-radius: 6px;
-            font-size: 0.8rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .action-btn.edit {
-            background: #dbeafe;
-            color: #1e40af;
-        }
-
-        .action-btn.edit:hover {
-            background: #bfdbfe;
-        }
-
-        .action-btn.whatsapp {
-            background: #dcfce7;
-            color: #166534;
-        }
-
-        .action-btn.whatsapp:hover {
-            background: #bbf7d0;
-        }
-
-        .action-btn.delete {
-            background: #fee2e2;
-            color: #dc2626;
-        }
-
-        .action-btn.delete:hover {
-            background: #fecaca;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 3rem 1rem;
-            color: #6b7280;
-        }
-
-        .empty-state-icon {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-            opacity: 0.5;
-        }
-
-        /* ===== PARTE 16: RESPONSIVE Y ANIMACIONES ===== */
+        /* ===== RESPONSIVE ===== */
         @media (max-width: 768px) {
             .container { padding: 1rem; }
             .stats-grid { grid-template-columns: 1fr; }
@@ -567,31 +413,9 @@
         .connecting {
             animation: pulse 1.5s infinite;
         }
-
-        /* ===== CUSTOM SCROLLBARS ===== */
-        div[style*="overflow-y: auto"]::-webkit-scrollbar {
-            width: 4px;
-        }
-
-        div[style*="overflow-y: auto"]::-webkit-scrollbar-track {
-            background: #f1f5f9;
-            border-radius: 2px;
-        }
-
-        div[style*="overflow-y: auto"]::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 2px;
-        }
-
-        div[style*="overflow-y: auto"]::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
-        }
     </style>
 </head>
 
-<!-- ========================================= -->
-<!-- PARTE 17: BODY Y FIREBASE STATUS -->
-<!-- ========================================= -->
 <body>
     <!-- Firebase Status Indicator -->
     <div id="firebaseStatus" class="firebase-status connecting">
@@ -599,9 +423,6 @@
         Conectando a Firebase...
     </div>
 
-<!-- ========================================= -->
-<!-- PARTE 18: PANTALLA DE LOGIN -->
-<!-- ========================================= -->
     <!-- Login Screen -->
     <div id="loginScreen">
         <div class="login-container">
@@ -631,7 +452,6 @@
                     ❌ Error de autenticación
                 </div>
                 
-                <!-- Migration Section -->
                 <div id="migrationSection" class="info-message" style="margin-top: 2rem;">
                     <h4>🔄 ¿Primera vez con Firebase?</h4>
                     <p style="font-size: 0.9rem; margin: 0.5rem 0;">Si tienes datos en localStorage, el director puede migrarlos después del login.</p>
@@ -640,9 +460,6 @@
         </div>
     </div>
 
-<!-- ========================================= -->
-<!-- PARTE 19: HEADER APLICACIÓN PRINCIPAL -->
-<!-- ========================================= -->
     <!-- Main Application -->
     <div id="mainApp" class="hidden">
         <div class="header">
@@ -672,10 +489,7 @@
                 </div>
             </div>
 
-<!-- ========================================= -->
-<!-- PARTE 20: ESTADÍSTICAS -->
-<!-- ========================================= -->
-            <!-- Stats -->
+            <!-- Stats - SIN CONTACTOS DE HOY -->
             <div class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-number" style="color: #10b981;" id="totalLeads">0</div>
@@ -692,16 +506,8 @@
                     <div>Conversiones</div>
                     <div style="font-size: 0.8rem; color: #666; margin-top: 0.25rem;">💰 Ventas</div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-number" style="color: #8b5cf6;" id="todayContacts">0</div>
-                    <div>Contactos Hoy</div>
-                    <div style="font-size: 0.8rem; color: #666; margin-top: 0.25rem;">📅 Día Actual</div>
-                </div>
             </div>
 
-<!-- ========================================= -->
-<!-- PARTE 21: NAVEGACIÓN DE PESTAÑAS -->
-<!-- ========================================= -->
             <!-- Tabs -->
             <div class="tabs">
                 <button class="tab active" onclick="showTab('contacts')" id="contactsTab">📞 Contactos</button>
@@ -712,15 +518,11 @@
                 <button class="tab" onclick="showTab('config')" id="configTab" style="display: none;">⚙️ Config</button>
             </div>
 
-<!-- ========================================= -->
-<!-- PARTE 22: TAB CONTACTOS - ARREGLADO -->
-<!-- ========================================= -->
-            <!-- Tab: Contacts -->
+            <!-- Tab: Contacts - SOLO FORMULARIO CENTRADO -->
             <div id="contacts" class="tab-content">
                 <h2 id="contactsTitle">📞 Registrar Contactos del Día</h2>
                 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem;">
-                    <!-- Add Contact Form -->
+                <div style="max-width: 600px; margin: 2rem auto;">
                     <div>
                         <h3>➕ Nuevo Contacto</h3>
                         <form onsubmit="addContact(event)">
@@ -775,27 +577,9 @@
                             </button>
                         </form>
                     </div>
-                    
-                    <!-- Today's Contacts - SECCIÓN COMPACTA ARREGLADA -->
-                    <div>
-                        <h3 style="font-size: 1.2rem; margin-bottom: 1rem; color: #374151;">📋 Mis Contactos de Hoy</h3>
-                        <div style="margin-bottom: 1rem;">
-                            <button onclick="updateTodayContacts()" class="btn btn-primary" style="margin-right: 0.5rem; padding: 0.4rem 0.8rem; font-size: 0.9rem;">🔄 Actualizar</button>
-                            <button onclick="debugTodayContacts()" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.9rem;">🔍 Debug</button>
-                        </div>
-                        <div id="todayContacts" style="background: #f8fafc; border-radius: 8px; padding: 1rem; min-height: 200px; max-height: 400px; overflow-y: auto;">
-                            <div style="text-align: center; padding: 2rem; color: #6b7280;">
-                                <div class="loading-spinner"></div><br>
-                                Cargando desde Firebase...
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
 
-<!-- ========================================= -->
-<!-- PARTE 23: TAB LEADS -->
-<!-- ========================================= -->
             <!-- Tab: Leads -->
             <div id="leads" class="tab-content hidden">
                 <h2 id="leadsTitle">👥 Gestión de Leads</h2>
@@ -803,7 +587,6 @@
                 <div style="margin-bottom: 1rem;">
                     <button onclick="refreshData()" class="btn btn-primary" style="margin-right: 1rem;">🔄 Sync Firebase</button>
                     
-                    <!-- Director Filters -->
                     <div id="leadsFilters" style="display: none; margin-top: 1rem;">
                         <select id="salespersonFilter" onchange="updateLeadsTable()" style="padding: 0.5rem; border-radius: 5px; border: 1px solid #ccc; margin-right: 0.5rem;">
                             <option value="">Todos los vendedores</option>
@@ -842,9 +625,6 @@
                 </table>
             </div>
 
-<!-- ========================================= -->
-<!-- PARTE 24: TAB PIPELINE -->
-<!-- ========================================= -->
             <!-- Tab: Pipeline -->
             <div id="pipeline" class="tab-content hidden">
                 <h2>🎯 Pipeline de Ventas</h2>
@@ -860,14 +640,10 @@
                 </div>
             </div>
 
-<!-- ========================================= -->
-<!-- PARTE 25: TAB REPORTES -->
-<!-- ========================================= -->
             <!-- Tab: Reports -->
             <div id="reports" class="tab-content hidden">
                 <h2 id="reportsTitle">📊 Reportes</h2>
                 
-                <!-- Personal Reports (Salespeople) -->
                 <div id="personalReports">
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem;">
                         <div id="weeklyPerformance">
@@ -879,7 +655,6 @@
                     </div>
                 </div>
                 
-                <!-- Director Reports -->
                 <div id="directorReports" class="hidden">
                     <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2rem; margin-top: 2rem;">
                         <div id="teamPerformance">
@@ -902,10 +677,7 @@
                 </div>
             </div>
 
-<!-- ========================================= -->
-<!-- PARTE 26: TAB MONITOREO (DIRECTOR) -->
-<!-- ========================================= -->
-            <!-- Tab: Monitoring (Director Only) -->
+            <!-- Tab: Monitoring -->
             <div id="monitoring" class="tab-content hidden">
                 <h2>👀 Monitoreo del Equipo</h2>
                 <div style="margin-bottom: 1rem;">
@@ -927,14 +699,10 @@
                 </div>
             </div>
 
-<!-- ========================================= -->
-<!-- PARTE 27: TAB CONFIGURACIÓN (DIRECTOR) -->
-<!-- ========================================= -->
-            <!-- Tab: Config (Director Only) -->
+            <!-- Tab: Config -->
             <div id="config" class="tab-content hidden">
                 <h2>⚙️ Configuración del Sistema</h2>
                 
-                <!-- Firebase Migration Section -->
                 <div id="directorConfig" class="hidden">
                     <div style="background: #dbeafe; padding: 2rem; border-radius: 10px; border-left: 4px solid #3b82f6; margin-bottom: 2rem;">
                         <h3>🔄 Migración & Reparación Firebase</h3>
@@ -1009,17 +777,12 @@
         </div>
     </div>
 
-<!-- ========================================= -->
-<!-- PARTE 28: FIREBASE SDK PRINCIPAL -->
-<!-- ========================================= -->
     <!-- Firebase SDK -->
     <script type="module">
-        // Import Firebase modules
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
         import { getDatabase, ref, set, get, push, update, remove, onValue, off } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
-        // Firebase configuration
         const firebaseConfig = {
             apiKey: "AIzaSyCuq1z8eTo9rufdEDXQFfvoxOkce-kBWOY",
             authDomain: "ciudad-bilingue-crm.firebaseapp.com",
@@ -1030,24 +793,20 @@
             appId: "1:690594486040:web:e8fffcffcee68a4d94f06d"
         };
 
-        // Initialize Firebase
         const app = initializeApp(firebaseConfig);
         const database = getDatabase(app);
         const auth = getAuth(app);
         
-        // Make available globally
         window.firebaseApp = app;
         window.firebaseDb = database;
         window.firebaseAuth = auth;
 
-        // Update Firebase status
         const statusEl = document.getElementById('firebaseStatus');
         statusEl.className = 'firebase-status';
         statusEl.innerHTML = '🔥 Firebase Conectado';
 
         console.log('✅ Firebase initialized successfully');
 
-        // PARTE 29: FIREBASE DATA MANAGER
         class SimpleFirebaseManager {
             constructor() {
                 this.database = database;
@@ -1057,7 +816,6 @@
                 
                 console.log('🔥 SimpleFirebaseManager initialized');
                 
-                // Listen for auth state changes
                 onAuthStateChanged(this.auth, (user) => {
                     if (user) {
                         this.currentUser = user;
@@ -1069,12 +827,10 @@
                 });
             }
 
-            // ===== FUNCIÓN 1: LOGIN =====
             async login(email, password) {
                 return await signInWithEmailAndPassword(this.auth, email, password);
             }
 
-            // ===== FUNCIÓN 2: CREATE USER =====
             async createUser(email, password, profile) {
                 const userCredential = await createUserWithEmailAndPassword(this.auth, email, password);
                 const user = userCredential.user;
@@ -1089,19 +845,16 @@
                 return user;
             }
 
-            // ===== FUNCIÓN 3: LOGOUT =====
             async logout() {
                 return await signOut(this.auth);
             }
 
-            // ===== FUNCIÓN 4: LOAD USER PROFILE =====
             async loadUserProfile() {
                 if (!this.currentUser) return null;
                 const snapshot = await get(ref(this.database, `users/${this.currentUser.uid}/profile`));
                 return snapshot.exists() ? snapshot.val() : null;
             }
 
-            // ===== FUNCIÓN 5: GET ALL USERS =====
             async getAllUsers() {
                 const snapshot = await get(ref(this.database, 'users'));
                 const users = {};
@@ -1117,7 +870,6 @@
                 return users;
             }
 
-            // ===== FUNCIÓN 6: ADD CONTACT =====
             async addContact(contactData) {
                 const contactRef = push(ref(this.database, 'contacts'));
                 const contact = {
@@ -1131,7 +883,6 @@
                 return contact;
             }
 
-            // ===== FUNCIÓN 7: GET ALL CONTACTS =====
             async getAllContacts() {
                 const snapshot = await get(ref(this.database, 'contacts'));
                 const contacts = [];
@@ -1143,7 +894,6 @@
                 return contacts;
             }
 
-            // ===== FUNCIÓN 8: GET FILTERED CONTACTS =====
             async getFilteredContacts() {
                 const userProfile = await this.loadUserProfile();
                 const allContacts = await this.getAllContacts();
@@ -1155,7 +905,6 @@
                 }
             }
 
-            // ===== FUNCIÓN 9: UPDATE CONTACT =====
             async updateContact(contactId, updates) {
                 await update(ref(this.database, `contacts/${contactId}`), {
                     ...updates,
@@ -1163,73 +912,55 @@
                 });
             }
 
-            // ===== FUNCIÓN 10: DELETE CONTACT =====
             async deleteContact(contactId) {
                 await remove(ref(this.database, `contacts/${contactId}`));
             }
 
-            // ===== FUNCIÓN 11: GET CONVENIOS =====
             async getConvenios() {
                 const snapshot = await get(ref(this.database, 'system/convenios'));
                 return snapshot.exists() ? snapshot.val() : [];
             }
 
-            // ===== FUNCIÓN 12: UPDATE CONVENIOS =====
             async updateConvenios(convenios) {
                 await set(ref(this.database, 'system/convenios'), convenios);
             }
 
-            // ===== FUNCIÓN 13: ADD OBSERVER =====
             addObserver(callback) {
                 this.observers.push(callback);
             }
         }
 
-        // Create global instance
         window.FirebaseData = new SimpleFirebaseManager();
-        
-        // Firebase ready event
         window.dispatchEvent(new Event('firebaseReady'));
     </script>
 
-<!-- ========================================= -->
-<!-- PARTE 30: AUTO PROFILE CREATION -->
-<!-- ========================================= -->
     <!-- Auto Profile Creation Script -->
     <script>
-        // ===== FUNCIÓN 14: AUTO PROFILE CREATION =====
-        // Auto-ensure user profile when Firebase is ready and user authenticates
         window.addEventListener('firebaseReady', () => {
             console.log('🔥 Firebase ready, setting up auto-profile creation...');
             
-            // Setup auth state listener for automatic profile creation
             if (window.FirebaseData && window.FirebaseData.auth) {
                 window.FirebaseData.auth.onAuthStateChanged(async (user) => {
                     if (user) {
                         console.log('👤 User authenticated, checking profile...');
                         
-                        // Wait a bit for the system to initialize
                         setTimeout(async () => {
                             try {
-                                // Check if profile exists
                                 const profile = await window.FirebaseData.loadUserProfile();
                                 
                                 if (!profile) {
                                     console.log('⚠️ No profile found, auto-creating...');
                                     
-                                    // Determine role based on email
                                     const isDirector = user.email.includes('director') || 
                                                      user.email.includes('admin') || 
                                                      user.email.includes('jefe');
                                     const role = isDirector ? 'director' : 'vendedor';
                                     
-                                    // Create name from email
                                     const name = user.email.split('@')[0]
                                         .split('.')
                                         .map(part => part.charAt(0).toUpperCase() + part.slice(1))
                                         .join(' ');
                                     
-                                    // Create profile
                                     const profileRef = ref(database, `users/${user.uid}/profile`);
                                     await set(profileRef, {
                                         name: name,
@@ -1241,32 +972,6 @@
                                     });
                                     
                                     console.log('✅ Profile auto-created successfully');
-                                    
-                                    // Show success notification
-                                    setTimeout(() => {
-                                        const notification = document.createElement('div');
-                                        notification.style.cssText = `
-                                            position: fixed;
-                                            top: 80px;
-                                            right: 20px;
-                                            background: #10b981;
-                                            color: white;
-                                            padding: 1rem 1.5rem;
-                                            border-radius: 8px;
-                                            font-size: 0.9rem;
-                                            font-weight: 500;
-                                            z-index: 1000;
-                                            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-                                        `;
-                                        notification.innerHTML = `✅ Perfil creado: ${name} (${role})`;
-                                        document.body.appendChild(notification);
-                                        
-                                        setTimeout(() => {
-                                            if (notification.parentNode) {
-                                                notification.parentNode.removeChild(notification);
-                                            }
-                                        }, 5000);
-                                    }, 1000);
                                 } else {
                                     console.log('✅ Profile exists:', profile.name);
                                 }
@@ -1282,23 +987,17 @@
         console.log('🔧 Auto-profile creation script loaded');
     </script>
 
-<!-- ========================================= -->
-<!-- PARTE 31: ENHANCED FIREBASE INTEGRATION -->
-<!-- ========================================= -->
+    <!-- Enhanced Firebase Integration -->
     <script>
-        // ===== FUNCIÓN 15: ENHANCED FIREBASE INTEGRATION =====
         document.addEventListener('DOMContentLoaded', () => {
             console.log('🚀 Enhanced DOM ready, preparing pipeline environment...');
             
-            // Ensure pipeline functions are available
             window.addEventListener('firebaseReady', () => {
                 console.log('🔥 Firebase ready event received');
                 
-                // Wait for all scripts to load
                 setTimeout(() => {
                     console.log('🔧 Checking pipeline readiness...');
                     
-                    // Check if essential functions exist
                     const requiredFunctions = [
                         'refreshPipeline',
                         'showPipelineDebug',
@@ -1310,7 +1009,6 @@
                     if (missingFunctions.length > 0) {
                         console.log('⚠️ Missing pipeline functions:', missingFunctions);
                         
-                        // Create fallback functions
                         if (typeof window.refreshPipeline !== 'function') {
                             window.refreshPipeline = function() {
                                 console.log('🔄 Fallback refreshPipeline called');
@@ -1348,7 +1046,6 @@
                         console.log('✅ All pipeline functions available');
                     }
                     
-                    // Auto-initialize pipeline if user is authenticated
                     if (window.FirebaseData && window.FirebaseData.currentUser) {
                         console.log('👤 User authenticated, auto-initializing pipeline...');
                         if (typeof window.initializePipeline === 'function') {
@@ -1358,20 +1055,16 @@
                         }
                     }
                     
-                }, 3000); // Wait 3 seconds for all scripts to load
+                }, 3000);
             });
         });
 
-        // ===== FUNCIÓN 16: FIREBASE DATA COMPATIBILITY =====
-        // Ensure compatibility between SimpleFirebaseManager and pipeline.js expectations
         window.addEventListener('firebaseReady', () => {
             if (window.FirebaseData) {
-                // Add any missing methods that pipeline.js might expect
                 if (!window.FirebaseData.contacts) {
                     window.FirebaseData.contacts = {};
                 }
                 
-                // Enhance the manager with additional methods if needed
                 const originalGetFilteredContacts = window.FirebaseData.getFilteredContacts;
                 window.FirebaseData.getFilteredContacts = async function() {
                     try {
@@ -1386,14 +1079,10 @@
             }
         });
 
-        // ===== FUNCIÓN 17: PIPELINE TAB ACTIVATION HANDLER =====
-        // Ensure pipeline initializes when tab is activated
         function showTab(tabName) {
-            // Call the original showTab function if it exists
             if (typeof window.originalShowTab === 'function') {
                 window.originalShowTab(tabName);
             } else {
-                // Basic tab switching if original function doesn't exist
                 document.querySelectorAll('.tab-content').forEach(content => {
                     content.classList.add('hidden');
                 });
@@ -1408,7 +1097,6 @@
                 if (targetTab) targetTab.classList.add('active');
             }
             
-            // Special handling for pipeline tab
             if (tabName === 'pipeline') {
                 console.log('🎯 Pipeline tab activated');
                 setTimeout(() => {
@@ -1421,16 +1109,12 @@
             }
         }
 
-        // Make the enhanced showTab globally available
         window.originalShowTab = window.showTab;
         window.showTab = showTab;
 
         console.log('✅ Enhanced pipeline preparation script loaded');
     </script>
 
-<!-- ========================================= -->
-<!-- PARTE 32: SCRIPTS EXTERNOS -->
-<!-- ========================================= -->
     <!-- Include all the JavaScript files -->
     <script src="AdminData.js"></script>
     <script src="core.js"></script>
