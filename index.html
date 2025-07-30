@@ -1981,6 +1981,446 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
         }
 
         console.log('✅ Complete CRM System loaded successfully');
+        // ===== PLACE THIS CODE RIGHT AFTER: console.log('✅ Complete CRM System loaded successfully'); =====
+        
+        // ===== CRITICAL MISSING FUNCTIONS =====
+        
+        // Fix showNotification function (PRIORITY 1)
+        function showNotification(message, type = 'info', duration = 5000) {
+            // Remove existing notifications
+            const existing = document.querySelectorAll('.notification-toast');
+            existing.forEach(n => n.remove());
+            
+            const notification = document.createElement('div');
+            notification.className = `notification-toast notification-${type}`;
+            
+            const colors = {
+                success: '#10b981',
+                error: '#ef4444',
+                warning: '#f59e0b',
+                info: '#3b82f6'
+            };
+            
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: ${colors[type] || colors.info};
+                color: white;
+                padding: 1rem 1.5rem;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                z-index: 10000;
+                max-width: 400px;
+                font-size: 0.9rem;
+                line-height: 1.4;
+                transform: translateX(100%);
+                transition: transform 0.3s ease;
+                white-space: pre-line;
+            `;
+            
+            notification.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div>${message}</div>
+                    <button onclick="this.parentElement.parentElement.remove()" style="background: none; border: none; color: white; font-size: 1.2rem; cursor: pointer; margin-left: 1rem; opacity: 0.8;">×</button>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Animate in
+            setTimeout(() => {
+                notification.style.transform = 'translateX(0)';
+            }, 100);
+            
+            // Auto remove
+            if (duration > 0) {
+                setTimeout(() => {
+                    notification.style.transform = 'translateX(100%)';
+                    setTimeout(() => notification.remove(), 300);
+                }, duration);
+            }
+        }
+
+        // Fix showLeadDetails function (PRIORITY 1)
+        async function showLeadDetails(leadId) {
+            try {
+                console.log('📋 Showing lead details for:', leadId);
+                
+                if (!window.FirebaseData) {
+                    alert('❌ Sistema no disponible');
+                    return;
+                }
+                
+                // Get lead data
+                const allContacts = await window.FirebaseData.getAllContacts();
+                const lead = allContacts.find(c => c.id === leadId);
+                
+                if (!lead) {
+                    alert('❌ Lead no encontrado');
+                    return;
+                }
+                
+                // Get salesperson name
+                const salespersonName = await getUserDisplayNameFirebase(lead.salespersonId);
+                
+                // Simple alert for now
+                const details = `📋 DETALLES DEL LEAD:
+
+👤 Nombre: ${lead.name}
+📞 Teléfono: ${lead.phone}
+✉️ Email: ${lead.email || 'No proporcionado'}
+📍 Ubicación: ${lead.location}
+🔗 Fuente: ${lead.source}
+📊 Estado: ${lead.status}
+🗓️ Fecha: ${formatDate(lead.date)}
+👨‍💼 Vendedor: ${salespersonName}
+
+📝 Notas:
+${lead.notes || 'Sin notas'}`;
+                
+                alert(details);
+                
+            } catch (error) {
+                console.error('❌ Error showing lead details:', error);
+                alert('❌ Error al mostrar detalles del lead');
+            }
+        }
+
+        // Fix getUserDisplayNameFirebase function
+        async function getUserDisplayNameFirebase(userId) {
+            try {
+                if (!userId || !window.FirebaseData) return 'Usuario Desconocido';
+                
+                const allUsers = await window.FirebaseData.getAllUsers();
+                const user = allUsers[userId];
+                
+                if (user && user.name) {
+                    return user.name;
+                }
+                
+                if (user && user.email) {
+                    return user.email.split('@')[0];
+                }
+                
+                return 'Usuario Desconocido';
+            } catch (error) {
+                console.error('❌ Error getting user display name:', error);
+                return 'Error Usuario';
+            }
+        }
+
+        // Fix runSystemDiagnostic function
+        async function runSystemDiagnostic() {
+            try {
+                const diagnostics = {
+                    timestamp: new Date().toISOString(),
+                    firebase: !!window.FirebaseData,
+                    authenticated: !!window.FirebaseData?.currentUser,
+                    userProfile: !!currentUser,
+                    totalContacts: 0,
+                    convenios: 0
+                };
+                
+                if (window.FirebaseData) {
+                    try {
+                        const contacts = await window.FirebaseData.getAllContacts();
+                        diagnostics.totalContacts = contacts.length;
+                        
+                        const convenios = await window.FirebaseData.getConvenios();
+                        diagnostics.convenios = convenios ? convenios.length : 0;
+                    } catch (error) {
+                        diagnostics.dataError = error.message;
+                    }
+                }
+                
+                const report = `🔍 DIAGNÓSTICO DEL SISTEMA:
+
+🔥 Firebase: ${diagnostics.firebase ? '✅' : '❌'}
+👤 Autenticado: ${diagnostics.authenticated ? '✅' : '❌'}
+📊 Total Contactos: ${diagnostics.totalContacts}
+🤝 Convenios: ${diagnostics.convenios}
+⏰ ${new Date().toLocaleString()}
+
+${diagnostics.dataError ? `❌ Error: ${diagnostics.dataError}` : '✅ Sistema funcionando'}`;
+                
+                alert(report);
+                console.log('🔍 System diagnostics:', diagnostics);
+                
+            } catch (error) {
+                console.error('❌ Error running diagnostics:', error);
+                alert(`❌ Error en diagnóstico: ${error.message}`);
+            }
+        }
+
+        // ===== FIX MONITORING TAB FUNCTIONS =====
+        
+        // Fix loadMonitoringData function
+        async function loadMonitoringData() {
+            try {
+                console.log('👀 Loading monitoring data');
+                
+                const teamOverview = document.getElementById('teamActivityOverview');
+                const individualActivity = document.getElementById('individualSalespeopleActivity');
+                const recentActivity = document.getElementById('recentTeamActivity');
+                
+                if (!window.FirebaseData || !window.FirebaseData.currentUser) {
+                    if (teamOverview) teamOverview.innerHTML = '<p style="color: #dc2626;">❌ Firebase no disponible</p>';
+                    if (individualActivity) individualActivity.innerHTML = '<p style="color: #dc2626;">❌ Firebase no disponible</p>';
+                    if (recentActivity) recentActivity.innerHTML = '<p style="color: #dc2626;">❌ Firebase no disponible</p>';
+                    return;
+                }
+                
+                const userProfile = await window.FirebaseData.loadUserProfile();
+                if (userProfile.role !== 'director') {
+                    if (teamOverview) teamOverview.innerHTML = '<p style="color: #f59e0b;">⚠️ Solo directores pueden ver el monitoreo</p>';
+                    return;
+                }
+                
+                // Load team data
+                const [allUsers, allContacts] = await Promise.all([
+                    window.FirebaseData.getAllUsers(),
+                    window.FirebaseData.getAllContacts()
+                ]);
+                
+                const today = new Date().toISOString().split('T')[0];
+                const todayContacts = allContacts.filter(c => c.date === today);
+                const salespeople = Object.entries(allUsers).filter(([uid, user]) => user.role === 'vendedor');
+                
+                // Team Overview
+                if (teamOverview) {
+                    teamOverview.innerHTML = `
+                        <div style="background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+                            <h3 style="margin: 0 0 1.5rem 0;">📊 Vista General del Equipo</h3>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                                <div style="text-align: center; padding: 1rem; background: #f0f9ff; border-radius: 8px;">
+                                    <div style="font-size: 2rem; font-weight: bold; color: #3b82f6;">${allContacts.length}</div>
+                                    <div style="color: #6b7280;">Total Leads</div>
+                                </div>
+                                <div style="text-align: center; padding: 1rem; background: #f0fdf4; border-radius: 8px;">
+                                    <div style="font-size: 2rem; font-weight: bold; color: #10b981;">${todayContacts.length}</div>
+                                    <div style="color: #6b7280;">Contactos Hoy</div>
+                                </div>
+                                <div style="text-align: center; padding: 1rem; background: #fefce8; border-radius: 8px;">
+                                    <div style="font-size: 2rem; font-weight: bold; color: #f59e0b;">${salespeople.length}</div>
+                                    <div style="color: #6b7280;">Vendedores</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                // Individual Activity
+                if (individualActivity) {
+                    const salespeopleStats = salespeople.map(([uid, user]) => {
+                        const userContacts = allContacts.filter(c => c.salespersonId === uid);
+                        const userTodayContacts = userContacts.filter(c => c.date === today);
+                        const userConversions = userContacts.filter(c => c.status === 'Convertido');
+                        
+                        return {
+                            name: user.name,
+                            email: user.email,
+                            totalContacts: userContacts.length,
+                            todayContacts: userTodayContacts.length,
+                            conversions: userConversions.length,
+                            conversionRate: userContacts.length > 0 ? (userConversions.length / userContacts.length * 100).toFixed(1) : 0
+                        };
+                    });
+                    
+                    individualActivity.innerHTML = `
+                        <div style="background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+                            <h3 style="margin: 0 0 1.5rem 0;">👥 Actividad Individual</h3>
+                            <div style="display: grid; gap: 1rem;">
+                                ${salespeopleStats.map(person => `
+                                    <div style="padding: 1rem; border: 1px solid #e5e7eb; border-radius: 8px; background: #f9fafb;">
+                                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                                            <div>
+                                                <h4 style="margin: 0 0 0.25rem 0;">${person.name}</h4>
+                                                <div style="font-size: 0.9rem; color: #6b7280;">${person.email}</div>
+                                            </div>
+                                            <div style="text-align: right;">
+                                                <div style="font-weight: bold; color: #3b82f6;">${person.todayContacts} hoy</div>
+                                                <div style="font-size: 0.9rem; color: #6b7280;">${person.totalContacts} total</div>
+                                            </div>
+                                        </div>
+                                        <div style="margin-top: 0.5rem; font-size: 0.9rem;">
+                                            <span style="color: #10b981;">✅ ${person.conversions} conversiones</span>
+                                            <span style="margin-left: 1rem; color: #f59e0b;">📊 ${person.conversionRate}% tasa</span>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                // Recent Activity
+                if (recentActivity) {
+                    const recentContacts = allContacts
+                        .sort((a, b) => new Date(b.date + ' ' + (b.time || '00:00:00')) - new Date(a.date + ' ' + (a.time || '00:00:00')))
+                        .slice(0, 10);
+                    
+                    recentActivity.innerHTML = `
+                        <div style="background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+                            <h3 style="margin: 0 0 1.5rem 0;">🕒 Actividad Reciente del Equipo</h3>
+                            <div style="max-height: 400px; overflow-y: auto;">
+                                ${recentContacts.map(contact => `
+                                    <div style="padding: 1rem; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
+                                        <div>
+                                            <div style="font-weight: 600;">${contact.name}</div>
+                                            <div style="font-size: 0.9rem; color: #6b7280;">📞 ${contact.phone}</div>
+                                        </div>
+                                        <div style="text-align: right;">
+                                            <div style="font-size: 0.8rem; color: #6b7280;">${formatDate(contact.date)}</div>
+                                            <div style="font-size: 0.8rem; color: #10b981;">${contact.status}</div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                console.log('✅ Monitoring data loaded successfully');
+                
+            } catch (error) {
+                console.error('❌ Error loading monitoring data:', error);
+                showNotification('❌ Error cargando datos de monitoreo', 'error');
+            }
+        }
+
+        // ===== FIX REPORTS RANKING =====
+        
+        // Enhanced loadReportsData function
+        async function loadReportsData() {
+            try {
+                console.log('📊 Loading reports data');
+                
+                if (!window.FirebaseData || !window.FirebaseData.currentUser) {
+                    console.log('⚠️ Firebase not available for reports');
+                    return;
+                }
+                
+                const userProfile = await window.FirebaseData.loadUserProfile();
+                const allContacts = await window.FirebaseData.getFilteredContacts();
+                
+                if (userProfile.role === 'director') {
+                    await loadDirectorReports(allContacts);
+                } else {
+                    await loadPersonalReports(allContacts);
+                }
+                
+            } catch (error) {
+                console.error('❌ Error loading reports data:', error);
+                showNotification('❌ Error cargando reportes', 'error');
+            }
+        }
+
+        // Fixed loadDirectorReports function
+        async function loadDirectorReports(contacts) {
+            const salesRankingEl = document.getElementById('salesRanking');
+            const directorReportsEl = document.getElementById('directorReports');
+            const personalReportsEl = document.getElementById('personalReports');
+            
+            if (directorReportsEl) directorReportsEl.classList.remove('hidden');
+            if (personalReportsEl) personalReportsEl.classList.add('hidden');
+            
+            if (!salesRankingEl) return;
+            
+            try {
+                const allUsers = await window.FirebaseData.getAllUsers();
+                const salespeople = Object.entries(allUsers).filter(([uid, user]) => user.role === 'vendedor');
+                
+                const rankings = salespeople.map(([uid, user]) => {
+                    const userContacts = contacts.filter(c => c.salespersonId === uid);
+                    const userConversions = userContacts.filter(c => c.status === 'Convertido');
+                    const today = new Date().toISOString().split('T')[0];
+                    const todayContacts = userContacts.filter(c => c.date === today);
+                    
+                    return {
+                        name: user.name,
+                        email: user.email,
+                        contacts: userContacts.length,
+                        conversions: userConversions.length,
+                        todayContacts: todayContacts.length,
+                        conversionRate: userContacts.length > 0 ? (userConversions.length / userContacts.length * 100).toFixed(1) : 0
+                    };
+                }).sort((a, b) => b.conversions - a.conversions);
+                
+                salesRankingEl.innerHTML = `
+                    <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+                        <h4 style="margin: 0 0 1rem 0; color: #374151;">🏆 Ranking de Ventas</h4>
+                        ${rankings.length === 0 ? `
+                            <div style="text-align: center; color: #6b7280; padding: 1rem;">
+                                No hay vendedores registrados
+                            </div>
+                        ` : rankings.map((person, index) => `
+                            <div style="
+                                display: flex;
+                                justify-content: space-between;
+                                align-items: center;
+                                padding: 1rem;
+                                margin-bottom: 0.5rem;
+                                background: ${index === 0 ? 'linear-gradient(135deg, #fef3c7, #fde68a)' : 
+                                             index === 1 ? 'linear-gradient(135deg, #e5e7eb, #d1d5db)' : 
+                                             index === 2 ? 'linear-gradient(135deg, #fecaca, #fca5a5)' : '#f9fafb'};
+                                border-radius: 8px;
+                                border-left: 4px solid ${index === 0 ? '#f59e0b' : index === 1 ? '#6b7280' : index === 2 ? '#ef4444' : '#e5e7eb'};
+                            ">
+                                <div>
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                                        <span style="font-size: 1.2rem;">
+                                            ${index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`}
+                                        </span>
+                                        <strong style="color: #374151;">${person.name}</strong>
+                                    </div>
+                                    <div style="font-size: 0.8rem; color: #6b7280;">${person.email}</div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <div style="font-weight: bold; color: #10b981; margin-bottom: 0.25rem;">
+                                        ${person.conversions} conversiones
+                                    </div>
+                                    <div style="font-size: 0.8rem; color: #6b7280;">
+                                        ${person.contacts} contactos (${person.conversionRate}%)
+                                    </div>
+                                    <div style="font-size: 0.8rem; color: #3b82f6;">
+                                        ${person.todayContacts} hoy
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+                
+                console.log('✅ Sales ranking loaded successfully');
+                
+            } catch (error) {
+                console.error('❌ Error loading sales ranking:', error);
+                salesRankingEl.innerHTML = `
+                    <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+                        <h4 style="margin: 0 0 1rem 0; color: #374151;">🏆 Ranking de Ventas</h4>
+                        <div style="text-align: center; color: #dc2626; padding: 1rem;">
+                            ❌ Error cargando ranking: ${error.message}
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        // Make functions globally available
+        window.showNotification = showNotification;
+        window.showLeadDetails = showLeadDetails;
+        window.getUserDisplayNameFirebase = getUserDisplayNameFirebase;
+        window.runSystemDiagnostic = runSystemDiagnostic;
+        window.loadMonitoringData = loadMonitoringData;
+        window.loadReportsData = loadReportsData;
+        window.loadDirectorReports = loadDirectorReports;
+
+        console.log('✅ All critical fixes applied successfully');
+
+    </script>
+</body>
+</html>
     </script>
     <script src="fixes.js"></script>
 </body>
