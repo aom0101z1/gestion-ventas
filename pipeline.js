@@ -224,6 +224,7 @@ function renderLeadCard(lead, stageColor) {
     const timeAgo = getTimeAgo(lead.date, lead.time);
     
    return `
+return `
     <div class="lead-card" 
          id="lead-card-${lead.id}"
          data-lead-id="${lead.id}"
@@ -233,13 +234,11 @@ function renderLeadCard(lead, stageColor) {
              border: 1px solid #e5e7eb;
              border-radius: 8px;
              padding: 1rem;
-             margin-bottom: 0;
+             margin-bottom: 0.75rem;
              cursor: move;
              transition: all 0.2s ease;
              position: relative;
              border-left: 3px solid ${priorityColor};
-             flex-shrink: 0;
-             width: 280px;
          "
              onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,0.12)'; this.style.transform='translateY(-2px)'"
              onmouseout="this.style.boxShadow='none'; this.style.transform='translateY(0)'">
