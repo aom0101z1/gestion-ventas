@@ -330,6 +330,50 @@
             .user-info { flex-direction: column; gap: 1rem; }
             .tabs { flex-direction: column; }
         }
+/* Enhanced Mobile Support */
+@media (max-width: 768px) {
+    .pipeline-grid {
+        grid-template-columns: 1fr !important;
+    }
+    
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+    
+    .lead-card {
+        padding: 0.75rem !important;
+    }
+    
+    .tabs {
+        flex-direction: column !important;
+    }
+    
+    .tab {
+        padding: 0.75rem !important;
+        font-size: 0.9rem !important;
+    }
+}
+
+/* Loading States */
+.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    border: 2px solid #f3f4f6;
+    border-top: 2px solid #3b82f6;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    transform: translate(-50%, -50%);
+}
+        
     </style>
 </head>
 
