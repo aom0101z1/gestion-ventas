@@ -1,1178 +1,1125 @@
-// core.js - FIREBASE INTEGRATED VERSION - FIXED
-// ===== FIREBASE VARIABLES GLOBALES =====
-let users = {}; // Will be loaded from Firebase
-let convenios = []; // Will be loaded from Firebase
+// core.js - FIREBASE INTEGRATED VERSION - ENHANCED WITH FUNCTION NUMBERING
+// ===== CORE SYSTEM MODULE ENHANCED =====
+// Authentication, initialization, and core functionality with Firebase
+// ================================================================================
+
+// ===== GLOBAL VARIABLES =====
 let currentUser = null;
-let currentUserProfile = null;
+let userRole = null;
+let isInitialized = false;
+let performanceMonitor = {
+    startTime: performance.now(),
+    loadTimes: [],
+    errorCount: 0
+};
 
-// ===== FIREBASE USER MANAGEMENT =====
-async function loadUsers() {
-    try {
-        if (window.FirebaseData) {
-            users = await window.FirebaseData.getAllUsers();
-            console.log('✅ Loading users from Firebase:', Object.keys(users).length);
-            return users;
-        } else {
-            console.log('⚠️ Firebase not available, using empty users');
-            return {};
-        }
-    } catch (error) {
-        console.error('❌ Error loading users from Firebase:', error);
-        return {};
-    }
-}
-
-async function saveUser(email, password, profile) {
-    try {
-        if (!window.FirebaseData) {
-            throw new Error('Firebase not available');
-        }
-        
-        const user = await window.FirebaseData.createUser(email, password, profile);
-        console.log('✅ User saved to Firebase:', email);
-        
-        // Reload users list
-        await loadUsers();
-        return user;
-    } catch (error) {
-        console.error('❌ Error saving user to Firebase:', error);
-        throw error;
-    }
-}
-
-// ===== CENTRALIZED DATA ACCESS =====
-function getAllData() {
-    if (window.AdminData && window.AdminData.isReady) {
-        return AdminData.getAllData();
-    } else {
-        console.warn('⚠️ Firebase AdminData not ready');
-        return [];
-    }
-}
-
-function getFilteredData() {
-    console.log('🔍 Getting filtered Firebase data for:', currentUserProfile?.role, currentUserProfile?.email);
-    
-    if (!window.AdminData || !window.AdminData.isReady) {
-        console.log('⚠️ Firebase AdminData not ready');
-        return [];
-    }
-    
-    const data = AdminData.getAllData();
-    
-    if (currentUserProfile?.role === 'director') {
-        console.log('👑 Director - returning ALL Firebase data:', data.length, 'records');
-        return data;
-    } else if (currentUser?.uid) {
-        const filtered = AdminData.getDataBySalesperson(currentUser.uid);
-        console.log('👤 Salesperson - filtered Firebase data:', filtered.length, 'records');
-        return filtered;
-    }
-    
-    console.log('⚠️ No user context available');
-    return [];
-}
-
-// ===== ENHANCED DATA INTEGRITY FUNCTIONS =====
-async function verifyDataIntegrity() {
-    if (!window.AdminData || !window.AdminData.isReady) {
-        console.error('❌ Firebase AdminData not available');
-        return false;
-    }
-    
-    console.log('🔍 VERIFICANDO INTEGRIDAD DE DATOS FIREBASE...');
-    
-    const data = AdminData.getAllData();
-    console.log('📊 Firebase AdminData:', data.length, 'registros');
-    
-    // Check if data is consistent
-    const issues = [];
-    data.forEach((item, index) => {
-        if (!item.id) issues.push(`Record ${index}: missing ID`);
-        if (!item.name) issues.push(`Record ${index}: missing name`);
-        if (!item.salespersonId && !item.salesperson) issues.push(`Record ${index}: missing salesperson`);
-    });
-    
-    if (issues.length > 0) {
-        console.warn('⚠️ Data integrity issues found:', issues);
-        return false;
-    }
-    
-    console.log('✅ Firebase data integrity verified');
-    return true;
-}
-
-async function forceFullSync() {
-    console.log('🔄 INICIANDO SINCRONIZACIÓN COMPLETA FIREBASE...');
-    
-    if (!window.AdminData) {
-        console.error('❌ Firebase AdminData not available');
-        return false;
-    }
-    
-    try {
-        // Reload data from Firebase
-        await AdminData.loadData();
-        
-        // Update all views
-        setTimeout(() => {
-            updateAllViews();
-            updateLeadsTable();
-            if (typeof refreshPipeline === 'function') refreshPipeline();
-        }, 200);
-        
-        console.log('✅ Firebase synchronization complete');
-        return true;
-    } catch (error) {
-        console.error('❌ Firebase sync error:', error);
-        return false;
-    }
-}
-
-// ===== INICIALIZACIÓN FIREBASE =====
-document.addEventListener('DOMContentLoaded', async function() {
-    console.log('🚀 Initializing Ciudad Bilingue CRM with Firebase');
-    
-    // Check if Firebase scripts are loaded
-    if (!window.FirebaseData) {
-        console.error('❌ Firebase not loaded! Make sure to include Firebase scripts.');
-        return;
-    }
-    
-    // Setup Firebase auth state listener
-    setupFirebaseAuthListener();
-    
-    // Load initial data
-    await loadUsers();
-    await loadConvenios();
-    
-    console.log('✅ Firebase initialization complete');
-});
-
-function setupFirebaseAuthListener() {
-    // Listen for Firebase auth state changes
-    if (window.FirebaseData && window.FirebaseData.auth) {
-        window.FirebaseData.auth.onAuthStateChanged(async (user) => {
-            if (user) {
-                console.log('✅ Firebase user authenticated:', user.email);
-                currentUser = user;
-                currentUserProfile = await window.FirebaseData.loadUserProfile();
-                
-                // Hide login screen and show main app
-                showMainApp();
-            } else {
-                console.log('ℹ️ No Firebase user authenticated');
-                currentUser = null;
-                currentUserProfile = null;
-                
-                // Show login screen
-                showLoginScreen();
-            }
-        });
-    }
-}
-
-function showLoginScreen() {
-    document.getElementById('loginScreen').classList.remove('hidden');
-    document.getElementById('mainApp').classList.add('hidden');
-}
-
-// Setup AdminData observers for automatic UI updates
-function setupAdminDataObservers() {
-    if (window.AdminData) {
-        AdminData.addObserver((data) => {
-            console.log('📊 Firebase AdminData changed, updating all views...');
-            updateAllViews();
-        });
-        console.log('✅ Firebase AdminData observers setup complete');
-    }
-}
-
-// ===== FIREBASE AUTHENTICATION =====
+// ===== FUNCIÓN 1: LOGIN WITH ENHANCED VALIDATION =====
 async function login(event) {
-    event.preventDefault();
-    const email = document.getElementById('username').value.trim(); // Using email instead of username
-    const password = document.getElementById('password').value;
+    console.log('⚡ FUNCIÓN 1: Login with Enhanced Validation');
     
-    console.log('🔐 Attempting Firebase login:', email);
+    if (event) {
+        event.preventDefault();
+    }
+    
+    const loginBtn = document.getElementById('loginBtn');
+    const originalText = loginBtn.innerHTML;
     
     try {
-        await window.FirebaseData.login(email, password);
-        // Auth state listener will handle the UI update
-        document.getElementById('loginError').classList.add('hidden');
-    } catch (error) {
-        console.error('❌ Firebase login failed:', error);
-        document.getElementById('loginError').textContent = `❌ ${error.message}`;
-        document.getElementById('loginError').classList.remove('hidden');
-    }
-}
-
-async function logout() {
-    try {
-        await window.FirebaseData.logout();
-        // Auth state listener will handle the UI update
-        console.log('✅ Firebase logout successful');
-    } catch (error) {
-        console.error('❌ Logout error:', error);
-        // Force reload as fallback
-        location.reload();
-    }
-}
-
-function showMainApp() {
-    document.getElementById('loginScreen').classList.add('hidden');
-    document.getElementById('mainApp').classList.remove('hidden');
-    setupUserInterface();
-}
-
-async function setupUserInterface() {
-    console.log('🎨 Configurando interfaz Firebase para:', currentUserProfile?.role);
-    
-    if (!currentUserProfile) {
-        console.error('❌ No user profile available');
+        // Disable login button with loading state
+        loginBtn.disabled = true;
+        loginBtn.innerHTML = '<div class="loading-spinner" style="width: 12px; height: 12px; display: inline-block; margin-right: 0.5rem;"></div>Conectando...';
         
-        // Try to ensure profile exists
-        console.log('🔄 Attempting to create missing profile...');
-        const profileCreated = await ensureUserProfile();
+        const email = document.getElementById('username').value.trim();
+        const password = document.getElementById('password').value;
         
-        if (!profileCreated) {
-            alert(`❌ Error: No se pudo cargar el perfil del usuario.
-
-🔧 Soluciones:
-1. Usar "Debug Usuario" para más información
-2. Cerrar sesión y volver a iniciar
-3. Contactar al administrador
-
-El sistema puede no funcionar correctamente sin un perfil válido.`);
-            return;
-        }
-    }
-    
-    document.getElementById('currentUserName').textContent = currentUserProfile.name;
-    document.getElementById('userRole').textContent = `(${currentUserProfile.role === 'director' ? 'Director' : 'Vendedor'})`;
-    
-    if (currentUserProfile.role === 'director') {
-        console.log('👑 Configurando interfaz de DIRECTOR Firebase');
-        
-        // Director-specific setup
-        document.getElementById('directorConfig').classList.remove('hidden');
-        document.getElementById('reportsTab').textContent = '📊 Dashboard Ejecutivo';
-        document.getElementById('reportsTitle').textContent = '📊 Dashboard Ejecutivo';
-        document.getElementById('monitoringTab').style.display = 'block';
-        document.getElementById('configTab').style.display = 'block';
-        
-        // Update tab labels for director
-        document.getElementById('contactsTab').textContent = '📞 Todos los Contactos';
-        document.getElementById('leadsTab').textContent = '👥 Todos los Leads';
-        document.getElementById('pipelineTab').textContent = '🎯 Pipeline del Equipo';
-        document.getElementById('leadsTitle').textContent = '👥 Gestión de Todos los Leads';
-        document.getElementById('contactsTitle').textContent = '📞 Contactos del Equipo';
-        document.getElementById('todayContactsTitle').textContent = '📋 Contactos de Hoy (Todos)';
-        
-        // Show director filters
-        document.getElementById('leadsFilters').style.display = 'block';
-        
-        // Add salesperson column to leads table
-        const leadsHeader = document.getElementById('leadsTableHeader');
-        if (!document.getElementById('salespersonColumn')) {
-            const salespersonTh = document.createElement('th');
-            salespersonTh.id = 'salespersonColumn';
-            salespersonTh.textContent = 'Vendedor';
-            leadsHeader.insertBefore(salespersonTh, leadsHeader.children[5]);
+        // Enhanced validation
+        const validationResult = validateLoginCredentials(email, password);
+        if (!validationResult.isValid) {
+            throw new Error(validationResult.message);
         }
         
-        await updateUsersList();
-        await updateConveniosList();
+        console.log('🔐 Attempting Firebase login for:', email);
         
-    } else {
-        console.log('👤 Configurando interfaz de VENDEDOR Firebase');
+        // Attempt Firebase login with timeout
+        const loginPromise = window.FirebaseData.login(email, password);
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Login timeout - check connection')), 10000)
+        );
         
-        // Vendedor-specific setup
-        document.getElementById('directorConfig').classList.add('hidden');
-        document.getElementById('reportsTab').textContent = '📊 Mi Dashboard';
-        document.getElementById('reportsTitle').textContent = '📊 Mi Dashboard Personal';
-        document.getElementById('monitoringTab').style.display = 'none';
-        document.getElementById('configTab').style.display = 'none';
-        document.getElementById('leadsFilters').style.display = 'none';
+        const userCredential = await Promise.race([loginPromise, timeoutPromise]);
+        console.log('✅ Firebase login successful');
         
-        // Reset tab labels for vendedor
-        document.getElementById('contactsTab').textContent = '📞 Mis Contactos';
-        document.getElementById('leadsTab').textContent = '👥 Mis Leads';
-        document.getElementById('pipelineTab').textContent = '🎯 Pipeline';
-        document.getElementById('leadsTitle').textContent = '👥 Gestión de Mis Leads';
-        document.getElementById('contactsTitle').textContent = '📞 Registrar Contactos del Día';
-        document.getElementById('todayContactsTitle').textContent = '📋 Mis Contactos de Hoy';
+        // Store user info
+        currentUser = userCredential.user;
         
-        // Remove salesperson column if it exists
-        const salespersonColumn = document.getElementById('salespersonColumn');
-        if (salespersonColumn) {
-            salespersonColumn.remove();
-        }
-    }
-    
-    await loadConveniosInSelect();
-    
-    // Setup AdminData observers
-    setupAdminDataObservers();
-    
-    // ENHANCED DATA LOADING WITH FIREBASE
-    setTimeout(async () => {
-        if (window.AdminData) {
-            console.log('🔄 Iniciando carga de datos Firebase...');
-            
-            // Wait for AdminData to be ready
-            let attempts = 0;
-            while (!window.AdminData.isReady && attempts < 50) {
-                await new Promise(resolve => setTimeout(resolve, 100));
-                attempts++;
-            }
-            
-            if (!window.AdminData.isReady) {
-                console.warn('⚠️ AdminData not ready after 5 seconds, continuing anyway');
-            }
-            
-            // Initial data load and UI update
-            setTimeout(async () => {
-                console.log('🎯 Actualizando todas las vistas Firebase...');
-                updateAllViews();
-                
-                if (currentUserProfile.role === 'director') {
-                    await populateSalespersonFilter();
-                    setTimeout(() => {
-                        updateLeadsTable();
-                        console.log('✅ Vista del director Firebase completamente actualizada');
-                    }, 300);
-                }
-                
-                if (typeof refreshPipeline === 'function') {
-                    setTimeout(() => {
-                        refreshPipeline();
-                    }, 500);
-                }
-            }, 200);
-            
-        } else {
-            console.log('❌ Firebase AdminData no disponible, reintentando...');
-            setTimeout(setupUserInterface, 500);
-        }
-    }, 100);
-}
-
-// ===== FIREBASE USER MANAGEMENT =====
-async function addUser() {
-    if (currentUserProfile?.role !== 'director') {
-        alert('❌ Solo el director puede agregar usuarios');
-        return;
-    }
-    
-    const email = document.getElementById('newUsername').value.trim();
-    const password = document.getElementById('newPassword').value;
-    const role = document.getElementById('newRole').value;
-    
-    if (!email || !password) {
-        alert('⚠️ Completa todos los campos');
-        return;
-    }
-    
-    if (!email.includes('@')) {
-        alert('⚠️ Ingresa un email válido');
-        return;
-    }
-    
-    // Disable button to prevent double submission
-    const submitBtn = document.querySelector('button[onclick="addUser()"]');
-    const originalText = submitBtn.innerHTML;
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = '<div class="loading-spinner" style="width: 12px; height: 12px; display: inline-block; margin-right: 0.5rem;"></div>Creando...';
-    
-    try {
-        // Create display name from email
-        const name = email.split('@')[0].split('.').map(n => n.charAt(0).toUpperCase() + n.slice(1)).join(' ');
-        
-        console.log('🔄 Creating Firebase user:', email);
-        
-        // Create user in Firebase Auth
-        const user = await saveUser(email, password, { name, role });
-        console.log('✅ Firebase Auth user created:', user.uid);
-        
-        // ✅ CRITICAL FIX: Ensure profile is created immediately
-        console.log('🔄 Creating user profile in database...');
-        
-        if (window.firebaseDb) {
-            const { ref, set } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js');
-            const profileRef = ref(window.firebaseDb, `users/${user.uid}/profile`);
-            await set(profileRef, {
-                name: name,
-                email: email,
-                role: role,
-                createdAt: new Date().toISOString(),
-                lastLogin: null,
-                updatedAt: new Date().toISOString()
-            });
-            console.log('✅ User profile created in database');
-        } else {
-            console.warn('⚠️ Firebase database not available, profile creation skipped');
-        }
-        
-        // Clear form
-        document.getElementById('newUsername').value = '';
-        document.getElementById('newPassword').value = '';
-        
-        // Update UI
-        await updateUsersList();
-        await populateSalespersonFilter();
-        
-        alert(`✅ Usuario creado correctamente en Firebase!
-
-👤 Email: ${email}
-🏷️ Nombre: ${name}
-🎭 Rol: ${role === 'director' ? 'Director' : 'Vendedor'}
-🔥 Perfil: Creado automáticamente
-📊 Base de datos: Firebase Realtime Database
-
-El usuario ya puede iniciar sesión inmediatamente sin errores.`);
-        
-        console.log('✅ Complete Firebase user setup finished:', email);
-    } catch (error) {
-        console.error('❌ Error adding Firebase user:', error);
-        alert(`❌ Error al crear usuario: ${error.message}
-
-Si el usuario se creó en Authentication pero falló el perfil, 
-puedes usar la herramienta de diagnóstico para repararlo.`);
-    } finally {
-        // Re-enable button
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = originalText;
-    }
-}
-
-async function deleteUser(userId) {
-    if (currentUserProfile?.role !== 'director') {
-        alert('❌ Solo el director puede eliminar usuarios');
-        return;
-    }
-    
-    // Don't allow deleting self
-    if (userId === currentUser?.uid) {
-        alert('❌ No puedes eliminar tu propia cuenta');
-        return;
-    }
-    
-    const userToDelete = users[userId];
-    if (!userToDelete) {
-        alert('❌ Usuario no encontrado');
-        return;
-    }
-    
-    if (confirm(`¿Estás seguro de eliminar al usuario ${userToDelete.name}?
-
-⚠️ Esta acción también eliminará todos los contactos asociados a este vendedor.
-⚠️ Esta acción NO se puede deshacer.`)) {
-        
-        try {
-            // Remove user's data from AdminData
-            if (window.AdminData && window.AdminData.isReady) {
-                const userData = AdminData.getDataBySalesperson(userId);
-                for (const contact of userData) {
-                    await AdminData.deleteContact(contact.id);
-                }
-                console.log(`🗑️ Deleted ${userData.length} contacts for user ${userId}`);
-            }
-            
-            // Note: Firebase Auth doesn't allow deleting users from client side
-            // In production, you'd need a Cloud Function for this
-            console.log('⚠️ Firebase user deletion requires server-side implementation');
-            
-            // Remove from local users list (temporary solution)
-            delete users[userId];
-            
-            // Update UI
-            await updateUsersList();
-            await populateSalespersonFilter();
-            updateAllViews();
-            
-            alert('✅ Usuario y sus datos eliminados localmente.\n\n⚠️ Para eliminar completamente de Firebase Auth, se requiere implementación servidor.');
-        } catch (error) {
-            console.error('❌ Error deleting user:', error);
-            alert(`❌ Error al eliminar usuario: ${error.message}`);
-        }
-    }
-}
-
-async function updateUsersList() {
-    const container = document.getElementById('usersList');
-    if (!container) return;
-    
-    // Reload users from Firebase
-    await loadUsers();
-    
-    container.innerHTML = Object.entries(users).map(([userId, user]) => `
-        <div class="user-card">
-            <div>
-                <strong>${user.name}</strong>
-                <span style="color: #666; font-size: 0.9rem;">(${user.email})</span>
-                <span style="background: ${user.role === 'director' ? '#667eea' : '#10b981'}; color: white; padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.8rem; margin-left: 0.5rem;">
-                    ${user.role === 'director' ? 'Director' : 'Vendedor'}
-                </span>
-            </div>
-            <button onclick="deleteUser('${userId}')" class="btn btn-warning" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;" ${userId === currentUser?.uid ? 'disabled' : ''}>
-                🗑️ Eliminar
-            </button>
-        </div>
-    `).join('');
-    
-    console.log('👥 Firebase users list updated with', Object.keys(users).length, 'users');
-}
-
-// ===== CONVENIOS FIREBASE =====
-async function loadConvenios() {
-    try {
-        if (window.FirebaseData) {
-            convenios = await window.FirebaseData.getConvenios();
-            console.log('✅ Loading convenios from Firebase:', convenios.length);
-        } else {
-            // Default convenios if Firebase not available
-            convenios = [
-                'Remigio', 'Hogar Nazaret', 'Empresa de Energía', 'Coats Cadena', 'Efigas', 'Cooperativa'
-            ];
-            console.log('⚠️ Using default convenios');
-        }
-        return convenios;
-    } catch (error) {
-        console.error('❌ Error loading convenios:', error);
-        return [];
-    }
-}
-
-async function addConvenio() {
-    if (currentUserProfile?.role !== 'director') {
-        alert('❌ Solo el director puede agregar convenios');
-        return;
-    }
-    
-    const convenioName = document.getElementById('newConvenio').value.trim();
-    if (!convenioName) {
-        alert('⚠️ Ingresa el nombre del convenio');
-        return;
-    }
-    
-    if (convenios.includes(convenioName)) {
-        alert('⚠️ Este convenio ya existe');
-        return;
-    }
-    
-    try {
-        convenios.push(convenioName);
-        await window.FirebaseData.updateConvenios(convenios);
-        
-        document.getElementById('newConvenio').value = '';
-        await updateConveniosList();
-        await loadConveniosInSelect();
-        alert('✅ Convenio agregado correctamente en Firebase');
-    } catch (error) {
-        console.error('❌ Error adding convenio:', error);
-        alert(`❌ Error al agregar convenio: ${error.message}`);
-    }
-}
-
-async function deleteConvenio(convenioName) {
-    if (currentUserProfile?.role !== 'director') {
-        alert('❌ Solo el director puede eliminar convenios');
-        return;
-    }
-    
-    if (confirm(`¿Estás seguro de eliminar el convenio "${convenioName}"?`)) {
-        try {
-            convenios = convenios.filter(c => c !== convenioName);
-            await window.FirebaseData.updateConvenios(convenios);
-            
-            await updateConveniosList();
-            await loadConveniosInSelect();
-            alert('✅ Convenio eliminado de Firebase');
-        } catch (error) {
-            console.error('❌ Error deleting convenio:', error);
-            alert(`❌ Error al eliminar convenio: ${error.message}`);
-        }
-    }
-}
-
-async function updateConveniosList() {
-    const container = document.getElementById('conveniosList');
-    if (!container) return;
-    
-    // Reload convenios from Firebase
-    await loadConvenios();
-    
-    container.innerHTML = convenios.map(convenio => `
-        <div class="convenio-item">
-            <span style="font-size: 0.9rem; font-weight: 500;">${convenio}</span>
-            <button onclick="deleteConvenio('${convenio}')" class="btn btn-warning" style="padding: 0.2rem 0.4rem; font-size: 0.7rem;">🗑️</button>
-        </div>
-    `).join('');
-}
-
-async function loadConveniosInSelect() {
-    const convenioSelect = document.getElementById('contactConvenio');
-    if (!convenioSelect) return;
-    
-    // Reload convenios from Firebase
-    await loadConvenios();
-    
-    convenioSelect.innerHTML = '<option value="">Seleccionar convenio...</option>';
-    convenios.forEach(convenio => {
-        const option = document.createElement('option');
-        option.value = convenio;
-        option.textContent = convenio;
-        convenioSelect.appendChild(option);
-    });
-    
-    console.log('✅ Firebase convenios cargados en select:', convenios.length);
-}
-
-// ===== REFRESH DATA CORREGIDO =====
-async function refreshData() {
-    console.log('🔄 Refreshing Firebase data...');
-    
-    // Show loading indicator
-    const indicators = document.querySelectorAll('.loading-spinner');
-    indicators.forEach(indicator => {
-        if (indicator.parentElement) {
-            indicator.parentElement.innerHTML = '<div class="loading-spinner"></div> Actualizando...';
-        }
-    });
-    
-    try {
-        if (window.AdminData && window.AdminData.isReady) {
-            // Reload data from Firebase
-            await AdminData.loadData();
-            
-            // 🔧 FIX: Single update call with proper timing
-            setTimeout(() => {
-                updateAllViews();
-                console.log('✅ Firebase data refresh completed');
-            }, 300);
-            
-        } else if (window.FirebaseData && window.FirebaseData.currentUser) {
-            // Direct Firebase approach if AdminData not ready
-            console.log('🔄 AdminData not ready, using direct Firebase calls');
-            
-            setTimeout(() => {
-                updateAllViews();
-                console.log('✅ Direct Firebase refresh completed');
-            }, 300);
-            
-        } else {
-            console.warn('⚠️ Neither AdminData nor FirebaseData available');
-            
-            // Update UI to show no data state
-            const todayContainer = document.getElementById('todayContacts');
-            if (todayContainer) {
-                todayContainer.innerHTML = `
-                    <p style="color: #ef4444; text-align: center; padding: 2rem;">
-                        ❌ Firebase no disponible<br>
-                        <small>Recarga la página o revisa tu conexión</small>
-                    </p>
-                `;
-            }
-        }
-        
-    } catch (error) {
-        console.error('❌ Error in refresh:', error);
-        
-        // Show error in UI
-        const todayContainer = document.getElementById('todayContacts');
-        if (todayContainer) {
-            todayContainer.innerHTML = `
-                <p style="color: #ef4444; text-align: center; padding: 2rem;">
-                    ❌ Error al actualizar datos<br>
-                    <small>${error.message}</small><br>
-                    <button onclick="refreshData()" class="btn btn-primary" style="margin-top: 1rem;">🔄 Reintentar</button>
-                </p>
-            `;
-        }
-    }
-}
-
-function debugData() {
-    if (!window.AdminData || !window.AdminData.isReady) {
-        alert('❌ Firebase AdminData not available');
-        return;
-    }
-    
-    const today = new Date().toISOString().split('T')[0];
-    const allData = AdminData.getAllData();
-    const filtered = getFilteredData();
-    const todayContacts = filtered.filter(c => c.date === today);
-    
-    let debugInfo = `🔍 FIREBASE ADMIN DATA DEBUG INFO:\n\n`;
-    debugInfo += `Usuario actual: ${currentUserProfile?.name} (${currentUserProfile?.email})\n`;
-    debugInfo += `Rol: ${currentUserProfile?.role}\n`;
-    debugInfo += `Firebase UID: ${currentUser?.uid}\n`;
-    debugInfo += `Fecha de hoy: ${today}\n`;
-    debugInfo += `Total contactos en Firebase: ${allData.length}\n`;
-    debugInfo += `Total usuarios en sistema: ${Object.keys(users).length}\n\n`;
-    
-    // Show all users
-    debugInfo += `👥 USUARIOS EN FIREBASE:\n`;
-    Object.entries(users).forEach(([userId, user]) => {
-        const userContacts = allData.filter(d => d.salespersonId === userId || d.salesperson === userId).length;
-        debugInfo += `   - ${user.name} (${user.email}): ${userContacts} contactos\n`;
-    });
-    
-    if (currentUserProfile?.role === 'director') {
-        debugInfo += `\n👑 VISTA DEL DIRECTOR:\n`;
-        debugInfo += `Viendo TODOS los contactos: ${filtered.length}\n`;
-        debugInfo += `Contactos de hoy (equipo): ${todayContacts.length}\n`;
-    } else {
-        debugInfo += `\n👤 MI VISTA:\n`;
-        debugInfo += `Mis contactos (filtrados): ${filtered.length}\n`;
-        debugInfo += `Mis contactos de hoy: ${todayContacts.length}\n`;
-    }
-    
-    // Add Firebase system status
-    const systemStatus = AdminData.getSystemStatus();
-    debugInfo += `\n🔥 ESTADO DEL SISTEMA FIREBASE:\n`;
-    debugInfo += `Firebase Ready: ${systemStatus.isReady}\n`;
-    debugInfo += `Authenticated: ${systemStatus.authenticated}\n`;
-    debugInfo += `Source: ${systemStatus.source}\n`;
-    debugInfo += `Last Update: ${systemStatus.lastUpdate ? new Date(systemStatus.lastUpdate).toLocaleString() : 'N/A'}\n`;
-    
-    alert(debugInfo);
-}
-
-// ===== UTILIDADES =====
-function getUserDisplayName(userId) {
-    if (users[userId]) {
-        return users[userId].name;
-    }
-    
-    // Fallback for legacy format
-    if (userId && userId.includes('.')) {
-        return userId.split('.').map(n => n.charAt(0).toUpperCase() + n.slice(1)).join(' ');
-    }
-    
-    return userId || 'Unknown User';
-}
-
-function formatDate(date) {
-    return new Date(date).toLocaleDateString('es-CO');
-}
-
-function showTab(tabName) {
-    document.querySelectorAll('.tab-content').forEach(tab => {
-        tab.classList.add('hidden');
-    });
-    document.querySelectorAll('.tab').forEach(btn => {
-        btn.classList.remove('active');
-    });
-    document.getElementById(tabName).classList.remove('hidden');
-    event.target.classList.add('active');
-    
-    // Force refresh specific views when tabs are shown
-    setTimeout(() => {
-        if (tabName === 'pipeline') {
-            if (typeof refreshPipeline === 'function') refreshPipeline();
-        } else if (tabName === 'monitoring' && currentUserProfile?.role === 'director') {
-            if (typeof refreshMonitoring === 'function') refreshMonitoring();
-        } else if (tabName === 'leads') {
-            updateLeadsTable();
-        } else if (tabName === 'reports') {
-            updateReports();
-        }
-    }, 100);
-}
-
-// ===== UPDATE ALL VIEWS CORREGIDO =====
-function updateAllViews() {
-    console.log('🔄 Updating all Firebase views...');
-    
-    try {
-        // Update stats
-        if (typeof updateStats === 'function') updateStats();
-        
-        // Update today contacts with new compact function
-        if (typeof updateTodayContacts === 'function') updateTodayContacts();
-        
-        // Update leads table
-        if (typeof updateLeadsTable === 'function') updateLeadsTable();
-        
-        // Update reports
-        if (typeof updateReports === 'function') updateReports();
-        
-        // Director-specific updates
-        if (currentUserProfile && currentUserProfile.role === 'director') {
-            populateSalespersonFilter();
-            
-            // Update monitoring if the tab is currently active
-            const monitoringTab = document.getElementById('monitoring');
-            if (monitoringTab && !monitoringTab.classList.contains('hidden')) {
-                if (typeof refreshMonitoring === 'function') refreshMonitoring();
-            }
-        }
-        
-        console.log('✅ All Firebase views updated');
-        
-    } catch (error) {
-        console.error('❌ Error updating views:', error);
-    }
-}
-
-async function populateSalespersonFilter() {
-    const filter = document.getElementById('salespersonFilter');
-    if (!filter) return;
-    
-    // Reload users from Firebase
-    await loadUsers();
-    
-    // Use the Firebase users object
-    const salespeople = Object.entries(users)
-        .filter(([userId, user]) => user.role === 'vendedor')
-        .map(([userId, user]) => ({ userId, name: user.name }));
-    
-    filter.innerHTML = '<option value="">Todos los vendedores</option>';
-    
-    salespeople.forEach(sp => {
-        const option = document.createElement('option');
-        option.value = sp.userId;
-        option.textContent = sp.name;
-        filter.appendChild(option);
-    });
-    
-    console.log('📋 Populated Firebase salesperson filter with', salespeople.length, 'salespeople');
-}
-
-async function clearLocalData() {
-    if (currentUserProfile?.role !== 'director') {
-        alert('❌ Solo el director puede eliminar todos los datos');
-        return;
-    }
-    
-    if (confirm('⚠️ ¿Estás seguro de eliminar TODOS los contactos de Firebase?\n\nEsta acción eliminará todos los datos del sistema.\n\n⚠️ Esta acción NO se puede deshacer.')) {
-        try {
-            if (window.AdminData && window.AdminData.isReady) {
-                await AdminData.clearAllData();
-                alert('🗑️ Todos los datos han sido eliminados de Firebase');
-            } else {
-                alert('❌ Firebase AdminData no disponible');
-            }
-        } catch (error) {
-            console.error('❌ Error clearing Firebase data:', error);
-            alert(`❌ Error al eliminar datos: ${error.message}`);
-        }
-    }
-}
-
-// ===== PROFILE MANAGEMENT & ERROR PREVENTION =====
-
-// Function to ensure user profile exists and create if missing
-async function ensureUserProfile() {
-    if (!window.FirebaseData || !window.FirebaseData.currentUser) {
-        console.log('No authenticated user for profile check');
-        return false;
-    }
-
-    try {
-        const user = window.FirebaseData.currentUser;
-        console.log('🔍 Checking profile for user:', user.email);
-        
-        // Try to load existing profile
-        let profile = await window.FirebaseData.loadUserProfile();
-        
+        // Load user profile with retries
+        const profile = await loadUserProfileWithRetry();
         if (!profile) {
-            console.log('⚠️ Profile not found, creating new one...');
-            
-            // Determine role based on email (temporary solution)
-            const isDirector = user.email.includes('director') || 
-                             user.email.includes('admin') || 
-                             user.email.includes('jefe');
-            const role = isDirector ? 'director' : 'vendedor';
-            
-            // Create name from email
-            const name = user.email.split('@')[0]
-                .split('.')
-                .map(part => part.charAt(0).toUpperCase() + part.slice(1))
-                .join(' ');
-            
-            // Create profile in Firebase
-            if (window.firebaseDb) {
-                const { ref, set } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js');
-                const profileRef = ref(window.firebaseDb, `users/${user.uid}/profile`);
-                await set(profileRef, {
-                    name: name,
-                    email: user.email,
-                    role: role,
-                    createdAt: new Date().toISOString(),
-                    lastLogin: new Date().toISOString(),
-                    autoCreated: true
-                });
-                
-                console.log('✅ Profile auto-created:', { name, email: user.email, role });
-                
-                // Update current user profile
-                currentUserProfile = await window.FirebaseData.loadUserProfile();
-                
-                // Show success message
-                setTimeout(() => {
-                    alert(`✅ Perfil creado automáticamente!
-
-👤 Nombre: ${name}
-📧 Email: ${user.email} 
-🎭 Rol: ${role === 'director' ? 'Director' : 'Vendedor'}
-🔄 Creación: Automática
-
-Ahora puedes usar el sistema normalmente.`);
-                }, 1000);
-                
-                return true;
-            } else {
-                console.error('❌ Firebase database not available');
-                return false;
-            }
-        } else {
-            console.log('✅ Profile found:', profile);
-            currentUserProfile = profile;
-            return true;
+            throw new Error('User profile not found. Contact administrator.');
         }
+        
+        userRole = profile.role;
+        console.log('👤 User role loaded:', userRole);
+        
+        // Update last login timestamp
+        await updateLastLogin();
+        
+        // Clear login error
+        hideLoginError();
+        
+        // Initialize main application
+        await initializeMainApplication();
+        
+        // Show success notification
+        showNotification(`✅ ¡Bienvenido ${profile.name}!\n🔥 Conectado a Firebase\n👑 Rol: ${profile.role}`, 'success', 3000);
+        
+        console.log('🎉 Login process completed successfully');
+        
     } catch (error) {
-        console.error('❌ Error checking/creating profile:', error);
-        alert(`❌ Error verificando perfil: ${error.message}`);
-        return false;
+        console.error('❌ FUNCIÓN 1 ERROR - Login failed:', error);
+        
+        let errorMessage = 'Error de autenticación';
+        
+        // Enhanced error handling
+        if (error.code === 'auth/user-not-found') {
+            errorMessage = 'Usuario no encontrado. Contacta al administrador.';
+        } else if (error.code === 'auth/wrong-password') {
+            errorMessage = 'Contraseña incorrecta.';
+        } else if (error.code === 'auth/too-many-requests') {
+            errorMessage = 'Demasiados intentos fallidos. Intenta más tarde.';
+        } else if (error.code === 'auth/network-request-failed') {
+            errorMessage = 'Error de conexión. Verifica tu internet.';
+        } else {
+            errorMessage = error.message;
+        }
+        
+        showLoginError(errorMessage);
+        performanceMonitor.errorCount++;
+        
+    } finally {
+        // Re-enable login button
+        loginBtn.disabled = false;
+        loginBtn.innerHTML = originalText;
     }
 }
 
-// Function to repair missing profiles for existing users
-async function repairUserProfiles() {
-    if (!window.FirebaseData || currentUserProfile?.role !== 'director') {
-        alert('❌ Solo el director puede reparar perfiles de usuarios');
-        return;
-    }
-
-    try {
-        console.log('🔧 Starting user profile repair...');
-        
-        // Get all authenticated users
-        const { ref, get, set } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js');
-        const authUsers = await get(ref(window.firebaseDb, 'users'));
-        const authUsersData = authUsers.val() || {};
-        
-        let repairedCount = 0;
-        let totalUsers = Object.keys(authUsersData).length;
-        
-        if (totalUsers === 0) {
-            alert('ℹ️ No hay usuarios para reparar');
-            return;
-        }
-        
-        for (const [userId, userData] of Object.entries(authUsersData)) {
-            if (!userData.profile) {
-                console.log(`🔧 Repairing profile for user ${userId}`);
-                
-                // Create basic profile
-                const profileRef = ref(window.firebaseDb, `users/${userId}/profile`);
-                await set(profileRef, {
-                    name: `Usuario ${userId.substring(0, 8)}`,
-                    email: `user-${userId}@ciudadbilingue.com`,
-                    role: 'vendedor',
-                    createdAt: new Date().toISOString(),
-                    repairedAt: new Date().toISOString(),
-                    needsUpdate: true
-                });
-                
-                repairedCount++;
-            }
-        }
-        
-        if (repairedCount > 0) {
-            alert(`✅ Reparación completada!
-
-🔧 Perfiles reparados: ${repairedCount}
-👥 Total usuarios: ${totalUsers}
-
-Los usuarios reparados necesitarán actualizar su información.`);
-        } else {
-            alert('✅ Todos los perfiles están en orden');
-        }
-        
-        console.log('✅ Profile repair completed');
-    } catch (error) {
-        console.error('❌ Error repairing profiles:', error);
-        alert(`❌ Error en la reparación: ${error.message}`);
-    }
-}
-
-// Function to show detailed user debug information  
-async function debugUserProfile() {
-    if (!window.FirebaseData || !window.FirebaseData.currentUser) {
-        alert('❌ No hay usuario autenticado');
-        return;
+// ===== FUNCIÓN 2: VALIDATE LOGIN CREDENTIALS =====
+function validateLoginCredentials(email, password) {
+    console.log('⚡ FUNCIÓN 2: Validate Login Credentials');
+    
+    const errors = [];
+    
+    // Email validation
+    if (!email) {
+        errors.push('Email es requerido');
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        errors.push('Formato de email inválido');
     }
     
+    // Password validation
+    if (!password) {
+        errors.push('Contraseña es requerida');
+    } else if (password.length < 6) {
+        errors.push('Contraseña debe tener al menos 6 caracteres');
+    }
+    
+    const result = {
+        isValid: errors.length === 0,
+        message: errors.join(', ')
+    };
+    
+    console.log('📋 Credential validation result:', result);
+    return result;
+}
+
+// ===== FUNCIÓN 3: LOAD USER PROFILE WITH RETRY =====
+async function loadUserProfileWithRetry(maxRetries = 3) {
+    console.log('⚡ FUNCIÓN 3: Load User Profile with Retry');
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            console.log(`👤 Loading user profile, attempt ${attempt}/${maxRetries}`);
+            
+            const profile = await window.FirebaseData.loadUserProfile();
+            if (profile) {
+                console.log('✅ User profile loaded successfully:', profile.name);
+                return profile;
+            }
+            
+            // If no profile found, wait before retry
+            if (attempt < maxRetries) {
+                console.log('⏳ Profile not found, waiting 1 second before retry...');
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            
+        } catch (error) {
+            console.error(`❌ Profile load attempt ${attempt} failed:`, error);
+            
+            if (attempt === maxRetries) {
+                throw error;
+            }
+            
+            // Wait before retry
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        }
+    }
+    
+    return null;
+}
+
+// ===== FUNCIÓN 4: UPDATE LAST LOGIN =====
+async function updateLastLogin() {
     try {
-        const user = window.FirebaseData.currentUser;
+        console.log('⚡ FUNCIÓN 4: Update Last Login');
+        
+        if (!currentUser) return;
+        
+        await window.FirebaseData.updateContact(currentUser.uid, {
+            lastLogin: new Date().toISOString(),
+            loginCount: (await getLoginCount()) + 1
+        });
+        
+        console.log('🕒 Last login timestamp updated');
+    } catch (error) {
+        console.error('❌ Error updating last login:', error);
+        // Non-critical error, don't throw
+    }
+}
+
+// ===== FUNCIÓN 5: GET LOGIN COUNT =====
+async function getLoginCount() {
+    try {
+        console.log('⚡ FUNCIÓN 5: Get Login Count');
+        
+        const profile = await window.FirebaseData.loadUserProfile();
+        return profile?.loginCount || 0;
+    } catch (error) {
+        console.error('❌ Error getting login count:', error);
+        return 0;
+    }
+}
+
+// ===== FUNCIÓN 6: SHOW/HIDE LOGIN ERROR =====
+function showLoginError(message) {
+    console.log('⚡ FUNCIÓN 6: Show Login Error');
+    
+    const errorDiv = document.getElementById('loginError');
+    if (errorDiv) {
+        errorDiv.textContent = message;
+        errorDiv.classList.remove('hidden');
+        
+        // Add shake animation
+        errorDiv.style.animation = 'shake 0.5s ease-in-out';
+        setTimeout(() => {
+            errorDiv.style.animation = '';
+        }, 500);
+    }
+}
+
+function hideLoginError() {
+    const errorDiv = document.getElementById('loginError');
+    if (errorDiv) {
+        errorDiv.classList.add('hidden');
+    }
+}
+
+// ===== FUNCIÓN 7: INITIALIZE MAIN APPLICATION =====
+async function initializeMainApplication() {
+    try {
+        console.log('⚡ FUNCIÓN 7: Initialize Main Application');
+        
+        // Hide login screen and show main app
+        document.getElementById('loginScreen').classList.add('hidden');
+        document.getElementById('mainApp').classList.remove('hidden');
+        
+        // Load user profile for display
         const profile = await window.FirebaseData.loadUserProfile();
         
-        let debugInfo = `🔍 DEBUG INFORMACIÓN COMPLETA DEL USUARIO:
-
-🔐 Firebase Authentication:
-   - UID: ${user.uid}
-   - Email: ${user.email}
-   - Verificado: ${user.emailVerified}
-   - Proveedor: ${user.providerData[0]?.providerId || 'N/A'}
-   - Creado: ${new Date(parseInt(user.metadata.createdAt)).toLocaleString()}
-   - Último login: ${new Date(parseInt(user.metadata.lastSignInTime)).toLocaleString()}
-
-👤 Perfil en Realtime Database:
-   - Existe: ${profile ? 'SÍ ✅' : 'NO ❌'}`;
+        // Update UI with user information
+        updateUserInterface(profile);
         
-        if (profile) {
-            debugInfo += `
-   - Nombre: ${profile.name}
-   - Email: ${profile.email}
-   - Rol: ${profile.role}
-   - Creado: ${new Date(profile.createdAt).toLocaleString()}
-   - Auto-creado: ${profile.autoCreated ? 'Sí' : 'No'}
-   - Necesita actualización: ${profile.needsUpdate ? 'Sí' : 'No'}`;
-        } else {
-            debugInfo += `
-   - ⚠️ PERFIL FALTANTE
-   - Esta es la causa del error "Cannot read properties of null"`;
+        // Configure role-based access
+        configureRoleBasedAccess(profile.role);
+        
+        // Initialize data and views
+        await initializeDataAndViews();
+        
+        // Initialize enhanced features
+        await initializeEnhancedFeatures();
+        
+        // Mark as initialized
+        isInitialized = true;
+        
+        // Performance monitoring
+        const initTime = performance.now() - performanceMonitor.startTime;
+        console.log(`🚀 Application initialized in ${initTime.toFixed(2)}ms`);
+        performanceMonitor.loadTimes.push(initTime);
+        
+    } catch (error) {
+        console.error('❌ FUNCIÓN 7 ERROR - Error initializing main application:', error);
+        showNotification('❌ Error inicializando la aplicación', 'error');
+    }
+}
+
+// ===== FUNCIÓN 8: UPDATE USER INTERFACE =====
+function updateUserInterface(profile) {
+    console.log('⚡ FUNCIÓN 8: Update User Interface');
+    
+    try {
+        // Update user name display
+        const userNameEl = document.getElementById('currentUserName');
+        if (userNameEl) {
+            userNameEl.textContent = profile.name || 'Usuario';
         }
         
-        debugInfo += `
-
-🔥 Estado del Sistema:
-   - Firebase conectado: ${window.firebaseApp ? 'SÍ' : 'NO'}
-   - Database disponible: ${window.firebaseDb ? 'SÍ' : 'NO'}
-   - AdminData listo: ${window.AdminData?.isReady ? 'SÍ' : 'NO'}
-
-💡 Acciones disponibles:
-   ${profile ? '- Perfil OK, sistema funcional' : '- Click "Crear Perfil Automático" para solucionar'}
-   - Use "Reparar Perfiles" si hay múltiples usuarios con problemas`;
+        // Update user role display
+        const userRoleEl = document.getElementById('userRole');
+        if (userRoleEl) {
+            const roleEmoji = profile.role === 'director' ? '👑' : '👤';
+            userRoleEl.textContent = `${roleEmoji} ${profile.role.charAt(0).toUpperCase() + profile.role.slice(1)}`;
+        }
         
-        alert(debugInfo);
+        // Update page titles based on role
+        updatePageTitles(profile);
+        
+        console.log('✅ User interface updated successfully');
+        
     } catch (error) {
+        console.error('❌ FUNCIÓN 8 ERROR - Error updating UI:', error);
+    }
+}
+
+// ===== FUNCIÓN 9: UPDATE PAGE TITLES =====
+function updatePageTitles(profile) {
+    console.log('⚡ FUNCIÓN 9: Update Page Titles');
+    
+    const titleMappings = {
+        director: {
+            'contactsTitle': '📞 Contactos del Equipo',
+            'leadsTitle': '👥 Gestión de Leads del Equipo',
+            'reportsTitle': '📊 Reportes Ejecutivos'
+        },
+        vendedor: {
+            'contactsTitle': '📞 Mis Contactos del Día',
+            'leadsTitle': '👥 Mis Leads',
+            'reportsTitle': '📊 Mis Reportes'
+        }
+    };
+    
+    const titles = titleMappings[profile.role] || titleMappings.vendedor;
+    
+    Object.keys(titles).forEach(elementId => {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.textContent = titles[elementId];
+        }
+    });
+}
+
+// ===== FUNCIÓN 10: CONFIGURE ROLE-BASED ACCESS =====
+function configureRoleBasedAccess(role) {
+    console.log('⚡ FUNCIÓN 10: Configure Role-Based Access');
+    
+    try {
+        // Show/hide tabs based on role
+        const monitoringTab = document.getElementById('monitoringTab');
+        const configTab = document.getElementById('configTab');
+        const directorConfig = document.getElementById('directorConfig');
+        const leadsFilters = document.getElementById('leadsFilters');
+        
+        if (role === 'director') {
+            // Show director-only features
+            if (monitoringTab) monitoringTab.style.display = 'block';
+            if (configTab) configTab.style.display = 'block';
+            if (directorConfig) directorConfig.classList.remove('hidden');
+            if (leadsFilters) leadsFilters.style.display = 'flex';
+            
+            // Update leads table header for directors
+            updateLeadsTableHeaderForDirector();
+            
+        } else {
+            // Hide director-only features
+            if (monitoringTab) monitoringTab.style.display = 'none';
+            if (configTab) configTab.style.display = 'none';
+            if (directorConfig) directorConfig.classList.add('hidden');
+            if (leadsFilters) leadsFilters.style.display = 'none';
+        }
+        
+        console.log('✅ Role-based access configured for:', role);
+        
+    } catch (error) {
+        console.error('❌ FUNCIÓN 10 ERROR - Error configuring role access:', error);
+    }
+}
+
+// ===== FUNCIÓN 11: UPDATE LEADS TABLE HEADER FOR DIRECTOR =====
+function updateLeadsTableHeaderForDirector() {
+    console.log('⚡ FUNCIÓN 11: Update Leads Table Header for Director');
+    
+    const header = document.getElementById('leadsTableHeader');
+    if (header) {
+        header.innerHTML = `
+            <th>👤 Nombre</th>
+            <th>📞 Teléfono</th>
+            <th>📍 Fuente</th>
+            <th>📊 Estado</th>
+            <th>📅 Fecha</th>
+            <th>👨‍💼 Vendedor</th>
+            <th>⚡ Acciones</th>
+        `;
+    }
+}
+
+// ===== FUNCIÓN 12: INITIALIZE DATA AND VIEWS =====
+async function initializeDataAndViews() {
+    try {
+        console.log('⚡ FUNCIÓN 12: Initialize Data and Views');
+        
+        // Show loading indicators
+        showLoadingStates();
+        
+        // Initialize data with parallel loading
+        const initPromises = [
+            updateStats(),
+            updateLeadsTable(),
+            loadConveniosSystem()
+        ];
+        
+        // Add role-specific initializations
+        const profile = await window.FirebaseData.loadUserProfile();
+        if (profile.role === 'director') {
+            initPromises.push(
+                updateReports(),
+                refreshMonitoring(),
+                loadSalespersonFilter()
+            );
+        } else {
+            initPromises.push(updateReports());
+        }
+        
+        // Wait for all initializations
+        await Promise.allSettled(initPromises);
+        
+        // Hide loading indicators
+        hideLoadingStates();
+        
+        console.log('✅ Data and views initialized successfully');
+        
+    } catch (error) {
+        console.error('❌ FUNCIÓN 12 ERROR - Error initializing data and views:', error);
+        showNotification('⚠️ Error cargando algunos datos', 'warning');
+    }
+}
+
+// ===== FUNCIÓN 13: SHOW/HIDE LOADING STATES =====
+function showLoadingStates() {
+    console.log('⚡ FUNCIÓN 13: Show Loading States');
+    
+    // Add loading class to main container
+    const container = document.querySelector('.container');
+    if (container) {
+        container.classList.add('loading');
+    }
+    
+    // Show skeleton loading for stats
+    const statsGrid = document.querySelector('.stats-grid');
+    if (statsGrid) {
+        statsGrid.style.opacity = '0.6';
+    }
+}
+
+function hideLoadingStates() {
+    // Remove loading class
+    const container = document.querySelector('.container');
+    if (container) {
+        container.classList.remove('loading');
+    }
+    
+    // Restore stats opacity
+    const statsGrid = document.querySelector('.stats-grid');
+    if (statsGrid) {
+        statsGrid.style.opacity = '1';
+    }
+}
+
+// ===== FUNCIÓN 14: LOAD CONVENIOS SYSTEM =====
+async function loadConveniosSystem() {
+    try {
+        console.log('⚡ FUNCIÓN 14: Load Convenios System');
+        
+        // Pre-load convenios for faster form interaction
+        if (window.FirebaseData) {
+            const convenios = await window.FirebaseData.getConvenios();
+            
+            // Cache convenios globally for quick access
+            window.cachedConvenios = convenios || [];
+            
+            console.log('🤝 Convenios system loaded:', convenios?.length || 0, 'convenios');
+            
+            // Initialize convenios list in config if director
+            const profile = await window.FirebaseData.loadUserProfile();
+            if (profile.role === 'director') {
+                await updateConveniosList();
+            }
+        }
+        
+    } catch (error) {
+        console.error('❌ FUNCIÓN 14 ERROR - Error loading convenios system:', error);
+        window.cachedConvenios = [];
+    }
+}
+
+// ===== FUNCIÓN 15: LOAD SALESPERSON FILTER =====
+async function loadSalespersonFilter() {
+    try {
+        console.log('⚡ FUNCIÓN 15: Load Salesperson Filter');
+        
+        const filter = document.getElementById('salespersonFilter');
+        if (!filter) return;
+        
+        // Load all users
+        const allUsers = await window.FirebaseData.getAllUsers();
+        const salespeople = Object.entries(allUsers).filter(([uid, user]) => user.role === 'vendedor');
+        
+        // Populate filter
+        filter.innerHTML = '<option value="">👥 Todos los vendedores</option>' +
+            salespeople.map(([uid, user]) => 
+                `<option value="${uid}">👤 ${user.name}</option>`
+            ).join('');
+        
+        console.log('✅ Salesperson filter loaded with', salespeople.length, 'salespeople');
+        
+    } catch (error) {
+        console.error('❌ FUNCIÓN 15 ERROR - Error loading salesperson filter:', error);
+    }
+}
+
+// ===== FUNCIÓN 16: INITIALIZE ENHANCED FEATURES =====
+async function initializeEnhancedFeatures() {
+    try {
+        console.log('⚡ FUNCIÓN 16: Initialize Enhanced Features');
+        
+        // Initialize keyboard shortcuts
+        initializeKeyboardShortcuts();
+        
+        // Initialize auto-save functionality
+        initializeAutoSave();
+        
+        // Initialize performance monitoring
+        initializePerformanceMonitoring();
+        
+        // Initialize offline detection
+        initializeOfflineDetection();
+        
+        // Initialize activity tracking
+        initializeActivityTracking();
+        
+        console.log('✅ Enhanced features initialized');
+        
+    } catch (error) {
+        console.error('❌ FUNCIÓN 16 ERROR - Error initializing enhanced features:', error);
+    }
+}
+
+// ===== FUNCIÓN 17: INITIALIZE KEYBOARD SHORTCUTS =====
+function initializeKeyboardShortcuts() {
+    console.log('⚡ FUNCIÓN 17: Initialize Keyboard Shortcuts');
+    
+    document.addEventListener('keydown', (e) => {
+        // Global shortcuts
+        if (e.ctrlKey || e.metaKey) {
+            switch (e.key) {
+                case 'Enter':
+                    // Submit active form
+                    const activeForm = document.querySelector('form:focus-within');
+                    if (activeForm) {
+                        e.preventDefault();
+                        activeForm.dispatchEvent(new Event('submit'));
+                    }
+                    break;
+                    
+                case 'r':
+                    // Refresh data
+                    e.preventDefault();
+                    refreshData();
+                    break;
+                    
+                case 'f':
+                    // Focus search
+                    e.preventDefault();
+                    const searchInput = document.querySelector('input[type="search"], input[placeholder*="buscar" i]');
+                    if (searchInput) {
+                        searchInput.focus();
+                    }
+                    break;
+                    
+                case '1':
+                case '2':
+                case '3':
+                case '4':
+                case '5':
+                case '6':
+                    // Switch tabs
+                    e.preventDefault();
+                    const tabIndex = parseInt(e.key) - 1;
+                    const tabs = document.querySelectorAll('.tab');
+                    if (tabs[tabIndex]) {
+                        tabs[tabIndex].click();
+                    }
+                    break;
+            }
+        }
+        
+        // Escape key actions
+        if (e.key === 'Escape') {
+            // Close modals, clear forms, etc.
+            const activeForm = document.querySelector('form:focus-within');
+            if (activeForm) {
+                activeForm.reset();
+            }
+        }
+    });
+    
+    console.log('⌨️ Keyboard shortcuts enabled');
+}
+
+// ===== FUNCIÓN 18: INITIALIZE AUTO-SAVE =====
+function initializeAutoSave() {
+    console.log('⚡ FUNCIÓN 18: Initialize Auto-Save');
+    
+    // Auto-save form data to sessionStorage to prevent data loss
+    const forms = document.querySelectorAll('form');
+    
+    forms.forEach(form => {
+        const inputs = form.querySelectorAll('input, select, textarea');
+        
+        inputs.forEach(input => {
+            // Load saved data
+            const savedValue = sessionStorage.getItem(`autosave_${input.id}`);
+            if (savedValue && !input.value) {
+                input.value = savedValue;
+            }
+            
+            // Save data on change
+            input.addEventListener('input', () => {
+                sessionStorage.setItem(`autosave_${input.id}`, input.value);
+            });
+        });
+        
+        // Clear auto-save data on successful submission
+        form.addEventListener('submit', () => {
+            setTimeout(() => {
+                inputs.forEach(input => {
+                    sessionStorage.removeItem(`autosave_${input.id}`);
+                });
+            }, 1000);
+        });
+    });
+    
+    console.log('💾 Auto-save functionality enabled');
+}
+
+// ===== FUNCIÓN 19: INITIALIZE PERFORMANCE MONITORING =====
+function initializePerformanceMonitoring() {
+    console.log('⚡ FUNCIÓN 19: Initialize Performance Monitoring');
+    
+    // Monitor page visibility
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            console.log('👁️ Page became visible - refreshing data');
+            refreshData();
+        }
+    });
+    
+    // Monitor memory usage (if available)
+    if ('memory' in performance) {
+        setInterval(() => {
+            const memory = performance.memory;
+            if (memory.usedJSHeapSize > memory.jsHeapSizeLimit * 0.9) {
+                console.warn('⚠️ High memory usage detected');
+                // Could trigger cleanup operations here
+            }
+        }, 60000); // Check every minute
+    }
+    
+    // Monitor network status
+    if ('connection' in navigator) {
+        const connection = navigator.connection;
+        console.log('📡 Network type:', connection.effectiveType);
+        
+        connection.addEventListener('change', () => {
+            console.log('📡 Network changed to:', connection.effectiveType);
+            updateNetworkStatus(connection.effectiveType);
+        });
+    }
+    
+    console.log('📊 Performance monitoring enabled');
+}
+
+// ===== FUNCIÓN 20: INITIALIZE OFFLINE DETECTION =====
+function initializeOfflineDetection() {
+    console.log('⚡ FUNCIÓN 20: Initialize Offline Detection');
+    
+    function updateOnlineStatus() {
+        const isOnline = navigator.onLine;
+        const firebaseStatus = document.getElementById('firebaseStatus');
+        
+        if (firebaseStatus) {
+            if (isOnline) {
+                firebaseStatus.classList.remove('disconnected');
+                firebaseStatus.innerHTML = '🔥 Firebase Conectado';
+            } else {
+                firebaseStatus.classList.add('disconnected');
+                firebaseStatus.innerHTML = '📱 Modo Offline';
+            }
+        }
+        
+        console.log('🌐 Online status:', isOnline ? 'Online' : 'Offline');
+    }
+    
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+    
+    // Initial check
+    updateOnlineStatus();
+    
+    console.log('📱 Offline detection enabled');
+}
+
+// ===== FUNCIÓN 21: INITIALIZE ACTIVITY TRACKING =====
+function initializeActivityTracking() {
+    console.log('⚡ FUNCIÓN 21: Initialize Activity Tracking');
+    
+    let lastActivity = Date.now();
+    let activityTimer;
+    
+    function resetActivityTimer() {
+        lastActivity = Date.now();
+        clearTimeout(activityTimer);
+        
+        // Auto-refresh data after 5 minutes of inactivity
+        activityTimer = setTimeout(() => {
+            console.log('🔄 Auto-refreshing due to inactivity');
+            refreshData();
+        }, 5 * 60 * 1000);
+    }
+    
+    // Track user activity
+    ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(event => {
+        document.addEventListener(event, resetActivityTimer, true);
+    });
+    
+    // Initial timer
+    resetActivityTimer();
+    
+    console.log('👤 Activity tracking enabled');
+}
+
+// ===== FUNCIÓN 22: UPDATE NETWORK STATUS =====
+function updateNetworkStatus(effectiveType) {
+    console.log('⚡ FUNCIÓN 22: Update Network Status');
+    
+    const statusMap = {
+        'slow-2g': { emoji: '🐌', text: 'Red Lenta' },
+        '2g': { emoji: '📶', text: 'Red 2G' },
+        '3g': { emoji: '📶', text: 'Red 3G' },
+        '4g': { emoji: '📶', text: 'Red 4G' }
+    };
+    
+    const status = statusMap[effectiveType] || { emoji: '📶', text: 'Red Desconocida' };
+    
+    // Could update UI to show network status
+    console.log(`📡 Network status updated: ${status.emoji} ${status.text}`);
+}
+
+// ===== FUNCIÓN 23: REFRESH DATA =====
+async function refreshData() {
+    try {
+        console.log('⚡ FUNCIÓN 23: Refresh Data');
+        
+        if (!isInitialized) {
+            console.log('⚠️ Application not initialized yet');
+            return;
+        }
+        
+        // Show refresh indicator
+        const refreshBtn = document.querySelector('[onclick="refreshData()"]');
+        if (refreshBtn) {
+            const originalText = refreshBtn.innerHTML;
+            refreshBtn.innerHTML = '🔄 Sincronizando...';
+            refreshBtn.disabled = true;
+            
+            setTimeout(() => {
+                refreshBtn.innerHTML = originalText;
+                refreshBtn.disabled = false;
+            }, 2000);
+        }
+        
+        // Refresh all data
+        await Promise.allSettled([
+            updateStats(),
+            updateLeadsTable(),
+            updateReports()
+        ]);
+        
+        // Refresh role-specific data
+        if (userRole === 'director') {
+            await Promise.allSettled([
+                refreshMonitoring(),
+                updateConveniosList()
+            ]);
+        }
+        
+        showNotification('✅ Datos actualizados', 'success', 2000);
+        console.log('✅ Data refresh completed');
+        
+    } catch (error) {
+        console.error('❌ FUNCIÓN 23 ERROR - Error refreshing data:', error);
+        showNotification('❌ Error al actualizar datos', 'error');
+    }
+}
+
+// ===== FUNCIÓN 24: LOGOUT WITH CLEANUP =====
+async function logout() {
+    try {
+        console.log('⚡ FUNCIÓN 24: Logout with Cleanup');
+        
+        // Confirm logout
+        const confirmLogout = confirm('¿Estás seguro de que quieres cerrar sesión?');
+        if (!confirmLogout) return;
+        
+        // Show logout indicator
+        const logoutBtn = document.querySelector('[onclick="logout()"]');
+        if (logoutBtn) {
+            logoutBtn.innerHTML = '🔄 Cerrando...';
+            logoutBtn.disabled = true;
+        }
+        
+        // Clear session data
+        clearSessionData();
+        
+        // Firebase logout
+        await window.FirebaseData.logout();
+        
+        // Reset application state
+        resetApplicationState();
+        
+        // Show login screen
+        document.getElementById('mainApp').classList.add('hidden');
+        document.getElementById('loginScreen').classList.remove('hidden');
+        
+        // Clear form fields
+        document.getElementById('username').value = '';
+        document.getElementById('password').value = '';
+        
+        // Focus username field
+        setTimeout(() => {
+            document.getElementById('username').focus();
+        }, 100);
+        
+        showNotification('👋 Sesión cerrada correctamente', 'info', 3000);
+        console.log('✅ Logout completed successfully');
+        
+    } catch (error) {
+        console.error('❌ FUNCIÓN 24 ERROR - Logout error:', error);
+        showNotification('❌ Error al cerrar sesión', 'error');
+    }
+}
+
+// ===== FUNCIÓN 25: CLEAR SESSION DATA =====
+function clearSessionData() {
+    console.log('⚡ FUNCIÓN 25: Clear Session Data');
+    
+    // Clear auto-save data
+    const keys = Object.keys(sessionStorage);
+    keys.forEach(key => {
+        if (key.startsWith('autosave_')) {
+            sessionStorage.removeItem(key);
+        }
+    });
+    
+    // Clear cached data
+    if (window.AdminData) {
+        window.AdminData.invalidateCache();
+    }
+    
+    console.log('🗑️ Session data cleared');
+}
+
+// ===== FUNCIÓN 26: RESET APPLICATION STATE =====
+function resetApplicationState() {
+    console.log('⚡ FUNCIÓN 26: Reset Application State');
+    
+    // Reset global variables
+    currentUser = null;
+    userRole = null;
+    isInitialized = false;
+    
+    // Reset UI state
+    const tabs = document.querySelectorAll('.tab');
+    tabs.forEach(tab => tab.classList.remove('active'));
+    
+    const tabContents = document.querySelectorAll('.tab-content');
+    tabContents.forEach(content => content.classList.add('hidden'));
+    
+    // Reset to default tab
+    const defaultTab = document.getElementById('contactsTab');
+    const defaultContent = document.getElementById('contacts');
+    
+    if (defaultTab) defaultTab.classList.add('active');
+    if (defaultContent) defaultContent.classList.remove('hidden');
+    
+    console.log('🔄 Application state reset');
+}
+
+// ===== FUNCIÓN 27: UPDATE CONVENIOS LIST =====
+async function updateConveniosList() {
+    try {
+        console.log('⚡ FUNCIÓN 27: Update Convenios List');
+        
+        const conveniosList = document.getElementById('conveniosList');
+        if (!conveniosList) return;
+        
+        conveniosList.innerHTML = '<div class="loading-spinner"></div> Cargando convenios...';
+        
+        const convenios = await window.FirebaseData.getConvenios();
+        
+        if (!convenios || convenios.length === 0) {
+            conveniosList.innerHTML = `
+                <div style="text-align: center; color: #666; padding: 2rem;">
+                    <div style="font-size: 2rem; margin-bottom: 1rem;">🤝</div>
+                    <p>No hay convenios registrados</p>
+                    <small>Agrega el primer convenio arriba</small>
+                </div>
+            `;
+            return;
+        }
+        
+        conveniosList.innerHTML = convenios.map((convenio, index) => `
+            <div class="convenio-item">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="background: #10b981; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: bold;">
+                        ${index + 1}
+                    </span>
+                    <span style="font-weight: 500;">${convenio}</span>
+                </div>
+                <button onclick="deleteConvenio('${convenio}')" 
+                        style="background: #ef4444; color: white; border: none; border-radius: 4px; padding: 0.25rem 0.5rem; cursor: pointer; font-size: 0.8rem;"
+                        title="Eliminar convenio">
+                    🗑️
+                </button>
+            </div>
+        `).join('');
+        
+        console.log('✅ Convenios list updated with', convenios.length, 'items');
+        
+    } catch (error) {
+        console.error('❌ FUNCIÓN 27 ERROR - Error updating convenios list:', error);
+        const conveniosList = document.getElementById('conveniosList');
+        if (conveniosList) {
+            conveniosList.innerHTML = '<div style="color: #ef4444;">❌ Error cargando convenios</div>';
+        }
+    }
+}
+
+// ===== FUNCIÓN 28: ADD CONVENIO =====
+async function addConvenio() {
+    try {
+        console.log('⚡ FUNCIÓN 28: Add Convenio');
+        
+        const input = document.getElementById('newConvenio');
+        const convenioName = input.value.trim();
+        
+        if (!convenioName) {
+            showNotification('⚠️ Ingresa el nombre del convenio', 'warning');
+            input.focus();
+            return;
+        }
+        
+        if (convenioName.length < 3) {
+            showNotification('⚠️ El nombre debe tener al menos 3 caracteres', 'warning');
+            input.focus();
+            return;
+        }
+        
+        // Get current convenios
+        const currentConvenios = await window.FirebaseData.getConvenios();
+        
+        // Check for duplicates
+        if (currentConvenios.includes(convenioName)) {
+            showNotification('⚠️ Este convenio ya existe', 'warning');
+            input.focus();
+            return;
+        }
+        
+        // Add new convenio
+        const updatedConvenios = [...currentConvenios, convenioName];
+        await window.FirebaseData.updateConvenios(updatedConvenios);
+        
+        // Clear input
+        input.value = '';
+        
+        // Update UI
+        await updateConveniosList();
+        
+        // Update cached convenios
+        window.cachedConvenios = updatedConvenios;
+        
+        showNotification(`✅ Convenio "${convenioName}" agregado correctamente`, 'success');
+        console.log('✅ Convenio added successfully:', convenioName);
+        
+    } catch (error) {
+        console.error('❌ FUNCIÓN 28 ERROR - Error adding convenio:', error);
+        showNotification('❌ Error al agregar convenio', 'error');
+    }
+}
+
+// ===== FUNCIÓN 29: DELETE CONVENIO =====
+async function deleteConvenio(convenioName) {
+    try {
+        console.log('⚡ FUNCIÓN 29: Delete Convenio');
+        
+        const confirmDelete = confirm(`¿Estás seguro de eliminar el convenio "${convenioName}"?\n\nEsta acción no se puede deshacer.`);
+        if (!confirmDelete) return;
+        
+        // Get current convenios
+        const currentConvenios = await window.FirebaseData.getConvenios();
+        
+        // Remove convenio
+        const updatedConvenios = currentConvenios.filter(c => c !== convenioName);
+        await window.FirebaseData.updateConvenios(updatedConvenios);
+        
+        // Update UI
+        await updateConveniosList();
+        
+        // Update cached convenios
+        window.cachedConvenios = updatedConvenios;
+        
+        showNotification(`✅ Convenio "${convenioName}" eliminado correctamente`, 'success');
+        console.log('✅ Convenio deleted successfully:', convenioName);
+        
+    } catch (error) {
+        console.error('❌ FUNCIÓN 29 ERROR - Error deleting convenio:', error);
+        showNotification('❌ Error al eliminar convenio', 'error');
+    }
+}
+
+// ===== FUNCIÓN 30: DEBUG DATA =====
+async function debugData() {
+    try {
+        console.log('⚡ FUNCIÓN 30: Debug Data');
+        
+        const debugInfo = {
+            timestamp: new Date().toISOString(),
+            user: {
+                authenticated: !!currentUser,
+                email: currentUser?.email,
+                role: userRole,
+                isInitialized: isInitialized
+            },
+            firebase: {
+                available: !!window.FirebaseData,
+                currentUser: !!window.FirebaseData?.currentUser
+            },
+            adminData: {
+                available: !!window.AdminData,
+                isReady: window.AdminData?.isReady,
+                dataCount: window.AdminData?.data?.length || 0
+            },
+            convenios: {
+                cached: window.cachedConvenios?.length || 0,
+                systemAvailable: typeof window.FirebaseData?.getConvenios === 'function'
+            },
+            performance: {
+                loadTimes: performanceMonitor.loadTimes,
+                errorCount: performanceMonitor.errorCount,
+                averageLoadTime: performanceMonitor.loadTimes.length > 0 ? 
+                    (performanceMonitor.loadTimes.reduce((a, b) => a + b, 0) / performanceMonitor.loadTimes.length).toFixed(2) + 'ms' : 'N/A'
+            }
+        };
+        
+        console.log('🔍 DEBUG INFO:', debugInfo);
+        
+        alert(`🔍 DEBUG INFORMATION:
+
+👤 USER:
+- Authenticated: ${debugInfo.user.authenticated ? '✅' : '❌'}
+- Email: ${debugInfo.user.email || 'N/A'}
+- Role: ${debugInfo.user.role || 'N/A'}
+- Initialized: ${debugInfo.user.isInitialized ? '✅' : '❌'}
+
+🔥 FIREBASE:
+- Available: ${debugInfo.firebase.available ? '✅' : '❌'}
+- Current User: ${debugInfo.firebase.currentUser ? '✅' : '❌'}
+
+📊 ADMIN DATA:
+- Available: ${debugInfo.adminData.available ? '✅' : '❌'}
+- Ready: ${debugInfo.adminData.isReady ? '✅' : '❌'}
+- Data Count: ${debugInfo.adminData.dataCount}
+
+🤝 CONVENIOS:
+- Cached: ${debugInfo.convenios.cached}
+- System Available: ${debugInfo.convenios.systemAvailable ? '✅' : '❌'}
+
+⚡ PERFORMANCE:
+- Average Load Time: ${debugInfo.performance.averageLoadTime}
+- Error Count: ${debugInfo.performance.errorCount}
+
+Check console for detailed information.`);
+        
+        return debugInfo;
+        
+    } catch (error) {
+        console.error('❌ FUNCIÓN 30 ERROR - Debug error:', error);
         alert(`❌ Error en debug: ${error.message}`);
     }
 }
 
-// ===== MIGRATION HELPERS =====
-
-async function migrateFromLocalStorage() {
-    if (currentUserProfile?.role !== 'director') {
-        alert('❌ Solo el director puede realizar la migración');
-        return;
+// ===== INITIALIZATION WHEN DOM IS READY =====
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('🚀 DOM loaded - Core system ready');
+    
+    // Start performance monitoring
+    performanceMonitor.startTime = performance.now();
+    
+    // Focus username field
+    const usernameField = document.getElementById('username');
+    if (usernameField) {
+        usernameField.focus();
     }
     
-    if (!window.AdminData || !window.AdminData.isReady) {
-        alert('❌ Firebase AdminData no disponible');
-        return;
-    }
-    
-    try {
-        const migrated = await AdminData.migrateFromLocalStorage();
-        if (migrated > 0) {
-            alert(`✅ Migración completada!\n\n📊 ${migrated} contactos migrados de localStorage a Firebase\n🔄 Los datos están ahora sincronizados en tiempo real`);
-            updateAllViews();
-        } else {
-            alert('ℹ️ No se encontraron datos en localStorage para migrar');
-        }
-    } catch (error) {
-        console.error('❌ Migration error:', error);
-        alert(`❌ Error en la migración: ${error.message}`);
-    }
-}
-
-async function diagnoseDirectorData() {
-    if (currentUserProfile?.role !== 'director') {
-        alert('❌ Esta función es solo para el director');
-        return;
-    }
-    
-    console.log('🔍 DIAGNÓSTICO COMPLETO DE DATOS FIREBASE DEL DIRECTOR');
-    
-    try {
-        const allData = AdminData?.getAllData() || [];
-        const filteredData = getFilteredData();
-        const usersCount = Object.keys(users).length;
-        const systemStatus = AdminData?.getSystemStatus();
-        
-        // Check for profile issues
-        let profileIssues = 0;
-        let usersWithoutProfiles = [];
-        
-        for (const [userId, user] of Object.entries(users)) {
-            if (!user.name || !user.role || !user.email) {
-                profileIssues++;
-                usersWithoutProfiles.push(userId);
+    // Add Enter key listener for password field
+    const passwordField = document.getElementById('password');
+    if (passwordField) {
+        passwordField.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                login();
             }
-        }
-        
-        let diagnostic = `🔍 DIAGNÓSTICO FIREBASE COMPLETO
-
-🔥 ESTADO DE FIREBASE:
-   - Conectado: ${window.firebaseApp ? 'SÍ ✅' : 'NO ❌'}
-   - Database: ${window.firebaseDb ? 'SÍ ✅' : 'NO ❌'}
-   - Auth: ${window.FirebaseData?.currentUser ? 'SÍ ✅' : 'NO ❌'}
-   - AdminData Ready: ${AdminData?.isReady ? 'SÍ ✅' : 'NO ❌'}
-
-👥 USUARIOS EN FIREBASE:
-   - Total usuarios: ${usersCount}
-   - Usuarios con problemas: ${profileIssues}
-   - Director autenticado: ${currentUser?.uid ? 'SÍ' : 'NO'}
-
-📊 DATOS DEL SISTEMA:
-   - Total contactos Firebase: ${allData.length}
-   - Vista filtrada: ${filteredData.length}
-   - Sincronización: ${systemStatus?.source || 'Unknown'}`;
-        
-        if (profileIssues > 0) {
-            diagnostic += `
-
-⚠️ PROBLEMAS DETECTADOS:
-   - ${profileIssues} usuarios con perfiles incompletos
-   - Esto puede causar errores al agregar contactos
-   - Usuarios afectados: ${usersWithoutProfiles.slice(0, 3).join(', ')}${usersWithoutProfiles.length > 3 ? '...' : ''}`;
-        }
-        
-        // Show all users and their data
-        diagnostic += `\n\n👥 DETALLES POR USUARIO:`;
-        let userIndex = 1;
-        for (const [userId, user] of Object.entries(users)) {
-            const userContacts = allData.filter(d => 
-                d.salespersonId === userId || d.salesperson === userId
-            ).length;
-            const hasCompleteProfile = user.name && user.role && user.email;
-            diagnostic += `\n   ${userIndex}. ${user.name || 'Sin nombre'} (${user.email || 'Sin email'})`;
-            diagnostic += `\n      - Rol: ${user.role || 'Sin rol'}`;
-            diagnostic += `\n      - Contactos: ${userContacts}`;
-            diagnostic += `\n      - Perfil: ${hasCompleteProfile ? 'Completo ✅' : 'Incompleto ⚠️'}`;
-            userIndex++;
-        }
-        
-        // Firebase system status
-        if (systemStatus) {
-            diagnostic += `\n\n🔥 ESTADO DEL SISTEMA:
-   - Fuente: ${systemStatus.source}
-   - Ready: ${systemStatus.isReady}
-   - Observers: ${systemStatus.observers}
-   - Última actualización: ${systemStatus.lastUpdate ? new Date(systemStatus.lastUpdate).toLocaleString() : 'N/A'}`;
-        }
-        
-        diagnostic += `\n\n🛠️ ACCIONES RECOMENDADAS:`;
-        if (profileIssues > 0) {
-            diagnostic += `\n   1. Click "Reparar Perfiles" para solucionar usuarios incompletos`;
-            diagnostic += `\n   2. Verificar que todos los usuarios puedan hacer login`;
-        } else {
-            diagnostic += `\n   ✅ Sistema funcionando correctamente`;
-        }
-        diagnostic += `\n   3. Use "Debug Usuario" para problemas específicos`;
-        diagnostic += `\n   4. Contactos se sincronizan en tiempo real`;
-        
-        alert(diagnostic);
-    } catch (error) {
-        console.error('❌ Error in diagnosis:', error);
-        alert(`❌ Error en el diagnóstico: ${error.message}`);
+        });
     }
-}
+    
+    console.log('✅ Core.js Enhanced loaded with 30 organized functions');
+});
 
-console.log('✅ Firebase Core module loaded successfully');
+// ===== GLOBAL ERROR HANDLER =====
+window.addEventListener('error', (e) => {
+    console.error('💥 Global Error:', e.error);
+    performanceMonitor.errorCount++;
+    
+    // Don't show notification for every error to avoid spam
+    if (performanceMonitor.errorCount <= 3) {
+        showNotification('⚠️ Se detectó un error. Verifica la consola.', 'warning');
+    }
+});
+
+// ===== UNHANDLED PROMISE REJECTION HANDLER =====
+window.addEventListener('unhandledrejection', (e) => {
+    console.error('💥 Unhandled Promise Rejection:', e.reason);
+    performanceMonitor.errorCount++;
+    
+    if (performanceMonitor.errorCount <= 3) {
+        showNotification('⚠️ Error de conexión detectado', 'warning');
+    }
+});
+
+console.log('✅ Core.js Enhanced loaded with comprehensive error handling and monitoring');
