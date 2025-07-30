@@ -320,8 +320,7 @@ ${lead.notes || 'Sin notas'}
 // SECTION C: TODAY'S CONTACTS FUNCTIONS
 // ================================================================================
 
-// ===== FUNCTION 6: UPDATE TODAY'S CONTACTS - ENHANCED =====
-// ===== FUNCTION 6: UPDATE TODAY'S CONTACTS - FIXED =====
+// ===== FUNCTION 6: UPDATE TODAY'S CONTACTS - SIMPLE VERSION =====
 async function updateTodayContacts() {
     console.log('📅 Updating today contacts...');
     
@@ -331,64 +330,46 @@ async function updateTodayContacts() {
         return;
     }
     
-    if (!window.FirebaseData || !window.FirebaseData.currentUser) {
-        console.log('❌ Firebase not available for today contacts');
-        container.innerHTML = `
-            <div style="text-align: center; padding: 2rem; color: #dc2626;">
-                <div style="font-size: 2rem; margin-bottom: 1rem;">❌</div>
-                <h4>Firebase no disponible</h4>
-                <p>Recarga la página</p>
-            </div>
-        `;
-        return;
-    }
-    
     try {
-        // Show loading state first
+        // Show loading
         container.innerHTML = `
             <div style="text-align: center; padding: 2rem; color: #6b7280;">
-                <div class="loading-spinner"></div>
-                <br>Cargando desde Firebase...
+                <div class="loading-spinner"></div><br>
+                Cargando desde Firebase...
             </div>
         `;
         
-        // Get user profile to determine role
-        const userProfile = await window.FirebaseData.loadUserProfile();
-        const isDirector = userProfile?.role === 'director';
-        
-        console.log('👤 User profile for today contacts:', userProfile?.role, userProfile?.email);
-        
-        // 🔧 FIX: Use same method as updateStats for consistency
-        let allContacts = await window.FirebaseData.getFilteredContacts();
-        console.log('📊 All filtered contacts loaded:', allContacts.length);
-        
-        // Filter for today's contacts with consistent date logic
-        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
-        console.log('📅 Filtering for today:', today);
-        
-        const todaysContacts = allContacts.filter(contact => {
-            // Use same date field as other functions
-            return contact.date === today;
-        });
+        // Get contacts
+        const allContacts = await window.FirebaseData.getFilteredContacts();
+        const today = new Date().toISOString().split('T')[0];
+        const todaysContacts = allContacts.filter(c => c.date === today);
         
         console.log('📅 Today\'s contacts found:', todaysContacts.length);
-        console.log('📅 Today\'s contacts data:', todaysContacts.map(c => ({name: c.name, date: c.date})));
         
-        // Update the container
+        // Simple display
         if (todaysContacts.length === 0) {
             container.innerHTML = `
-                <div style="text-align: center; padding: 3rem; color: #6b7280;">
+                <div style="text-align: center; padding: 2rem; color: #6b7280;">
                     <div style="font-size: 2rem; margin-bottom: 1rem;">📅</div>
-                    <h4 style="margin-bottom: 0.5rem;">No hay contactos de hoy</h4>
-                    <p style="font-size: 0.9rem;">Los nuevos contactos aparecerán aquí</p>
-                    <div style="font-size: 0.8rem; color: #999; margin-top: 1rem;">
-                        Total en Firebase: ${allContacts.length} | Fecha: ${today}
-                    </div>
+                    <h4>No hay contactos de hoy</h4>
+                    <p>Los nuevos aparecerán aquí</p>
                 </div>
             `;
         } else {
-            // 🔧 FIX: Use async version of compact renderer
-            container.innerHTML = await renderTodayContactsCompact(todaysContacts, isDirector);
+            const contactsHTML = todaysContacts.map(contact => `
+                <div style="background: white; padding: 1rem; margin-bottom: 0.5rem; border-radius: 6px; border-left: 3px solid #667eea;">
+                    <div style="font-weight: 600;">${contact.name}</div>
+                    <div style="color: #10b981; font-size: 0.9rem;">📞 ${contact.phone}</div>
+                    <div style="color: #666; font-size: 0.8rem;">${contact.source}</div>
+                </div>
+            `).join('');
+            
+            container.innerHTML = `
+                <div style="margin-bottom: 1rem;">
+                    <span style="font-weight: 500;">📅 Contactos de Hoy (${todaysContacts.length})</span>
+                </div>
+                ${contactsHTML}
+            `;
         }
         
         console.log('✅ Today contacts updated successfully');
@@ -397,48 +378,15 @@ async function updateTodayContacts() {
         console.error('❌ Error updating today contacts:', error);
         container.innerHTML = `
             <div style="text-align: center; padding: 2rem;">
-                <div style="background: #fee2e2; border: 1px solid #fecaca; border-radius: 8px; padding: 1.5rem; color: #dc2626;">
-                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">⚠️</div>
+                <div style="background: #fee2e2; padding: 1rem; border-radius: 8px; color: #dc2626;">
                     <h4>Error al cargar contactos</h4>
-                    <p style="font-size: 0.9rem; margin: 0.5rem 0;">${error.message}</p>
+                    <p>${error.message}</p>
                     <button onclick="updateTodayContacts()" style="background: #dc2626; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-top: 0.5rem;">
                         🔄 Reintentar
                     </button>
                 </div>
             </div>
         `;
-    }
-}// ===== FUNCTION 6: UPDATE TODAY'S CONTACTS =====
-async function updateTodayContacts() {
-    if (!window.FirebaseData || !window.FirebaseData.currentUser) {
-        console.log('❌ Firebase not available for today contacts');
-        return;
-    }
-    
-    try {
-        const todayContacts = await window.FirebaseData.getFilteredContacts();
-        const today = new Date().toISOString().split('T')[0];
-        const todayFiltered = todayContacts.filter(c => c.date === today);
-        
-        console.log('📅 Updating today contacts with Firebase');
-        console.log(`   - Today contacts: ${todayFiltered.length}`);
-        
-        const container = document.getElementById('todayContacts');
-        if (!container) {
-            console.log('❌ Today contacts container not found');
-            return;
-        }
-        
-        // 🔧 FIX: Use compact rendering
-        await renderTodayContactsCompact(todayFiltered);
-        
-        console.log('✅ Today contacts updated with Firebase');
-    } catch (error) {
-        console.error('❌ Error updating today contacts:', error);
-        const container = document.getElementById('todayContacts');
-        if (container) {
-            container.innerHTML = `<p style="color: #dc2626; text-align: center; padding: 2rem;">❌ Error: ${error.message}</p>`;
-        }
     }
 }
 
