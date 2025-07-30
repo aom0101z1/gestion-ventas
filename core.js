@@ -310,6 +310,12 @@ async function loadTabData(tabName) {
                     await loadMonitoringData();
                 }
                 break;
+
+             case 'socialMedia':
+                if (typeof loadSocialMediaData === 'function') {
+                    await loadSocialMediaData();
+                }
+                break;
                 
             default:
                 console.log('ℹ️ No specific data loading for tab:', tabName);
