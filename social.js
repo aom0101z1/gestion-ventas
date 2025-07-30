@@ -1053,3 +1053,14 @@ window.addEventListener('beforeunload', () => {
 });
 
 console.log('✅ Social.js module loaded - Facebook Fanpage Integration Ready');
+
+// Manual testing function - add at the end of social.js
+window.manualFacebookSetup = function(pageAccessToken, pageId, pageName) {
+    FACEBOOK_CONFIG.pageAccessToken = pageAccessToken;
+    FACEBOOK_CONFIG.pageId = pageId;
+    
+    window.SocialManager.updateConnectionStatus(true, pageName);
+    window.SocialManager.loadConversations();
+    
+    console.log('✅ Manual Facebook setup complete');
+};
