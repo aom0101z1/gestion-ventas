@@ -8,7 +8,7 @@ const FACEBOOK_CONFIG = {
     appId: '1125538789641684', // Reemplazar con tu App ID de Facebook
     apiVersion: 'v18.0',
     // In social.js, update line 9:
-    permissions: ['email', 'public_profile', 'pages_show_list', 'pages_read_engagement'],
+    permissions: ['email', 'public_profile'],
     pageAccessToken: null,
     pageId: null
 };
