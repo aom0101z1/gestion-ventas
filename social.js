@@ -5,7 +5,7 @@
 
 // ===== CONFIGURACIÓN GLOBAL =====
 const FACEBOOK_CONFIG = {
-    appId: 'TU_APP_ID_AQUI', // Reemplazar con tu App ID de Facebook
+    appId: '1125538789641684', // Reemplazar con tu App ID de Facebook
     apiVersion: 'v18.0',
     permissions: ['pages_messaging', 'pages_read_engagement', 'pages_manage_metadata', 'pages_read_user_content'],
     pageAccessToken: null,
