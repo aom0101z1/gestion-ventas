@@ -217,30 +217,30 @@ function configureRoleBasedAccess(role) {
 }
 
 // ===== TAB NAVIGATION SYSTEM =====
-function switchTab(tabName) {
+async function switchTab(tabName) {
     console.log('📑 Switching to tab:', tabName);
-    
+
     try {
         // Prevent switching if loading
         if (appState.isLoading) {
             console.log('⚠️ App is loading, tab switch prevented');
             return;
         }
-        
+
         // Hide all tab contents
         document.querySelectorAll('.tab-content').forEach(content => {
             content.classList.add('hidden');
         });
-        
+
         // Remove active class from all tabs
         document.querySelectorAll('.tab').forEach(tab => {
             tab.classList.remove('active');
         });
-        
+
         // Show target content
         const targetContent = document.getElementById(tabName);
         const targetTab = document.getElementById(tabName + 'Tab');
-        
+
         if (targetContent) {
             targetContent.classList.remove('hidden');
             console.log('✅ Tab content shown:', tabName);
@@ -249,20 +249,27 @@ function switchTab(tabName) {
             showNotification(`❌ Tab "${tabName}" no encontrada`, 'error');
             return;
         }
-        
+
         if (targetTab) {
             targetTab.classList.add('active');
             console.log('✅ Tab activated:', tabName);
         }
-        
+
         // Update app state
         appState.currentTab = tabName;
-        
-        // Load tab-specific data
+
+        // Cambia aquí: Si es la pestaña 'socialMedia', llama la función especial
+        if (tabName === 'socialMedia') {
+            if (typeof loadSocialMediaData === 'function') {
+                await loadSocialMediaData();
+            }
+        }
+
+        // Load tab-specific data (esto lo puedes dejar después del bloque anterior)
         await loadTabData(tabName);
-        
+
         console.log('✅ Tab switched successfully:', tabName);
-        
+
     } catch (error) {
         console.error('❌ Error switching tab:', error);
         showNotification('❌ Error al cambiar de pestaña', 'error');
