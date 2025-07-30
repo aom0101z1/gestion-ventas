@@ -175,16 +175,20 @@ function renderPipelineColumn(status, config, leads) {
             </div>
             
             <!-- Column Body -->
-            <div class="pipeline-body" 
-                 data-status="${status}"
-                 style="
-                     padding: 1rem;
-                     max-height: 450px;
-                     overflow-y: auto;
-                     min-height: 300px;
-                 ">
-                ${leadCount === 0 ? renderEmptyColumn(status, config.color) : leads.map(lead => renderLeadCard(lead, config.color)).join('')}
-            </div>
+<!-- Column Body -->
+<div class="pipeline-body" 
+     data-status="${status}"
+     style="
+         padding: 1rem;
+         max-height: 450px;
+         min-height: 300px;
+         display: flex;
+         flex-direction: row;
+         gap: 0.75rem;
+         overflow-x: auto;
+         overflow-y: hidden;
+         white-space: nowrap;
+     ">
             
             <!-- Column Footer -->
             <div style="
