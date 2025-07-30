@@ -83,6 +83,9 @@ async function loadPipelineData() {
         
         // Initialize drag and drop if supported
         initializeDragAndDrop();
+
+
+        
         
         console.log('✅ Pipeline data loaded successfully');
         
@@ -392,6 +395,9 @@ function renderEmptyColumn(status, color) {
             border: 2px dashed #e5e7eb;
             border-radius: 8px;
             margin: 1rem 0;
+            display: inline-block;
+            width: 280px;
+            flex-shrink: 0;
         ">
             <div style="font-size: 2rem; margin-bottom: 1rem; opacity: 0.5;">
                 ${PIPELINE_STAGES[status].emoji}
@@ -724,6 +730,50 @@ function initializeDragAndDrop() {
     console.log('🖱️ Initializing drag and drop for pipeline');
     
     // Add drag and drop styles
+style.textContent = `
+    .lead-card {
+        cursor: move !important;
+    }
+    
+    .lead-card.dragging {
+        opacity: 0.5;
+        transform: rotate(5deg);
+        cursor: grabbing !important;
+    }
+    
+    .pipeline-column.drag-over {
+        background: #f0f9ff !important;
+        border: 2px dashed #3b82f6 !important;
+    }
+    
+    .pipeline-column.drag-over .pipeline-header {
+        background: #dbeafe !important;
+    }
+    
+    .pipeline-body.drag-over {
+        background: rgba(59, 130, 246, 0.05);
+    }
+    
+    /* Add scrollbar styling for horizontal scroll */
+    .pipeline-body::-webkit-scrollbar {
+        height: 8px;
+    }
+    
+    .pipeline-body::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+    }
+    
+    .pipeline-body::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+    }
+    
+    .pipeline-body::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+`;
+    
     const style = document.createElement('style');
     style.textContent = `
         .lead-card {
