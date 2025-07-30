@@ -83,9 +83,6 @@ async function loadPipelineData() {
         
         // Initialize drag and drop if supported
         initializeDragAndDrop();
-
-
-        
         
         console.log('✅ Pipeline data loaded successfully');
         
@@ -178,20 +175,21 @@ function renderPipelineColumn(status, config, leads) {
             </div>
             
             <!-- Column Body -->
-<!-- Column Body -->
-<div class="pipeline-body" 
-     data-status="${status}"
-     style="
-         padding: 1rem;
-         max-height: 450px;
-         min-height: 300px;
-         display: flex;
-         flex-direction: row;
-         gap: 0.75rem;
-         overflow-x: auto;
-         overflow-y: hidden;
-         white-space: nowrap;
-     ">
+            <div class="pipeline-body" 
+                 data-status="${status}"
+                 style="
+                     padding: 1rem;
+                     max-height: 450px;
+                     min-height: 300px;
+                     display: flex;
+                     flex-direction: row;
+                     gap: 0.75rem;
+                     overflow-x: auto;
+                     overflow-y: hidden;
+                     white-space: nowrap;
+                 ">
+                ${leadCount === 0 ? renderEmptyColumn(status, config.color) : leads.map(lead => renderLeadCard(lead, config.color)).join('')}
+            </div>
             
             <!-- Column Footer -->
             <div style="
@@ -226,26 +224,26 @@ function renderLeadCard(lead, stageColor) {
     const sourceIcon = getSourceIcon(lead.source);
     const timeAgo = getTimeAgo(lead.date, lead.time);
     
-   return `
-return `
-   return `
-    <div class="lead-card" 
-         id="lead-card-${lead.id}"
-         data-lead-id="${lead.id}"
-         draggable="true"
-         style="
-             background: #f9fafb;
-             border: 1px solid #e5e7eb;
-             border-radius: 8px;
-             padding: 1rem;
-             margin-bottom: 0;
-             cursor: move;
-             transition: all 0.2s ease;
-             position: relative;
-             border-left: 3px solid ${priorityColor};
-             flex-shrink: 0;
-             width: 280px;
-         "
+    return `
+        <div class="lead-card" 
+             id="lead-card-${lead.id}"
+             data-lead-id="${lead.id}"
+             draggable="true"
+             style="
+                 background: #f9fafb;
+                 border: 1px solid #e5e7eb;
+                 border-radius: 8px;
+                 padding: 1rem;
+                 margin-bottom: 0;
+                 cursor: move;
+                 transition: all 0.2s ease;
+                 position: relative;
+                 border-left: 3px solid ${priorityColor};
+                 flex-shrink: 0;
+                 width: 280px;
+                 display: inline-block;
+                 vertical-align: top;
+             "
              onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,0.12)'; this.style.transform='translateY(-2px)'"
              onmouseout="this.style.boxShadow='none'; this.style.transform='translateY(0)'">
             
@@ -394,10 +392,11 @@ function renderEmptyColumn(status, color) {
             padding: 3rem 1rem;
             border: 2px dashed #e5e7eb;
             border-radius: 8px;
-            margin: 1rem 0;
+            margin: 0;
             display: inline-block;
             width: 280px;
             flex-shrink: 0;
+            vertical-align: top;
         ">
             <div style="font-size: 2rem; margin-bottom: 1rem; opacity: 0.5;">
                 ${PIPELINE_STAGES[status].emoji}
@@ -730,50 +729,6 @@ function initializeDragAndDrop() {
     console.log('🖱️ Initializing drag and drop for pipeline');
     
     // Add drag and drop styles
-style.textContent = `
-    .lead-card {
-        cursor: move !important;
-    }
-    
-    .lead-card.dragging {
-        opacity: 0.5;
-        transform: rotate(5deg);
-        cursor: grabbing !important;
-    }
-    
-    .pipeline-column.drag-over {
-        background: #f0f9ff !important;
-        border: 2px dashed #3b82f6 !important;
-    }
-    
-    .pipeline-column.drag-over .pipeline-header {
-        background: #dbeafe !important;
-    }
-    
-    .pipeline-body.drag-over {
-        background: rgba(59, 130, 246, 0.05);
-    }
-    
-    /* Add scrollbar styling for horizontal scroll */
-    .pipeline-body::-webkit-scrollbar {
-        height: 8px;
-    }
-    
-    .pipeline-body::-webkit-scrollbar-track {
-        background: #f1f1f1;
-        border-radius: 4px;
-    }
-    
-    .pipeline-body::-webkit-scrollbar-thumb {
-        background: #888;
-        border-radius: 4px;
-    }
-    
-    .pipeline-body::-webkit-scrollbar-thumb:hover {
-        background: #555;
-    }
-`;
-    
     const style = document.createElement('style');
     style.textContent = `
         .lead-card {
@@ -797,6 +752,25 @@ style.textContent = `
         
         .pipeline-body.drag-over {
             background: rgba(59, 130, 246, 0.05);
+        }
+        
+        /* Add scrollbar styling for horizontal scroll */
+        .pipeline-body::-webkit-scrollbar {
+            height: 8px;
+        }
+        
+        .pipeline-body::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        
+        .pipeline-body::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        
+        .pipeline-body::-webkit-scrollbar-thumb:hover {
+            background: #555;
         }
     `;
     
