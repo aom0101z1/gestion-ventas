@@ -9,7 +9,7 @@
     <title>🏫 Ciudad Bilingue - CRM</title>
 
 <!-- ========================================= -->
-<!-- PARTE 2-15: CSS COMPLETO -->
+<!-- PARTE 2-15: CSS COMPLETO Y ARREGLADO -->
 <!-- ========================================= -->
     <style>
         /* ===== PARTE 2: RESET Y CONFIGURACIÓN BÁSICA ===== */
@@ -399,28 +399,7 @@
             border-left: 4px solid #3b82f6;
         }
 
-        /* ===== PARTE 15: RESPONSIVE Y ANIMACIONES + CONTACTOS COMPACTOS ===== */
-        @media (max-width: 768px) {
-            .container { padding: 1rem; }
-            .stats-grid { grid-template-columns: 1fr; }
-            .user-info { flex-direction: column; gap: 1rem; }
-            #pipelineContainer { flex-direction: column; gap: 0.5rem; }
-            .pipeline-column { min-width: 100%; max-height: 300px; }
-            .pipeline-cards { max-height: 200px; }
-            .tabs { flex-direction: column; }
-        }
-        
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
-        
-        .connecting {
-            animation: pulse 1.5s infinite;
-        }
-
-        /* ===== CONTACTOS COMPACTOS (NUEVO) ===== */
+        /* ===== PARTE 15: CONTACTOS COMPACTOS MEJORADOS ===== */
         .contact-item {
             background: white;
             border-radius: 8px;
@@ -428,10 +407,11 @@
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
             border-left: 3px solid #667eea;
             overflow: hidden;
-            transition: all 0.2s ease;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
 
         .contact-item:hover {
+            transform: translateY(-1px);
             box-shadow: 0 2px 8px rgba(0,0,0,0.15);
         }
 
@@ -442,11 +422,11 @@
             align-items: center;
             cursor: pointer;
             background: white;
-            transition: background 0.2s ease;
+            transition: background-color 0.2s ease;
         }
 
         .contact-header:hover {
-            background: #f8fafc;
+            background-color: #f9fafb;
         }
 
         .contact-main-info {
@@ -499,6 +479,7 @@
             background: #f8fafc;
             border-top: 1px solid #e5e7eb;
             display: none;
+            transition: all 0.3s ease;
         }
 
         .detail-row {
@@ -573,103 +554,50 @@
             opacity: 0.5;
         }
 
-        /* ===== CONTACT CARDS CSS - ADD TO index.html <style> section ===== */
+        /* ===== PARTE 16: RESPONSIVE Y ANIMACIONES ===== */
+        @media (max-width: 768px) {
+            .container { padding: 1rem; }
+            .stats-grid { grid-template-columns: 1fr; }
+            .user-info { flex-direction: column; gap: 1rem; }
+            #pipelineContainer { flex-direction: column; gap: 0.5rem; }
+            .pipeline-column { min-width: 100%; max-height: 300px; }
+            .pipeline-cards { max-height: 200px; }
+            .tabs { flex-direction: column; }
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .connecting {
+            animation: pulse 1.5s infinite;
+        }
 
-/* Contact item hover effects */
-.contact-item {
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
+        /* ===== CUSTOM SCROLLBARS ===== */
+        div[style*="overflow-y: auto"]::-webkit-scrollbar {
+            width: 4px;
+        }
 
-.contact-item:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
-}
+        div[style*="overflow-y: auto"]::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 2px;
+        }
 
-/* Contact header cursor and hover */
-.contact-header {
-    transition: background-color 0.2s ease;
-}
+        div[style*="overflow-y: auto"]::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 2px;
+        }
 
-.contact-header:hover {
-    background-color: #f9fafb !important;
-}
-
-/* Status badges */
-.status-badge {
-    padding: 0.2rem 0.5rem;
-    border-radius: 12px;
-    font-size: 0.75rem;
-    font-weight: 500;
-}
-
-.status-nuevo {
-    background: #dbeafe;
-    color: #1e40af;
-}
-
-.status-contactado {
-    background: #fef3c7;
-    color: #92400e;
-}
-
-.status-interesado {
-    background: #d1fae5;
-    color: #065f46;
-}
-
-.status-negociacion {
-    background: #fde2e8;
-    color: #be185d;
-}
-
-.status-convertido {
-    background: #dcfce7;
-    color: #166534;
-}
-
-.status-perdido {
-    background: #fee2e2;
-    color: #dc2626;
-}
-
-/* Contact details animation */
-.contact-details {
-    transition: all 0.3s ease;
-}
-
-/* Button hover effects */
-button {
-    transition: all 0.2s ease;
-}
-
-button:hover {
-    transform: translateY(-1px);
-    filter: brightness(1.1);
-}
-
-/* Custom scrollbar for contact list */
-div[style*="overflow-y: auto"]::-webkit-scrollbar {
-    width: 4px;
-}
-
-div[style*="overflow-y: auto"]::-webkit-scrollbar-track {
-    background: #f1f5f9;
-    border-radius: 2px;
-}
-
-div[style*="overflow-y: auto"]::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
-    border-radius: 2px;
-}
-
-div[style*="overflow-y: auto"]::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
-}
+        div[style*="overflow-y: auto"]::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
     </style>
 </head>
 
 <!-- ========================================= -->
-<!-- PARTE 16: BODY Y FIREBASE STATUS -->
+<!-- PARTE 17: BODY Y FIREBASE STATUS -->
 <!-- ========================================= -->
 <body>
     <!-- Firebase Status Indicator -->
@@ -679,7 +607,7 @@ div[style*="overflow-y: auto"]::-webkit-scrollbar-thumb:hover {
     </div>
 
 <!-- ========================================= -->
-<!-- PARTE 17: PANTALLA DE LOGIN -->
+<!-- PARTE 18: PANTALLA DE LOGIN -->
 <!-- ========================================= -->
     <!-- Login Screen -->
     <div id="loginScreen">
@@ -720,7 +648,7 @@ div[style*="overflow-y: auto"]::-webkit-scrollbar-thumb:hover {
     </div>
 
 <!-- ========================================= -->
-<!-- PARTE 18: HEADER APLICACIÓN PRINCIPAL -->
+<!-- PARTE 19: HEADER APLICACIÓN PRINCIPAL -->
 <!-- ========================================= -->
     <!-- Main Application -->
     <div id="mainApp" class="hidden">
@@ -752,7 +680,7 @@ div[style*="overflow-y: auto"]::-webkit-scrollbar-thumb:hover {
             </div>
 
 <!-- ========================================= -->
-<!-- PARTE 19: ESTADÍSTICAS -->
+<!-- PARTE 20: ESTADÍSTICAS -->
 <!-- ========================================= -->
             <!-- Stats -->
             <div class="stats-grid">
@@ -779,7 +707,7 @@ div[style*="overflow-y: auto"]::-webkit-scrollbar-thumb:hover {
             </div>
 
 <!-- ========================================= -->
-<!-- PARTE 20: NAVEGACIÓN DE PESTAÑAS -->
+<!-- PARTE 21: NAVEGACIÓN DE PESTAÑAS -->
 <!-- ========================================= -->
             <!-- Tabs -->
             <div class="tabs">
@@ -792,11 +720,11 @@ div[style*="overflow-y: auto"]::-webkit-scrollbar-thumb:hover {
             </div>
 
 <!-- ========================================= -->
-<!-- PARTE 21: TAB CONTACTOS -->
+<!-- PARTE 22: TAB CONTACTOS - ARREGLADO -->
 <!-- ========================================= -->
             <!-- Tab: Contacts -->
             <div id="contacts" class="tab-content">
-                <h2 id="contactsTitle">📞 Registrar Contactos</h2>
+                <h2 id="contactsTitle">📞 Registrar Contactos del Día</h2>
                 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem;">
                     <!-- Add Contact Form -->
@@ -855,25 +783,25 @@ div[style*="overflow-y: auto"]::-webkit-scrollbar-thumb:hover {
                         </form>
                     </div>
                     
-                    <!-- Today's Contacts -->
+                    <!-- Today's Contacts - SECCIÓN COMPACTA ARREGLADA -->
                     <div>
-                        <h3 id="todayContactsTitle">📋 Contactos de Hoy</h3>
+                        <h3 style="font-size: 1.2rem; margin-bottom: 1rem; color: #374151;">📋 Mis Contactos de Hoy</h3>
                         <div style="margin-bottom: 1rem;">
-                            <button onclick="refreshData()" class="btn btn-primary" style="margin-right: 0.5rem;">🔄 Actualizar</button>
-                            <button onclick="debugData()" class="btn btn-secondary">🔍 Debug</button>
+                            <button onclick="updateTodayContacts()" class="btn btn-primary" style="margin-right: 0.5rem; padding: 0.4rem 0.8rem; font-size: 0.9rem;">🔄 Actualizar</button>
+                            <button onclick="debugTodayContacts()" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.9rem;">🔍 Debug</button>
                         </div>
-                        <div id="todayContacts">
-                            <p style="color: #666; text-align: center; padding: 2rem;">
+                        <div id="todayContacts" style="background: #f8fafc; border-radius: 8px; padding: 1rem; min-height: 200px; max-height: 400px; overflow-y: auto;">
+                            <div style="text-align: center; padding: 2rem; color: #6b7280;">
                                 <div class="loading-spinner"></div><br>
                                 Cargando desde Firebase...
-                            </p>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
 <!-- ========================================= -->
-<!-- PARTE 22: TAB LEADS -->
+<!-- PARTE 23: TAB LEADS -->
 <!-- ========================================= -->
             <!-- Tab: Leads -->
             <div id="leads" class="tab-content hidden">
@@ -922,7 +850,7 @@ div[style*="overflow-y: auto"]::-webkit-scrollbar-thumb:hover {
             </div>
 
 <!-- ========================================= -->
-<!-- PARTE 23: TAB PIPELINE -->
+<!-- PARTE 24: TAB PIPELINE -->
 <!-- ========================================= -->
             <!-- Tab: Pipeline -->
             <div id="pipeline" class="tab-content hidden">
@@ -940,7 +868,7 @@ div[style*="overflow-y: auto"]::-webkit-scrollbar-thumb:hover {
             </div>
 
 <!-- ========================================= -->
-<!-- PARTE 24: TAB REPORTES -->
+<!-- PARTE 25: TAB REPORTES -->
 <!-- ========================================= -->
             <!-- Tab: Reports -->
             <div id="reports" class="tab-content hidden">
@@ -982,7 +910,7 @@ div[style*="overflow-y: auto"]::-webkit-scrollbar-thumb:hover {
             </div>
 
 <!-- ========================================= -->
-<!-- PARTE 25: TAB MONITOREO (DIRECTOR) -->
+<!-- PARTE 26: TAB MONITOREO (DIRECTOR) -->
 <!-- ========================================= -->
             <!-- Tab: Monitoring (Director Only) -->
             <div id="monitoring" class="tab-content hidden">
@@ -1007,7 +935,7 @@ div[style*="overflow-y: auto"]::-webkit-scrollbar-thumb:hover {
             </div>
 
 <!-- ========================================= -->
-<!-- PARTE 26: TAB CONFIGURACIÓN (DIRECTOR) -->
+<!-- PARTE 27: TAB CONFIGURACIÓN (DIRECTOR) -->
 <!-- ========================================= -->
             <!-- Tab: Config (Director Only) -->
             <div id="config" class="tab-content hidden">
@@ -1089,7 +1017,7 @@ div[style*="overflow-y: auto"]::-webkit-scrollbar-thumb:hover {
     </div>
 
 <!-- ========================================= -->
-<!-- PARTE 27: FIREBASE SDK PRINCIPAL -->
+<!-- PARTE 28: FIREBASE SDK PRINCIPAL -->
 <!-- ========================================= -->
     <!-- Firebase SDK -->
     <script type="module">
@@ -1126,7 +1054,7 @@ div[style*="overflow-y: auto"]::-webkit-scrollbar-thumb:hover {
 
         console.log('✅ Firebase initialized successfully');
 
-        // PARTE 28: FIREBASE DATA MANAGER
+        // PARTE 29: FIREBASE DATA MANAGER
         class SimpleFirebaseManager {
             constructor() {
                 this.database = database;
@@ -1148,10 +1076,12 @@ div[style*="overflow-y: auto"]::-webkit-scrollbar-thumb:hover {
                 });
             }
 
+            // ===== FUNCIÓN 1: LOGIN =====
             async login(email, password) {
                 return await signInWithEmailAndPassword(this.auth, email, password);
             }
 
+            // ===== FUNCIÓN 2: CREATE USER =====
             async createUser(email, password, profile) {
                 const userCredential = await createUserWithEmailAndPassword(this.auth, email, password);
                 const user = userCredential.user;
@@ -1166,16 +1096,19 @@ div[style*="overflow-y: auto"]::-webkit-scrollbar-thumb:hover {
                 return user;
             }
 
+            // ===== FUNCIÓN 3: LOGOUT =====
             async logout() {
                 return await signOut(this.auth);
             }
 
+            // ===== FUNCIÓN 4: LOAD USER PROFILE =====
             async loadUserProfile() {
                 if (!this.currentUser) return null;
                 const snapshot = await get(ref(this.database, `users/${this.currentUser.uid}/profile`));
                 return snapshot.exists() ? snapshot.val() : null;
             }
 
+            // ===== FUNCIÓN 5: GET ALL USERS =====
             async getAllUsers() {
                 const snapshot = await get(ref(this.database, 'users'));
                 const users = {};
@@ -1191,6 +1124,7 @@ div[style*="overflow-y: auto"]::-webkit-scrollbar-thumb:hover {
                 return users;
             }
 
+            // ===== FUNCIÓN 6: ADD CONTACT =====
             async addContact(contactData) {
                 const contactRef = push(ref(this.database, 'contacts'));
                 const contact = {
@@ -1204,6 +1138,7 @@ div[style*="overflow-y: auto"]::-webkit-scrollbar-thumb:hover {
                 return contact;
             }
 
+            // ===== FUNCIÓN 7: GET ALL CONTACTS =====
             async getAllContacts() {
                 const snapshot = await get(ref(this.database, 'contacts'));
                 const contacts = [];
@@ -1215,6 +1150,7 @@ div[style*="overflow-y: auto"]::-webkit-scrollbar-thumb:hover {
                 return contacts;
             }
 
+            // ===== FUNCIÓN 8: GET FILTERED CONTACTS =====
             async getFilteredContacts() {
                 const userProfile = await this.loadUserProfile();
                 const allContacts = await this.getAllContacts();
@@ -1226,6 +1162,7 @@ div[style*="overflow-y: auto"]::-webkit-scrollbar-thumb:hover {
                 }
             }
 
+            // ===== FUNCIÓN 9: UPDATE CONTACT =====
             async updateContact(contactId, updates) {
                 await update(ref(this.database, `contacts/${contactId}`), {
                     ...updates,
@@ -1233,19 +1170,23 @@ div[style*="overflow-y: auto"]::-webkit-scrollbar-thumb:hover {
                 });
             }
 
+            // ===== FUNCIÓN 10: DELETE CONTACT =====
             async deleteContact(contactId) {
                 await remove(ref(this.database, `contacts/${contactId}`));
             }
 
+            // ===== FUNCIÓN 11: GET CONVENIOS =====
             async getConvenios() {
                 const snapshot = await get(ref(this.database, 'system/convenios'));
                 return snapshot.exists() ? snapshot.val() : [];
             }
 
+            // ===== FUNCIÓN 12: UPDATE CONVENIOS =====
             async updateConvenios(convenios) {
                 await set(ref(this.database, 'system/convenios'), convenios);
             }
 
+            // ===== FUNCIÓN 13: ADD OBSERVER =====
             addObserver(callback) {
                 this.observers.push(callback);
             }
@@ -1259,10 +1200,11 @@ div[style*="overflow-y: auto"]::-webkit-scrollbar-thumb:hover {
     </script>
 
 <!-- ========================================= -->
-<!-- PARTE 29: AUTO PROFILE CREATION -->
+<!-- PARTE 30: AUTO PROFILE CREATION -->
 <!-- ========================================= -->
     <!-- Auto Profile Creation Script -->
     <script>
+        // ===== FUNCIÓN 14: AUTO PROFILE CREATION =====
         // Auto-ensure user profile when Firebase is ready and user authenticates
         window.addEventListener('firebaseReady', () => {
             console.log('🔥 Firebase ready, setting up auto-profile creation...');
@@ -1348,10 +1290,10 @@ div[style*="overflow-y: auto"]::-webkit-scrollbar-thumb:hover {
     </script>
 
 <!-- ========================================= -->
-<!-- PARTE 29.5: ENHANCED FIREBASE INTEGRATION & PIPELINE PREPARATION -->
+<!-- PARTE 31: ENHANCED FIREBASE INTEGRATION -->
 <!-- ========================================= -->
     <script>
-        // ===== ENHANCED FIREBASE INTEGRATION & PIPELINE PREPARATION =====
+        // ===== FUNCIÓN 15: ENHANCED FIREBASE INTEGRATION =====
         document.addEventListener('DOMContentLoaded', () => {
             console.log('🚀 Enhanced DOM ready, preparing pipeline environment...');
             
@@ -1427,7 +1369,7 @@ div[style*="overflow-y: auto"]::-webkit-scrollbar-thumb:hover {
             });
         });
 
-        // ===== ENHANCED FIREBASE DATA COMPATIBILITY =====
+        // ===== FUNCIÓN 16: FIREBASE DATA COMPATIBILITY =====
         // Ensure compatibility between SimpleFirebaseManager and pipeline.js expectations
         window.addEventListener('firebaseReady', () => {
             if (window.FirebaseData) {
@@ -1451,7 +1393,7 @@ div[style*="overflow-y: auto"]::-webkit-scrollbar-thumb:hover {
             }
         });
 
-        // ===== PIPELINE TAB ACTIVATION HANDLER =====
+        // ===== FUNCIÓN 17: PIPELINE TAB ACTIVATION HANDLER =====
         // Ensure pipeline initializes when tab is activated
         function showTab(tabName) {
             // Call the original showTab function if it exists
@@ -1494,7 +1436,7 @@ div[style*="overflow-y: auto"]::-webkit-scrollbar-thumb:hover {
     </script>
 
 <!-- ========================================= -->
-<!-- PARTE 30: SCRIPTS EXTERNOS -->
+<!-- PARTE 32: SCRIPTS EXTERNOS -->
 <!-- ========================================= -->
     <!-- Include all the JavaScript files -->
     <script src="AdminData.js"></script>
