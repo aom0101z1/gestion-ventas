@@ -991,7 +991,6 @@ function setupPipelineEventListeners() {
     
     console.log('🎧 Pipeline event listeners setup complete');
 }
-
 // ===== MODULE INITIALIZATION =====
 function initializePipelineModule() {
     console.log('🚀 Initializing pipeline module');
@@ -1042,86 +1041,18 @@ if (typeof module !== 'undefined' && module.exports) {
         pipelineStats
     };
 }
-// Make drag and drop functions globally available
-window.handleDragStart = function(event, leadId) {
-    console.log('🖱️ Drag started for lead:', leadId);
-    
-    draggedLead = leadId;
-    event.dataTransfer.effectAllowed = 'move';
-    event.dataTransfer.setData('text/plain', leadId);
-    event.target.classList.add('dragging');
-    event.target.style.opacity = '0.5';
-};
 
-window.handleDragOver = function(event) {
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
-    event.currentTarget.classList.add('drag-over');
-    event.currentTarget.style.background = '#f0f9ff';
-    event.currentTarget.style.border = '2px dashed #3b82f6';
-};
+// ===== GLOBAL FUNCTION ASSIGNMENTS =====
+// Make functions globally available for inline event handlers
+window.handleDragStart = handleDragStart;
+window.handleDragOver = handleDragOver;
+window.handleDrop = handleDrop;
+window.loadPipelineData = loadPipelineData;
+window.addNewLeadToStage = addNewLeadToStage;
+window.showLeadDetails = showLeadDetails || function(id) { console.log('Show lead details:', id); };
+window.refreshPipeline = refreshPipeline;
+window.exportPipelineData = exportPipelineData;
+window.togglePipelineView = togglePipelineView;
+window.editLeadQuick = editLeadQuick;
 
-window.handleDragLeave = function(event) {
-    event.currentTarget.classList.remove('drag-over');
-    event.currentTarget.style.background = '';
-    event.currentTarget.style.border = '';
-};
-
-window.handleDrop = async function(event, newStatus) {
-    event.preventDefault();
-    event.stopPropagation();
-    
-    const leadId = event.dataTransfer.getData('text/plain');
-    const column = event.currentTarget;
-    
-    // Remove visual feedback
-    column.classList.remove('drag-over');
-    column.style.background = '';
-    column.style.border = '';
-    
-    // Reset all dragging cards
-    document.querySelectorAll('.lead-card').forEach(card => {
-        card.classList.remove('dragging');
-        card.style.opacity = '';
-    });
-    
-    if (!leadId || !newStatus) {
-        console.error('❌ Invalid drop operation');
-        return;
-    }
-    
-    try {
-        console.log('🎯 Updating lead status:', leadId, 'to', newStatus);
-        
-        // Update in Firebase
-        await window.FirebaseData.updateContact(leadId, { status: newStatus });
-        
-        // Show success message
-        alert(`✅ Lead movido a "${newStatus}"`);
-        
-        // Refresh pipeline
-        setTimeout(() => {
-            loadPipelineData();
-        }, 500);
-        
-    } catch (error) {
-        console.error('❌ Error updating lead status:', error);
-        alert(`❌ Error al mover lead: ${error.message}`);
-    }
-};
-
-// Also fix the event listeners on columns
-window.addEventListener('DOMContentLoaded', () => {
-    setTimeout(() => {
-        // Add event listeners to all pipeline columns
-        document.querySelectorAll('.pipeline-column').forEach(column => {
-            column.addEventListener('dragover', (e) => handleDragOver(e));
-            column.addEventListener('dragleave', (e) => handleDragLeave(e));
-            column.addEventListener('drop', (e) => {
-                const status = column.getAttribute('data-status');
-                handleDrop(e, status);
-            });
-        });
-    }, 1000);
-});
-console.log('✅ Pipeline.js module loaded successfully');
+console.log('✅ Pipeline.js module loaded successfully - Drag & Drop Fixed!');
