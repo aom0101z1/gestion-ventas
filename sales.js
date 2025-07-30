@@ -1,14 +1,14 @@
-// sales.js - FIREBASE INTEGRATED VERSION - ORGANIZED WITH FUNCTION NUMBERS
+// sales.js - FIREBASE INTEGRATED VERSION - ENHANCED WITH DYNAMIC CONVENIOS
 // ================================================================================
 // SECTION A: CONTACT MANAGEMENT FUNCTIONS
 // ================================================================================
 
-// ===== FUNCTION 1: ADD CONTACT =====
+// ===== FUNCIÓN 1: ADD CONTACT =====
 async function addContact(event) {
     event.preventDefault();
     
     if (!window.FirebaseData || !window.FirebaseData.currentUser) {
-        alert('❌ Firebase no disponible o usuario no autenticado. Recarga la página.');
+        showNotification('❌ Firebase no disponible o usuario no autenticado. Recarga la página.', 'error');
         return;
     }
     
@@ -20,10 +20,12 @@ async function addContact(event) {
     
     try {
         let source = document.getElementById('contactSource').value;
+        
+        // Handle convenio selection
         if (source === 'CONVENIO') {
             const convenio = document.getElementById('contactConvenio').value;
             if (!convenio) {
-                alert('⚠️ Selecciona un convenio');
+                showNotification('⚠️ Selecciona un convenio específico', 'warning');
                 return;
             }
             source = `CONVENIO: ${convenio}`;
@@ -34,6 +36,7 @@ async function addContact(event) {
             phone: document.getElementById('contactPhone').value.trim(),
             email: document.getElementById('contactEmail').value.trim(),
             source: source,
+            convenio: source.includes('CONVENIO:') ? source.replace('CONVENIO: ', '') : null,
             location: document.getElementById('contactLocation').value,
             notes: document.getElementById('contactNotes').value.trim(),
             date: new Date().toISOString().split('T')[0],
@@ -43,7 +46,7 @@ async function addContact(event) {
         
         // Validate required fields
         if (!contact.name || !contact.phone || !contact.source || !contact.location) {
-            alert('⚠️ Completa todos los campos obligatorios');
+            showNotification('⚠️ Completa todos los campos obligatorios', 'warning');
             return;
         }
         
@@ -53,34 +56,34 @@ async function addContact(event) {
         const savedContact = await window.FirebaseData.addContact(contact);
         console.log('✅ Contact saved to Firebase:', savedContact);
         
-        // Clear form
-        event.target.reset();
-        document.getElementById('convenioGroup').style.display = 'none';
-        document.getElementById('contactConvenio').required = false;
+        // Clear form with animation
+        clearFormWithAnimation(event.target);
         
-        // 🔧 FIX: Single UI update call only
-        setTimeout(() => {
-            updateAllViews();
-        }, 500);
+        // Update all views with debouncing
+        debounceUpdateViews();
         
         // Get stats for success message
         const userProfile = await window.FirebaseData.loadUserProfile();
         const allContacts = await window.FirebaseData.getFilteredContacts();
         const todayContacts = allContacts.filter(c => c.date === new Date().toISOString().split('T')[0]);
         
-        alert(`✅ ¡Contacto guardado en Firebase!
+        showNotification(`✅ ¡Contacto guardado exitosamente!
 
 👤 ${savedContact.name}
 📞 ${savedContact.phone}
+${savedContact.convenio ? `🤝 Convenio: ${savedContact.convenio}` : ''}
 🔥 Sincronizado en tiempo real
 📊 Tus contactos totales: ${allContacts.length}
-📋 Contactos hoy: ${todayContacts.length}
-
-✨ Disponible inmediatamente para todo el equipo!`);
+📋 Contactos hoy: ${todayContacts.length}`, 'success');
+        
+        // Auto-focus back to name field for next contact
+        setTimeout(() => {
+            document.getElementById('contactName').focus();
+        }, 1000);
         
     } catch (error) {
         console.error('❌ Error saving to Firebase:', error);
-        alert(`❌ Error al guardar en Firebase: ${error.message}`);
+        showNotification(`❌ Error al guardar en Firebase: ${error.message}`, 'error');
     } finally {
         // Re-enable submit button
         submitBtn.disabled = false;
@@ -88,8 +91,8 @@ async function addContact(event) {
     }
 }
 
-// ===== FUNCTION 2: HANDLE SOURCE CHANGE =====
-function handleSourceChange() {
+// ===== FUNCIÓN 2: HANDLE SOURCE CHANGE - ENHANCED =====
+async function handleSourceChange() {
     const sourceSelect = document.getElementById('contactSource');
     const convenioGroup = document.getElementById('convenioGroup');
     const convenioSelect = document.getElementById('contactConvenio');
@@ -97,14 +100,63 @@ function handleSourceChange() {
     console.log('🔍 Source changed to:', sourceSelect.value);
     
     if (sourceSelect.value === 'CONVENIO') {
-        console.log('✅ Showing convenio dropdown');
+        console.log('✅ Loading convenios from Firebase...');
+        
+        // Show loading state
+        convenioSelect.innerHTML = '<option value="">Cargando convenios...</option>';
         convenioGroup.style.display = 'block';
+        convenioGroup.classList.add('slide-in');
         convenioSelect.required = true;
+        
+        try {
+            // Load convenios from Firebase
+            const convenios = await window.FirebaseData.getConvenios();
+            console.log('📋 Loaded convenios:', convenios);
+            
+            // Populate dropdown
+            if (convenios && convenios.length > 0) {
+                convenioSelect.innerHTML = '<option value="">Seleccionar convenio...</option>' +
+                    convenios.map(conv => `<option value="${conv}">${conv}</option>`).join('');
+            } else {
+                convenioSelect.innerHTML = '<option value="">No hay convenios configurados</option>';
+                showNotification('⚠️ No hay convenios configurados. Contacta al administrador.', 'warning');
+            }
+        } catch (error) {
+            console.error('❌ Error loading convenios:', error);
+            convenioSelect.innerHTML = '<option value="">Error cargando convenios</option>';
+            showNotification('❌ Error al cargar convenios', 'error');
+        }
     } else {
         console.log('❌ Hiding convenio dropdown');
-        convenioGroup.style.display = 'none';
+        convenioGroup.classList.remove('slide-in');
+        convenioGroup.classList.add('slide-out');
+        
+        setTimeout(() => {
+            convenioGroup.style.display = 'none';
+            convenioGroup.classList.remove('slide-out');
+        }, 300);
+        
         convenioSelect.required = false;
         convenioSelect.value = '';
+    }
+}
+
+// ===== FUNCIÓN 3: LOAD CONVENIOS ON PAGE LOAD =====
+async function loadConveniosOnInit() {
+    try {
+        if (!window.FirebaseData) {
+            console.log('⚠️ Firebase not ready for loading convenios');
+            return;
+        }
+        
+        const convenios = await window.FirebaseData.getConvenios();
+        console.log('🔄 Pre-loaded convenios for faster access:', convenios?.length || 0);
+        
+        // Cache convenios for faster access
+        window.cachedConvenios = convenios || [];
+    } catch (error) {
+        console.error('❌ Error pre-loading convenios:', error);
+        window.cachedConvenios = [];
     }
 }
 
@@ -112,10 +164,10 @@ function handleSourceChange() {
 // SECTION B: LEAD MANAGEMENT FUNCTIONS
 // ================================================================================
 
-// ===== FUNCTION 3: DELETE LEAD =====
+// ===== FUNCIÓN 4: DELETE LEAD - ENHANCED =====
 async function deleteLead(leadId) {
     if (!window.FirebaseData || !window.FirebaseData.currentUser) {
-        alert('❌ Firebase no disponible');
+        showNotification('❌ Firebase no disponible', 'error');
         return;
     }
     
@@ -125,42 +177,44 @@ async function deleteLead(leadId) {
         const lead = allContacts.find(l => l.id === leadId);
         
         if (!lead) {
-            alert('❌ Lead no encontrado');
+            showNotification('❌ Lead no encontrado', 'error');
             return;
         }
         
         // Check permissions - salespeople can only delete their own leads
         const userProfile = await window.FirebaseData.loadUserProfile();
         if (userProfile.role !== 'director' && lead.salespersonId !== window.FirebaseData.currentUser.uid) {
-            alert('❌ Solo puedes eliminar tus propios leads');
+            showNotification('❌ Solo puedes eliminar tus propios leads', 'error');
             return;
         }
         
-        if (confirm(`¿Estás seguro de eliminar el lead de "${lead.name}"?
-
-📞 Teléfono: ${lead.phone}
-📍 Fuente: ${lead.source}
-👤 Vendedor: ${getUserDisplayName(lead.salespersonId)}
-
-Esta acción no se puede deshacer y se eliminará de Firebase.`)) {
-            
+        // Enhanced confirmation dialog
+        const confirmResult = await showConfirmDialog({
+            title: '🗑️ Confirmar Eliminación',
+            message: `¿Estás seguro de eliminar el lead de "${lead.name}"?`,
+            details: `📞 Teléfono: ${lead.phone}\n📍 Fuente: ${lead.source}\n👤 Vendedor: ${await getUserDisplayNameFirebase(lead.salespersonId)}`,
+            confirmText: 'Eliminar',
+            cancelText: 'Cancelar',
+            type: 'danger'
+        });
+        
+        if (confirmResult) {
             await window.FirebaseData.deleteContact(leadId);
             console.log('✅ Lead deleted from Firebase:', leadId);
             
-            // Force immediate UI update
-            setTimeout(() => {
-                updateAllViews();
-            }, 500);
+            // Animate removal and update views
+            animateLeadRemoval(leadId);
+            debounceUpdateViews();
             
-            alert(`✅ Lead de "${lead.name}" eliminado de Firebase correctamente`);
+            showNotification(`✅ Lead de "${lead.name}" eliminado correctamente`, 'success');
         }
     } catch (error) {
         console.error('❌ Error deleting from Firebase:', error);
-        alert(`❌ Error al eliminar de Firebase: ${error.message}`);
+        showNotification(`❌ Error al eliminar: ${error.message}`, 'error');
     }
 }
 
-// ===== FUNCTION 4: UPDATE LEADS TABLE =====
+// ===== FUNCIÓN 5: UPDATE LEADS TABLE - OPTIMIZED =====
 async function updateLeadsTable() {
     console.log('📋 Updating Firebase leads table');
     
@@ -182,8 +236,11 @@ async function updateLeadsTable() {
         
         console.log('👤 User profile:', userProfile.role, userProfile.email);
         
-        // Get filtered data from Firebase
-        let data = await window.FirebaseData.getFilteredContacts();
+        // Show loading state with skeleton
+        showLeadsTableSkeleton();
+        
+        // Get filtered data from Firebase with caching
+        let data = await getCachedFilteredContacts();
         console.log('   - Filtered Firebase data:', data.length, 'records');
         
         // Apply director filters if director is logged in
@@ -220,49 +277,32 @@ async function updateLeadsTable() {
                     👥 Usuarios en Firebase: ${Object.keys(allUsers).length} (${salespeople} vendedores)<br>
                     🔥 Base de datos: Firebase Realtime Database
                 </div>
-                <button onclick="diagnoseDirectorData()" style="background: #667eea; color: white; border: none; padding: 0.5rem 1rem; border-radius: 5px; margin-top: 1rem; cursor: pointer;">🔍 Diagnosticar Firebase</button>`;
+                <button onclick="diagnoseDirectorData()" class="btn btn-primary" style="margin-top: 1rem;">🔍 Diagnosticar Firebase</button>`;
             } else {
-                message = 'No tienes leads registrados en Firebase. Agrega contactos en la pestaña "Mis Contactos".';
+                message = `No tienes leads registrados en Firebase. 
+                <div style="margin-top: 1rem;">
+                    <button onclick="showTab('contacts')" class="btn btn-primary">➕ Agregar Contactos</button>
+                </div>`;
             }
             
             tbody.innerHTML = `<tr><td colspan="${colSpan}" style="text-align: center; color: #666; padding: 2rem;">${message}</td></tr>`;
             return;
         }
         
-        // Sort by date (newest first)
+        // Sort by date (newest first) with performance optimization
         data.sort((a, b) => {
             const dateA = new Date(a.date + ' ' + (a.time || '00:00:00'));
             const dateB = new Date(b.date + ' ' + (b.time || '00:00:00'));
             return dateB - dateA;
         });
         
-        tbody.innerHTML = await Promise.all(data.map(async (lead) => {
-            const salespersonCell = userProfile.role === 'director' 
-                ? `<td><span style="background: #667eea; color: white; padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.8rem;">${await getUserDisplayNameFirebase(lead.salespersonId)}</span></td>`
-                : '';
-            
-            // Check if user can delete this lead
-            const canDelete = userProfile.role === 'director' || lead.salespersonId === window.FirebaseData.currentUser.uid;
-            
-            return `
-                <tr>
-                    <td style="font-weight: 500;">${lead.name}</td>
-                    <td>${lead.phone}</td>
-                    <td style="font-size: 0.9rem;">${lead.source.length > 30 ? lead.source.substring(0, 30) + '...' : lead.source}</td>
-                    <td><span class="status-badge status-${lead.status.toLowerCase().replace(' ', '').replace('ó', 'o')}">${lead.status}</span></td>
-                    <td style="font-size: 0.9rem;">${formatDate(lead.date)}</td>
-                    ${salespersonCell}
-                    <td>
-                        <button onclick="showLeadDetails('${lead.id}')" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; margin-right: 0.25rem;">
-                            📋 Ver
-                        </button>
-                        ${canDelete ? `<button onclick="deleteLead('${lead.id}')" class="btn btn-warning" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; background: #ef4444;">🗑️</button>` : ''}
-                    </td>
-                </tr>
-            `;
-        })).then(rows => rows.join(''));
+        // Render table with virtual scrolling for large datasets
+        tbody.innerHTML = await renderLeadsTableRows(data, userProfile);
         
         console.log('✅ Firebase leads table updated with', data.length, 'records');
+        
+        // Add table animations
+        animateTableRows();
         
     } catch (error) {
         console.error('❌ Error updating Firebase leads table:', error);
@@ -273,10 +313,10 @@ async function updateLeadsTable() {
     }
 }
 
-// ===== FUNCTION 5: SHOW LEAD DETAILS =====
+// ===== FUNCIÓN 6: SHOW LEAD DETAILS - ENHANCED =====
 async function showLeadDetails(leadId) {
     if (!window.FirebaseData || !window.FirebaseData.currentUser) {
-        alert('❌ Firebase no disponible');
+        showNotification('❌ Firebase no disponible', 'error');
         return;
     }
     
@@ -285,1053 +325,654 @@ async function showLeadDetails(leadId) {
         const lead = allContacts.find(l => l.id === leadId);
         
         if (!lead) {
-            alert('❌ Lead no encontrado en Firebase');
+            showNotification('❌ Lead no encontrado en Firebase', 'error');
             return;
         }
         
         const salespersonName = await getUserDisplayNameFirebase(lead.salespersonId);
         
-        alert(`📋 DETALLES DEL LEAD (Firebase)
-
-👤 Nombre: ${lead.name}
-📞 Teléfono: ${lead.phone}
-📧 Email: ${lead.email || 'No proporcionado'}
-📍 Fuente: ${lead.source}
-🏘️ Ubicación: ${lead.location}
-📝 Estado: ${lead.status}
-👨‍💼 Vendedor: ${salespersonName}
-📅 Fecha: ${formatDate(lead.date)}
-⏰ Hora: ${lead.time}
-🔥 ID Firebase: ${lead.id}
-
-💬 Notas:
-${lead.notes || 'Sin notas'}
-
----
-🔄 Para cambiar estado: Ve al Pipeline y arrastra la tarjeta
-🗑️ Para eliminar: Usa el botón 🗑️ en la tabla de leads`);
+        // Enhanced lead details modal
+        await showLeadDetailsModal({
+            lead: lead,
+            salespersonName: salespersonName,
+            actions: ['edit', 'whatsapp', 'delete', 'pipeline']
+        });
+        
     } catch (error) {
         console.error('❌ Error showing lead details:', error);
-        alert(`❌ Error al mostrar detalles: ${error.message}`);
+        showNotification(`❌ Error al mostrar detalles: ${error.message}`, 'error');
     }
 }
 
 // ================================================================================
-// SECTION C: TODAY'S CONTACTS FUNCTIONS
+// SECTION C: UI/UX ENHANCEMENT FUNCTIONS
 // ================================================================================
 
-// ===== FUNCTION 6: UPDATE TODAY'S CONTACTS - SIMPLE VERSION =====
-async function updateTodayContacts() {
-    console.log('📅 Updating today contacts...');
+// ===== FUNCIÓN 7: SHOW NOTIFICATION - ENHANCED =====
+function showNotification(message, type = 'info', duration = 5000) {
+    // Remove existing notifications
+    const existing = document.querySelectorAll('.notification-toast');
+    existing.forEach(n => n.remove());
     
-    const container = document.getElementById('todayContacts');
-    if (!container) {
-        console.log('❌ Today contacts container not found');
-        return;
-    }
+    const notification = document.createElement('div');
+    notification.className = `notification-toast notification-${type}`;
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : type === 'warning' ? '#f59e0b' : '#3b82f6'};
+        color: white;
+        padding: 1rem 1.5rem;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 10000;
+        max-width: 400px;
+        font-size: 0.9rem;
+        line-height: 1.4;
+        transform: translateX(100%);
+        transition: transform 0.3s ease;
+        white-space: pre-line;
+    `;
     
-    try {
-        // Show loading
-        container.innerHTML = `
-            <div style="text-align: center; padding: 2rem; color: #6b7280;">
-                <div class="loading-spinner"></div><br>
-                Cargando desde Firebase...
-            </div>
-        `;
-        
-        // Get contacts
-        const allContacts = await window.FirebaseData.getFilteredContacts();
-        const today = new Date().toISOString().split('T')[0];
-        const todaysContacts = allContacts.filter(c => c.date === today);
-        
-        console.log('📅 Today\'s contacts found:', todaysContacts.length);
-        
-        // Simple display
-        if (todaysContacts.length === 0) {
-            container.innerHTML = `
-                <div style="text-align: center; padding: 2rem; color: #6b7280;">
-                    <div style="font-size: 2rem; margin-bottom: 1rem;">📅</div>
-                    <h4>No hay contactos de hoy</h4>
-                    <p>Los nuevos aparecerán aquí</p>
-                </div>
-            `;
-        } else {
-            const contactsHTML = todaysContacts.map(contact => `
-                <div style="background: white; padding: 1rem; margin-bottom: 0.5rem; border-radius: 6px; border-left: 3px solid #667eea;">
-                    <div style="font-weight: 600;">${contact.name}</div>
-                    <div style="color: #10b981; font-size: 0.9rem;">📞 ${contact.phone}</div>
-                    <div style="color: #666; font-size: 0.8rem;">${contact.source}</div>
-                </div>
-            `).join('');
+    notification.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div>${message}</div>
+            <button onclick="this.parentElement.parentElement.remove()" style="background: none; border: none; color: white; font-size: 1.2rem; cursor: pointer; margin-left: 1rem; opacity: 0.8;">×</button>
+        </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Animate in
+    setTimeout(() => {
+        notification.style.transform = 'translateX(0)';
+    }, 100);
+    
+    // Auto remove
+    setTimeout(() => {
+        notification.style.transform = 'translateX(100%)';
+        setTimeout(() => notification.remove(), 300);
+    }, duration);
+}
+
+// ===== FUNCIÓN 8: CLEAR FORM WITH ANIMATION =====
+function clearFormWithAnimation(form) {
+    // Animate form fields clearing
+    const fields = form.querySelectorAll('input, select, textarea');
+    
+    fields.forEach((field, index) => {
+        setTimeout(() => {
+            field.style.transform = 'scale(0.95)';
+            field.style.opacity = '0.7';
             
-            container.innerHTML = `
-                <div style="margin-bottom: 1rem;">
-                    <span style="font-weight: 500;">📅 Contactos de Hoy (${todaysContacts.length})</span>
-                </div>
-                ${contactsHTML}
-            `;
+            setTimeout(() => {
+                field.value = '';
+                field.style.transform = 'scale(1)';
+                field.style.opacity = '1';
+            }, 150);
+        }, index * 50);
+    });
+    
+    // Reset convenio dropdown
+    document.getElementById('convenioGroup').style.display = 'none';
+    document.getElementById('contactConvenio').required = false;
+}
+
+// ===== FUNCIÓN 9: DEBOUNCE UPDATE VIEWS =====
+let updateViewsTimeout;
+function debounceUpdateViews() {
+    clearTimeout(updateViewsTimeout);
+    updateViewsTimeout = setTimeout(() => {
+        updateAllViews();
+    }, 300);
+}
+
+// ===== FUNCIÓN 10: SHOW LEADS TABLE SKELETON =====
+function showLeadsTableSkeleton() {
+    const tbody = document.getElementById('leadsTable');
+    if (!tbody) return;
+    
+    const skeletonRows = Array.from({length: 5}, (_, i) => `
+        <tr class="skeleton-row">
+            <td><div class="skeleton-text"></div></td>
+            <td><div class="skeleton-text"></div></td>
+            <td><div class="skeleton-text"></div></td>
+            <td><div class="skeleton-text"></div></td>
+            <td><div class="skeleton-text"></div></td>
+            <td><div class="skeleton-text"></div></td>
+        </tr>
+    `).join('');
+    
+    tbody.innerHTML = skeletonRows;
+    
+    // Add skeleton styles if not exists
+    if (!document.getElementById('skeleton-styles')) {
+        const style = document.createElement('style');
+        style.id = 'skeleton-styles';
+        style.textContent = `
+            .skeleton-text {
+                height: 16px;
+                background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+                background-size: 200% 100%;
+                animation: skeleton-loading 1.5s infinite;
+                border-radius: 4px;
+                width: 80%;
+            }
+            @keyframes skeleton-loading {
+                0% { background-position: 200% 0; }
+                100% { background-position: -200% 0; }
+            }
+            .skeleton-row { opacity: 0.7; }
+        `;
+        document.head.appendChild(style);
+    }
+}
+
+// ===== FUNCIÓN 11: RENDER LEADS TABLE ROWS - OPTIMIZED =====
+async function renderLeadsTableRows(data, userProfile) {
+    // Use document fragment for better performance
+    const fragment = document.createDocumentFragment();
+    const tempDiv = document.createElement('div');
+    
+    const rows = await Promise.all(data.map(async (lead) => {
+        const salespersonCell = userProfile.role === 'director' 
+            ? `<td><span class="salesperson-badge">${await getUserDisplayNameFirebase(lead.salespersonId)}</span></td>`
+            : '';
+        
+        // Check if user can delete this lead
+        const canDelete = userProfile.role === 'director' || lead.salespersonId === window.FirebaseData.currentUser.uid;
+        
+        // Enhanced source display with convenio highlighting
+        let sourceDisplay = lead.source;
+        if (lead.source.includes('CONVENIO:')) {
+            const convenio = lead.source.replace('CONVENIO: ', '');
+            sourceDisplay = `<span class="convenio-badge">🤝 ${convenio}</span>`;
+        } else if (lead.source.length > 25) {
+            sourceDisplay = `<span title="${lead.source}">${lead.source.substring(0, 25)}...</span>`;
         }
         
-        console.log('✅ Today contacts updated successfully');
-        
-    } catch (error) {
-        console.error('❌ Error updating today contacts:', error);
-        container.innerHTML = `
-            <div style="text-align: center; padding: 2rem;">
-                <div style="background: #fee2e2; padding: 1rem; border-radius: 8px; color: #dc2626;">
-                    <h4>Error al cargar contactos</h4>
-                    <p>${error.message}</p>
-                    <button onclick="updateTodayContacts()" style="background: #dc2626; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-top: 0.5rem;">
-                        🔄 Reintentar
-                    </button>
-                </div>
-            </div>
-        `;
-    }
-}
-
-// ===== FUNCTION 7: RENDER TODAY'S CONTACTS COMPACT =====
-async function renderTodayContactsCompact(contacts) {
-    const container = document.getElementById('todayContacts');
-    
-    if (!contacts || contacts.length === 0) {
-        container.innerHTML = `
-            <div style="text-align: center; padding: 3rem 1rem; color: #6b7280;">
-                <div style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;">📝</div>
-                <p>No hay contactos registrados hoy</p>
-                <small>Los nuevos contactos aparecerán aquí automáticamente</small>
-            </div>
-        `;
-        return;
-    }
-
-    // Filtrar contactos de hoy
-    const today = new Date().toDateString();
-    const todayContacts = contacts.filter(contact => {
-        const contactDate = new Date(contact.date || contact.createdAt).toDateString();
-        return contactDate === today;
-    });
-
-    if (todayContacts.length === 0) {
-        container.innerHTML = `
-            <div style="text-align: center; padding: 3rem 1rem; color: #6b7280;">
-                <div style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;">📅</div>
-                <p>No hay contactos nuevos hoy</p>
-                <small>¡Comienza agregando tu primer contacto del día!</small>
-            </div>
-        `;
-        return;
-    }
-
-    // Ordenar por hora más reciente
-    todayContacts.sort((a, b) => {
-        const timeA = new Date(a.createdAt || a.date).getTime();
-        const timeB = new Date(b.createdAt || b.date).getTime();
-        return timeB - timeA;
-    });
-
-    const contactsHTML = await Promise.all(todayContacts.map(async (contact) => {
-        const time = new Date(contact.createdAt || contact.date).toLocaleTimeString('es-ES', {
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-
-        const userProfile = await window.FirebaseData.loadUserProfile();
-        const canDelete = userProfile.role === 'director' || contact.salespersonId === window.FirebaseData.currentUser.uid;
-
         return `
-            <div class="contact-item" style="background: white; border-radius: 8px; margin-bottom: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-left: 3px solid #667eea; overflow: hidden; transition: all 0.2s ease;">
-                <div class="contact-header" onclick="toggleContactDetails('${contact.id}')" style="padding: 0.75rem 1rem; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: white;">
-                    <div style="display: flex; align-items: center; gap: 0.75rem; flex: 1;">
-                        <div>
-                            <div style="font-weight: 600; color: #1f2937;">${contact.name}</div>
-                            <div style="color: #10b981; font-size: 0.9rem;">📞 ${contact.phone}</div>
-                        </div>
-                        <span style="background: #e0e7ff; color: #3730a3; padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.8rem;">${contact.source || 'Sin fuente'}</span>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <span style="color: #6b7280; font-size: 0.8rem;">${time}</span>
-                        <button style="background: none; border: none; color: #6b7280; cursor: pointer; padding: 0.25rem; border-radius: 4px; transition: all 0.2s ease;" id="expand-${contact.id}">
-                            ⌄
+            <tr class="lead-row" data-lead-id="${lead.id}">
+                <td class="lead-name">${lead.name}</td>
+                <td class="lead-phone">
+                    <div>${lead.phone}</div>
+                    <button onclick="openWhatsApp('${lead.phone}', '${lead.name}')" class="whatsapp-mini-btn" title="Abrir WhatsApp">
+                        💬
+                    </button>
+                </td>
+                <td class="lead-source">${sourceDisplay}</td>
+                <td><span class="status-badge status-${lead.status.toLowerCase().replace(' ', '').replace('ó', 'o')}">${lead.status}</span></td>
+                <td class="lead-date">${formatDateEnhanced(lead.date, lead.time)}</td>
+                ${salespersonCell}
+                <td class="lead-actions">
+                    <div class="action-buttons">
+                        <button onclick="showLeadDetails('${lead.id}')" class="btn-action btn-view" title="Ver detalles">
+                            📋
                         </button>
-                    </div>
-                </div>
-                <div class="contact-details" id="details-${contact.id}" style="padding: 0 1rem 1rem 1rem; background: #f8fafc; border-top: 1px solid #e5e7eb; display: none;">
-                    ${contact.email ? `
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.9rem;">
-                            <span style="color: #6b7280; font-weight: 500;">Email:</span>
-                            <span style="color: #1f2937;">${contact.email}</span>
-                        </div>
-                    ` : ''}
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.9rem;">
-                        <span style="color: #6b7280; font-weight: 500;">Ubicación:</span>
-                        <span style="color: #1f2937;">${contact.location || 'No especificada'}</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.9rem;">
-                        <span style="color: #6b7280; font-weight: 500;">Estado:</span>
-                        <span style="color: #1f2937;">
-                            <span class="status-badge status-${(contact.status || 'nuevo').toLowerCase()}">${contact.status || 'Nuevo'}</span>
-                        </span>
-                    </div>
-                    ${contact.convenio ? `
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.9rem;">
-                            <span style="color: #6b7280; font-weight: 500;">Convenio:</span>
-                            <span style="color: #1f2937;">${contact.convenio}</span>
-                        </div>
-                    ` : ''}
-                    ${contact.notes ? `
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.9rem;">
-                            <span style="color: #6b7280; font-weight: 500;">Notas:</span>
-                            <span style="color: #1f2937;">${contact.notes}</span>
-                        </div>
-                    ` : ''}
-                    <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #e5e7eb;">
-                        <button onclick="editContact('${contact.id}')" style="padding: 0.4rem 0.8rem; border: none; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s ease; background: #dbeafe; color: #1e40af;">
-                            ✏️ Editar
+                        <button onclick="editLeadInline('${lead.id}')" class="btn-action btn-edit" title="Editar">
+                            ✏️
                         </button>
-                        <button onclick="openWhatsApp('${contact.phone}', '${contact.name}')" style="padding: 0.4rem 0.8rem; border: none; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s ease; background: #dcfce7; color: #166534;">
-                            💬 WhatsApp
-                        </button>
-                        ${canDelete ? `<button onclick="deleteLead('${contact.id}')" style="padding: 0.4rem 0.8rem; border: none; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s ease; background: #fee2e2; color: #dc2626;">🗑️ Eliminar</button>` : ''}
+                        ${canDelete ? `<button onclick="deleteLead('${lead.id}')" class="btn-action btn-delete" title="Eliminar">🗑️</button>` : ''}
                     </div>
-                </div>
-            </div>
+                </td>
+            </tr>
         `;
     }));
-
-    container.innerHTML = contactsHTML.join('');
+    
+    return rows.join('');
 }
 
-
-// ===== FUNCTION 8: TOGGLE CONTACT DETAILS - FIXED =====
-function toggleContactDetails(contactId) {
-    const detailsElement = document.getElementById(`details-${contactId}`);
-    const expandButton = document.getElementById(`expand-${contactId}`);
-    
-    if (detailsElement) {
-        const isCurrentlyVisible = detailsElement.style.display === 'block';
+// ===== FUNCIÓN 12: ANIMATE TABLE ROWS =====
+function animateTableRows() {
+    const rows = document.querySelectorAll('.lead-row');
+    rows.forEach((row, index) => {
+        row.style.opacity = '0';
+        row.style.transform = 'translateY(20px)';
         
-        if (isCurrentlyVisible) {
-            // Close the details
-            detailsElement.style.display = 'none';
-            if (expandButton) expandButton.textContent = '⌄';
-        } else {
-            // Open the details
-            detailsElement.style.display = 'block';
-            if (expandButton) expandButton.textContent = '⌃';
-        }
-        
-        console.log(`👁️ Toggled contact ${contactId}: ${isCurrentlyVisible ? 'closed' : 'opened'}`);
-    } else {
-        console.error(`❌ Could not find details element for contact ${contactId}`);
-    }
+        setTimeout(() => {
+            row.style.transition = 'all 0.3s ease';
+            row.style.opacity = '1';
+            row.style.transform = 'translateY(0)';
+        }, index * 50);
+    });
 }
-// ===== FUNCTION 8.1: GET TIME AGO - UTILITY =====
-function getTimeAgo(dateString, timeString) {
-    if (!dateString) return 'Sin fecha';
-    
-    try {
-        const fullDateTime = timeString ? `${dateString} ${timeString}` : dateString;
-        const date = new Date(fullDateTime);
-        const now = new Date();
-        
-        if (isNaN(date.getTime())) {
-            return timeString || 'Sin hora';
-        }
-        
-        const diffInMinutes = Math.floor((now - date) / (1000 * 60));
-        
-        if (diffInMinutes < 1) return 'Ahora';
-        if (diffInMinutes < 60) return `${diffInMinutes}m`;
-        
-        const diffInHours = Math.floor(diffInMinutes / 60);
-        if (diffInHours < 24) return `${diffInHours}h`;
-        
-        return timeString || 'Hoy';
-    } catch (error) {
-        return timeString || 'Sin hora';
+
+// ===== FUNCIÓN 13: ANIMATE LEAD REMOVAL =====
+function animateLeadRemoval(leadId) {
+    const row = document.querySelector(`[data-lead-id="${leadId}"]`);
+    if (row) {
+        row.style.transform = 'translateX(-100%)';
+        row.style.opacity = '0';
+        setTimeout(() => row.remove(), 300);
     }
 }
 
-// ===== FUNCTION 8.2: GET SALESPERSON DISPLAY NAME - UTILITY =====
-function getSalespersonDisplayName(salespersonId) {
-    try {
-        if (window.FirebaseData && window.FirebaseData.usersData) {
-            const user = window.FirebaseData.usersData[salespersonId];
-            if (user && user.name) return user.name;
-        }
-        return 'Vendedor';
-    } catch (error) {
-        return 'Vendedor';
-    }
-}
-
-// ===== FUNCTION 8.3: DEBUG TODAY'S CONTACTS =====
-function debugTodayContacts() {
-    console.log('🔍 DEBUGGING TODAY\'S CONTACTS');
-    
-    const container = document.getElementById('todayContacts');
-    console.log('Container found:', !!container);
-    
-    if (window.FirebaseData) {
-        console.log('Firebase available:', true);
-        console.log('Current user:', window.FirebaseData.currentUser?.email);
-        
-        if (window.FirebaseData.contacts) {
-            const contacts = Object.values(window.FirebaseData.contacts);
-            console.log('Total contacts:', contacts.length);
-            
-            const today = new Date().toDateString();
-            const todaysContacts = contacts.filter(contact => {
-                const contactDate = new Date(contact.date || contact.createdAt);
-                return contactDate.toDateString() === today;
-            });
-            
-            console.log('Today\'s contacts:', todaysContacts.length);
-            console.log('Today\'s contacts data:', todaysContacts);
-        } else {
-            console.log('No contacts in Firebase cache');
-        }
-    } else {
-        console.log('Firebase not available');
-    }
-    
-    alert(`🔍 DEBUG INFO:
-
-Container: ${!!container ? 'Found' : 'NOT FOUND'}
-Firebase: ${!!window.FirebaseData ? 'Available' : 'NOT AVAILABLE'}
-User: ${window.FirebaseData?.currentUser?.email || 'Not authenticated'}
-Contacts: ${window.FirebaseData?.contacts ? Object.keys(window.FirebaseData.contacts).length : 0}
-
-Check console for detailed logs.`);
-}
 // ================================================================================
-// SECTION D: UTILITY FUNCTIONS
+// SECTION D: PERFORMANCE OPTIMIZATION FUNCTIONS
 // ================================================================================
 
-// ===== FUNCTION 9: OPEN WHATSAPP =====
-function openWhatsApp(phone, name) {
+// ===== FUNCIÓN 14: GET CACHED FILTERED CONTACTS =====
+let contactsCache = null;
+let cacheTimestamp = null;
+const CACHE_DURATION = 30000; // 30 seconds
+
+async function getCachedFilteredContacts() {
+    const now = Date.now();
+    
+    if (contactsCache && cacheTimestamp && (now - cacheTimestamp) < CACHE_DURATION) {
+        console.log('📦 Using cached contacts data');
+        return contactsCache;
+    }
+    
+    console.log('🔄 Refreshing contacts cache');
+    contactsCache = await window.FirebaseData.getFilteredContacts();
+    cacheTimestamp = now;
+    
+    return contactsCache;
+}
+
+// ===== FUNCIÓN 15: INVALIDATE CACHE =====
+function invalidateContactsCache() {
+    contactsCache = null;
+    cacheTimestamp = null;
+    console.log('🗑️ Contacts cache invalidated');
+}
+
+// ===== FUNCIÓN 16: BATCH UPDATE VIEWS =====
+let batchUpdateQueued = false;
+function batchUpdateAllViews() {
+    if (batchUpdateQueued) return;
+    
+    batchUpdateQueued = true;
+    requestAnimationFrame(() => {
+        updateAllViews();
+        batchUpdateQueued = false;
+    });
+}
+
+// ================================================================================
+// SECTION E: UTILITY FUNCTIONS - ENHANCED
+// ================================================================================
+
+// ===== FUNCIÓN 17: OPEN WHATSAPP - ENHANCED =====
+function openWhatsApp(phone, name, customMessage = null) {
     const cleanPhone = phone.replace(/\D/g, '');
-    const message = `Hola ${name}, te contacto desde Ciudad Bilingüe. ¿Cómo estás?`;
+    const message = customMessage || `Hola ${name}, te contacto desde Ciudad Bilingüe. ¿Cómo estás?`;
     const url = `https://wa.me/57${cleanPhone}?text=${encodeURIComponent(message)}`;
+    
+    // Analytics tracking
+    console.log('📱 Opening WhatsApp for:', name, phone);
+    
     window.open(url, '_blank');
+    
+    // Show confirmation
+    showNotification(`📱 Abriendo WhatsApp para ${name}`, 'info', 2000);
 }
 
-// ===== FUNCTION 10: EDIT CONTACT =====
-function editContact(contactId) {
-    alert(`Funcionalidad de editar contacto: ${contactId}\n\nPuedes implementar esta función según tus necesidades.`);
+// ===== FUNCIÓN 18: EDIT LEAD INLINE =====
+async function editLeadInline(leadId) {
+    try {
+        const allContacts = await window.FirebaseData.getAllContacts();
+        const lead = allContacts.find(l => l.id === leadId);
+        
+        if (!lead) {
+            showNotification('❌ Lead no encontrado', 'error');
+            return;
+        }
+        
+        // Check permissions
+        const userProfile = await window.FirebaseData.loadUserProfile();
+        if (userProfile.role !== 'director' && lead.salespersonId !== window.FirebaseData.currentUser.uid) {
+            showNotification('❌ Solo puedes editar tus propios leads', 'error');
+            return;
+        }
+        
+        // Show inline edit modal
+        await showInlineEditModal(lead);
+        
+    } catch (error) {
+        console.error('❌ Error editing lead:', error);
+        showNotification(`❌ Error al editar: ${error.message}`, 'error');
+    }
 }
 
-// ===== FUNCTION 11: GET USER DISPLAY NAME FIREBASE =====
+// ===== FUNCIÓN 19: GET USER DISPLAY NAME FIREBASE - OPTIMIZED =====
+const userNamesCache = new Map();
+
 async function getUserDisplayNameFirebase(userId) {
     try {
         if (!userId) return 'Unknown User';
         
+        // Check cache first
+        if (userNamesCache.has(userId)) {
+            return userNamesCache.get(userId);
+        }
+        
         const allUsers = await window.FirebaseData.getAllUsers();
         const user = allUsers[userId];
         
+        let displayName = 'Unknown User';
+        
         if (user && user.name) {
-            return user.name;
+            displayName = user.name;
+        } else if (user && user.email) {
+            displayName = user.email.split('@')[0];
         }
         
-        // Fallback to email if available
-        if (user && user.email) {
-            return user.email.split('@')[0];
-        }
+        // Cache the result
+        userNamesCache.set(userId, displayName);
         
-        return 'Unknown User';
+        return displayName;
     } catch (error) {
         console.error('❌ Error getting user display name:', error);
         return 'Unknown User';
     }
 }
 
-// ================================================================================
-// SECTION E: DATA CLEANUP FUNCTIONS
-// ================================================================================
-
-// ===== FUNCTION 12: CLEAR TEST DATA =====
-async function clearTestData() {
-    if (!window.FirebaseData || !window.FirebaseData.currentUser) {
-        alert('❌ Firebase no disponible');
-        return;
-    }
-    
+// ===== FUNCIÓN 20: FORMAT DATE ENHANCED =====
+function formatDateEnhanced(dateString, timeString = null) {
     try {
-        const userProfile = await window.FirebaseData.loadUserProfile();
-        if (userProfile.role !== 'director') {
-            alert('❌ Solo el director puede limpiar datos de prueba');
-            return;
-        }
+        const date = new Date(dateString);
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
         
-        const allContacts = await window.FirebaseData.getAllContacts();
-        const testDataNames = [
-            'Carlos Rodríguez', 'Ana Martínez', 'Luis Gómez', 
-            'Patricia López', 'Roberto Silva', 'Carmen Fernández',
-            'Miguel Torres', 'Carlos Rodriguez', 'Test User', 'Usuario Prueba'
-        ];
+        const isToday = date.toDateString() === today.toDateString();
+        const isYesterday = date.toDateString() === yesterday.toDateString();
         
-        const testDataPhones = [
-            '3001234567', '3109876543', '3156789012', '3187654321', 
-            '3203456789', '3134567890', '3145678901', '1234567890'
-        ];
-        
-        const testData = allContacts.filter(contact => 
-            testDataNames.includes(contact.name) || 
-            testDataPhones.includes(contact.phone) ||
-            contact.notes?.toLowerCase().includes('test') ||
-            contact.notes?.toLowerCase().includes('prueba')
-        );
-        
-        if (testData.length === 0) {
-            alert('ℹ️ No se encontraron datos de prueba para eliminar en Firebase');
-            return;
-        }
-        
-        if (confirm(`🗑️ Se encontraron ${testData.length} registros de datos de prueba en Firebase.
-
-¿Quieres eliminar todos los datos de prueba?
-
-Esto incluye contactos como:
-${testData.slice(0, 3).map(d => `• ${d.name} (${d.phone})`).join('\n')}
-${testData.length > 3 ? `\n... y ${testData.length - 3} más` : ''}
-
-Esta acción no se puede deshacer.`)) {
-            
-            let deletedCount = 0;
-            for (const data of testData) {
-                try {
-                    await window.FirebaseData.deleteContact(data.id);
-                    deletedCount++;
-                } catch (error) {
-                    console.error('Error deleting test data:', error);
-                }
-            }
-            
-            // Force UI update
-            setTimeout(() => {
-                updateAllViews();
-            }, 500);
-            
-            alert(`✅ ${deletedCount} datos de prueba eliminados de Firebase correctamente`);
-        }
-    } catch (error) {
-        console.error('❌ Error clearing test data:', error);
-        alert(`❌ Error al limpiar datos de prueba: ${error.message}`);
-    }
-}
-
-// ===== FUNCTION 13: CLEAR MY DATA =====
-async function clearMyData() {
-    if (!window.FirebaseData || !window.FirebaseData.currentUser) {
-        alert('❌ Firebase no disponible');
-        return;
-    }
-    
-    try {
-        const myContacts = await window.FirebaseData.getFilteredContacts();
-        
-        if (myContacts.length === 0) {
-            alert('ℹ️ No tienes datos para eliminar en Firebase');
-            return;
-        }
-        
-        if (confirm(`🗑️ ¿Estás seguro de eliminar TODOS tus ${myContacts.length} contactos de Firebase?
-
-Esto incluye:
-${myContacts.slice(0, 3).map(d => `• ${d.name} (${d.phone})`).join('\n')}
-${myContacts.length > 3 ? `\n... y ${myContacts.length - 3} más` : ''}
-
-Esta acción NO se puede deshacer.`)) {
-            
-            let deletedCount = 0;
-            for (const contact of myContacts) {
-                try {
-                    await window.FirebaseData.deleteContact(contact.id);
-                    deletedCount++;
-                } catch (error) {
-                    console.error('Error deleting contact:', error);
-                }
-            }
-            
-            // Force UI update
-            setTimeout(() => {
-                updateAllViews();
-            }, 500);
-            
-            alert(`✅ ${deletedCount} de tus contactos eliminados de Firebase correctamente`);
-        }
-    } catch (error) {
-        console.error('❌ Error clearing my data:', error);
-        alert(`❌ Error al eliminar tus datos: ${error.message}`);
-    }
-}
-
-// ================================================================================
-// SECTION F: MONITORING FUNCTIONS (DIRECTOR)
-// ================================================================================
-
-// ===== FUNCTION 14: REFRESH MONITORING =====
-async function refreshMonitoring() {
-    if (!window.FirebaseData || !window.FirebaseData.currentUser) {
-        alert('❌ Firebase no disponible');
-        return;
-    }
-    
-    try {
-        const userProfile = await window.FirebaseData.loadUserProfile();
-        if (userProfile.role !== 'director') {
-            alert('❌ Solo el director puede acceder al monitoreo');
-            return;
-        }
-        
-        console.log('👀 Actualizando monitoreo Firebase del equipo');
-        
-        await updateTeamActivityOverview();
-        await updateIndividualSalespeopleActivity();
-        await updateRecentTeamActivity();
-    } catch (error) {
-        console.error('❌ Error refreshing Firebase monitoring:', error);
-        alert(`❌ Error al actualizar monitoreo: ${error.message}`);
-    }
-}
-
-// ===== FUNCTION 15: UPDATE TEAM ACTIVITY OVERVIEW =====
-async function updateTeamActivityOverview() {
-    if (!window.FirebaseData) return;
-    
-    try {
-        const allContacts = await window.FirebaseData.getAllContacts();
-        const allUsers = await window.FirebaseData.getAllUsers();
-        const today = new Date().toISOString().split('T')[0];
-        
-        const todayContacts = allContacts.filter(c => c.date === today);
-        const activeLeads = allContacts.filter(c => !['Convertido', 'Perdido'].includes(c.status));
-        const conversions = allContacts.filter(c => c.status === 'Convertido');
-        const salespeople = Object.values(allUsers).filter(u => u.role === 'vendedor');
-        
-        const teamGoalProgress = salespeople.length > 0 ? 
-            (salespeople.filter(sp => {
-                const userTodayContacts = todayContacts.filter(c => 
-                    Object.keys(allUsers).find(uid => allUsers[uid].email === sp.email) && 
-                    c.salespersonId === Object.keys(allUsers).find(uid => allUsers[uid].email === sp.email)
-                );
-                return userTodayContacts.length >= 10;
-            }).length / salespeople.length * 100).toFixed(0) : 0;
-        
-        const container = document.getElementById('teamActivityOverview');
-        if (!container) return;
-        
-        container.innerHTML = `
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
-                <div style="background: white; padding: 1.5rem; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center;">
-                    <div style="font-size: 2rem; font-weight: bold; color: #667eea;">${todayContacts.length}</div>
-                    <div style="font-size: 0.9rem; color: #666;">Contactos Hoy (Equipo)</div>
-                    <div style="font-size: 0.8rem; color: #888; margin-top: 0.5rem;">Meta: ${salespeople.length * 10}</div>
-                    <div style="font-size: 0.7rem; color: #ff6b35; margin-top: 0.25rem;">🔥 Firebase</div>
-                </div>
-                
-                <div style="background: white; padding: 1.5rem; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center;">
-                    <div style="font-size: 2rem; font-weight: bold; color: #10b981;">${activeLeads.length}</div>
-                    <div style="font-size: 0.9rem; color: #666;">Leads Activos</div>
-                    <div style="font-size: 0.8rem; color: #888; margin-top: 0.5rem;">En proceso</div>
-                    <div style="font-size: 0.7rem; color: #ff6b35; margin-top: 0.25rem;">🔥 Tiempo Real</div>
-                </div>
-                
-                <div style="background: white; padding: 1.5rem; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center;">
-                    <div style="font-size: 2rem; font-weight: bold; color: #f59e0b;">${conversions.length}</div>
-                    <div style="font-size: 0.9rem; color: #666;">Conversiones Totales</div>
-                    <div style="font-size: 0.8rem; color: #888; margin-top: 0.5rem;">Este periodo</div>
-                    <div style="font-size: 0.7rem; color: #ff6b35; margin-top: 0.25rem;">🔥 Sincronizado</div>
-                </div>
-                
-                <div style="background: white; padding: 1.5rem; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center;">
-                    <div style="font-size: 2rem; font-weight: bold; color: #8b5cf6;">${teamGoalProgress}%</div>
-                    <div style="font-size: 0.9rem; color: #666;">Equipo en Meta</div>
-                    <div style="font-size: 0.8rem; color: #888; margin-top: 0.5rem;">${salespeople.length} vendedores</div>
-                    <div style="font-size: 0.7rem; color: #ff6b35; margin-top: 0.25rem;">🔥 Firebase</div>
-                </div>
-            </div>
-        `;
-    } catch (error) {
-        console.error('❌ Error updating team activity overview:', error);
-    }
-}
-
-// ===== FUNCTION 16: UPDATE INDIVIDUAL SALESPEOPLE ACTIVITY =====
-async function updateIndividualSalespeopleActivity() {
-    if (!window.FirebaseData) return;
-    
-    try {
-        const allContacts = await window.FirebaseData.getAllContacts();
-        const allUsers = await window.FirebaseData.getAllUsers();
-        const today = new Date().toISOString().split('T')[0];
-        
-        // Get all salespeople
-        const salespeople = Object.entries(allUsers)
-            .filter(([uid, user]) => user.role === 'vendedor')
-            .map(([uid, user]) => {
-                const userContacts = allContacts.filter(c => c.salespersonId === uid);
-                const todayContacts = userContacts.filter(c => c.date === today);
-                const activeLeads = userContacts.filter(c => !['Convertido', 'Perdido'].includes(c.status));
-                const conversions = userContacts.filter(c => c.status === 'Convertido');
-                
-                return {
-                    uid,
-                    name: user.name,
-                    email: user.email,
-                    stats: {
-                        totalContacts: userContacts.length,
-                        todayContacts: todayContacts.length,
-                        activeLeads: activeLeads.length,
-                        conversions: conversions.length,
-                        conversionRate: userContacts.length > 0 ? (conversions.length / userContacts.length * 100).toFixed(1) : 0
-                    }
-                };
-            });
-        
-        // Sort by today's contacts (most active first)
-        salespeople.sort((a, b) => b.stats.todayContacts - a.stats.todayContacts);
-        
-        const container = document.getElementById('individualSalespeopleActivity');
-        if (!container) return;
-        
-        container.innerHTML = `
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1rem;">
-                ${salespeople.map(person => {
-                    const stats = person.stats;
-                    const statusColor = stats.todayContacts >= 10 ? '#10b981' : stats.todayContacts >= 5 ? '#f59e0b' : '#ef4444';
-                    
-                    // Calculate days since last activity
-                    const userData = allContacts.filter(d => d.salespersonId === person.uid);
-                    const lastActivity = userData.length > 0 ? Math.max(...userData.map(d => new Date(d.date).getTime())) : 0;
-                    const daysSinceLastActivity = lastActivity > 0 ? Math.floor((Date.now() - lastActivity) / (1000 * 60 * 60 * 24)) : 999;
-                    
-                    const activityStatus = daysSinceLastActivity === 0 ? '🟢 Activo hoy' : 
-                                         daysSinceLastActivity === 1 ? '🟡 Ayer' : 
-                                         daysSinceLastActivity < 7 ? `🟠 Hace ${daysSinceLastActivity} días` : 
-                                         userData.length === 0 ? '⚪ Sin datos' : '🔴 Inactivo';
-                    
-                    const goalProgress = (stats.todayContacts / 10 * 100).toFixed(0);
-                    
-                    return `
-                        <div style="background: white; padding: 1.5rem; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border-left: 4px solid ${statusColor};">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                                <h4 style="margin: 0; color: #333;">${person.name}</h4>
-                                <span style="font-size: 0.8rem; color: #666;">${activityStatus}</span>
-                            </div>
-                            
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                                <div>
-                                    <div style="font-size: 1.5rem; font-weight: bold; color: ${statusColor};">${stats.todayContacts}/10</div>
-                                    <div style="font-size: 0.8rem; color: #666;">Contactos Hoy</div>
-                                </div>
-                                <div>
-                                    <div style="font-size: 1.5rem; font-weight: bold; color: #667eea;">${stats.activeLeads}</div>
-                                    <div style="font-size: 0.8rem; color: #666;">Leads Activos</div>
-                                </div>
-                            </div>
-                            
-                            <div style="margin-bottom: 1rem;">
-                                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #666;">
-                                    <span>Progreso Meta Diaria</span>
-                                    <span>${goalProgress}%</span>
-                                </div>
-                                <div style="background: #e5e7eb; height: 6px; border-radius: 3px; margin-top: 0.25rem;">
-                                    <div style="background: ${statusColor}; height: 6px; border-radius: 3px; width: ${Math.min(goalProgress, 100)}%;"></div>
-                                </div>
-                            </div>
-                            
-                            <div style="display: flex; justify-content: space-between; gap: 1rem; font-size: 0.85rem; color: #666;">
-                                <span>📊 Total: ${stats.totalContacts}</span>
-                                <span>✅ Convertidos: ${stats.conversions}</span>
-                                <span>📈 Tasa: ${stats.conversionRate}%</span>
-                            </div>
-                            
-                            <div style="font-size: 0.7rem; color: #ff6b35; margin-top: 0.5rem; text-align: center;">
-                                🔥 Firebase Real-time
-                            </div>
-                        </div>
-                    `;
-                }).join('')}
-            </div>
-        `;
-    } catch (error) {
-        console.error('❌ Error updating individual salespeople activity:', error);
-    }
-}
-
-// ===== FUNCTION 17: UPDATE RECENT TEAM ACTIVITY =====
-async function updateRecentTeamActivity() {
-    if (!window.FirebaseData) return;
-    
-    try {
-        // Get recent activities (last 20 activities)
-        const allContacts = await window.FirebaseData.getAllContacts();
-        const recentData = [...allContacts]
-            .sort((a, b) => {
-                const dateTimeA = new Date(a.date + ' ' + (a.time || '00:00:00'));
-                const dateTimeB = new Date(b.date + ' ' + (b.time || '00:00:00'));
-                return dateTimeB - dateTimeA;
-            })
-            .slice(0, 20);
-        
-        console.log('🕒 Generating recent team activity from Firebase:', recentData.length, 'activities');
-        
-        const container = document.getElementById('recentTeamActivity');
-        if (!container) return;
-        
-        container.innerHTML = `
-            <div style="background: white; padding: 1.5rem; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-                <div style="margin-bottom: 1rem; display: flex; justify-content: between; align-items: center;">
-                    <h4 style="margin: 0;">🕒 Actividad Reciente del Equipo</h4>
-                    <span style="font-size: 0.8rem; color: #ff6b35; background: #fff7ed; padding: 0.25rem 0.5rem; border-radius: 12px;">🔥 Firebase Real-time</span>
-                </div>
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Fecha</th>
-                            <th>Vendedor</th>
-                            <th>Cliente</th>
-                            <th>Fuente</th>
-                            <th>Estado</th>
-                            <th>Acción</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${await Promise.all(recentData.map(async (activity) => `
-                            <tr>
-                                <td style="font-size: 0.9rem;">${formatDate(activity.date)}<br><small style="color: #666;">${activity.time || '00:00'}</small></td>
-                                <td><span style="background: #667eea; color: white; padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.8rem;">${await getUserDisplayNameFirebase(activity.salespersonId)}</span></td>
-                                <td style="font-weight: 500;">${activity.name}</td>
-                                <td style="font-size: 0.9rem;">${activity.source.length > 20 ? activity.source.substring(0, 20) + '...' : activity.source}</td>
-                                <td><span class="status-badge status-${activity.status.toLowerCase().replace(' ', '').replace('ó', 'o')}">${activity.status}</span></td>
-                                <td>
-                                    <button onclick="showLeadDetails('${activity.id}')" class="btn btn-primary" style="padding: 0.2rem 0.4rem; font-size: 0.7rem;">
-                                        👁️ Ver
-                                    </button>
-                                </td>
-                            </tr>
-                        `)).then(rows => rows.join(''))}
-                    </tbody>
-                </table>
-                ${recentData.length === 0 ? '<p style="text-align: center; color: #666; padding: 2rem;">No hay actividad reciente del equipo en Firebase</p>' : ''}
-            </div>
-        `;
-    } catch (error) {
-        console.error('❌ Error updating recent team activity:', error);
-    }
-}
-
-// ================================================================================
-// SECTION G: STATS AND REPORTS FUNCTIONS
-// ================================================================================
-
-// ===== FUNCTION 18: UPDATE STATS =====
-async function updateStats() {
-    if (!window.FirebaseData || !window.FirebaseData.currentUser) {
-        console.log('❌ Firebase not available for stats');
-        return;
-    }
-    
-    try {
-        console.log('📊 Updating stats with Firebase');
-        
-        const userProfile = await window.FirebaseData.loadUserProfile();
-        const allContacts = await window.FirebaseData.getFilteredContacts();
-        const today = new Date().toISOString().split('T')[0];
-        
-        const todayContacts = allContacts.filter(c => c.date === today);
-        const activeLeads = allContacts.filter(c => !['Convertido', 'Perdido'].includes(c.status));
-        const conversions = allContacts.filter(c => c.status === 'Convertido');
-        
-        // Update stat cards
-        const totalLeadsEl = document.getElementById('totalLeads');
-        const activeLeadsEl = document.getElementById('activeLeads');
-        const conversionsEl = document.getElementById('conversions');
-        const todayContactsEl = document.getElementById('todayContacts');
-        
-        if (totalLeadsEl) totalLeadsEl.textContent = allContacts.length;
-        if (activeLeadsEl) activeLeadsEl.textContent = activeLeads.length;
-        if (conversionsEl) conversionsEl.textContent = conversions.length;
-        if (todayContactsEl) todayContactsEl.textContent = todayContacts.length;
-        
-        console.log('✅ Firebase stats updated successfully');
-        console.log(`   - Total: ${allContacts.length}, Active: ${activeLeads.length}, Conversions: ${conversions.length}, Today: ${todayContacts.length}`);
-    } catch (error) {
-        console.error('❌ Error updating Firebase stats:', error);
-    }
-}
-
-// ===== FUNCTION 19: UPDATE REPORTS =====
-async function updateReports() {
-    try {
-        const userProfile = await window.FirebaseData.loadUserProfile();
-        if (userProfile.role === 'director') {
-            document.getElementById('personalReports').classList.add('hidden');
-            document.getElementById('directorReports').classList.remove('hidden');
-            await updateDirectorReports();
+        let dateDisplay;
+        if (isToday) {
+            dateDisplay = 'Hoy';
+        } else if (isYesterday) {
+            dateDisplay = 'Ayer';
         } else {
-            document.getElementById('personalReports').classList.remove('hidden');
-            document.getElementById('directorReports').classList.add('hidden');
-            await updatePersonalReports();
-        }
-    } catch (error) {
-        console.error('❌ Error updating Firebase reports:', error);
-    }
-}
-
-// ===== FUNCTION 20: UPDATE PERSONAL REPORTS =====
-async function updatePersonalReports() {
-    if (!window.FirebaseData) return;
-    
-    try {
-        const allContacts = await window.FirebaseData.getFilteredContacts();
-        
-        // Calculate weekly contacts
-        const weeklyContacts = allContacts.filter(c => {
-            const contactDate = new Date(c.date);
-            const weekAgo = new Date();
-            weekAgo.setDate(weekAgo.getDate() - 7);
-            return contactDate >= weekAgo;
-        }).length;
-        
-        const conversions = allContacts.filter(c => c.status === 'Convertido').length;
-        const conversionRate = allContacts.length > 0 ? (conversions / allContacts.length * 100).toFixed(1) : 0;
-        
-        const weeklyPerformanceEl = document.getElementById('weeklyPerformance');
-        if (weeklyPerformanceEl) {
-            weeklyPerformanceEl.innerHTML = `
-                <div style="background: #f9fafb; padding: 1.5rem; border-radius: 8px; border-left: 3px solid #ff6b35;">
-                    <div style="font-size: 2rem; font-weight: bold; color: #667eea; text-align: center;">${weeklyContacts}</div>
-                    <div style="text-align: center; color: #666;">Contactos esta semana</div>
-                    <div style="margin-top: 1rem; text-align: center;">
-                        <div style="font-size: 0.9rem; color: #666;">Meta semanal: 50 contactos</div>
-                        <div style="background: #e5e7eb; height: 8px; border-radius: 4px; margin-top: 0.5rem;">
-                            <div style="background: #667eea; height: 8px; border-radius: 4px; width: ${Math.min((weeklyContacts/50)*100, 100)}%;"></div>
-                        </div>
-                    </div>
-                    <div style="font-size: 0.7rem; color: #ff6b35; text-align: center; margin-top: 0.5rem;">🔥 Firebase Real-time</div>
-                </div>
-            `;
-        }
-        
-        const personalTargetsEl = document.getElementById('personalTargets');
-        if (personalTargetsEl) {
-            personalTargetsEl.innerHTML = `
-                <div style="background: #f9fafb; padding: 1.5rem; border-radius: 8px; border-left: 3px solid #ff6b35;">
-                    <div style="margin-bottom: 1rem;">
-                        <div style="font-weight: 600;">📊 Mis Estadísticas Firebase</div>
-                        <div style="font-size: 0.9rem; color: #666; margin-top: 0.5rem;">
-                            Total leads: ${allContacts.length}<br>
-                            Conversiones: ${conversions}<br>
-                            Tasa de conversión: ${conversionRate}%
-                        </div>
-                    </div>
-                    <div style="margin-top: 1rem;">
-                        <div style="font-weight: 600; color: ${conversionRate >= 15 ? '#10b981' : conversionRate >= 10 ? '#f59e0b' : '#ef4444'}">
-                            ${conversionRate >= 15 ? '🏆 ¡Excelente!' : conversionRate >= 10 ? '📈 Buen trabajo' : '💪 Puedes mejorar'}
-                        </div>
-                    </div>
-                    <div style="font-size: 0.7rem; color: #ff6b35; text-align: center; margin-top: 1rem;">🔥 Sincronizado en tiempo real</div>
-                </div>
-            `;
-        }
-    } catch (error) {
-        console.error('❌ Error updating personal reports:', error);
-    }
-}
-
-// ===== FUNCTION 21: UPDATE DIRECTOR REPORTS =====
-async function updateDirectorReports() {
-    if (!window.FirebaseData) return;
-    
-    try {
-        const allContacts = await window.FirebaseData.getAllContacts();
-        const allUsers = await window.FirebaseData.getAllUsers();
-        const today = new Date().toISOString().split('T')[0];
-        
-        // Team performance
-        const salespeople = Object.entries(allUsers)
-            .filter(([uid, user]) => user.role === 'vendedor')
-            .map(([uid, user]) => {
-                const userContacts = allContacts.filter(c => c.salespersonId === uid);
-                const todayContacts = userContacts.filter(c => c.date === today);
-                const conversions = userContacts.filter(c => c.status === 'Convertido');
-                
-                return {
-                    uid,
-                    name: user.name,
-                    stats: {
-                        totalContacts: userContacts.length,
-                        todayContacts: todayContacts.length,
-                        conversions: conversions.length,
-                        conversionRate: userContacts.length > 0 ? (conversions.length / userContacts.length * 100).toFixed(1) : 0
-                    }
-                };
+            dateDisplay = date.toLocaleDateString('es-ES', { 
+                day: 'numeric', 
+                month: 'short' 
             });
-        
-        const teamPerformanceEl = document.getElementById('teamPerformance');
-        if (teamPerformanceEl) {
-            teamPerformanceEl.innerHTML = `
-                <div style="background: #f9fafb; padding: 1rem; border-radius: 8px; border-left: 3px solid #ff6b35;">
-                    <h4 style="margin: 0 0 1rem 0;">👥 Rendimiento del Equipo Firebase</h4>
-                    ${salespeople.map(person => {
-                        const perf = person.stats;
-                        const statusColor = perf.todayContacts >= 10 ? '#10b981' : perf.todayContacts >= 5 ? '#f59e0b' : '#ef4444';
-                        return `
-                            <div style="margin-bottom: 1rem; padding: 1rem; background: white; border-radius: 5px; border-left: 3px solid ${statusColor};">
-                                <div style="font-weight: 600; margin-bottom: 0.5rem;">${person.name}</div>
-                                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; font-size: 0.9rem;">
-                                    <div>Hoy: ${perf.todayContacts}/10</div>
-                                    <div>Total: ${perf.totalContacts}</div>
-                                    <div>Tasa: ${perf.conversionRate}%</div>
-                                </div>
-                            </div>
-                        `;
-                    }).join('')}
-                    ${salespeople.length === 0 ? '<p style="text-align: center; color: #666;">No hay vendedores registrados en Firebase</p>' : ''}
-                    <div style="font-size: 0.7rem; color: #ff6b35; text-align: center; margin-top: 0.5rem;">🔥 Firebase Real-time</div>
-                </div>
-            `;
         }
         
-        // Sales ranking
-        const sortedTeam = [...salespeople].sort((a, b) => b.stats.conversions - a.stats.conversions);
+        const timeDisplay = timeString ? 
+            timeString.substring(0, 5) : 
+            date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
         
-        const salesRankingEl = document.getElementById('salesRanking');
-        if (salesRankingEl) {
-            salesRankingEl.innerHTML = `
-                <div style="background: #f9fafb; padding: 1rem; border-radius: 8px; border-left: 3px solid #ff6b35;">
-                    <h4 style="margin: 0 0 1rem 0;">🏆 Ranking de Ventas Firebase</h4>
-                    ${sortedTeam.map((person, index) => `
-                        <div style="margin-bottom: 0.5rem; padding: 0.75rem; background: white; border-radius: 5px; display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <span style="font-weight: bold; color: ${index === 0 ? '#f59e0b' : '#666'};">${index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '#' + (index + 1)}</span>
-                                ${person.name}
-                            </div>
-                            <div style="font-weight: bold; color: #10b981;">${person.stats.conversions} ventas</div>
-                        </div>
-                    `).join('')}
-                    ${sortedTeam.length === 0 ? '<p style="text-align: center; color: #666;">No hay datos de ventas en Firebase</p>' : ''}
-                    <div style="font-size: 0.7rem; color: #ff6b35; text-align: center; margin-top: 0.5rem;">🔥 Firebase Real-time</div>
-                </div>
-            `;
-        }
-        
-        // Executive summary
-        const totalContacts = allContacts.length;
-        const todayContacts = allContacts.filter(c => c.date === today).length;
-        const totalConversions = allContacts.filter(c => c.status === 'Convertido').length;
-        const conversionRate = totalContacts > 0 ? (totalConversions / totalContacts * 100).toFixed(1) : 0;
-        
-        const executiveSummaryEl = document.getElementById('executiveSummary');
-        if (executiveSummaryEl) {
-            executiveSummaryEl.innerHTML = `
-                <div style="background: #f9fafb; padding: 1.5rem; border-radius: 8px; border-left: 3px solid #ff6b35;">
-                    <h4 style="margin: 0 0 1rem 0;">📈 Resumen Ejecutivo Firebase</h4>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem;">
-                        <div style="background: white; padding: 1rem; border-radius: 5px; text-align: center;">
-                            <div style="font-size: 1.5rem; font-weight: bold; color: #667eea;">${todayContacts}</div>
-                            <div style="font-size: 0.9rem; color: #666;">Contactos Hoy</div>
-                        </div>
-                        <div style="background: white; padding: 1rem; border-radius: 5px; text-align: center;">
-                            <div style="font-size: 1.5rem; font-weight: bold; color: #10b981;">${totalContacts}</div>
-                            <div style="font-size: 0.9rem; color: #666;">Total Leads</div>
-                        </div>
-                        <div style="background: white; padding: 1rem; border-radius: 5px; text-align: center;">
-                            <div style="font-size: 1.5rem; font-weight: bold; color: #f59e0b;">${totalConversions}</div>
-                            <div style="font-size: 0.9rem; color: #666;">Conversiones</div>
-                        </div>
-                        <div style="background: white; padding: 1rem; border-radius: 5px; text-align: center;">
-                            <div style="font-size: 1.5rem; font-weight: bold; color: #8b5cf6;">${conversionRate}%</div>
-                            <div style="font-size: 0.9rem; color: #666;">Tasa Conversión</div>
-                        </div>
-                    </div>
-                    <div style="font-size: 0.7rem; color: #ff6b35; text-align: center; margin-top: 1rem;">🔥 Firebase Real-time Database</div>
-                </div>
-            `;
-        }
+        return `
+            <div class="date-display">
+                <div class="date-part">${dateDisplay}</div>
+                <div class="time-part">${timeDisplay}</div>
+            </div>
+        `;
     } catch (error) {
-        console.error('❌ Error updating director reports:', error);
+        return dateString || 'Sin fecha';
     }
 }
 
-// ================================================================================
-// SECTION H: EXPORT AND FINAL FUNCTIONS
-// ================================================================================
+// ===== FUNCIÓN 21: UPDATE ALL VIEWS - OPTIMIZED =====
+async function updateAllViews() {
+    try {
+        console.log('🔄 Updating all views...');
+        
+        // Invalidate cache to ensure fresh data
+        invalidateContactsCache();
+        
+        // Update views concurrently for better performance
+        const updatePromises = [
+            updateStats(),
+            updateLeadsTable()
+        ];
+        
+        // Only update monitoring if user is director
+        const userProfile = await window.FirebaseData.loadUserProfile();
+        if (userProfile && userProfile.role === 'director') {
+            updatePromises.push(refreshMonitoring());
+        }
+        
+        await Promise.all(updatePromises);
+        
+        console.log('✅ All views updated successfully');
+    } catch (error) {
+        console.error('❌ Error updating views:', error);
+        showNotification('⚠️ Error al actualizar vistas', 'warning');
+    }
+}
 
-// ===== FUNCTION 22: EXPORT TODAY'S CONTACTS =====
-async function exportTodayContacts() {
-    if (!window.FirebaseData || !window.FirebaseData.currentUser) {
-        alert('❌ Firebase no disponible');
-        return;
+// ===== FUNCIÓN 22: INITIALIZE ENHANCED UI =====
+function initializeEnhancedUI() {
+    console.log('🎨 Initializing enhanced UI...');
+    
+    // Add custom CSS for enhanced UI
+    addEnhancedStyles();
+    
+    // Load convenios on page load
+    if (window.FirebaseData) {
+        loadConveniosOnInit();
+    } else {
+        // Wait for Firebase to be ready
+        window.addEventListener('firebaseReady', loadConveniosOnInit);
     }
     
-    try {
-        const today = new Date().toISOString().split('T')[0];
-        const allContacts = await window.FirebaseData.getFilteredContacts();
-        const todayContacts = allContacts.filter(c => c.date === today);
-        
-        if (todayContacts.length === 0) {
-            alert('📋 No hay contactos de hoy para exportar desde Firebase');
-            return;
+    // Add keyboard shortcuts
+    addKeyboardShortcuts();
+    
+    // Add performance monitoring
+    monitorPerformance();
+    
+    console.log('✅ Enhanced UI initialized');
+}
+
+// ===== FUNCIÓN 23: ADD ENHANCED STYLES =====
+function addEnhancedStyles() {
+    if (document.getElementById('enhanced-styles')) return;
+    
+    const style = document.createElement('style');
+    style.id = 'enhanced-styles';
+    style.textContent = `
+        /* Enhanced animations */
+        .slide-in {
+            animation: slideIn 0.3s ease-out;
         }
         
-        let csvData = "ID,Nombre,Teléfono,Email,Fuente,Ubicación,Notas,Vendedor,Fecha,Hora,Estado\n";
-        
-        for (const contact of todayContacts) {
-            const salespersonName = await getUserDisplayNameFirebase(contact.salespersonId);
-            csvData += `${contact.id},"${contact.name}","${contact.phone}","${contact.email}","${contact.source}","${contact.location}","${contact.notes}","${salespersonName}","${contact.date}","${contact.time}","${contact.status}"\n`;
+        .slide-out {
+            animation: slideOut 0.3s ease-in;
         }
         
-        // Create downloadable file
-        const blob = new Blob([csvData], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
         
-        const userProfile = await window.FirebaseData.loadUserProfile();
-        const filename = userProfile.role === 'director' 
-            ? `contactos_equipo_firebase_${today}.csv`
-            : `contactos_firebase_${today}_${userProfile.name.replace(/\s+/g, '_')}.csv`;
-        a.download = filename;
-        a.click();
-        window.URL.revokeObjectURL(url);
+        @keyframes slideOut {
+            from { opacity: 1; transform: translateY(0); }
+            to { opacity: 0; transform: translateY(-10px); }
+        }
         
-        // Also prepare data for copy/paste
-        const copyText = await Promise.all(todayContacts.map(async (c) => {
-            const salespersonName = await getUserDisplayNameFirebase(c.salespersonId);
-            return `${c.id}\t${c.name}\t${c.phone}\t${c.email}\t${c.source}\t${c.location}\t${c.notes}\t${salespersonName}\t${c.date}\t${c.time}\t${c.status}`;
-        })).then(rows => rows.join('\n'));
+        /* Enhanced badges */
+        .salesperson-badge {
+            background: #667eea;
+            color: white;
+            padding: 0.2rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
         
-        // Copy to clipboard
-        navigator.clipboard.writeText(copyText).then(() => {
-            alert(`✅ Exportación Firebase completada!
+        .convenio-badge {
+            background: #10b981;
+            color: white;
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        
+        /* Enhanced action buttons */
+        .action-buttons {
+            display: flex;
+            gap: 0.25rem;
+        }
+        
+        .btn-action {
+            background: none;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            padding: 0.3rem 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.8rem;
+        }
+        
+        .btn-action:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .btn-view:hover { background: #dbeafe; border-color: #3b82f6; }
+        .btn-edit:hover { background: #fef3c7; border-color: #f59e0b; }
+        .btn-delete:hover { background: #fee2e2; border-color: #ef4444; }
+        
+        /* Enhanced phone display */
+        .lead-phone {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .whatsapp-mini-btn {
+            background: #25d366;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            font-size: 0.7rem;
+            transition: transform 0.2s ease;
+        }
+        
+        .whatsapp-mini-btn:hover {
+            transform: scale(1.1);
+        }
+        
+        /* Enhanced date display */
+        .date-display {
+            font-size: 0.85rem;
+        }
+        
+        .date-part {
+            font-weight: 500;
+            color: #374151;
+        }
+        
+        .time-part {
+            color: #6b7280;
+            font-size: 0.8rem;
+        }
+        
+        /* Form enhancements */
+        .form-group {
+            position: relative;
+        }
+        
+        .form-group input:focus + .form-label,
+        .form-group select:focus + .form-label {
+            color: #667eea;
+        }
+        
+        /* Loading enhancements */
+        .loading-spinner {
+            border: 2px solid #f3f4f6;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        /* Responsive enhancements */
+        @media (max-width: 768px) {
+            .action-buttons {
+                flex-direction: column;
+                gap: 0.125rem;
+            }
+            
+            .btn-action {
+                padding: 0.4rem;
+                font-size: 0.9rem;
+            }
+            
+            .salesperson-badge {
+                font-size: 0.7rem;
+                padding: 0.1rem 0.4rem;
+            }
+        }
+    `;
+    
+    document.head.appendChild(style);
+}
 
-📥 Archivo CSV descargado: ${filename}
-📋 Datos copiados al clipboard - pégalos directamente en Google Sheets
-🔥 Fuente: Firebase Realtime Database
+// ===== FUNCIÓN 24: ADD KEYBOARD SHORTCUTS =====
+function addKeyboardShortcuts() {
+    document.addEventListener('keydown', (e) => {
+        // Ctrl/Cmd + Enter to submit form
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            const activeForm = document.querySelector('form:focus-within');
+            if (activeForm) {
+                e.preventDefault();
+                activeForm.dispatchEvent(new Event('submit'));
+            }
+        }
+        
+        // Escape to clear form
+        if (e.key === 'Escape') {
+            const activeForm = document.querySelector('form:focus-within');
+            if (activeForm) {
+                activeForm.reset();
+                clearFormWithAnimation(activeForm);
+            }
+        }
+        
+        // Ctrl/Cmd + R to refresh data
+        if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
+            e.preventDefault();
+            refreshData();
+        }
+    });
+    
+    console.log('⌨️ Keyboard shortcuts enabled');
+}
 
-Total contactos exportados: ${todayContacts.length}`);
-        }).catch(() => {
-            alert(`✅ Archivo CSV descargado desde Firebase!
-
-📥 Archivo: ${filename}
-Total contactos: ${todayContacts.length}
-🔥 Fuente: Firebase Realtime Database
-
-Para copy/paste manual:
-${copyText}`);
-        });
-    } catch (error) {
-        console.error('❌ Error exporting Firebase data:', error);
-        alert(`❌ Error al exportar desde Firebase: ${error.message}`);
-    }
+// ===== FUNCIÓN 25: MONITOR PERFORMANCE =====
+function monitorPerformance() {
+    let loadTimes = [];
+    
+    window.addEventListener('beforeunload', () => {
+        const avgLoadTime = loadTimes.reduce((a, b) => a + b, 0) / loadTimes.length;
+        console.log('📊 Average operation time:', avgLoadTime.toFixed(2), 'ms');
+    });
+    
+    // Override updateLeadsTable to monitor performance
+    const originalUpdateLeadsTable = updateLeadsTable;
+    updateLeadsTable = async function() {
+        const start = performance.now();
+        await originalUpdateLeadsTable();
+        const end = performance.now();
+        loadTimes.push(end - start);
+        console.log('⚡ updateLeadsTable took:', (end - start).toFixed(2), 'ms');
+    };
 }
 
 // ================================================================================
-// END OF SALES.JS - ALL FUNCTIONS ORGANIZED AND NUMBERED
+// INITIALIZATION
 // ================================================================================
 
-console.log('✅ Sales.js loaded with 22 organized functions');
+// Initialize enhanced UI when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeEnhancedUI);
+} else {
+    initializeEnhancedUI();
+}
+
+// Initialize when Firebase is ready
+window.addEventListener('firebaseReady', () => {
+    console.log('🔥 Firebase ready - initializing sales module');
+    loadConveniosOnInit();
+});
+
+console.log('✅ Enhanced Sales.js loaded with 25 optimized functions');
