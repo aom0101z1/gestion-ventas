@@ -1,4 +1,4 @@
-// tasks-realtime.js - TASK MANAGEMENT MODULE FOR FIREBASE REALTIME DATABASE
+// tasks.js - TASK MANAGEMENT MODULE
 // ===== STANDALONE TASK MANAGEMENT SYSTEM =====
 
 // Global variables for tasks module
@@ -33,35 +33,55 @@ async function loadTasksData() {
             return;
         }
         
-        // Show loading state
-        showTasksLoading();
+        // Initialize with empty data to show UI immediately
+        tasksData = [];
+        renderTasksView();
         
-        // Check if FirebaseData is available
-        if (!window.FirebaseData || !window.FirebaseData.currentUser) {
-            showTasksError('Usuario no autenticado');
-            return;
+        // Check if Firebase and user are available
+        if (window.FirebaseData && window.FirebaseData.currentUser && typeof firebase !== 'undefined') {
+            console.log('✅ Firebase and user available, setting up listener');
+            setupTasksListener();
+        } else {
+            console.log('⏳ Waiting for Firebase to be ready...');
+            
+            // Try again in a moment
+            setTimeout(() => {
+                if (window.FirebaseData && window.FirebaseData.currentUser && typeof firebase !== 'undefined') {
+                    setupTasksListener();
+                } else {
+                    console.log('📋 Firebase not ready yet, showing empty state');
+                }
+            }, 2000);
         }
-        
-        // Set up real-time listener for tasks using Realtime Database
-        setupTasksListener();
-        
-        console.log('✅ Tasks module loaded successfully');
         
     } catch (error) {
         console.error('❌ Error loading tasks:', error);
-        showTasksError(`Error cargando tareas: ${error.message}`);
+        // Show empty state instead of error
+        tasksData = [];
+        renderTasksView();
     }
 }
 
 // ===== FIREBASE REALTIME DATABASE LISTENERS =====
 function setupTasksListener() {
     try {
-        const currentUser = window.FirebaseData.currentUser;
-        if (!currentUser) {
-            console.error('❌ No current user found');
-            showTasksError('Usuario no autenticado');
+        // Check if Firebase is available
+        if (typeof firebase === 'undefined' || !firebase.database) {
+            console.error('❌ Firebase not available');
+            tasksData = [];
+            renderTasksView();
             return;
         }
+        
+        const currentUser = window.FirebaseData && window.FirebaseData.currentUser;
+        if (!currentUser) {
+            console.error('❌ No current user found');
+            tasksData = [];
+            renderTasksView();
+            return;
+        }
+        
+        console.log('📋 Setting up tasks listener for user:', currentUser.uid);
         
         // Reference to tasks in Realtime Database
         const tasksRef = firebase.database().ref('tasks');
@@ -88,12 +108,15 @@ function setupTasksListener() {
             renderTasksView();
         }, (error) => {
             console.error('❌ Error listening to tasks:', error);
-            showTasksError('Error al cargar tareas en tiempo real');
+            // Show empty state instead of error
+            tasksData = [];
+            renderTasksView();
         });
         
     } catch (error) {
         console.error('❌ Error setting up tasks listener:', error);
-        showTasksError('Error al configurar el listener de tareas');
+        tasksData = [];
+        renderTasksView();
     }
 }
 
@@ -101,10 +124,16 @@ function setupTasksListener() {
 async function handleCreateTask(event) {
     event.preventDefault();
     
+    // Check if Firebase is available
+    if (typeof firebase === 'undefined' || !firebase.database) {
+        showNotification('❌ Firebase no está disponible', 'error');
+        return;
+    }
+    
     const form = event.target;
     const formData = new FormData(form);
     
-    const currentUser = window.FirebaseData.currentUser;
+    const currentUser = window.FirebaseData && window.FirebaseData.currentUser;
     if (!currentUser) {
         showNotification('❌ Usuario no autenticado', 'error');
         return;
@@ -150,10 +179,16 @@ async function handleCreateTask(event) {
 async function handleUpdateProgress(event, taskId) {
     event.preventDefault();
     
+    // Check if Firebase is available
+    if (typeof firebase === 'undefined' || !firebase.database) {
+        showNotification('❌ Firebase no está disponible', 'error');
+        return;
+    }
+    
     const form = event.target;
     const formData = new FormData(form);
     
-    const currentUser = window.FirebaseData.currentUser;
+    const currentUser = window.FirebaseData && window.FirebaseData.currentUser;
     if (!currentUser) {
         showNotification('❌ Usuario no autenticado', 'error');
         return;
@@ -202,6 +237,12 @@ async function handleUpdateProgress(event, taskId) {
 async function markTaskComplete(taskId) {
     if (!confirm('¿Marcar esta tarea como completada?')) return;
     
+    // Check if Firebase is available
+    if (typeof firebase === 'undefined' || !firebase.database) {
+        showNotification('❌ Firebase no está disponible', 'error');
+        return;
+    }
+    
     try {
         const taskRef = firebase.database().ref(`tasks/${taskId}`);
         await taskRef.update({
@@ -223,6 +264,12 @@ async function markTaskComplete(taskId) {
 async function deleteTask(taskId) {
     if (!confirm('¿Estás seguro de eliminar esta tarea? Esta acción no se puede deshacer.')) return;
     
+    // Check if Firebase is available
+    if (typeof firebase === 'undefined' || !firebase.database) {
+        showNotification('❌ Firebase no está disponible', 'error');
+        return;
+    }
+    
     try {
         const taskRef = firebase.database().ref(`tasks/${taskId}`);
         await taskRef.remove();
@@ -237,6 +284,12 @@ async function deleteTask(taskId) {
 }
 
 function updateOverdueStatus() {
+    // Check if Firebase is available
+    if (typeof firebase === 'undefined' || !firebase.database) {
+        console.warn('⚠️ Cannot update overdue status - Firebase not available');
+        return;
+    }
+    
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
@@ -1440,4 +1493,4 @@ window.showTaskCalendar = showTaskCalendar;
 window.toggleCompleteProgress = toggleCompleteProgress;
 window.closeModal = closeModal;
 
-console.log('✅ Tasks-realtime.js module loaded successfully!');
+console.log('✅ Tasks.js module loaded successfully!');
