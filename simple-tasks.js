@@ -1,4 +1,4 @@
-// simple-tasks.js - Task Management System (Phase 1) - COMPLETE ORGANIZED VERSION
+// simple-tasks.js - Task Management System (Phase 1) - FIREBASE V10 FIXED VERSION
 console.log('📋 Task Management System loading...');
 
 // ========================================
@@ -9,6 +9,7 @@ let currentFilter = 'all';
 // Use existing currentUser from index.html - don't redeclare
 let isAdmin = false;
 let draggedTask = null;
+let tasksListener = null; // Store listener reference
 
 // Task status configurations
 const TASK_STATUS = {
@@ -63,96 +64,81 @@ async function loadTasksMain() {
 }
 
 // IMMEDIATE OVERRIDE - Don't wait
-console.log('📋 Overriding loadTasksData function NOW...');
-window.loadTasksData = loadTasksMain;
-
-// Also create the function that index.html is looking for
-window.initializeTasksModule = loadTasksMain;
-
-console.log('✅ Task Management System override complete');
+console.log('📋 Overriding loadTasks function...');
+window.loadTasks = loadTasksMain;
 
 // ========================================
 // SECTION 3: UI RENDERING
 // ========================================
 function renderTasksUI() {
-    const tabContent = document.getElementById('tasks');
+    const tasksContainer = document.getElementById('tasks');
     
-    tabContent.innerHTML = `
-        <div style="padding: 20px; background: #f9fafb; min-height: calc(100vh - 200px);">
-            <!-- Header -->
-            <div style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 20px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
-                    <div>
-                        <h2 style="margin: 0; color: #1f2937; font-size: 24px;">📋 Gestión de Tareas</h2>
-                        <p style="margin: 5px 0 0 0; color: #6b7280;">
-                            ${isAdmin ? 'Vista de Administrador - Todas las tareas' : 'Mis tareas asignadas'}
-                        </p>
-                    </div>
-                    <div style="display: flex; gap: 10px; align-items: center;">
-                        <button onclick="showCreateTaskModal()" 
-                                style="padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; display: flex; align-items: center; gap: 8px;">
-                            ➕ Nueva Tarea
-                        </button>
-                        <button onclick="refreshTasks()" 
-                                style="padding: 10px 20px; background: white; color: #374151; border: 1px solid #d1d5db; border-radius: 8px; cursor: pointer; font-weight: 500;">
-                            🔄 Actualizar
-                        </button>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Filters -->
-            <div style="background: white; padding: 15px 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 20px;">
-                <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
-                    <span style="font-weight: 500; color: #374151;">Filtros:</span>
-                    <select id="filterStatus" onchange="applyFilters()" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;">
-                        <option value="all">Todos los estados</option>
-                        <option value="todo">Por Hacer</option>
-                        <option value="in_progress">En Progreso</option>
-                        <option value="review">En Revisión</option>
-                        <option value="done">Completado</option>
+    tasksContainer.innerHTML = `
+        <!-- Header -->
+        <h2>📋 Gestión de Tareas</h2>
+        <p style="color: #6b7280; margin-bottom: 20px;">Vista de ${isAdmin ? 'Administrador - Todas las tareas' : 'Empleado - Mis tareas'}</p>
+        
+        <!-- Action Bar -->
+        <div style="display: flex; gap: 10px; margin-bottom: 20px; align-items: center;">
+            <button onclick="showCreateTaskModal()" class="btn btn-primary">➕ Nueva Tarea</button>
+            <button onclick="refreshTasks()" class="btn" style="background: #6b7280; color: white;">🔄 Actualizar</button>
+        </div>
+        
+        <!-- Filters -->
+        <div style="background: #f9fafb; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+            <h4 style="margin: 0 0 10px 0; color: #374151;">Filtros:</h4>
+            <div style="display: flex; gap: 15px; flex-wrap: wrap; align-items: center;">
+                <select id="filterStatus" onchange="applyFilters()" style="padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                    <option value="all">Todos los estados</option>
+                    <option value="todo">📝 Por Hacer</option>
+                    <option value="in_progress">🔄 En Progreso</option>
+                    <option value="review">👀 En Revisión</option>
+                    <option value="done">✅ Completado</option>
+                </select>
+                
+                ${isAdmin ? `
+                    <select id="filterAssignee" onchange="applyFilters()" style="padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                        <option value="all">Todos los usuarios</option>
                     </select>
-                    ${isAdmin ? `
-                        <select id="filterAssignee" onchange="applyFilters()" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;">
-                            <option value="all">Todos los usuarios</option>
-                        </select>
-                    ` : ''}
-                    <select id="filterPriority" onchange="applyFilters()" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;">
-                        <option value="all">Todas las prioridades</option>
-                        <option value="urgent">Urgente</option>
-                        <option value="high">Alta</option>
-                        <option value="medium">Media</option>
-                        <option value="low">Baja</option>
-                    </select>
-                    <button onclick="clearFilters()" style="padding: 8px 16px; background: #f3f4f6; color: #374151; border: none; border-radius: 6px; cursor: pointer;">
-                        ❌ Limpiar
-                    </button>
-                </div>
+                ` : ''}
+                
+                <select id="filterPriority" onchange="applyFilters()" style="padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                    <option value="all">Todas las prioridades</option>
+                    <option value="low">🟢 Baja</option>
+                    <option value="medium">🟡 Media</option>
+                    <option value="high">🔴 Alta</option>
+                    <option value="urgent">🚨 Urgente</option>
+                </select>
+                
+                <button onclick="clearFilters()" style="padding: 8px 16px; background: #dc2626; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                    ❌ Limpiar
+                </button>
             </div>
-            
-            <!-- Kanban Board -->
-            <div id="kanbanBoard" style="display: flex; gap: 20px; overflow-x: auto; padding-bottom: 20px;">
-                ${Object.entries(TASK_STATUS).map(([status, config]) => `
-                    <div class="kanban-column" 
-                         style="flex: 1; min-width: 300px; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
-                        <div style="padding: 15px; background: ${config.color}10; border-bottom: 2px solid ${config.color}; border-radius: 12px 12px 0 0;">
-                            <h3 style="margin: 0; color: ${config.color}; font-size: 16px; display: flex; align-items: center; gap: 8px;">
-                                <span>${config.icon}</span>
-                                <span>${config.label}</span>
-                                <span id="count-${status}" style="background: ${config.color}20; padding: 2px 8px; border-radius: 12px; font-size: 14px;">0</span>
-                            </h3>
-                        </div>
-                        <div id="column-${status}" 
-                             class="task-column" 
-                             data-status="${status}"
-                             ondrop="handleDrop(event)" 
-                             ondragover="handleDragOver(event)"
-                             style="padding: 15px; min-height: 400px;">
-                            <!-- Tasks will be added here -->
+        </div>
+        
+        <!-- Kanban Board -->
+        <div id="kanbanBoard" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+            ${Object.entries(TASK_STATUS).map(([key, status]) => `
+                <div class="kanban-column" style="background: #f9fafb; border-radius: 8px; padding: 15px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3 style="margin: 0; color: ${status.color}; font-size: 16px;">
+                            ${status.icon} ${status.label}
+                        </h3>
+                        <span id="count-${key}" style="background: ${status.color}20; color: ${status.color}; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold;">
+                            0
+                        </span>
+                    </div>
+                    <div id="column-${key}" class="task-column" style="min-height: 300px;" 
+                         ondrop="handleDrop(event, '${key}')" 
+                         ondragover="handleDragOver(event)"
+                         ondragleave="handleDragLeave(event)">
+                        <div style="text-align: center; color: #9ca3af; padding: 40px;">
+                            <div class="loading-spinner" style="width: 30px; height: 30px; margin: 0 auto;"></div>
+                            <p style="margin-top: 10px;">Cargando tareas...</p>
                         </div>
                     </div>
-                `).join('')}
-            </div>
+                </div>
+            `).join('')}
         </div>
         
         <!-- Modal Container -->
@@ -164,58 +150,46 @@ function renderTasksUI() {
 }
 
 // ========================================
-// SECTION 4: FIREBASE INTEGRATION (FIXED)
+// SECTION 4: FIREBASE INTEGRATION (FIXED FOR V10)
 // ========================================
 function setupTasksListener() {
-    console.log('🔍 Checking Firebase availability...');
-    
-    // Check if Firebase is available - FIXED for your system
-    if (!window.firebaseDb || !window.FirebaseData) {
-        console.error('❌ Firebase not ready yet');
-        
-        // Show loading state
-        const kanbanBoard = document.getElementById('kanbanBoard');
-        if (kanbanBoard) {
-            kanbanBoard.innerHTML = `
-                <div style="width: 100%; text-align: center; padding: 40px;">
-                    <div style="background: #f3f4f6; padding: 20px; border-radius: 8px;">
-                        <div class="loading-spinner" style="width: 32px; height: 32px; margin: 0 auto 1rem;"></div>
-                        <h3>Conectando con Firebase...</h3>
-                        <p>Por favor espera un momento</p>
-                    </div>
-                </div>
-            `;
+    try {
+        if (!window.firebaseDb || !window.firebaseModules) {
+            console.error('❌ Firebase not ready');
+            showError('Firebase no está listo todavía. Por favor, recarga la página.');
+            return;
         }
         
-        // Try again in a moment
-        setTimeout(() => {
-            setupTasksListener();
-        }, 1000);
-        return;
-    }
-    
-    console.log('🔥 Firebase is ready! Setting up listener...');
-    
-    try {
-        // FIXED: Use firebaseDb.ref() directly for your system
-        const tasksRef = window.firebaseDb.ref('tasks');
+        console.log('🔥 Setting up Firebase tasks listener...');
         
-        tasksRef.on('value', (snapshot) => {
-            const allTasks = snapshot.val() || {};
-            tasksData = [];
+        // Remove previous listener if exists
+        if (tasksListener) {
+            window.firebaseModules.database.off(tasksListener);
+        }
+        
+        // FIXED: Use Firebase v10 modular syntax
+        const { ref, onValue } = window.firebaseModules.database;
+        const tasksRef = ref(window.firebaseDb, 'tasks');
+        
+        tasksListener = onValue(tasksRef, (snapshot) => {
+            console.log('📥 Tasks data received from Firebase');
+            const data = snapshot.val() || {};
             
-            // Convert to array and filter based on user role
-            Object.keys(allTasks).forEach(taskId => {
-                const task = allTasks[taskId];
-                task.id = taskId;
-                
-                // Admin sees all, others see only their tasks
-                if (isAdmin || (currentUser && (task.assignedTo === currentUser.uid || task.createdBy === currentUser.uid))) {
-                    tasksData.push(task);
-                }
-            });
+            // Convert to array with IDs
+            tasksData = Object.entries(data).map(([id, task]) => ({
+                id,
+                ...task
+            }));
             
-            console.log(`✅ Loaded ${tasksData.length} tasks from Firebase`);
+            // Filter based on user role
+            if (!isAdmin) {
+                tasksData = tasksData.filter(task => 
+                    task.assignedTo === currentUser?.uid || 
+                    task.createdBy === currentUser?.uid
+                );
+            }
+            
+            console.log(`📋 Loaded ${tasksData.length} tasks`);
             
             // Update assignee filter if admin
             if (isAdmin) {
@@ -225,7 +199,7 @@ function setupTasksListener() {
             // Render tasks
             renderTasks();
             
-            // If this is the first load and no tasks, show a welcome message
+            // Show welcome message if no tasks
             if (tasksData.length === 0 && document.getElementById('column-todo')) {
                 document.getElementById('column-todo').innerHTML = `
                     <div style="text-align: center; color: #9ca3af; padding: 40px;">
@@ -243,6 +217,7 @@ function setupTasksListener() {
         showError('Error al configurar Firebase: ' + error.message);
     }
 }
+
 // ========================================
 // SECTION 5: TASK RENDERING FUNCTIONS
 // ========================================
@@ -297,75 +272,80 @@ function renderTaskCard(task) {
              draggable="true" 
              ondragstart="handleDragStart(event, '${task.id}')"
              onclick="showTaskDetails('${task.id}')"
-             style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 10px; cursor: move; transition: all 0.2s;">
+             style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 10px; cursor: pointer; transition: all 0.2s; ${isOverdue ? 'border-color: #dc2626;' : ''}">
+            
             <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
-                <h4 style="margin: 0; font-size: 14px; color: #1f2937; flex: 1;">${task.title || 'Sin título'}</h4>
-                <span style="font-size: 20px;" title="${priority.label}">${priority.icon}</span>
+                <h4 style="margin: 0; color: #1f2937; font-size: 14px; font-weight: 600;">${task.title}</h4>
+                <span style="font-size: 18px;">${priority.icon}</span>
             </div>
             
             ${task.description ? `
-                <p style="margin: 0 0 8px 0; font-size: 13px; color: #6b7280; line-height: 1.4;">
-                    ${task.description.substring(0, 100)}${task.description.length > 100 ? '...' : ''}
+                <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 13px; line-height: 1.4;">
+                    ${task.description.length > 100 ? task.description.substring(0, 100) + '...' : task.description}
                 </p>
             ` : ''}
             
-            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    ${task.assignedToName ? `
-                        <span style="background: #f3f4f6; padding: 2px 8px; border-radius: 4px; color: #374151;">
-                            👤 ${task.assignedToName}
-                        </span>
-                    ` : ''}
-                    ${dueDate ? `
-                        <span style="background: ${isOverdue ? '#fee2e2' : '#f3f4f6'}; color: ${isOverdue ? '#dc2626' : '#374151'}; padding: 2px 8px; border-radius: 4px;">
-                            📅 ${dueDate.toLocaleDateString('es-CO')}
-                        </span>
-                    ` : ''}
-                </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #6b7280;">
+                <span>👤 ${task.assignedToName || 'Sin asignar'}</span>
+                ${dueDate ? `
+                    <span style="${isOverdue ? 'color: #dc2626; font-weight: bold;' : ''}">
+                        📅 ${dueDate.toLocaleDateString('es-CO')}
+                    </span>
+                ` : ''}
             </div>
         </div>
     `;
 }
 
 // ========================================
-// SECTION 6: DRAG AND DROP HANDLERS
+// SECTION 6: DRAG AND DROP HANDLERS (FIXED FOR V10)
 // ========================================
-function handleDragStart(event, taskId) {
-    draggedTask = tasksData.find(t => t.id === taskId);
+window.handleDragStart = function(event, taskId) {
+    draggedTask = taskId;
     event.dataTransfer.effectAllowed = 'move';
-}
+    event.target.style.opacity = '0.5';
+};
 
-function handleDragOver(event) {
+window.handleDragOver = function(event) {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
-}
+    event.currentTarget.style.backgroundColor = '#e5e7eb';
+};
 
-async function handleDrop(event) {
+window.handleDragLeave = function(event) {
+    event.currentTarget.style.backgroundColor = '#f9fafb';
+};
+
+window.handleDrop = async function(event, newStatus) {
     event.preventDefault();
+    event.currentTarget.style.backgroundColor = '#f9fafb';
     
-    const column = event.target.closest('.task-column');
-    if (!column || !draggedTask) return;
-    
-    const newStatus = column.dataset.status;
-    if (draggedTask.status === newStatus) return;
+    if (!draggedTask) return;
     
     try {
-        // FIXED: Use firebaseDb.ref() directly
-        const taskRef = window.firebaseDb.ref(`tasks/${draggedTask.id}`);
-        await taskRef.update({
+        // FIXED: Use Firebase v10 modular syntax
+        const { ref, update } = window.firebaseModules.database;
+        const taskRef = ref(window.firebaseDb, `tasks/${draggedTask}`);
+        
+        await update(taskRef, {
             status: newStatus,
             lastUpdated: new Date().toISOString(),
             lastUpdatedBy: currentUser.uid
         });
         
-        console.log('✅ Task status updated via drag and drop');
+        console.log('✅ Task moved via drag & drop');
+        showNotification('Tarea actualizada', 'success');
     } catch (error) {
         console.error('❌ Error updating task:', error);
-        showNotification('Error al actualizar tarea', 'error');
+        showNotification('Error al mover tarea', 'error');
     }
     
+    // Reset drag state
     draggedTask = null;
-}
+    document.querySelectorAll('.task-card').forEach(card => {
+        card.style.opacity = '1';
+    });
+};
 
 // ========================================
 // SECTION 7: CREATE TASK MODAL
@@ -373,10 +353,10 @@ async function handleDrop(event) {
 window.showCreateTaskModal = function() {
     const modal = `
         <div class="modal-overlay" onclick="closeModal(event)" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;">
-            <div class="modal-content" onclick="event.stopPropagation()" style="background: white; border-radius: 12px; padding: 24px; max-width: 500px; width: 90%; max-height: 90vh; overflow-y: auto;">
+            <div class="modal-content" onclick="event.stopPropagation()" style="background: white; border-radius: 12px; padding: 24px; max-width: 500px; width: 90%;">
                 <h3 style="margin: 0 0 20px 0; color: #1f2937;">➕ Nueva Tarea</h3>
                 
-                <form onsubmit="handleCreateTask(event)">
+                <form onsubmit="createTask(event)">
                     <div style="margin-bottom: 16px;">
                         <label style="display: block; margin-bottom: 6px; color: #374151; font-weight: 500;">Título *</label>
                         <input type="text" name="title" required 
@@ -416,7 +396,7 @@ window.showCreateTaskModal = function() {
                     
                     <div style="display: flex; gap: 10px; justify-content: flex-end;">
                         <button type="button" onclick="closeModal()" 
-                                style="padding: 10px 20px; background: #f3f4f6; color: #374151; border: none; border-radius: 6px; cursor: pointer;">
+                                style="padding: 10px 20px; background: #e5e7eb; color: #374151; border: none; border-radius: 6px; cursor: pointer;">
                             Cancelar
                         </button>
                         <button type="submit" 
@@ -436,32 +416,33 @@ window.showCreateTaskModal = function() {
 };
 
 // ========================================
-// SECTION 8: CREATE TASK HANDLER (FIXED)
+// SECTION 8: CREATE TASK HANDLER (FIXED FOR V10)
 // ========================================
-window.handleCreateTask = async function(event) {
+window.createTask = async function(event) {
     event.preventDefault();
     
     const form = event.target;
-    const formData = new FormData(form);
+    const assigneeSelect = form.assignedTo;
+    const assigneeName = assigneeSelect.options[assigneeSelect.selectedIndex].text.split(' (')[0];
     
     const newTask = {
-        title: formData.get('title'),
-        description: formData.get('description'),
-        priority: formData.get('priority'),
-        dueDate: formData.get('dueDate'),
-        assignedTo: formData.get('assignedTo'),
-        assignedToName: document.getElementById('assigneeSelect').options[document.getElementById('assigneeSelect').selectedIndex].text.replace(' (Yo)', ''),
+        title: form.title.value,
+        description: form.description.value,
+        priority: form.priority.value,
+        dueDate: form.dueDate.value,
+        assignedTo: form.assignedTo.value,
+        assignedToName: assigneeName,
         status: 'todo',
         createdBy: currentUser.uid,
-        createdByName: currentUser.email,
         createdAt: new Date().toISOString(),
         lastUpdated: new Date().toISOString()
     };
     
     try {
-        // FIXED: Use firebaseDb.ref() directly
-        const tasksRef = window.firebaseDb.ref('tasks');
-        await tasksRef.push(newTask);
+        // FIXED: Use Firebase v10 modular syntax
+        const { ref, push } = window.firebaseModules.database;
+        const tasksRef = ref(window.firebaseDb, 'tasks');
+        await push(tasksRef, newTask);
         
         console.log('✅ Task created successfully');
         showNotification('Tarea creada exitosamente', 'success');
@@ -547,13 +528,15 @@ window.showTaskDetails = function(taskId) {
 };
 
 // ========================================
-// SECTION 10: UPDATE TASK STATUS (FIXED)
+// SECTION 10: UPDATE TASK STATUS (FIXED FOR V10)
 // ========================================
 window.updateTaskStatus = async function(taskId, newStatus) {
     try {
-        // FIXED: Use firebaseDb.ref() directly
-        const taskRef = window.firebaseDb.ref(`tasks/${taskId}`);
-        await taskRef.update({
+        // FIXED: Use Firebase v10 modular syntax
+        const { ref, update } = window.firebaseModules.database;
+        const taskRef = ref(window.firebaseDb, `tasks/${taskId}`);
+        
+        await update(taskRef, {
             status: newStatus,
             lastUpdated: new Date().toISOString(),
             lastUpdatedBy: currentUser.uid
@@ -569,15 +552,16 @@ window.updateTaskStatus = async function(taskId, newStatus) {
 };
 
 // ========================================
-// SECTION 11: DELETE TASK (FIXED)
+// SECTION 11: DELETE TASK (FIXED FOR V10)
 // ========================================
 window.deleteTask = async function(taskId) {
     if (!confirm('¿Estás seguro de eliminar esta tarea?')) return;
     
     try {
-        // FIXED: Use firebaseDb.ref() directly
-        const taskRef = window.firebaseDb.ref(`tasks/${taskId}`);
-        await taskRef.remove();
+        // FIXED: Use Firebase v10 modular syntax
+        const { ref, remove } = window.firebaseModules.database;
+        const taskRef = ref(window.firebaseDb, `tasks/${taskId}`);
+        await remove(taskRef);
         
         console.log('✅ Task deleted');
         showNotification('Tarea eliminada', 'success');
