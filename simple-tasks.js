@@ -169,8 +169,8 @@ function renderTasksUI() {
 function setupTasksListener() {
     console.log('🔍 Checking Firebase availability...');
     
-    // Check if Firebase is available
-    if (!window.firebase || !window.firebase.database) {
+    // Check if Firebase is available - FIXED for your system
+    if (!window.firebaseDb || !window.FirebaseData) {
         console.error('❌ Firebase not ready yet');
         
         // Show loading state
@@ -197,8 +197,8 @@ function setupTasksListener() {
     console.log('🔥 Firebase is ready! Setting up listener...');
     
     try {
-        // FIXED: Use firebase.database().ref() directly
-        const tasksRef = window.firebase.database().ref('tasks');
+        // FIXED: Use firebaseDb.ref() directly for your system
+        const tasksRef = window.firebaseDb.ref('tasks');
         
         tasksRef.on('value', (snapshot) => {
             const allTasks = snapshot.val() || {};
@@ -243,7 +243,6 @@ function setupTasksListener() {
         showError('Error al configurar Firebase: ' + error.message);
     }
 }
-
 // ========================================
 // SECTION 5: TASK RENDERING FUNCTIONS
 // ========================================
@@ -351,8 +350,8 @@ async function handleDrop(event) {
     if (draggedTask.status === newStatus) return;
     
     try {
-        // FIXED: Use firebase.database().ref() directly
-        const taskRef = window.firebase.database().ref(`tasks/${draggedTask.id}`);
+        // FIXED: Use firebaseDb.ref() directly
+        const taskRef = window.firebaseDb.ref(`tasks/${draggedTask.id}`);
         await taskRef.update({
             status: newStatus,
             lastUpdated: new Date().toISOString(),
@@ -460,8 +459,8 @@ window.handleCreateTask = async function(event) {
     };
     
     try {
-        // FIXED: Use firebase.database().ref() directly
-        const tasksRef = window.firebase.database().ref('tasks');
+        // FIXED: Use firebaseDb.ref() directly
+        const tasksRef = window.firebaseDb.ref('tasks');
         await tasksRef.push(newTask);
         
         console.log('✅ Task created successfully');
@@ -552,8 +551,8 @@ window.showTaskDetails = function(taskId) {
 // ========================================
 window.updateTaskStatus = async function(taskId, newStatus) {
     try {
-        // FIXED: Use firebase.database().ref() directly
-        const taskRef = window.firebase.database().ref(`tasks/${taskId}`);
+        // FIXED: Use firebaseDb.ref() directly
+        const taskRef = window.firebaseDb.ref(`tasks/${taskId}`);
         await taskRef.update({
             status: newStatus,
             lastUpdated: new Date().toISOString(),
@@ -576,8 +575,8 @@ window.deleteTask = async function(taskId) {
     if (!confirm('¿Estás seguro de eliminar esta tarea?')) return;
     
     try {
-        // FIXED: Use firebase.database().ref() directly
-        const taskRef = window.firebase.database().ref(`tasks/${taskId}`);
+        // FIXED: Use firebaseDb.ref() directly
+        const taskRef = window.firebaseDb.ref(`tasks/${taskId}`);
         await taskRef.remove();
         
         console.log('✅ Task deleted');
