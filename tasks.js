@@ -8,12 +8,15 @@ let allTasks = [];
 window.loadTasksData = function() {
     console.log('📋 Tasks tab clicked - loadTasksData called');
     
-    // Get the tasks tab content area
-    const tabContent = document.querySelector('.tab-content[data-tab="tasks"]');
+    // Get the tasks tab content area by ID
+    const tabContent = document.getElementById('tasks');
     if (!tabContent) {
         console.error('❌ Tasks tab content area not found');
         return;
     }
+    
+    // Make sure it's visible
+    tabContent.style.display = 'block';
     
     // Create the UI
     tabContent.innerHTML = `
