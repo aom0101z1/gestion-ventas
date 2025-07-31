@@ -65,7 +65,7 @@ async function loadTasksMain() {
 
 // IMMEDIATE OVERRIDE - Don't wait
 console.log('📋 Overriding loadTasks function...');
-window.loadTasks = loadTasksMain;
+window.loadTasksData = loadTasksMain;  // Add "Data" to match what the tab system expects
 
 // ========================================
 // SECTION 3: UI RENDERING
