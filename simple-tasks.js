@@ -150,8 +150,11 @@ function renderTasksUI() {
 }
 
 // ========================================
-// SECTION 4: FIREBASE INTEGRATION (FIXED FOR V10)
+// DIRECT FIXES FOR EACH FIREBASE SECTION
 // ========================================
+
+// SECTION 4 FIX (around line 201):
+// Replace the entire setupTasksListener function with this:
 function setupTasksListener() {
     try {
         if (!window.firebaseDb || !window.firebaseModules) {
@@ -162,16 +165,11 @@ function setupTasksListener() {
         
         console.log('🔥 Setting up Firebase tasks listener...');
         
-        // Remove previous listener if exists
-        if (tasksListener) {
-            window.firebaseModules.database.off(tasksListener);
-        }
-        
-        // FIXED: Use Firebase v10 modular syntax
+        // Get Firebase v10 functions
         const { ref, onValue } = window.firebaseModules.database;
         const tasksRef = ref(window.firebaseDb, 'tasks');
         
-        tasksListener = onValue(tasksRef, (snapshot) => {
+        onValue(tasksRef, (snapshot) => {
             console.log('📥 Tasks data received from Firebase');
             const data = snapshot.val() || {};
             
@@ -198,16 +196,6 @@ function setupTasksListener() {
             
             // Render tasks
             renderTasks();
-            
-            // Show welcome message if no tasks
-            if (tasksData.length === 0 && document.getElementById('column-todo')) {
-                document.getElementById('column-todo').innerHTML = `
-                    <div style="text-align: center; color: #9ca3af; padding: 40px;">
-                        <h4>¡Bienvenido al Sistema de Tareas!</h4>
-                        <p>Crea tu primera tarea usando el botón "➕ Nueva Tarea"</p>
-                    </div>
-                `;
-            }
         }, (error) => {
             console.error('❌ Firebase error:', error);
             showError('Error al cargar tareas: ' + error.message);
@@ -297,25 +285,7 @@ function renderTaskCard(task) {
     `;
 }
 
-// ========================================
-// SECTION 6: DRAG AND DROP HANDLERS (FIXED FOR V10)
-// ========================================
-window.handleDragStart = function(event, taskId) {
-    draggedTask = taskId;
-    event.dataTransfer.effectAllowed = 'move';
-    event.target.style.opacity = '0.5';
-};
-
-window.handleDragOver = function(event) {
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
-    event.currentTarget.style.backgroundColor = '#e5e7eb';
-};
-
-window.handleDragLeave = function(event) {
-    event.currentTarget.style.backgroundColor = '#f9fafb';
-};
-
+// SECTION 6 FIX (handleDrop function):
 window.handleDrop = async function(event, newStatus) {
     event.preventDefault();
     event.currentTarget.style.backgroundColor = '#f9fafb';
@@ -323,7 +293,6 @@ window.handleDrop = async function(event, newStatus) {
     if (!draggedTask) return;
     
     try {
-        // FIXED: Use Firebase v10 modular syntax
         const { ref, update } = window.firebaseModules.database;
         const taskRef = ref(window.firebaseDb, `tasks/${draggedTask}`);
         
@@ -340,7 +309,6 @@ window.handleDrop = async function(event, newStatus) {
         showNotification('Error al mover tarea', 'error');
     }
     
-    // Reset drag state
     draggedTask = null;
     document.querySelectorAll('.task-card').forEach(card => {
         card.style.opacity = '1';
@@ -415,9 +383,7 @@ window.showCreateTaskModal = function() {
     loadUsersForAssignment();
 };
 
-// ========================================
-// SECTION 8: CREATE TASK HANDLER (FIXED FOR V10)
-// ========================================
+// SECTION 8 FIX (createTask function):
 window.createTask = async function(event) {
     event.preventDefault();
     
@@ -439,7 +405,6 @@ window.createTask = async function(event) {
     };
     
     try {
-        // FIXED: Use Firebase v10 modular syntax
         const { ref, push } = window.firebaseModules.database;
         const tasksRef = ref(window.firebaseDb, 'tasks');
         await push(tasksRef, newTask);
@@ -452,6 +417,7 @@ window.createTask = async function(event) {
         showNotification('Error al crear tarea', 'error');
     }
 };
+
 
 // ========================================
 // SECTION 9: TASK DETAILS MODAL
@@ -527,12 +493,9 @@ window.showTaskDetails = function(taskId) {
     document.getElementById('modalContainer').innerHTML = modal;
 };
 
-// ========================================
-// SECTION 10: UPDATE TASK STATUS (FIXED FOR V10)
-// ========================================
+// SECTION 10 FIX (updateTaskStatus function):
 window.updateTaskStatus = async function(taskId, newStatus) {
     try {
-        // FIXED: Use Firebase v10 modular syntax
         const { ref, update } = window.firebaseModules.database;
         const taskRef = ref(window.firebaseDb, `tasks/${taskId}`);
         
@@ -551,14 +514,11 @@ window.updateTaskStatus = async function(taskId, newStatus) {
     }
 };
 
-// ========================================
-// SECTION 11: DELETE TASK (FIXED FOR V10)
-// ========================================
+// SECTION 11 FIX (deleteTask function):
 window.deleteTask = async function(taskId) {
     if (!confirm('¿Estás seguro de eliminar esta tarea?')) return;
     
     try {
-        // FIXED: Use Firebase v10 modular syntax
         const { ref, remove } = window.firebaseModules.database;
         const taskRef = ref(window.firebaseDb, `tasks/${taskId}`);
         await remove(taskRef);
