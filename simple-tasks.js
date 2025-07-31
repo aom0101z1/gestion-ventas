@@ -4,6 +4,7 @@ console.log('📋 Task Management System loading...');
 // Global variables
 let tasksData = [];
 let currentFilter = 'all';
+// Use existing currentUser from index.html - don't redeclare
 let isAdmin = false;
 let draggedTask = null;
 
@@ -22,45 +23,47 @@ const TASK_PRIORITY = {
     urgent: { label: 'Urgente', color: '#dc2626', icon: '🚨' }
 };
 
-// Wait for system to be ready
-setTimeout(() => {
-    console.log('📋 Initializing Task Management System...');
+// Create the main function that will be called
+async function loadTasksMain() {
+    console.log('✅ Loading tasks module...');
     
-    // Override the loadTasksData function
-    window.loadTasksData = async function() {
-        console.log('✅ Loading tasks module...');
-        
-        // Get current user info
-        if (window.FirebaseData && window.FirebaseData.currentUser) {
-            currentUser = window.FirebaseData.currentUser;
-            const profile = await window.FirebaseData.loadUserProfile();
-            isAdmin = profile && profile.role === 'director';
-            console.log('👤 User:', currentUser.email, 'Admin:', isAdmin);
-        }
-        
-        // Get the tasks tab content area
-        const tabContent = document.getElementById('tasks');
-        if (!tabContent) {
-            console.error('❌ Tasks tab content area not found');
-            return;
-        }
-        
-        // Clear and show content
-        tabContent.innerHTML = '';
-        tabContent.style.display = 'block';
-        tabContent.classList.remove('hidden');
-        
-        // Render main UI
-        renderTasksUI();
-        
-        // Setup Firebase listener
-        setupTasksListener();
-        
-        console.log('✅ Tasks module initialized');
-    };
+    // Get current user info
+    if (window.FirebaseData && window.FirebaseData.currentUser) {
+        currentUser = window.FirebaseData.currentUser;
+        const profile = await window.FirebaseData.loadUserProfile();
+        isAdmin = profile && profile.role === 'director';
+        console.log('👤 User:', currentUser.email, 'Admin:', isAdmin);
+    }
     
-    console.log('✅ Task Management System ready');
-}, 100);
+    // Get the tasks tab content area
+    const tabContent = document.getElementById('tasks');
+    if (!tabContent) {
+        console.error('❌ Tasks tab content area not found');
+        return;
+    }
+    
+    // Clear and show content
+    tabContent.innerHTML = '';
+    tabContent.style.display = 'block';
+    tabContent.classList.remove('hidden');
+    
+    // Render main UI
+    renderTasksUI();
+    
+    // Setup Firebase listener
+    setupTasksListener();
+    
+    console.log('✅ Tasks module initialized');
+}
+
+// IMMEDIATE OVERRIDE - Don't wait
+console.log('📋 Overriding loadTasksData function NOW...');
+window.loadTasksData = loadTasksMain;
+
+// Also create the function that index.html is looking for
+window.initializeTasksModule = loadTasksMain;
+
+console.log('✅ Task Management System override complete');
 
 // ===== UI RENDERING =====
 function renderTasksUI() {
