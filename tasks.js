@@ -9,9 +9,32 @@ let taskCategories = ['Sales', 'Admin', 'Marketing', 'Customer Service']; // Def
 
 // Helper function to get Firestore reference
 function getFirestore() {
+    // Debug: Log available Firebase references
+    console.log('🔍 Checking Firebase references:', {
+        'window.firebase': !!window.firebase,
+        'window.firebase.firestore': !!(window.firebase && window.firebase.firestore),
+        'window.db': !!window.db,
+        'window.FirebaseData': !!window.FirebaseData,
+        'window.FirebaseData.db': !!(window.FirebaseData && window.FirebaseData.db),
+        'firebase': typeof firebase !== 'undefined'
+    });
+    
+    // Try different ways to access Firestore
     if (window.firebase && window.firebase.firestore) {
         return window.firebase.firestore();
     }
+    if (window.db) {
+        return window.db;
+    }
+    if (window.FirebaseData && window.FirebaseData.db) {
+        return window.FirebaseData.db;
+    }
+    
+    // Try global firebase
+    if (typeof firebase !== 'undefined' && firebase.firestore) {
+        return firebase.firestore();
+    }
+    
     console.error('❌ Firestore not available');
     return null;
 }
@@ -45,25 +68,34 @@ async function loadTasksData() {
         // Show loading state
         showTasksLoading();
         
-        // Check Firebase availability
-        if (!window.firebase || !window.firebase.firestore) {
-            console.error('❌ Firebase not available');
-            showTasksError('Firebase no está disponible. Por favor recarga la página.');
-            return;
+        // Wait for Firebase to be ready
+        let retries = 0;
+        const maxRetries = 10;
+        
+        while (retries < maxRetries) {
+            const db = getFirestore();
+            
+            if (db && window.FirebaseData && window.FirebaseData.currentUser) {
+                console.log('✅ Firebase is ready');
+                
+                // Set up real-time listener for tasks
+                setupTasksListener();
+                
+                // Load categories from Firebase
+                await loadTaskCategories();
+                
+                console.log('✅ Tasks module loaded successfully');
+                return;
+            }
+            
+            console.log(`⏳ Waiting for Firebase... (attempt ${retries + 1}/${maxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, 500));
+            retries++;
         }
         
-        if (!window.FirebaseData || !window.FirebaseData.currentUser) {
-            showTasksError('Usuario no autenticado');
-            return;
-        }
-        
-        // Set up real-time listener for tasks
-        setupTasksListener();
-        
-        // Load categories from Firebase
-        await loadTaskCategories();
-        
-        console.log('✅ Tasks module loaded successfully');
+        // If we get here, Firebase didn't load
+        console.error('❌ Firebase failed to load after retries');
+        showTasksError('Firebase no está disponible. Por favor recarga la página.');
         
     } catch (error) {
         console.error('❌ Error loading tasks:', error);
@@ -78,14 +110,17 @@ function setupTasksListener() {
         const db = getFirestore();
         if (!db) {
             console.error('❌ Firebase Firestore not initialized');
-            showTasksError('Firebase no está inicializado correctamente');
+            // Show empty state instead of error
+            tasksData = [];
+            renderTasksView();
             return;
         }
         
-        const currentUser = window.FirebaseData.currentUser;
+        const currentUser = window.FirebaseData && window.FirebaseData.currentUser;
         if (!currentUser) {
             console.error('❌ No current user found');
-            showTasksError('Usuario no autenticado');
+            tasksData = [];
+            renderTasksView();
             return;
         }
         
@@ -125,14 +160,16 @@ function setupTasksListener() {
                 if (error.code === 'permission-denied') {
                     showTasksError('No tienes permisos para ver las tareas. Contacta al administrador.');
                 } else {
-                    // Try to create the collection if it doesn't exist
-                    console.log('📋 Attempting to initialize tasks collection...');
-                    renderEmptyTasks();
+                    // Show empty state instead of error
+                    console.log('📋 Showing empty tasks state');
+                    tasksData = [];
+                    renderTasksView();
                 }
             });
     } catch (error) {
         console.error('❌ Error setting up tasks listener:', error);
-        showTasksError('Error al configurar el listener de tareas');
+        tasksData = [];
+        renderTasksView();
     }
 }
 
@@ -140,6 +177,30 @@ function setupTasksListener() {
 function renderTasksView() {
     const container = document.getElementById('tasksContainer');
     if (!container) return;
+    
+    // Check if we have Firebase connection
+    const db = getFirestore();
+    if (!db) {
+        container.innerHTML = `
+            <div style="
+                text-align: center;
+                padding: 4rem;
+                background: white;
+                border-radius: 12px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            ">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">⚠️</div>
+                <h3 style="margin: 0 0 1rem 0; color: #374151;">Conectando con Firebase...</h3>
+                <p style="color: #6b7280; margin-bottom: 2rem;">
+                    Por favor espera mientras se establece la conexión
+                </p>
+                <button onclick="loadTasksData()" class="btn btn-primary">
+                    🔄 Reintentar
+                </button>
+            </div>
+        `;
+        return;
+    }
     
     const filteredTasks = filterTasks(tasksData);
     const taskStats = calculateTaskStats(filteredTasks);
@@ -963,7 +1024,18 @@ async function handleCreateTask(event) {
     
     const form = event.target;
     const formData = new FormData(form);
-    const currentUser = window.FirebaseData.currentUser;
+    
+    // Get current user safely
+    const currentUser = window.FirebaseData && window.FirebaseData.currentUser;
+    if (!currentUser) {
+        showNotification('❌ Usuario no autenticado', 'error');
+        return;
+    }
+    
+    const assignedTo = formData.get('assignedTo') || currentUser.uid;
+    const assignedToText = form.assignedTo && form.assignedTo.selectedIndex >= 0 
+        ? form.assignedTo.options[form.assignedTo.selectedIndex].text 
+        : 'Usuario';
     
     const newTask = {
         title: formData.get('title'),
@@ -972,15 +1044,15 @@ async function handleCreateTask(event) {
         priority: formData.get('priority'),
         startDate: formData.get('startDate'),
         dueDate: formData.get('dueDate'),
-        assignedTo: formData.get('assignedTo'),
-        assignedToName: form.assignedTo.options[form.assignedTo.selectedIndex].text,
+        assignedTo: assignedTo,
+        assignedToName: assignedToText,
         createdBy: currentUser.uid,
-        createdByName: currentUser.displayName || currentUser.email,
+        createdByName: currentUser.displayName || currentUser.email || 'Usuario',
         createdDate: new Date().toISOString(),
         status: 'pending',
         progress: 0,
         notes: [],
-        participants: [currentUser.uid, formData.get('assignedTo')].filter(unique)
+        participants: [currentUser.uid, assignedTo].filter(unique)
     };
     
     try {
@@ -1012,7 +1084,14 @@ async function handleUpdateProgress(event, taskId) {
     
     const form = event.target;
     const formData = new FormData(form);
-    const currentUser = window.FirebaseData.currentUser;
+    
+    // Get current user safely
+    const currentUser = window.FirebaseData && window.FirebaseData.currentUser;
+    if (!currentUser) {
+        showNotification('❌ Usuario no autenticado', 'error');
+        return;
+    }
+    
     const progress = parseInt(formData.get('progress'));
     const note = formData.get('note');
     const markComplete = formData.get('markComplete');
@@ -1033,14 +1112,19 @@ async function handleUpdateProgress(event, taskId) {
                 date: new Date().toISOString(),
                 note: note,
                 author: currentUser.uid,
-                authorName: currentUser.displayName || currentUser.email,
+                authorName: currentUser.displayName || currentUser.email || 'Usuario',
                 progress: updates.progress
             };
             
             updates.notes = [...(task.notes || []), newNote];
         }
         
-        const db = window.firebase.firestore();
+        const db = getFirestore();
+        if (!db) {
+            showNotification('❌ Firebase no disponible', 'error');
+            return;
+        }
+        
         await db.collection('tasks').doc(taskId).update(updates);
         
         showNotification('✅ Progreso actualizado', 'success');
@@ -1056,7 +1140,12 @@ async function markTaskComplete(taskId) {
     if (!confirm('¿Marcar esta tarea como completada?')) return;
     
     try {
-        const db = window.firebase.firestore();
+        const db = getFirestore();
+        if (!db) {
+            showNotification('❌ Firebase no disponible', 'error');
+            return;
+        }
+        
         await db.collection('tasks').doc(taskId).update({
             status: 'completed',
             progress: 100,
@@ -1077,7 +1166,12 @@ async function deleteTask(taskId) {
     if (!confirm('¿Estás seguro de eliminar esta tarea? Esta acción no se puede deshacer.')) return;
     
     try {
-        const db = window.firebase.firestore();
+        const db = getFirestore();
+        if (!db) {
+            showNotification('❌ Firebase no disponible', 'error');
+            return;
+        }
+        
         await db.collection('tasks').doc(taskId).delete();
         
         showNotification('✅ Tarea eliminada', 'success');
@@ -1091,7 +1185,12 @@ async function deleteTask(taskId) {
 
 // ===== UTILITY FUNCTIONS =====
 function filterTasks(tasks) {
-    const currentUser = window.FirebaseData.currentUser;
+    const currentUser = window.FirebaseData && window.FirebaseData.currentUser;
+    
+    // If no user, return all tasks
+    if (!currentUser) {
+        return tasks;
+    }
     
     switch (currentFilter) {
         case 'my_tasks':
@@ -1130,7 +1229,11 @@ function updateOverdueStatus() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    const db = window.firebase.firestore();
+    const db = getFirestore();
+    if (!db) {
+        console.warn('⚠️ Cannot update overdue status - Firebase not available');
+        return;
+    }
     
     tasksData.forEach(task => {
         if (task.status !== 'completed') {
@@ -1190,22 +1293,34 @@ function unique(value, index, self) {
 }
 
 function renderUserOptions() {
-    // This would be replaced with actual users from Firebase
-    // For now, using mock data
+    // Get current user info if available
+    const currentUser = window.FirebaseData && window.FirebaseData.currentUser;
+    
+    if (currentUser) {
+        return `
+            <option value="${currentUser.uid}" selected>
+                Yo (${currentUser.displayName || currentUser.email || 'Usuario actual'})
+            </option>
+            <option value="user2">Otro usuario</option>
+        `;
+    }
+    
+    // Fallback if no user info available
     return `
-        <option value="${window.FirebaseData.currentUser.uid}">
-            Yo (${window.FirebaseData.currentUser.displayName || window.FirebaseData.currentUser.email})
-        </option>
-        <option value="user2">María García</option>
-        <option value="user3">Carlos López</option>
-        <option value="user4">Ana Martínez</option>
+        <option value="">Seleccionar usuario...</option>
+        <option value="current">Usuario actual</option>
     `;
 }
 
 async function loadTaskCategories() {
     try {
+        const db = getFirestore();
+        if (!db) {
+            console.warn('⚠️ Cannot load categories - Firebase not available');
+            return;
+        }
+        
         // Load custom categories from Firebase
-        const db = window.firebase.firestore();
         const doc = await db.collection('settings').doc('taskCategories').get();
         if (doc.exists) {
             const customCategories = doc.data().categories || [];
@@ -1451,6 +1566,9 @@ function initializeTasksModule() {
     }
     
     try {
+        // Initialize styles
+        initializeTaskStyles();
+        
         tasksInitialized = true;
         console.log('✅ Tasks module initialized successfully');
         
@@ -1463,12 +1581,13 @@ function initializeTasksModule() {
 document.addEventListener('DOMContentLoaded', () => {
     console.log('📋 Tasks module DOM ready');
     
-    // Initialize when Firebase is ready
-    if (window.FirebaseData) {
-        initializeTasksModule();
-    } else {
-        window.addEventListener('firebaseReady', initializeTasksModule);
-    }
+    // Initialize the module immediately
+    initializeTasksModule();
+    
+    // Also listen for Firebase ready event
+    window.addEventListener('firebaseReady', () => {
+        console.log('📋 Firebase ready event received in tasks module');
+    });
 });
 
 // ===== GLOBAL FUNCTION ASSIGNMENTS =====
