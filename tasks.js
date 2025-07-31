@@ -111,20 +111,19 @@ function setupTasksListener() {
         
         console.log('🔥 Setting up tasks listener for user:', currentUser.uid);
         
-        // Import Firebase functions
-        const { ref, onValue, off } = window.firebaseModules.database;
-        
-        // Reference to tasks
-        const tasksRef = ref(window.firebaseDb, 'tasks');
+        // Reference to tasks using Firebase v9 CDN syntax
+        const tasksRef = firebase.database().ref('tasks');
         
         // Remove any existing listener
         if (taskListeners.length > 0) {
-            taskListeners.forEach(listener => off(tasksRef, 'value', listener));
+            taskListeners.forEach(listener => {
+                tasksRef.off('value', listener);
+            });
             taskListeners = [];
         }
         
         // Create new listener
-        const listener = onValue(tasksRef, (snapshot) => {
+        tasksRef.on('value', (snapshot) => {
             console.log('📥 Tasks data received');
             tasksData = [];
             const allTasks = snapshot.val() || {};
@@ -149,8 +148,6 @@ function setupTasksListener() {
             console.log(`📋 Loaded ${tasksData.length} tasks`);
             renderTasksView();
         });
-        
-        taskListeners.push(listener);
         
     } catch (error) {
         console.error('❌ Error setting up listener:', error);
@@ -265,9 +262,9 @@ async function createTask(event) {
             updatedAt: new Date().toISOString()
         };
         
-        // Save to Firebase
-        const { ref, push } = window.firebaseModules.database;
-        await push(ref(window.firebaseDb, 'tasks'), taskData);
+        // Save to Firebase using v9 CDN syntax
+        const tasksRef = firebase.database().ref('tasks');
+        await tasksRef.push(taskData);
         
         // Close modal
         form.closest('.modal').remove();
@@ -283,8 +280,7 @@ async function createTask(event) {
 // ===== LOAD USERS LIST =====
 async function loadUsersList() {
     try {
-        const { ref, get } = window.firebaseModules.database;
-        const snapshot = await get(ref(window.firebaseDb, 'users'));
+        const snapshot = await firebase.database().ref('users').once('value');
         const users = snapshot.val() || {};
         
         const select = document.getElementById('assigneeSelect');
@@ -470,8 +466,7 @@ function showTaskDetails(taskId) {
 // ===== UPDATE FUNCTIONS =====
 async function updateTaskProgress(taskId, progress) {
     try {
-        const { ref, update } = window.firebaseModules.database;
-        await update(ref(window.firebaseDb, `tasks/${taskId}`), {
+        await firebase.database().ref(`tasks/${taskId}`).update({
             progress: parseInt(progress),
             updatedAt: new Date().toISOString()
         });
@@ -486,8 +481,7 @@ async function updateTaskProgress(taskId, progress) {
 
 async function updateTaskStatus(taskId, status) {
     try {
-        const { ref, update } = window.firebaseModules.database;
-        await update(ref(window.firebaseDb, `tasks/${taskId}`), {
+        await firebase.database().ref(`tasks/${taskId}`).update({
             status: status,
             updatedAt: new Date().toISOString()
         });
@@ -517,8 +511,7 @@ async function addTaskNote(taskId) {
         const notes = task.notes || [];
         notes.push(newNote);
         
-        const { ref, update } = window.firebaseModules.database;
-        await update(ref(window.firebaseDb, `tasks/${taskId}`), {
+        await firebase.database().ref(`tasks/${taskId}`).update({
             notes: notes,
             updatedAt: new Date().toISOString()
         });
@@ -961,22 +954,22 @@ if (!document.getElementById('tasksStyles')) {
 }
 
 // ===== INITIALIZE WHEN READY =====
-// Wait for Firebase modules to be available
-function waitForFirebaseModules() {
-    if (window.firebaseModules && window.firebaseModules.database) {
-        console.log('✅ Firebase modules available');
+// Wait for Firebase to be available
+function waitForFirebase() {
+    if (typeof firebase !== 'undefined' && firebase.database && window.FirebaseData) {
+        console.log('✅ Firebase available, initializing tasks');
         initializeTasks();
     } else {
-        console.log('⏳ Waiting for Firebase modules...');
-        setTimeout(waitForFirebaseModules, 100);
+        console.log('⏳ Waiting for Firebase...');
+        setTimeout(waitForFirebase, 100);
     }
 }
 
 // Check if we should initialize now or wait
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', waitForFirebaseModules);
+    document.addEventListener('DOMContentLoaded', waitForFirebase);
 } else {
-    waitForFirebaseModules();
+    waitForFirebase();
 }
 
 // Export for global access
@@ -987,7 +980,8 @@ window.tasksModule = {
     showTaskDetails,
     updateTaskProgress,
     updateTaskStatus,
-    addTaskNote
+    addTaskNote,
+    createTask
 };
 
 console.log('📋 Tasks module loaded successfully');
