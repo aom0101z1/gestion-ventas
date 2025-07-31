@@ -1,43 +1,11 @@
-// tasks.js - TASK MANAGEMENT MODULE
+// tasks-realtime.js - TASK MANAGEMENT MODULE FOR FIREBASE REALTIME DATABASE
 // ===== STANDALONE TASK MANAGEMENT SYSTEM =====
 
 // Global variables for tasks module
 let tasksData = [];
 let tasksInitialized = false;
 let currentFilter = 'all';
-let taskCategories = ['Sales', 'Admin', 'Marketing', 'Customer Service']; // Default categories
-
-// Helper function to get Firestore reference
-function getFirestore() {
-    // Debug: Log available Firebase references
-    console.log('🔍 Checking Firebase references:', {
-        'window.firebase': !!window.firebase,
-        'window.firebase.firestore': !!(window.firebase && window.firebase.firestore),
-        'window.db': !!window.db,
-        'window.FirebaseData': !!window.FirebaseData,
-        'window.FirebaseData.db': !!(window.FirebaseData && window.FirebaseData.db),
-        'firebase': typeof firebase !== 'undefined'
-    });
-    
-    // Try different ways to access Firestore
-    if (window.firebase && window.firebase.firestore) {
-        return window.firebase.firestore();
-    }
-    if (window.db) {
-        return window.db;
-    }
-    if (window.FirebaseData && window.FirebaseData.db) {
-        return window.FirebaseData.db;
-    }
-    
-    // Try global firebase
-    if (typeof firebase !== 'undefined' && firebase.firestore) {
-        return firebase.firestore();
-    }
-    
-    console.error('❌ Firestore not available');
-    return null;
-}
+let taskCategories = ['Sales', 'Admin', 'Marketing', 'Customer Service'];
 
 // Task status configurations
 const TASK_STATUS = {
@@ -68,34 +36,16 @@ async function loadTasksData() {
         // Show loading state
         showTasksLoading();
         
-        // Wait for Firebase to be ready
-        let retries = 0;
-        const maxRetries = 10;
-        
-        while (retries < maxRetries) {
-            const db = getFirestore();
-            
-            if (db && window.FirebaseData && window.FirebaseData.currentUser) {
-                console.log('✅ Firebase is ready');
-                
-                // Set up real-time listener for tasks
-                setupTasksListener();
-                
-                // Load categories from Firebase
-                await loadTaskCategories();
-                
-                console.log('✅ Tasks module loaded successfully');
-                return;
-            }
-            
-            console.log(`⏳ Waiting for Firebase... (attempt ${retries + 1}/${maxRetries})`);
-            await new Promise(resolve => setTimeout(resolve, 500));
-            retries++;
+        // Check if FirebaseData is available
+        if (!window.FirebaseData || !window.FirebaseData.currentUser) {
+            showTasksError('Usuario no autenticado');
+            return;
         }
         
-        // If we get here, Firebase didn't load
-        console.error('❌ Firebase failed to load after retries');
-        showTasksError('Firebase no está disponible. Por favor recarga la página.');
+        // Set up real-time listener for tasks using Realtime Database
+        setupTasksListener();
+        
+        console.log('✅ Tasks module loaded successfully');
         
     } catch (error) {
         console.error('❌ Error loading tasks:', error);
@@ -103,104 +53,213 @@ async function loadTasksData() {
     }
 }
 
-// ===== FIREBASE LISTENERS =====
+// ===== FIREBASE REALTIME DATABASE LISTENERS =====
 function setupTasksListener() {
     try {
-        // Check if Firebase is properly initialized
-        const db = getFirestore();
-        if (!db) {
-            console.error('❌ Firebase Firestore not initialized');
-            // Show empty state instead of error
-            tasksData = [];
-            renderTasksView();
-            return;
-        }
-        
-        const currentUser = window.FirebaseData && window.FirebaseData.currentUser;
+        const currentUser = window.FirebaseData.currentUser;
         if (!currentUser) {
             console.error('❌ No current user found');
-            tasksData = [];
-            renderTasksView();
+            showTasksError('Usuario no autenticado');
             return;
         }
         
-        // Try a simpler query first - just get all tasks
-        db.collection('tasks')
-            .limit(50) // Limit to 50 tasks for now
-            .onSnapshot(snapshot => {
-                tasksData = [];
-                
-                if (snapshot.empty) {
-                    console.log('📋 No tasks found in database');
-                    renderTasksView(); // Show empty state
-                    return;
-                }
-                
-                snapshot.forEach(doc => {
-                    const taskData = { id: doc.id, ...doc.data() };
-                    
-                    // Filter tasks where user is participant
-                    if (taskData.participants && 
-                        taskData.participants.includes(currentUser.uid)) {
-                        tasksData.push(taskData);
-                    }
-                });
-                
-                console.log(`✅ Loaded ${tasksData.length} tasks`);
-                
-                // Update overdue status
-                updateOverdueStatus();
-                
-                // Render tasks view
-                renderTasksView();
-            }, error => {
-                console.error('❌ Error listening to tasks:', error);
-                
-                // If it's a permission error, show appropriate message
-                if (error.code === 'permission-denied') {
-                    showTasksError('No tienes permisos para ver las tareas. Contacta al administrador.');
-                } else {
-                    // Show empty state instead of error
-                    console.log('📋 Showing empty tasks state');
-                    tasksData = [];
-                    renderTasksView();
+        // Reference to tasks in Realtime Database
+        const tasksRef = firebase.database().ref('tasks');
+        
+        // Listen to all tasks
+        tasksRef.on('value', (snapshot) => {
+            tasksData = [];
+            const allTasks = snapshot.val() || {};
+            
+            // Convert object to array and filter by user
+            Object.keys(allTasks).forEach(taskId => {
+                const task = allTasks[taskId];
+                if (task.participants && task.participants.includes(currentUser.uid)) {
+                    tasksData.push({ id: taskId, ...task });
                 }
             });
+            
+            console.log(`✅ Loaded ${tasksData.length} tasks`);
+            
+            // Update overdue status
+            updateOverdueStatus();
+            
+            // Render tasks view
+            renderTasksView();
+        }, (error) => {
+            console.error('❌ Error listening to tasks:', error);
+            showTasksError('Error al cargar tareas en tiempo real');
+        });
+        
     } catch (error) {
         console.error('❌ Error setting up tasks listener:', error);
-        tasksData = [];
-        renderTasksView();
+        showTasksError('Error al configurar el listener de tareas');
     }
+}
+
+// ===== TASK CRUD OPERATIONS WITH REALTIME DATABASE =====
+async function handleCreateTask(event) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const formData = new FormData(form);
+    
+    const currentUser = window.FirebaseData.currentUser;
+    if (!currentUser) {
+        showNotification('❌ Usuario no autenticado', 'error');
+        return;
+    }
+    
+    const assignedTo = formData.get('assignedTo') || currentUser.uid;
+    const assignedToText = form.assignedTo && form.assignedTo.selectedIndex >= 0 
+        ? form.assignedTo.options[form.assignedTo.selectedIndex].text 
+        : 'Usuario';
+    
+    const newTask = {
+        title: formData.get('title'),
+        description: formData.get('description'),
+        category: formData.get('category'),
+        priority: formData.get('priority'),
+        startDate: formData.get('startDate'),
+        dueDate: formData.get('dueDate'),
+        assignedTo: assignedTo,
+        assignedToName: assignedToText,
+        createdBy: currentUser.uid,
+        createdByName: currentUser.displayName || currentUser.email || 'Usuario',
+        createdDate: new Date().toISOString(),
+        status: 'pending',
+        progress: 0,
+        notes: [],
+        participants: [currentUser.uid, assignedTo].filter(unique)
+    };
+    
+    try {
+        // Create task in Realtime Database
+        const tasksRef = firebase.database().ref('tasks');
+        await tasksRef.push(newTask);
+        
+        showNotification('✅ Tarea creada exitosamente', 'success');
+        closeModal();
+        
+    } catch (error) {
+        console.error('Error creating task:', error);
+        showNotification('❌ Error al crear tarea', 'error');
+    }
+}
+
+async function handleUpdateProgress(event, taskId) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const formData = new FormData(form);
+    
+    const currentUser = window.FirebaseData.currentUser;
+    if (!currentUser) {
+        showNotification('❌ Usuario no autenticado', 'error');
+        return;
+    }
+    
+    const progress = parseInt(formData.get('progress'));
+    const note = formData.get('note');
+    const markComplete = formData.get('markComplete');
+    
+    const task = tasksData.find(t => t.id === taskId);
+    if (!task) return;
+    
+    try {
+        const updates = {
+            progress: markComplete ? 100 : progress,
+            status: markComplete || progress === 100 ? 'completed' : task.status,
+            lastUpdated: new Date().toISOString()
+        };
+        
+        // Add note if provided
+        if (note) {
+            const newNote = {
+                date: new Date().toISOString(),
+                note: note,
+                author: currentUser.uid,
+                authorName: currentUser.displayName || currentUser.email || 'Usuario',
+                progress: updates.progress
+            };
+            
+            updates.notes = [...(task.notes || []), newNote];
+        }
+        
+        // Update in Realtime Database
+        const taskRef = firebase.database().ref(`tasks/${taskId}`);
+        await taskRef.update(updates);
+        
+        showNotification('✅ Progreso actualizado', 'success');
+        closeModal();
+        
+    } catch (error) {
+        console.error('Error updating progress:', error);
+        showNotification('❌ Error al actualizar progreso', 'error');
+    }
+}
+
+async function markTaskComplete(taskId) {
+    if (!confirm('¿Marcar esta tarea como completada?')) return;
+    
+    try {
+        const taskRef = firebase.database().ref(`tasks/${taskId}`);
+        await taskRef.update({
+            status: 'completed',
+            progress: 100,
+            completedDate: new Date().toISOString(),
+            lastUpdated: new Date().toISOString()
+        });
+        
+        showNotification('✅ Tarea completada', 'success');
+        closeModal();
+        
+    } catch (error) {
+        console.error('Error completing task:', error);
+        showNotification('❌ Error al completar tarea', 'error');
+    }
+}
+
+async function deleteTask(taskId) {
+    if (!confirm('¿Estás seguro de eliminar esta tarea? Esta acción no se puede deshacer.')) return;
+    
+    try {
+        const taskRef = firebase.database().ref(`tasks/${taskId}`);
+        await taskRef.remove();
+        
+        showNotification('✅ Tarea eliminada', 'success');
+        closeModal();
+        
+    } catch (error) {
+        console.error('Error deleting task:', error);
+        showNotification('❌ Error al eliminar tarea', 'error');
+    }
+}
+
+function updateOverdueStatus() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    tasksData.forEach(task => {
+        if (task.status !== 'completed') {
+            const dueDate = new Date(task.dueDate);
+            dueDate.setHours(0, 0, 0, 0);
+            
+            if (dueDate < today && task.status !== 'overdue') {
+                // Update to overdue in Realtime Database
+                const taskRef = firebase.database().ref(`tasks/${task.id}`);
+                taskRef.update({ status: 'overdue' }).catch(error => {
+                    console.error('Error updating overdue status:', error);
+                });
+            }
+        }
+    });
 }
 
 // ===== TASK RENDERING =====
 function renderTasksView() {
     const container = document.getElementById('tasksContainer');
     if (!container) return;
-    
-    // Check if we have Firebase connection
-    const db = getFirestore();
-    if (!db) {
-        container.innerHTML = `
-            <div style="
-                text-align: center;
-                padding: 4rem;
-                background: white;
-                border-radius: 12px;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-            ">
-                <div style="font-size: 3rem; margin-bottom: 1rem;">⚠️</div>
-                <h3 style="margin: 0 0 1rem 0; color: #374151;">Conectando con Firebase...</h3>
-                <p style="color: #6b7280; margin-bottom: 2rem;">
-                    Por favor espera mientras se establece la conexión
-                </p>
-                <button onclick="loadTasksData()" class="btn btn-primary">
-                    🔄 Reintentar
-                </button>
-            </div>
-        `;
-        return;
-    }
     
     const filteredTasks = filterTasks(tasksData);
     const taskStats = calculateTaskStats(filteredTasks);
@@ -1018,176 +1077,10 @@ function showTaskDetails(taskId) {
     document.body.appendChild(modal);
 }
 
-// ===== TASK CRUD OPERATIONS =====
-async function handleCreateTask(event) {
-    event.preventDefault();
-    
-    const form = event.target;
-    const formData = new FormData(form);
-    
-    // Get current user safely
-    const currentUser = window.FirebaseData && window.FirebaseData.currentUser;
-    if (!currentUser) {
-        showNotification('❌ Usuario no autenticado', 'error');
-        return;
-    }
-    
-    const assignedTo = formData.get('assignedTo') || currentUser.uid;
-    const assignedToText = form.assignedTo && form.assignedTo.selectedIndex >= 0 
-        ? form.assignedTo.options[form.assignedTo.selectedIndex].text 
-        : 'Usuario';
-    
-    const newTask = {
-        title: formData.get('title'),
-        description: formData.get('description'),
-        category: formData.get('category'),
-        priority: formData.get('priority'),
-        startDate: formData.get('startDate'),
-        dueDate: formData.get('dueDate'),
-        assignedTo: assignedTo,
-        assignedToName: assignedToText,
-        createdBy: currentUser.uid,
-        createdByName: currentUser.displayName || currentUser.email || 'Usuario',
-        createdDate: new Date().toISOString(),
-        status: 'pending',
-        progress: 0,
-        notes: [],
-        participants: [currentUser.uid, assignedTo].filter(unique)
-    };
-    
-    try {
-        const db = getFirestore();
-        if (!db) {
-            showNotification('❌ Firebase no disponible', 'error');
-            return;
-        }
-        
-        await db.collection('tasks').add(newTask);
-        
-        showNotification('✅ Tarea creada exitosamente', 'success');
-        closeModal();
-        
-        // Send notification to assigned user if different from creator
-        if (newTask.assignedTo !== currentUser.uid) {
-            // This would integrate with your notification system
-            console.log('Notification sent to:', newTask.assignedToName);
-        }
-        
-    } catch (error) {
-        console.error('Error creating task:', error);
-        showNotification('❌ Error al crear tarea', 'error');
-    }
-}
-
-async function handleUpdateProgress(event, taskId) {
-    event.preventDefault();
-    
-    const form = event.target;
-    const formData = new FormData(form);
-    
-    // Get current user safely
-    const currentUser = window.FirebaseData && window.FirebaseData.currentUser;
-    if (!currentUser) {
-        showNotification('❌ Usuario no autenticado', 'error');
-        return;
-    }
-    
-    const progress = parseInt(formData.get('progress'));
-    const note = formData.get('note');
-    const markComplete = formData.get('markComplete');
-    
-    const task = tasksData.find(t => t.id === taskId);
-    if (!task) return;
-    
-    try {
-        const updates = {
-            progress: markComplete ? 100 : progress,
-            status: markComplete || progress === 100 ? 'completed' : task.status,
-            lastUpdated: new Date().toISOString()
-        };
-        
-        // Add note if provided
-        if (note) {
-            const newNote = {
-                date: new Date().toISOString(),
-                note: note,
-                author: currentUser.uid,
-                authorName: currentUser.displayName || currentUser.email || 'Usuario',
-                progress: updates.progress
-            };
-            
-            updates.notes = [...(task.notes || []), newNote];
-        }
-        
-        const db = getFirestore();
-        if (!db) {
-            showNotification('❌ Firebase no disponible', 'error');
-            return;
-        }
-        
-        await db.collection('tasks').doc(taskId).update(updates);
-        
-        showNotification('✅ Progreso actualizado', 'success');
-        closeModal();
-        
-    } catch (error) {
-        console.error('Error updating progress:', error);
-        showNotification('❌ Error al actualizar progreso', 'error');
-    }
-}
-
-async function markTaskComplete(taskId) {
-    if (!confirm('¿Marcar esta tarea como completada?')) return;
-    
-    try {
-        const db = getFirestore();
-        if (!db) {
-            showNotification('❌ Firebase no disponible', 'error');
-            return;
-        }
-        
-        await db.collection('tasks').doc(taskId).update({
-            status: 'completed',
-            progress: 100,
-            completedDate: new Date().toISOString(),
-            lastUpdated: new Date().toISOString()
-        });
-        
-        showNotification('✅ Tarea completada', 'success');
-        closeModal();
-        
-    } catch (error) {
-        console.error('Error completing task:', error);
-        showNotification('❌ Error al completar tarea', 'error');
-    }
-}
-
-async function deleteTask(taskId) {
-    if (!confirm('¿Estás seguro de eliminar esta tarea? Esta acción no se puede deshacer.')) return;
-    
-    try {
-        const db = getFirestore();
-        if (!db) {
-            showNotification('❌ Firebase no disponible', 'error');
-            return;
-        }
-        
-        await db.collection('tasks').doc(taskId).delete();
-        
-        showNotification('✅ Tarea eliminada', 'success');
-        closeModal();
-        
-    } catch (error) {
-        console.error('Error deleting task:', error);
-        showNotification('❌ Error al eliminar tarea', 'error');
-    }
-}
-
 // ===== UTILITY FUNCTIONS =====
 function filterTasks(tasks) {
     const currentUser = window.FirebaseData && window.FirebaseData.currentUser;
     
-    // If no user, return all tasks
     if (!currentUser) {
         return tasks;
     }
@@ -1223,33 +1116,6 @@ function calculateTaskStats(tasks) {
         completed: tasks.filter(t => t.status === 'completed').length,
         overdue: tasks.filter(t => t.status === 'overdue').length
     };
-}
-
-function updateOverdueStatus() {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    const db = getFirestore();
-    if (!db) {
-        console.warn('⚠️ Cannot update overdue status - Firebase not available');
-        return;
-    }
-    
-    tasksData.forEach(task => {
-        if (task.status !== 'completed') {
-            const dueDate = new Date(task.dueDate);
-            dueDate.setHours(0, 0, 0, 0);
-            
-            if (dueDate < today && task.status !== 'overdue') {
-                // Update to overdue in Firebase
-                db.collection('tasks').doc(task.id).update({
-                    status: 'overdue'
-                }).catch(error => {
-                    console.error('Error updating overdue status:', error);
-                });
-            }
-        }
-    });
 }
 
 function calculateDaysUntilDue(dueDate) {
@@ -1293,7 +1159,6 @@ function unique(value, index, self) {
 }
 
 function renderUserOptions() {
-    // Get current user info if available
     const currentUser = window.FirebaseData && window.FirebaseData.currentUser;
     
     if (currentUser) {
@@ -1305,30 +1170,10 @@ function renderUserOptions() {
         `;
     }
     
-    // Fallback if no user info available
     return `
         <option value="">Seleccionar usuario...</option>
         <option value="current">Usuario actual</option>
     `;
-}
-
-async function loadTaskCategories() {
-    try {
-        const db = getFirestore();
-        if (!db) {
-            console.warn('⚠️ Cannot load categories - Firebase not available');
-            return;
-        }
-        
-        // Load custom categories from Firebase
-        const doc = await db.collection('settings').doc('taskCategories').get();
-        if (doc.exists) {
-            const customCategories = doc.data().categories || [];
-            taskCategories = [...new Set([...taskCategories, ...customCategories])];
-        }
-    } catch (error) {
-        console.error('Error loading categories:', error);
-    }
 }
 
 function toggleCompleteProgress(checkbox) {
@@ -1367,7 +1212,6 @@ function showNotification(message, type = 'info', duration = 3000) {
 // ===== CALENDAR VIEW =====
 function showTaskCalendar() {
     alert('📅 Vista de calendario - Próximamente');
-    // This would show a calendar view of tasks
 }
 
 // ===== LOADING AND ERROR STATES =====
@@ -1566,9 +1410,7 @@ function initializeTasksModule() {
     }
     
     try {
-        // Initialize styles
         initializeTaskStyles();
-        
         tasksInitialized = true;
         console.log('✅ Tasks module initialized successfully');
         
@@ -1580,14 +1422,7 @@ function initializeTasksModule() {
 // ===== EVENT LISTENERS =====
 document.addEventListener('DOMContentLoaded', () => {
     console.log('📋 Tasks module DOM ready');
-    
-    // Initialize the module immediately
     initializeTasksModule();
-    
-    // Also listen for Firebase ready event
-    window.addEventListener('firebaseReady', () => {
-        console.log('📋 Firebase ready event received in tasks module');
-    });
 });
 
 // ===== GLOBAL FUNCTION ASSIGNMENTS =====
@@ -1605,4 +1440,4 @@ window.showTaskCalendar = showTaskCalendar;
 window.toggleCompleteProgress = toggleCompleteProgress;
 window.closeModal = closeModal;
 
-console.log('✅ Tasks.js module loaded successfully!');
+console.log('✅ Tasks-realtime.js module loaded successfully!');
