@@ -13,14 +13,27 @@ async function initializeTasks() {
     console.log('📋 Initializing tasks module...');
     
     try {
-        // Wait for Firebase to be ready
+        // Wait for Firebase and user to be ready
         if (!window.firebaseDb || !window.FirebaseData || !window.FirebaseData.currentUser) {
-            console.log('⏳ Waiting for Firebase...');
-            setTimeout(initializeTasks, 1000);
+            console.log('⏳ Waiting for Firebase and authentication...');
+            return; // Don't retry, wait for manual initialization
+        }
+        
+        // Check if main app is visible (user is logged in)
+        const mainApp = document.getElementById('mainApp');
+        if (!mainApp || mainApp.classList.contains('hidden')) {
+            console.log('⏳ Waiting for main app to be visible...');
             return;
         }
         
-        console.log('✅ Firebase ready, setting up tasks');
+        // Check if tasks tab exists
+        const tasksTab = document.querySelector('.tab-content[data-tab="tasks"]');
+        if (!tasksTab) {
+            console.log('⚠️ Tasks tab not found, skipping initialization');
+            return;
+        }
+        
+        console.log('✅ All requirements met, setting up tasks');
         
         // Initialize UI
         setupTasksUI();
@@ -954,27 +967,21 @@ if (!document.getElementById('tasksStyles')) {
 }
 
 // ===== INITIALIZE WHEN READY =====
-// Wait for Firebase to be available
-function waitForFirebase() {
-    if (typeof firebase !== 'undefined' && firebase.database && window.FirebaseData) {
-        console.log('✅ Firebase available, initializing tasks');
+// This function should be called from the main app after login
+window.initializeTasksModule = function() {
+    console.log('📋 Tasks module initialization requested');
+    
+    // Check if Firebase is available
+    if (typeof firebase !== 'undefined' && firebase.database && window.FirebaseData && window.FirebaseData.currentUser) {
         initializeTasks();
     } else {
-        console.log('⏳ Waiting for Firebase...');
-        setTimeout(waitForFirebase, 100);
+        console.log('⚠️ Cannot initialize tasks - requirements not met');
     }
-}
-
-// Check if we should initialize now or wait
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', waitForFirebase);
-} else {
-    waitForFirebase();
-}
+};
 
 // Export for global access
 window.tasksModule = {
-    initializeTasks,
+    initializeTasks: window.initializeTasksModule,
     showCreateTaskModal,
     filterTasks,
     showTaskDetails,
@@ -984,4 +991,4 @@ window.tasksModule = {
     createTask
 };
 
-console.log('📋 Tasks module loaded successfully');
+console.log('📋 Tasks module loaded successfully - call window.initializeTasksModule() after login');
