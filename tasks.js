@@ -4,7 +4,7 @@
 // ================================================================================
 
 // ===== GLOBAL VARIABLES =====
-let tasksData = [];
+window.tasksData = window.tasksData || [];
 let currentFilter = 'all';
 let taskListeners = [];
 
@@ -138,14 +138,14 @@ function setupTasksListener() {
         // Create new listener
         tasksRef.on('value', (snapshot) => {
             console.log('📥 Tasks data received');
-            tasksData = [];
+            window.tasksData = [];
             const allTasks = snapshot.val() || {};
             
             // Convert to array and filter by user
             Object.entries(allTasks).forEach(([id, task]) => {
                 if (task.createdBy === currentUser.uid || 
                     task.assignedTo === currentUser.uid) {
-                    tasksData.push({
+                    window.tasksData.push({
                         id: id,
                         ...task
                     });
@@ -156,9 +156,9 @@ function setupTasksListener() {
             updateTaskStatuses();
             
             // Sort by date
-            tasksData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            window.tasksData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
             
-            console.log(`📋 Loaded ${tasksData.length} tasks`);
+            console.log(`📋 Loaded ${window.tasksData.length} tasks`);
             renderTasksView();
         });
         
@@ -383,7 +383,7 @@ function renderTaskCard(task) {
 
 // ===== SHOW TASK DETAILS =====
 function showTaskDetails(taskId) {
-    const task = tasksData.find(t => t.id === taskId);
+    const task = window.tasksData.find(t => t.id === taskId);
     if (!task) return;
     
     const modal = document.createElement('div');
@@ -512,7 +512,7 @@ async function addTaskNote(taskId) {
     if (!noteText) return;
     
     try {
-        const task = tasksData.find(t => t.id === taskId);
+        const task = window.tasksData.find(t => t.id === taskId);
         const userProfile = await window.FirebaseData.loadUserProfile();
         
         const newNote = {
@@ -560,13 +560,13 @@ function getFilteredTasks() {
     
     switch (currentFilter) {
         case 'my-tasks':
-            return tasksData.filter(task => task.assignedTo === currentUser.uid);
+            return window.tasksData.filter(task => task.assignedTo === currentUser.uid);
         case 'assigned-by-me':
-            return tasksData.filter(task => task.createdBy === currentUser.uid && task.assignedTo !== currentUser.uid);
+            return window.tasksData.filter(task => task.createdBy === currentUser.uid && task.assignedTo !== currentUser.uid);
         case 'overdue':
-            return tasksData.filter(task => task.status === 'overdue');
+            return window.tasksData.filter(task => task.status === 'overdue');
         default:
-            return tasksData;
+            return window.tasksData;
     }
 }
 
@@ -574,7 +574,7 @@ function getFilteredTasks() {
 function updateTaskStatuses() {
     const today = new Date().toISOString().split('T')[0];
     
-    tasksData.forEach(task => {
+    window.tasksData.forEach(task => {
         if (task.status !== 'completed' && task.dueDate < today) {
             task.status = 'overdue';
         }
@@ -971,12 +971,24 @@ if (!document.getElementById('tasksStyles')) {
 window.initializeTasksModule = function() {
     console.log('📋 Tasks module initialization requested');
     
-    // Check if Firebase is available
-    if (typeof firebase !== 'undefined' && firebase.database && window.FirebaseData && window.FirebaseData.currentUser) {
-        initializeTasks();
-    } else {
-        console.log('⚠️ Cannot initialize tasks - requirements not met');
-    }
+    // Add a small delay to ensure everything is ready
+    setTimeout(() => {
+        // Check if Firebase is available
+        if (typeof firebase !== 'undefined' && firebase.database && window.FirebaseData && window.FirebaseData.currentUser) {
+            console.log('✅ All requirements met, initializing tasks');
+            initializeTasks();
+        } else {
+            console.log('⚠️ Requirements not ready yet, retrying...');
+            // Try again in a moment
+            setTimeout(() => {
+                if (typeof firebase !== 'undefined' && firebase.database && window.FirebaseData && window.FirebaseData.currentUser) {
+                    initializeTasks();
+                } else {
+                    console.error('❌ Cannot initialize tasks - requirements not met after retry');
+                }
+            }, 1000);
+        }
+    }, 100);
 };
 
 // Export for global access
