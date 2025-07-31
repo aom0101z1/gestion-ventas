@@ -1,805 +1,230 @@
-// tasks.js - TASK MANAGEMENT MODULE
-// ===== STANDALONE TASK MANAGEMENT SYSTEM =====
+// tasks.js - Task Management Module
+// ================================================================================
+// ✅ COMPLETE TASK MANAGEMENT SYSTEM - Firebase Realtime Database
+// ================================================================================
 
-// Global variables for tasks module
+// ===== GLOBAL VARIABLES =====
 let tasksData = [];
-let tasksInitialized = false;
 let currentFilter = 'all';
-let taskCategories = ['Sales', 'Admin', 'Marketing', 'Customer Service'];
+let taskListeners = [];
 
-// Task status configurations
-const TASK_STATUS = {
-    pending: { label: 'Pendiente', color: '#6b7280', emoji: '⏳' },
-    in_progress: { label: 'En Progreso', color: '#3b82f6', emoji: '🔄' },
-    completed: { label: 'Completado', color: '#10b981', emoji: '✅' },
-    overdue: { label: 'Vencido', color: '#ef4444', emoji: '❌' }
-};
-
-// Priority configurations
-const TASK_PRIORITY = {
-    low: { label: 'Baja', color: '#10b981', emoji: '🟢' },
-    medium: { label: 'Media', color: '#f59e0b', emoji: '🟡' },
-    high: { label: 'Alta', color: '#ef4444', emoji: '🔴' }
-};
-
-// ===== MAIN TASK LOADING FUNCTION =====
-async function loadTasksData() {
+// ===== INITIALIZATION =====
+async function initializeTasks() {
+    console.log('📋 Initializing tasks module...');
+    
     try {
-        console.log('📋 Loading tasks data');
-        
-        const container = document.getElementById('tasksContainer');
-        if (!container) {
-            console.error('❌ Tasks container not found');
+        // Wait for Firebase to be ready
+        if (!window.firebaseDb || !window.FirebaseData || !window.FirebaseData.currentUser) {
+            console.log('⏳ Waiting for Firebase...');
+            setTimeout(initializeTasks, 1000);
             return;
         }
         
-        // Initialize with empty data to show UI immediately
-        tasksData = [];
-        renderTasksView();
+        console.log('✅ Firebase ready, setting up tasks');
         
-        // Check if Firebase and user are available
-        if (window.FirebaseData && window.FirebaseData.currentUser && typeof firebase !== 'undefined') {
-            console.log('✅ Firebase and user available, setting up listener');
-            setupTasksListener();
-        } else {
-            console.log('⏳ Waiting for Firebase to be ready...');
-            
-            // Try again in a moment
-            setTimeout(() => {
-                if (window.FirebaseData && window.FirebaseData.currentUser && typeof firebase !== 'undefined') {
-                    setupTasksListener();
-                } else {
-                    console.log('📋 Firebase not ready yet, showing empty state');
-                }
-            }, 2000);
-        }
+        // Initialize UI
+        setupTasksUI();
+        
+        // Load tasks data
+        await loadTasksData();
+        
+        console.log('✅ Tasks module initialized successfully');
         
     } catch (error) {
-        console.error('❌ Error loading tasks:', error);
-        // Show empty state instead of error
-        tasksData = [];
-        renderTasksView();
+        console.error('❌ Error initializing tasks:', error);
+        renderEmptyState();
     }
 }
 
-// ===== FIREBASE REALTIME DATABASE LISTENERS =====
-function setupTasksListener() {
-    try {
-        // Check if Firebase is available
-        if (typeof firebase === 'undefined' || !firebase.database) {
-            console.error('❌ Firebase not available');
-            tasksData = [];
-            renderTasksView();
-            return;
-        }
-        
-        const currentUser = window.FirebaseData && window.FirebaseData.currentUser;
-        if (!currentUser) {
-            console.error('❌ No current user found');
-            tasksData = [];
-            renderTasksView();
-            return;
-        }
-        
-        console.log('📋 Setting up tasks listener for user:', currentUser.uid);
-        
-        // Reference to tasks in Realtime Database
-        const tasksRef = firebase.database().ref('tasks');
-        
-        // Listen to all tasks
-        tasksRef.on('value', (snapshot) => {
-            tasksData = [];
-            const allTasks = snapshot.val() || {};
-            
-            // Convert object to array and filter by user
-            Object.keys(allTasks).forEach(taskId => {
-                const task = allTasks[taskId];
-                if (task.participants && task.participants.includes(currentUser.uid)) {
-                    tasksData.push({ id: taskId, ...task });
-                }
-            });
-            
-            console.log(`✅ Loaded ${tasksData.length} tasks`);
-            
-            // Update overdue status
-            updateOverdueStatus();
-            
-            // Render tasks view
-            renderTasksView();
-        }, (error) => {
-            console.error('❌ Error listening to tasks:', error);
-            // Show empty state instead of error
-            tasksData = [];
-            renderTasksView();
-        });
-        
-    } catch (error) {
-        console.error('❌ Error setting up tasks listener:', error);
-        tasksData = [];
-        renderTasksView();
-    }
-}
-
-// ===== TASK CRUD OPERATIONS WITH REALTIME DATABASE =====
-async function handleCreateTask(event) {
-    event.preventDefault();
+// ===== UI SETUP =====
+function setupTasksUI() {
+    console.log('🎨 Setting up tasks UI');
     
-    // Check if Firebase is available
-    if (typeof firebase === 'undefined' || !firebase.database) {
-        showNotification('❌ Firebase no está disponible', 'error');
+    // Create filter buttons container if it doesn't exist
+    const tabContent = document.querySelector('.tab-content[data-tab="tasks"]');
+    if (!tabContent) {
+        console.error('❌ Tasks tab content not found');
         return;
     }
     
-    const form = event.target;
-    const formData = new FormData(form);
-    
-    const currentUser = window.FirebaseData && window.FirebaseData.currentUser;
-    if (!currentUser) {
-        showNotification('❌ Usuario no autenticado', 'error');
-        return;
-    }
-    
-    const assignedTo = formData.get('assignedTo') || currentUser.uid;
-    const assignedToText = form.assignedTo && form.assignedTo.selectedIndex >= 0 
-        ? form.assignedTo.options[form.assignedTo.selectedIndex].text 
-        : 'Usuario';
-    
-    const newTask = {
-        title: formData.get('title'),
-        description: formData.get('description'),
-        category: formData.get('category'),
-        priority: formData.get('priority'),
-        startDate: formData.get('startDate'),
-        dueDate: formData.get('dueDate'),
-        assignedTo: assignedTo,
-        assignedToName: assignedToText,
-        createdBy: currentUser.uid,
-        createdByName: currentUser.displayName || currentUser.email || 'Usuario',
-        createdDate: new Date().toISOString(),
-        status: 'pending',
-        progress: 0,
-        notes: [],
-        participants: [currentUser.uid, assignedTo].filter(unique)
-    };
-    
-    try {
-        // Create task in Realtime Database
-        const tasksRef = firebase.database().ref('tasks');
-        await tasksRef.push(newTask);
-        
-        showNotification('✅ Tarea creada exitosamente', 'success');
-        closeModal();
-        
-    } catch (error) {
-        console.error('Error creating task:', error);
-        showNotification('❌ Error al crear tarea', 'error');
-    }
-}
-
-async function handleUpdateProgress(event, taskId) {
-    event.preventDefault();
-    
-    // Check if Firebase is available
-    if (typeof firebase === 'undefined' || !firebase.database) {
-        showNotification('❌ Firebase no está disponible', 'error');
-        return;
-    }
-    
-    const form = event.target;
-    const formData = new FormData(form);
-    
-    const currentUser = window.FirebaseData && window.FirebaseData.currentUser;
-    if (!currentUser) {
-        showNotification('❌ Usuario no autenticado', 'error');
-        return;
-    }
-    
-    const progress = parseInt(formData.get('progress'));
-    const note = formData.get('note');
-    const markComplete = formData.get('markComplete');
-    
-    const task = tasksData.find(t => t.id === taskId);
-    if (!task) return;
-    
-    try {
-        const updates = {
-            progress: markComplete ? 100 : progress,
-            status: markComplete || progress === 100 ? 'completed' : task.status,
-            lastUpdated: new Date().toISOString()
-        };
-        
-        // Add note if provided
-        if (note) {
-            const newNote = {
-                date: new Date().toISOString(),
-                note: note,
-                author: currentUser.uid,
-                authorName: currentUser.displayName || currentUser.email || 'Usuario',
-                progress: updates.progress
-            };
-            
-            updates.notes = [...(task.notes || []), newNote];
-        }
-        
-        // Update in Realtime Database
-        const taskRef = firebase.database().ref(`tasks/${taskId}`);
-        await taskRef.update(updates);
-        
-        showNotification('✅ Progreso actualizado', 'success');
-        closeModal();
-        
-    } catch (error) {
-        console.error('Error updating progress:', error);
-        showNotification('❌ Error al actualizar progreso', 'error');
-    }
-}
-
-async function markTaskComplete(taskId) {
-    if (!confirm('¿Marcar esta tarea como completada?')) return;
-    
-    // Check if Firebase is available
-    if (typeof firebase === 'undefined' || !firebase.database) {
-        showNotification('❌ Firebase no está disponible', 'error');
-        return;
-    }
-    
-    try {
-        const taskRef = firebase.database().ref(`tasks/${taskId}`);
-        await taskRef.update({
-            status: 'completed',
-            progress: 100,
-            completedDate: new Date().toISOString(),
-            lastUpdated: new Date().toISOString()
-        });
-        
-        showNotification('✅ Tarea completada', 'success');
-        closeModal();
-        
-    } catch (error) {
-        console.error('Error completing task:', error);
-        showNotification('❌ Error al completar tarea', 'error');
-    }
-}
-
-async function deleteTask(taskId) {
-    if (!confirm('¿Estás seguro de eliminar esta tarea? Esta acción no se puede deshacer.')) return;
-    
-    // Check if Firebase is available
-    if (typeof firebase === 'undefined' || !firebase.database) {
-        showNotification('❌ Firebase no está disponible', 'error');
-        return;
-    }
-    
-    try {
-        const taskRef = firebase.database().ref(`tasks/${taskId}`);
-        await taskRef.remove();
-        
-        showNotification('✅ Tarea eliminada', 'success');
-        closeModal();
-        
-    } catch (error) {
-        console.error('Error deleting task:', error);
-        showNotification('❌ Error al eliminar tarea', 'error');
-    }
-}
-
-function updateOverdueStatus() {
-    // Check if Firebase is available
-    if (typeof firebase === 'undefined' || !firebase.database) {
-        console.warn('⚠️ Cannot update overdue status - Firebase not available');
-        return;
-    }
-    
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    tasksData.forEach(task => {
-        if (task.status !== 'completed') {
-            const dueDate = new Date(task.dueDate);
-            dueDate.setHours(0, 0, 0, 0);
-            
-            if (dueDate < today && task.status !== 'overdue') {
-                // Update to overdue in Realtime Database
-                const taskRef = firebase.database().ref(`tasks/${task.id}`);
-                taskRef.update({ status: 'overdue' }).catch(error => {
-                    console.error('Error updating overdue status:', error);
-                });
-            }
-        }
-    });
-}
-
-// ===== TASK RENDERING =====
-function renderTasksView() {
-    const container = document.getElementById('tasksContainer');
-    if (!container) return;
-    
-    const filteredTasks = filterTasks(tasksData);
-    const taskStats = calculateTaskStats(filteredTasks);
-    
-    container.innerHTML = `
-        ${renderTasksHeader(taskStats)}
-        ${renderTasksFilters()}
-        ${renderTasksList(filteredTasks)}
-    `;
-    
-    // Initialize task styles
-    initializeTaskStyles();
-}
-
-function renderTasksHeader(stats) {
-    return `
-        <div style="
-            background: white;
-            padding: 1.5rem;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-            margin-bottom: 1.5rem;
-        ">
-            <div style="
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                flex-wrap: wrap;
-                gap: 1rem;
-                margin-bottom: 1.5rem;
-            ">
-                <h2 style="
-                    margin: 0;
-                    color: #374151;
-                    display: flex;
-                    align-items: center;
-                    gap: 0.5rem;
-                ">
-                    📋 Gestión de Tareas
-                    <span style="
-                        background: #f3f4f6;
-                        color: #6b7280;
-                        padding: 0.25rem 0.5rem;
-                        border-radius: 12px;
-                        font-size: 0.8rem;
-                        font-weight: normal;
-                    ">
-                        ${stats.total} total
-                    </span>
-                </h2>
-                
-                <div style="display: flex; gap: 1rem;">
-                    <button onclick="showCreateTaskModal()" 
-                            class="btn btn-primary"
-                            style="
-                                padding: 0.75rem 1.5rem;
-                                display: flex;
-                                align-items: center;
-                                gap: 0.5rem;
-                            ">
-                        ➕ Nueva Tarea
-                    </button>
-                    
-                    <button onclick="showTaskCalendar()" 
-                            class="btn btn-secondary"
-                            style="padding: 0.75rem 1.5rem;">
-                        📅 Calendario
-                    </button>
-                </div>
-            </div>
-            
-            <!-- Task Statistics -->
-            <div style="
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-                gap: 1rem;
-            ">
-                <div style="
-                    text-align: center;
-                    padding: 1rem;
-                    background: #dbeafe;
-                    border-radius: 8px;
-                ">
-                    <div style="font-size: 1.5rem; font-weight: bold; color: #3b82f6;">
-                        ${stats.inProgress}
-                    </div>
-                    <div style="font-size: 0.9rem; color: #1e40af;">En Progreso</div>
-                </div>
-                
-                <div style="
-                    text-align: center;
-                    padding: 1rem;
-                    background: #fef3c7;
-                    border-radius: 8px;
-                ">
-                    <div style="font-size: 1.5rem; font-weight: bold; color: #f59e0b;">
-                        ${stats.pending}
-                    </div>
-                    <div style="font-size: 0.9rem; color: #d97706;">Pendientes</div>
-                </div>
-                
-                <div style="
-                    text-align: center;
-                    padding: 1rem;
-                    background: #d1fae5;
-                    border-radius: 8px;
-                ">
-                    <div style="font-size: 1.5rem; font-weight: bold; color: #10b981;">
-                        ${stats.completed}
-                    </div>
-                    <div style="font-size: 0.9rem; color: #059669;">Completadas</div>
-                </div>
-                
-                <div style="
-                    text-align: center;
-                    padding: 1rem;
-                    background: #fee2e2;
-                    border-radius: 8px;
-                ">
-                    <div style="font-size: 1.5rem; font-weight: bold; color: #ef4444;">
-                        ${stats.overdue}
-                    </div>
-                    <div style="font-size: 0.9rem; color: #dc2626;">Vencidas</div>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-function renderTasksFilters() {
-    return `
-        <div style="
-            background: white;
-            padding: 1rem;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-            margin-bottom: 1.5rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 1rem;
-        ">
-            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                <button onclick="setTaskFilter('all')" 
-                        class="filter-btn ${currentFilter === 'all' ? 'active' : ''}"
-                        style="
-                            padding: 0.5rem 1rem;
-                            border: 1px solid #e5e7eb;
-                            background: ${currentFilter === 'all' ? '#3b82f6' : 'white'};
-                            color: ${currentFilter === 'all' ? 'white' : '#374151'};
-                            border-radius: 6px;
-                            cursor: pointer;
-                            font-size: 0.85rem;
-                        ">
-                    Todas
+    // Clear existing content
+    tabContent.innerHTML = `
+        <div id="tasksContainer">
+            <div class="tasks-header">
+                <h2>📋 Gestión de Tareas</h2>
+                <button onclick="showCreateTaskModal()" class="btn-primary">
+                    <i class="icon">➕</i> Nueva Tarea
                 </button>
-                
-                <button onclick="setTaskFilter('my_tasks')" 
-                        class="filter-btn ${currentFilter === 'my_tasks' ? 'active' : ''}"
-                        style="
-                            padding: 0.5rem 1rem;
-                            border: 1px solid #e5e7eb;
-                            background: ${currentFilter === 'my_tasks' ? '#3b82f6' : 'white'};
-                            color: ${currentFilter === 'my_tasks' ? 'white' : '#374151'};
-                            border-radius: 6px;
-                            cursor: pointer;
-                            font-size: 0.85rem;
-                        ">
+            </div>
+            
+            <div class="tasks-filters">
+                <button class="filter-btn active" data-filter="all" onclick="filterTasks('all')">
+                    Todas las Tareas
+                </button>
+                <button class="filter-btn" data-filter="my-tasks" onclick="filterTasks('my-tasks')">
                     Mis Tareas
                 </button>
-                
-                <button onclick="setTaskFilter('assigned')" 
-                        class="filter-btn ${currentFilter === 'assigned' ? 'active' : ''}"
-                        style="
-                            padding: 0.5rem 1rem;
-                            border: 1px solid #e5e7eb;
-                            background: ${currentFilter === 'assigned' ? '#3b82f6' : 'white'};
-                            color: ${currentFilter === 'assigned' ? 'white' : '#374151'};
-                            border-radius: 6px;
-                            cursor: pointer;
-                            font-size: 0.85rem;
-                        ">
-                    Asignadas por mí
+                <button class="filter-btn" data-filter="assigned-by-me" onclick="filterTasks('assigned-by-me')">
+                    Asignadas por Mí
                 </button>
-                
-                <button onclick="setTaskFilter('overdue')" 
-                        class="filter-btn ${currentFilter === 'overdue' ? 'active' : ''}"
-                        style="
-                            padding: 0.5rem 1rem;
-                            border: 1px solid #e5e7eb;
-                            background: ${currentFilter === 'overdue' ? '#3b82f6' : 'white'};
-                            color: ${currentFilter === 'overdue' ? 'white' : '#374151'};
-                            border-radius: 6px;
-                            cursor: pointer;
-                            font-size: 0.85rem;
-                        ">
+                <button class="filter-btn" data-filter="overdue" onclick="filterTasks('overdue')">
                     Vencidas
                 </button>
             </div>
             
-            <div style="display: flex; gap: 0.5rem; align-items: center;">
-                <label style="font-size: 0.85rem; color: #6b7280;">Categoría:</label>
-                <select onchange="filterByCategory(this.value)" style="
-                    padding: 0.5rem;
-                    border: 1px solid #e5e7eb;
-                    border-radius: 6px;
-                    font-size: 0.85rem;
-                ">
-                    <option value="all">Todas</option>
-                    ${taskCategories.map(cat => `<option value="${cat}">${cat}</option>`).join('')}
-                </select>
+            <div id="tasksListContainer">
+                <div class="loading-spinner"></div>
             </div>
         </div>
     `;
 }
 
-function renderTasksList(tasks) {
-    if (tasks.length === 0) {
-        return renderEmptyTasks();
+// ===== DATA LOADING =====
+async function loadTasksData() {
+    console.log('📊 Loading tasks data...');
+    
+    try {
+        const currentUser = window.FirebaseData.currentUser;
+        if (!currentUser) {
+            console.error('❌ No user authenticated');
+            renderEmptyState();
+            return;
+        }
+        
+        // Setup real-time listener
+        setupTasksListener();
+        
+    } catch (error) {
+        console.error('❌ Error loading tasks:', error);
+        renderEmptyState();
     }
-    
-    // Group tasks by status
-    const groupedTasks = {
-        overdue: tasks.filter(t => t.status === 'overdue'),
-        in_progress: tasks.filter(t => t.status === 'in_progress'),
-        pending: tasks.filter(t => t.status === 'pending'),
-        completed: tasks.filter(t => t.status === 'completed')
-    };
-    
-    return `
-        <div style="display: grid; gap: 1.5rem;">
-            ${Object.entries(groupedTasks).map(([status, statusTasks]) => {
-                if (statusTasks.length === 0) return '';
-                
-                return `
-                    <div style="
-                        background: white;
-                        border-radius: 12px;
-                        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-                        overflow: hidden;
-                    ">
-                        <div style="
-                            padding: 1rem;
-                            background: ${TASK_STATUS[status].color}15;
-                            border-bottom: 1px solid #e5e7eb;
-                            display: flex;
-                            align-items: center;
-                            gap: 0.5rem;
-                        ">
-                            <span style="font-size: 1.2rem;">${TASK_STATUS[status].emoji}</span>
-                            <span style="font-weight: 600; color: ${TASK_STATUS[status].color};">
-                                ${TASK_STATUS[status].label} (${statusTasks.length})
-                            </span>
-                        </div>
-                        
-                        <div style="padding: 1rem;">
-                            ${statusTasks.map(task => renderTaskCard(task)).join('')}
-                        </div>
-                    </div>
-                `;
-            }).join('')}
-        </div>
-    `;
 }
 
-function renderTaskCard(task) {
-    const priority = TASK_PRIORITY[task.priority || 'medium'];
-    const assignedUser = task.assignedToName || 'Sin asignar';
-    const progressPercent = task.progress || 0;
-    const daysUntilDue = calculateDaysUntilDue(task.dueDate);
-    
-    return `
-        <div class="task-card" 
-             onclick="showTaskDetails('${task.id}')"
-             style="
-                 background: #f9fafb;
-                 border: 1px solid #e5e7eb;
-                 border-radius: 8px;
-                 padding: 1rem;
-                 margin-bottom: 0.75rem;
-                 cursor: pointer;
-                 transition: all 0.2s ease;
-                 position: relative;
-             ">
+// ===== FIREBASE LISTENERS =====
+function setupTasksListener() {
+    try {
+        const currentUser = window.FirebaseData.currentUser;
+        if (!currentUser || !window.firebaseDb) {
+            console.error('❌ Firebase not ready');
+            return;
+        }
+        
+        console.log('🔥 Setting up tasks listener for user:', currentUser.uid);
+        
+        // Import Firebase functions
+        const { ref, onValue, off } = window.firebaseModules.database;
+        
+        // Reference to tasks
+        const tasksRef = ref(window.firebaseDb, 'tasks');
+        
+        // Remove any existing listener
+        if (taskListeners.length > 0) {
+            taskListeners.forEach(listener => off(tasksRef, 'value', listener));
+            taskListeners = [];
+        }
+        
+        // Create new listener
+        const listener = onValue(tasksRef, (snapshot) => {
+            console.log('📥 Tasks data received');
+            tasksData = [];
+            const allTasks = snapshot.val() || {};
             
-            <div style="
-                display: flex;
-                justify-content: space-between;
-                align-items: flex-start;
-                margin-bottom: 0.75rem;
-            ">
-                <div style="flex: 1;">
-                    <div style="
-                        display: flex;
-                        align-items: center;
-                        gap: 0.5rem;
-                        margin-bottom: 0.5rem;
-                    ">
-                        <span style="font-size: 1rem;">${priority.emoji}</span>
-                        <h4 style="margin: 0; color: #374151; font-size: 1rem;">
-                            ${task.title}
-                        </h4>
-                    </div>
-                    
-                    <div style="
-                        font-size: 0.85rem;
-                        color: #6b7280;
-                        margin-bottom: 0.5rem;
-                    ">
-                        ${task.description || 'Sin descripción'}
-                    </div>
-                    
-                    <div style="
-                        display: flex;
-                        gap: 1rem;
-                        font-size: 0.8rem;
-                        color: #6b7280;
-                    ">
-                        <span>👤 ${assignedUser}</span>
-                        <span>📁 ${task.category}</span>
-                        <span>📅 ${formatDate(task.dueDate)}</span>
-                    </div>
-                </div>
-                
-                <button onclick="event.stopPropagation(); showUpdateProgressModal('${task.id}')"
-                        style="
-                            background: #3b82f6;
-                            color: white;
-                            border: none;
-                            padding: 0.5rem 1rem;
-                            border-radius: 6px;
-                            cursor: pointer;
-                            font-size: 0.8rem;
-                        "
-                        onmouseover="this.style.opacity='0.8'"
-                        onmouseout="this.style.opacity='1'">
-                    Actualizar
-                </button>
-            </div>
+            // Convert to array and filter by user
+            Object.entries(allTasks).forEach(([id, task]) => {
+                if (task.createdBy === currentUser.uid || 
+                    task.assignedTo === currentUser.uid) {
+                    tasksData.push({
+                        id: id,
+                        ...task
+                    });
+                }
+            });
             
-            <!-- Progress Bar -->
-            <div style="
-                background: #e5e7eb;
-                height: 8px;
-                border-radius: 4px;
-                overflow: hidden;
-                margin-bottom: 0.5rem;
-            ">
-                <div style="
-                    background: ${progressPercent === 100 ? '#10b981' : '#3b82f6'};
-                    height: 100%;
-                    width: ${progressPercent}%;
-                    transition: width 0.3s ease;
-                "></div>
-            </div>
+            // Update task statuses
+            updateTaskStatuses();
             
-            <div style="
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                font-size: 0.8rem;
-            ">
-                <span style="color: #6b7280;">${progressPercent}% completado</span>
-                ${daysUntilDue !== null ? `
-                    <span style="color: ${daysUntilDue < 0 ? '#ef4444' : daysUntilDue <= 3 ? '#f59e0b' : '#6b7280'};">
-                        ${daysUntilDue < 0 ? `Vencido hace ${Math.abs(daysUntilDue)} días` : 
-                          daysUntilDue === 0 ? 'Vence hoy' : 
-                          `Vence en ${daysUntilDue} días`}
-                    </span>
-                ` : ''}
-            </div>
+            // Sort by date
+            tasksData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
             
-            ${task.notes && task.notes.length > 0 ? `
-                <div style="
-                    margin-top: 0.5rem;
-                    padding-top: 0.5rem;
-                    border-top: 1px solid #e5e7eb;
-                    font-size: 0.75rem;
-                    color: #6b7280;
-                ">
-                    💬 ${task.notes.length} nota${task.notes.length > 1 ? 's' : ''}
-                </div>
-            ` : ''}
-        </div>
-    `;
+            console.log(`📋 Loaded ${tasksData.length} tasks`);
+            renderTasksView();
+        });
+        
+        taskListeners.push(listener);
+        
+    } catch (error) {
+        console.error('❌ Error setting up listener:', error);
+        renderEmptyState();
+    }
 }
 
-function renderEmptyTasks() {
-    return `
-        <div style="
-            text-align: center;
-            padding: 4rem;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-        ">
-            <div style="font-size: 3rem; margin-bottom: 1rem;">📋</div>
-            <h3 style="margin: 0 0 1rem 0; color: #374151;">No hay tareas</h3>
-            <p style="color: #6b7280; margin-bottom: 2rem;">
-                ${currentFilter === 'all' ? 'No hay tareas creadas aún' : 'No hay tareas que coincidan con el filtro'}
-            </p>
-            <button onclick="showCreateTaskModal()" class="btn btn-primary">
-                ➕ Crear Primera Tarea
-            </button>
-        </div>
-    `;
-}
-
-// ===== TASK MODALS =====
+// ===== TASK CREATION =====
 function showCreateTaskModal() {
     const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
+    modal.className = 'modal';
     modal.innerHTML = `
-        <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-content">
             <div class="modal-header">
                 <h3>➕ Nueva Tarea</h3>
-                <button onclick="closeModal()" class="close-btn">&times;</button>
+                <span class="close" onclick="this.parentElement.parentElement.parentElement.remove()">&times;</span>
             </div>
-            
             <div class="modal-body">
-                <form id="createTaskForm" onsubmit="handleCreateTask(event)">
+                <form id="createTaskForm" onsubmit="createTask(event)">
                     <div class="form-group">
                         <label>Título *</label>
-                        <input type="text" name="title" required 
-                               placeholder="Ej: Visitar escuelas en Pereira"
-                               style="width: 100%; padding: 0.75rem; border: 1px solid #e5e7eb; border-radius: 6px;">
+                        <input type="text" name="title" required placeholder="Título de la tarea">
                     </div>
                     
                     <div class="form-group">
                         <label>Descripción</label>
-                        <textarea name="description" rows="3"
-                                  placeholder="Detalles de la tarea..."
-                                  style="width: 100%; padding: 0.75rem; border: 1px solid #e5e7eb; border-radius: 6px;"></textarea>
+                        <textarea name="description" rows="3" placeholder="Descripción detallada..."></textarea>
                     </div>
                     
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-row">
                         <div class="form-group">
-                            <label>Categoría *</label>
-                            <select name="category" required
-                                    style="width: 100%; padding: 0.75rem; border: 1px solid #e5e7eb; border-radius: 6px;">
-                                ${taskCategories.map(cat => `<option value="${cat}">${cat}</option>`).join('')}
+                            <label>Categoría</label>
+                            <select name="category">
+                                <option value="sales">Ventas</option>
+                                <option value="admin">Administración</option>
+                                <option value="marketing">Marketing</option>
+                                <option value="customer-service">Servicio al Cliente</option>
                             </select>
                         </div>
                         
                         <div class="form-group">
-                            <label>Prioridad *</label>
-                            <select name="priority" required
-                                    style="width: 100%; padding: 0.75rem; border: 1px solid #e5e7eb; border-radius: 6px;">
-                                <option value="low">🟢 Baja</option>
-                                <option value="medium" selected>🟡 Media</option>
-                                <option value="high">🔴 Alta</option>
+                            <label>Prioridad</label>
+                            <select name="priority">
+                                <option value="low">Baja</option>
+                                <option value="medium" selected>Media</option>
+                                <option value="high">Alta</option>
+                                <option value="urgent">Urgente</option>
                             </select>
                         </div>
                     </div>
                     
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-row">
                         <div class="form-group">
-                            <label>Fecha Inicio *</label>
-                            <input type="date" name="startDate" required
-                                   value="${new Date().toISOString().split('T')[0]}"
-                                   style="width: 100%; padding: 0.75rem; border: 1px solid #e5e7eb; border-radius: 6px;">
+                            <label>Fecha de Inicio</label>
+                            <input type="date" name="startDate" value="${new Date().toISOString().split('T')[0]}">
                         </div>
                         
                         <div class="form-group">
-                            <label>Fecha Vencimiento *</label>
-                            <input type="date" name="dueDate" required
-                                   min="${new Date().toISOString().split('T')[0]}"
-                                   style="width: 100%; padding: 0.75rem; border: 1px solid #e5e7eb; border-radius: 6px;">
+                            <label>Fecha de Vencimiento</label>
+                            <input type="date" name="dueDate" required>
                         </div>
                     </div>
                     
                     <div class="form-group">
-                        <label>Asignar a *</label>
-                        <select name="assignedTo" required
-                                style="width: 100%; padding: 0.75rem; border: 1px solid #e5e7eb; border-radius: 6px;">
+                        <label>Asignar a</label>
+                        <select name="assignedTo" id="assigneeSelect">
                             <option value="">Seleccionar usuario...</option>
-                            ${renderUserOptions()}
                         </select>
                     </div>
                     
                     <div class="form-actions">
-                        <button type="button" onclick="closeModal()" class="btn btn-secondary">
+                        <button type="submit" class="btn-primary">Crear Tarea</button>
+                        <button type="button" class="btn-secondary" onclick="this.closest('.modal').remove()">
                             Cancelar
-                        </button>
-                        <button type="submit" class="btn btn-primary">
-                            Crear Tarea
                         </button>
                     </div>
                 </form>
@@ -808,321 +233,233 @@ function showCreateTaskModal() {
     `;
     
     document.body.appendChild(modal);
+    loadUsersList();
 }
 
-function showUpdateProgressModal(taskId) {
-    const task = tasksData.find(t => t.id === taskId);
-    if (!task) return;
+// ===== CREATE TASK =====
+async function createTask(event) {
+    event.preventDefault();
     
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    modal.innerHTML = `
-        <div class="modal-content" style="max-width: 500px;">
-            <div class="modal-header">
-                <h3>📊 Actualizar Progreso</h3>
-                <button onclick="closeModal()" class="close-btn">&times;</button>
+    try {
+        const form = event.target;
+        const currentUser = window.FirebaseData.currentUser;
+        const userProfile = await window.FirebaseData.loadUserProfile();
+        
+        const taskData = {
+            title: form.title.value,
+            description: form.description.value,
+            category: form.category.value,
+            priority: form.priority.value,
+            startDate: form.startDate.value,
+            dueDate: form.dueDate.value,
+            assignedTo: form.assignedTo.value || currentUser.uid,
+            assignedToName: form.assignedTo.value ? 
+                form.assigneeSelect.options[form.assigneeSelect.selectedIndex].text : 
+                userProfile.name,
+            createdBy: currentUser.uid,
+            createdByName: userProfile.name,
+            status: 'pending',
+            progress: 0,
+            notes: [],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+        
+        // Save to Firebase
+        const { ref, push } = window.firebaseModules.database;
+        await push(ref(window.firebaseDb, 'tasks'), taskData);
+        
+        // Close modal
+        form.closest('.modal').remove();
+        
+        showNotification('✅ Tarea creada exitosamente', 'success');
+        
+    } catch (error) {
+        console.error('❌ Error creating task:', error);
+        showNotification('❌ Error al crear la tarea', 'error');
+    }
+}
+
+// ===== LOAD USERS LIST =====
+async function loadUsersList() {
+    try {
+        const { ref, get } = window.firebaseModules.database;
+        const snapshot = await get(ref(window.firebaseDb, 'users'));
+        const users = snapshot.val() || {};
+        
+        const select = document.getElementById('assigneeSelect');
+        if (!select) return;
+        
+        select.innerHTML = '<option value="">Seleccionar usuario...</option>';
+        
+        Object.entries(users).forEach(([uid, userData]) => {
+            if (userData.profile) {
+                const option = document.createElement('option');
+                option.value = uid;
+                option.textContent = userData.profile.name;
+                select.appendChild(option);
+            }
+        });
+        
+    } catch (error) {
+        console.error('❌ Error loading users:', error);
+    }
+}
+
+// ===== RENDER TASKS =====
+function renderTasksView() {
+    console.log('🎨 Rendering tasks view');
+    
+    const container = document.getElementById('tasksListContainer');
+    if (!container) return;
+    
+    const filteredTasks = getFilteredTasks();
+    
+    if (filteredTasks.length === 0) {
+        renderEmptyState();
+        return;
+    }
+    
+    container.innerHTML = `
+        <div class="tasks-list">
+            ${filteredTasks.map(task => renderTaskCard(task)).join('')}
+        </div>
+    `;
+}
+
+// ===== RENDER TASK CARD =====
+function renderTaskCard(task) {
+    const statusColors = {
+        pending: '#ffa500',
+        'in-progress': '#3498db',
+        completed: '#27ae60',
+        overdue: '#e74c3c'
+    };
+    
+    const priorityIcons = {
+        low: '🟢',
+        medium: '🟡',
+        high: '🟠',
+        urgent: '🔴'
+    };
+    
+    return `
+        <div class="task-card" onclick="showTaskDetails('${task.id}')">
+            <div class="task-header">
+                <h3>${task.title}</h3>
+                <span class="priority-icon">${priorityIcons[task.priority]}</span>
             </div>
             
-            <div class="modal-body">
-                <h4 style="margin: 0 0 1rem 0; color: #374151;">${task.title}</h4>
-                
-                <form id="updateProgressForm" onsubmit="handleUpdateProgress(event, '${taskId}')">
-                    <div class="form-group">
-                        <label>Progreso: <span id="progressValue">${task.progress || 0}%</span></label>
-                        <input type="range" name="progress" 
-                               min="0" max="100" 
-                               value="${task.progress || 0}"
-                               oninput="document.getElementById('progressValue').textContent = this.value + '%'"
-                               style="width: 100%;">
-                        
-                        <div style="
-                            background: #e5e7eb;
-                            height: 8px;
-                            border-radius: 4px;
-                            overflow: hidden;
-                            margin-top: 0.5rem;
-                        ">
-                            <div id="progressBar" style="
-                                background: ${task.progress === 100 ? '#10b981' : '#3b82f6'};
-                                height: 100%;
-                                width: ${task.progress || 0}%;
-                                transition: width 0.3s ease;
-                            "></div>
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Agregar Nota</label>
-                        <textarea name="note" rows="3"
-                                  placeholder="Describe el progreso realizado..."
-                                  style="width: 100%; padding: 0.75rem; border: 1px solid #e5e7eb; border-radius: 6px;"></textarea>
-                    </div>
-                    
-                    ${task.progress !== 100 ? `
-                        <div class="form-group">
-                            <label>
-                                <input type="checkbox" name="markComplete" onchange="toggleCompleteProgress(this)">
-                                Marcar como completada
-                            </label>
-                        </div>
-                    ` : ''}
-                    
-                    <div class="form-actions">
-                        <button type="button" onclick="closeModal()" class="btn btn-secondary">
-                            Cancelar
-                        </button>
-                        <button type="submit" class="btn btn-primary">
-                            Actualizar
-                        </button>
-                    </div>
-                </form>
-                
-                ${task.notes && task.notes.length > 0 ? `
-                    <div style="
-                        margin-top: 2rem;
-                        padding-top: 1rem;
-                        border-top: 1px solid #e5e7eb;
-                    ">
-                        <h5 style="margin: 0 0 1rem 0; color: #374151;">📝 Notas Anteriores</h5>
-                        <div style="max-height: 200px; overflow-y: auto;">
-                            ${task.notes.map(note => `
-                                <div style="
-                                    background: #f9fafb;
-                                    padding: 0.75rem;
-                                    border-radius: 6px;
-                                    margin-bottom: 0.5rem;
-                                ">
-                                    <div style="
-                                        font-size: 0.8rem;
-                                        color: #6b7280;
-                                        margin-bottom: 0.25rem;
-                                    ">
-                                        ${note.authorName} - ${formatDateTime(note.date)}
-                                    </div>
-                                    <div style="font-size: 0.9rem; color: #374151;">
-                                        ${note.note}
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                ` : ''}
+            <div class="task-meta">
+                <span class="task-category">${getCategoryName(task.category)}</span>
+                <span class="task-status" style="background-color: ${statusColors[task.status]}">
+                    ${getStatusName(task.status)}
+                </span>
+            </div>
+            
+            <div class="task-info">
+                <p><strong>Asignado a:</strong> ${task.assignedToName}</p>
+                <p><strong>Vencimiento:</strong> ${formatDate(task.dueDate)}</p>
+            </div>
+            
+            <div class="task-progress">
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: ${task.progress}%"></div>
+                </div>
+                <span class="progress-text">${task.progress}%</span>
             </div>
         </div>
     `;
-    
-    document.body.appendChild(modal);
-    
-    // Update progress bar on slider change
-    const slider = modal.querySelector('input[type="range"]');
-    slider.addEventListener('input', function() {
-        const progressBar = document.getElementById('progressBar');
-        progressBar.style.width = this.value + '%';
-        progressBar.style.background = this.value === '100' ? '#10b981' : '#3b82f6';
-    });
 }
 
+// ===== SHOW TASK DETAILS =====
 function showTaskDetails(taskId) {
     const task = tasksData.find(t => t.id === taskId);
     if (!task) return;
     
     const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
+    modal.className = 'modal';
     modal.innerHTML = `
-        <div class="modal-content" style="max-width: 700px;">
+        <div class="modal-content large">
             <div class="modal-header">
-                <h3>📋 Detalles de Tarea</h3>
-                <button onclick="closeModal()" class="close-btn">&times;</button>
+                <h3>📋 ${task.title}</h3>
+                <span class="close" onclick="this.parentElement.parentElement.parentElement.remove()">&times;</span>
             </div>
-            
             <div class="modal-body">
-                <div style="
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: flex-start;
-                    margin-bottom: 1.5rem;
-                ">
-                    <div>
-                        <h2 style="margin: 0 0 0.5rem 0; color: #374151;">
-                            ${TASK_PRIORITY[task.priority].emoji} ${task.title}
-                        </h2>
-                        <p style="color: #6b7280; margin: 0;">
-                            ${task.description || 'Sin descripción'}
-                        </p>
-                    </div>
-                    
-                    <span style="
-                        background: ${TASK_STATUS[task.status].color}15;
-                        color: ${TASK_STATUS[task.status].color};
-                        padding: 0.5rem 1rem;
-                        border-radius: 20px;
-                        font-weight: 600;
-                        font-size: 0.9rem;
-                    ">
-                        ${TASK_STATUS[task.status].emoji} ${TASK_STATUS[task.status].label}
-                    </span>
-                </div>
-                
-                <div style="
-                    display: grid;
-                    grid-template-columns: repeat(2, 1fr);
-                    gap: 1rem;
-                    margin-bottom: 1.5rem;
-                ">
-                    <div style="
-                        background: #f9fafb;
-                        padding: 1rem;
-                        border-radius: 8px;
-                    ">
-                        <div style="font-size: 0.8rem; color: #6b7280; margin-bottom: 0.25rem;">
-                            Asignado a
+                <div class="task-details-grid">
+                    <div class="task-details-main">
+                        <div class="detail-section">
+                            <h4>Descripción</h4>
+                            <p>${task.description || 'Sin descripción'}</p>
                         </div>
-                        <div style="font-weight: 600; color: #374151;">
-                            👤 ${task.assignedToName || 'Sin asignar'}
+                        
+                        <div class="detail-section">
+                            <h4>Progreso</h4>
+                            <div class="progress-control">
+                                <input type="range" id="progressSlider" min="0" max="100" 
+                                       value="${task.progress}" onchange="updateTaskProgress('${taskId}', this.value)">
+                                <span id="progressValue">${task.progress}%</span>
+                            </div>
                         </div>
-                    </div>
-                    
-                    <div style="
-                        background: #f9fafb;
-                        padding: 1rem;
-                        border-radius: 8px;
-                    ">
-                        <div style="font-size: 0.8rem; color: #6b7280; margin-bottom: 0.25rem;">
-                            Creado por
+                        
+                        <div class="detail-section">
+                            <h4>Estado</h4>
+                            <select onchange="updateTaskStatus('${taskId}', this.value)">
+                                <option value="pending" ${task.status === 'pending' ? 'selected' : ''}>Pendiente</option>
+                                <option value="in-progress" ${task.status === 'in-progress' ? 'selected' : ''}>En Progreso</option>
+                                <option value="completed" ${task.status === 'completed' ? 'selected' : ''}>Completada</option>
+                            </select>
                         </div>
-                        <div style="font-weight: 600; color: #374151;">
-                            👤 ${task.createdByName || 'Desconocido'}
-                        </div>
-                    </div>
-                    
-                    <div style="
-                        background: #f9fafb;
-                        padding: 1rem;
-                        border-radius: 8px;
-                    ">
-                        <div style="font-size: 0.8rem; color: #6b7280; margin-bottom: 0.25rem;">
-                            Fecha Inicio
-                        </div>
-                        <div style="font-weight: 600; color: #374151;">
-                            📅 ${formatDate(task.startDate)}
-                        </div>
-                    </div>
-                    
-                    <div style="
-                        background: #f9fafb;
-                        padding: 1rem;
-                        border-radius: 8px;
-                    ">
-                        <div style="font-size: 0.8rem; color: #6b7280; margin-bottom: 0.25rem;">
-                            Fecha Vencimiento
-                        </div>
-                        <div style="font-weight: 600; color: #374151;">
-                            📅 ${formatDate(task.dueDate)}
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Progress Section -->
-                <div style="margin-bottom: 2rem;">
-                    <div style="
-                        display: flex;
-                        justify-content: space-between;
-                        align-items: center;
-                        margin-bottom: 0.5rem;
-                    ">
-                        <label style="font-weight: 600; color: #374151;">Progreso</label>
-                        <span style="font-weight: 600; color: #3b82f6;">${task.progress || 0}%</span>
-                    </div>
-                    <div style="
-                        background: #e5e7eb;
-                        height: 12px;
-                        border-radius: 6px;
-                        overflow: hidden;
-                    ">
-                        <div style="
-                            background: ${task.progress === 100 ? '#10b981' : '#3b82f6'};
-                            height: 100%;
-                            width: ${task.progress || 0}%;
-                            transition: width 0.3s ease;
-                        "></div>
-                    </div>
-                </div>
-                
-                <!-- Actions -->
-                <div style="
-                    display: flex;
-                    gap: 1rem;
-                    padding-bottom: 1.5rem;
-                    border-bottom: 1px solid #e5e7eb;
-                ">
-                    <button onclick="closeModal(); showUpdateProgressModal('${taskId}')" 
-                            class="btn btn-primary">
-                        📊 Actualizar Progreso
-                    </button>
-                    
-                    ${task.status !== 'completed' ? `
-                        <button onclick="markTaskComplete('${taskId}')" 
-                                class="btn btn-success">
-                            ✅ Marcar Completada
-                        </button>
-                    ` : ''}
-                    
-                    <button onclick="deleteTask('${taskId}')" 
-                            class="btn btn-danger">
-                        🗑️ Eliminar
-                    </button>
-                </div>
-                
-                <!-- Notes History -->
-                ${task.notes && task.notes.length > 0 ? `
-                    <div style="margin-top: 1.5rem;">
-                        <h4 style="margin: 0 0 1rem 0; color: #374151;">📝 Historial de Notas</h4>
-                        <div style="max-height: 300px; overflow-y: auto;">
-                            ${task.notes.map(note => `
-                                <div style="
-                                    background: #f9fafb;
-                                    padding: 1rem;
-                                    border-radius: 8px;
-                                    margin-bottom: 0.75rem;
-                                    border-left: 3px solid #3b82f6;
-                                ">
-                                    <div style="
-                                        display: flex;
-                                        justify-content: space-between;
-                                        align-items: center;
-                                        margin-bottom: 0.5rem;
-                                    ">
-                                        <span style="
-                                            font-weight: 600;
-                                            color: #374151;
-                                            font-size: 0.9rem;
-                                        ">
-                                            ${note.authorName}
-                                        </span>
-                                        <span style="
-                                            font-size: 0.8rem;
-                                            color: #6b7280;
-                                        ">
-                                            ${formatDateTime(note.date)}
-                                        </span>
-                                    </div>
-                                    <div style="color: #4b5563;">
-                                        ${note.note}
-                                    </div>
-                                    ${note.progress !== undefined ? `
-                                        <div style="
-                                            margin-top: 0.5rem;
-                                            font-size: 0.8rem;
-                                            color: #6b7280;
-                                        ">
-                                            Progreso actualizado a: ${note.progress}%
+                        
+                        <div class="detail-section">
+                            <h4>Notas</h4>
+                            <div class="notes-list">
+                                ${task.notes && task.notes.length > 0 ? 
+                                    task.notes.map(note => `
+                                        <div class="note-item">
+                                            <p>${note.text}</p>
+                                            <small>${note.author} - ${formatDateTime(note.createdAt)}</small>
                                         </div>
-                                    ` : ''}
-                                </div>
-                            `).join('')}
+                                    `).join('') : 
+                                    '<p>No hay notas aún</p>'
+                                }
+                            </div>
+                            <div class="add-note">
+                                <textarea id="newNote" placeholder="Agregar una nota..."></textarea>
+                                <button onclick="addTaskNote('${taskId}')" class="btn-primary">
+                                    Agregar Nota
+                                </button>
+                            </div>
                         </div>
                     </div>
-                ` : ''}
+                    
+                    <div class="task-details-sidebar">
+                        <div class="detail-item">
+                            <strong>Creado por:</strong> ${task.createdByName}
+                        </div>
+                        <div class="detail-item">
+                            <strong>Asignado a:</strong> ${task.assignedToName}
+                        </div>
+                        <div class="detail-item">
+                            <strong>Categoría:</strong> ${getCategoryName(task.category)}
+                        </div>
+                        <div class="detail-item">
+                            <strong>Prioridad:</strong> ${getPriorityName(task.priority)}
+                        </div>
+                        <div class="detail-item">
+                            <strong>Fecha de inicio:</strong> ${formatDate(task.startDate)}
+                        </div>
+                        <div class="detail-item">
+                            <strong>Fecha de vencimiento:</strong> ${formatDate(task.dueDate)}
+                        </div>
+                        <div class="detail-item">
+                            <strong>Creado:</strong> ${formatDateTime(task.createdAt)}
+                        </div>
+                        <div class="detail-item">
+                            <strong>Actualizado:</strong> ${formatDateTime(task.updatedAt)}
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     `;
@@ -1130,367 +467,527 @@ function showTaskDetails(taskId) {
     document.body.appendChild(modal);
 }
 
-// ===== UTILITY FUNCTIONS =====
-function filterTasks(tasks) {
-    const currentUser = window.FirebaseData && window.FirebaseData.currentUser;
-    
-    if (!currentUser) {
-        return tasks;
+// ===== UPDATE FUNCTIONS =====
+async function updateTaskProgress(taskId, progress) {
+    try {
+        const { ref, update } = window.firebaseModules.database;
+        await update(ref(window.firebaseDb, `tasks/${taskId}`), {
+            progress: parseInt(progress),
+            updatedAt: new Date().toISOString()
+        });
+        
+        document.getElementById('progressValue').textContent = progress + '%';
+        
+    } catch (error) {
+        console.error('❌ Error updating progress:', error);
+        showNotification('❌ Error al actualizar el progreso', 'error');
     }
+}
+
+async function updateTaskStatus(taskId, status) {
+    try {
+        const { ref, update } = window.firebaseModules.database;
+        await update(ref(window.firebaseDb, `tasks/${taskId}`), {
+            status: status,
+            updatedAt: new Date().toISOString()
+        });
+        
+        showNotification('✅ Estado actualizado', 'success');
+        
+    } catch (error) {
+        console.error('❌ Error updating status:', error);
+        showNotification('❌ Error al actualizar el estado', 'error');
+    }
+}
+
+async function addTaskNote(taskId) {
+    const noteText = document.getElementById('newNote').value.trim();
+    if (!noteText) return;
+    
+    try {
+        const task = tasksData.find(t => t.id === taskId);
+        const userProfile = await window.FirebaseData.loadUserProfile();
+        
+        const newNote = {
+            text: noteText,
+            author: userProfile.name,
+            createdAt: new Date().toISOString()
+        };
+        
+        const notes = task.notes || [];
+        notes.push(newNote);
+        
+        const { ref, update } = window.firebaseModules.database;
+        await update(ref(window.firebaseDb, `tasks/${taskId}`), {
+            notes: notes,
+            updatedAt: new Date().toISOString()
+        });
+        
+        // Clear the textarea
+        document.getElementById('newNote').value = '';
+        
+        // Refresh the modal
+        document.querySelector('.modal').remove();
+        showTaskDetails(taskId);
+        
+    } catch (error) {
+        console.error('❌ Error adding note:', error);
+        showNotification('❌ Error al agregar la nota', 'error');
+    }
+}
+
+// ===== FILTER FUNCTIONS =====
+function filterTasks(filter) {
+    currentFilter = filter;
+    
+    // Update active button
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.filter === filter);
+    });
+    
+    renderTasksView();
+}
+
+function getFilteredTasks() {
+    const currentUser = window.FirebaseData.currentUser;
+    if (!currentUser) return [];
     
     switch (currentFilter) {
-        case 'my_tasks':
-            return tasks.filter(t => t.assignedTo === currentUser.uid);
-        case 'assigned':
-            return tasks.filter(t => t.createdBy === currentUser.uid && t.assignedTo !== currentUser.uid);
+        case 'my-tasks':
+            return tasksData.filter(task => task.assignedTo === currentUser.uid);
+        case 'assigned-by-me':
+            return tasksData.filter(task => task.createdBy === currentUser.uid && task.assignedTo !== currentUser.uid);
         case 'overdue':
-            return tasks.filter(t => t.status === 'overdue');
+            return tasksData.filter(task => task.status === 'overdue');
         default:
-            return tasks;
+            return tasksData;
     }
 }
 
-function setTaskFilter(filter) {
-    currentFilter = filter;
-    renderTasksView();
+// ===== UTILITY FUNCTIONS =====
+function updateTaskStatuses() {
+    const today = new Date().toISOString().split('T')[0];
+    
+    tasksData.forEach(task => {
+        if (task.status !== 'completed' && task.dueDate < today) {
+            task.status = 'overdue';
+        }
+    });
 }
 
-function filterByCategory(category) {
-    // Implement category filtering
-    console.log('Filter by category:', category);
-    renderTasksView();
-}
-
-function calculateTaskStats(tasks) {
-    return {
-        total: tasks.length,
-        pending: tasks.filter(t => t.status === 'pending').length,
-        inProgress: tasks.filter(t => t.status === 'in_progress').length,
-        completed: tasks.filter(t => t.status === 'completed').length,
-        overdue: tasks.filter(t => t.status === 'overdue').length
-    };
-}
-
-function calculateDaysUntilDue(dueDate) {
-    if (!dueDate) return null;
+function renderEmptyState() {
+    const container = document.getElementById('tasksListContainer');
+    if (!container) return;
     
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    const due = new Date(dueDate);
-    due.setHours(0, 0, 0, 0);
-    
-    const diffTime = due - today;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    return diffDays;
+    container.innerHTML = `
+        <div class="empty-state">
+            <h3>No hay tareas</h3>
+            <p>Crea tu primera tarea para comenzar</p>
+            <button onclick="showCreateTaskModal()" class="btn-primary">
+                <i class="icon">➕</i> Nueva Tarea
+            </button>
+        </div>
+    `;
 }
 
 function formatDate(dateString) {
     if (!dateString) return 'Sin fecha';
-    
     const date = new Date(dateString);
-    const options = { day: 'numeric', month: 'short', year: 'numeric' };
-    return date.toLocaleDateString('es-ES', options);
+    return date.toLocaleDateString('es-CO');
 }
 
 function formatDateTime(dateString) {
     if (!dateString) return 'Sin fecha';
-    
     const date = new Date(dateString);
-    const options = { 
-        day: 'numeric', 
-        month: 'short', 
-        hour: '2-digit', 
-        minute: '2-digit' 
+    return date.toLocaleString('es-CO');
+}
+
+function getCategoryName(category) {
+    const categories = {
+        'sales': 'Ventas',
+        'admin': 'Administración',
+        'marketing': 'Marketing',
+        'customer-service': 'Servicio al Cliente'
     };
-    return date.toLocaleDateString('es-ES', options);
+    return categories[category] || category;
 }
 
-function unique(value, index, self) {
-    return self.indexOf(value) === index;
+function getStatusName(status) {
+    const statuses = {
+        'pending': 'Pendiente',
+        'in-progress': 'En Progreso',
+        'completed': 'Completada',
+        'overdue': 'Vencida'
+    };
+    return statuses[status] || status;
 }
 
-function renderUserOptions() {
-    const currentUser = window.FirebaseData && window.FirebaseData.currentUser;
-    
-    if (currentUser) {
-        return `
-            <option value="${currentUser.uid}" selected>
-                Yo (${currentUser.displayName || currentUser.email || 'Usuario actual'})
-            </option>
-            <option value="user2">Otro usuario</option>
-        `;
-    }
-    
-    return `
-        <option value="">Seleccionar usuario...</option>
-        <option value="current">Usuario actual</option>
-    `;
+function getPriorityName(priority) {
+    const priorities = {
+        'low': 'Baja',
+        'medium': 'Media',
+        'high': 'Alta',
+        'urgent': 'Urgente'
+    };
+    return priorities[priority] || priority;
 }
 
-function toggleCompleteProgress(checkbox) {
-    const progressSlider = checkbox.form.querySelector('input[name="progress"]');
-    const progressValue = document.getElementById('progressValue');
-    const progressBar = document.getElementById('progressBar');
-    
-    if (checkbox.checked) {
-        progressSlider.value = 100;
-        progressValue.textContent = '100%';
-        progressBar.style.width = '100%';
-        progressBar.style.background = '#10b981';
-        progressSlider.disabled = true;
-    } else {
-        progressSlider.disabled = false;
-    }
-}
-
-// ===== MODAL FUNCTIONS =====
-function closeModal() {
-    const modal = document.querySelector('.modal-overlay');
-    if (modal) {
-        modal.remove();
-    }
-}
-
-function showNotification(message, type = 'info', duration = 3000) {
+function showNotification(message, type = 'info') {
     // Use existing notification system if available
     if (window.showNotification) {
-        window.showNotification(message, type, duration);
+        window.showNotification(message, type);
     } else {
+        // Fallback to alert
         alert(message);
     }
 }
 
-// ===== CALENDAR VIEW =====
-function showTaskCalendar() {
-    alert('📅 Vista de calendario - Próximamente');
-}
-
-// ===== LOADING AND ERROR STATES =====
-function showTasksLoading() {
-    const container = document.getElementById('tasksContainer');
-    if (container) {
-        container.innerHTML = `
-            <div style="
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                min-height: 400px;
-                color: #6b7280;
-            ">
-                <div style="text-align: center;">
-                    <div class="loading-spinner" style="width: 32px; height: 32px; margin: 0 auto 1rem;"></div>
-                    <div>Cargando tareas...</div>
-                </div>
-            </div>
-        `;
-    }
-}
-
-function showTasksError(message) {
-    const container = document.getElementById('tasksContainer');
-    if (container) {
-        container.innerHTML = `
-            <div style="
-                text-align: center;
-                color: #dc2626;
-                padding: 3rem;
-                background: white;
-                border-radius: 12px;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-            ">
-                <div style="font-size: 2rem; margin-bottom: 1rem;">⚠️</div>
-                <h3 style="margin: 0 0 1rem 0;">Error en Tareas</h3>
-                <p style="margin: 0 0 1rem 0; color: #6b7280;">${message}</p>
-                <button onclick="loadTasksData()" class="btn btn-primary">
-                    🔄 Reintentar
-                </button>
-            </div>
-        `;
-    }
-}
-
 // ===== STYLES =====
-function initializeTaskStyles() {
-    if (document.getElementById('task-styles')) return;
-    
-    const style = document.createElement('style');
-    style.id = 'task-styles';
-    style.textContent = `
-        .task-card:hover {
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            transform: translateY(-2px);
-        }
-        
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-        }
-        
-        .modal-content {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
-            max-height: 90vh;
-            overflow-y: auto;
-            margin: 20px;
-        }
-        
-        .modal-header {
-            padding: 1.5rem;
-            border-bottom: 1px solid #e5e7eb;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .modal-header h3 {
-            margin: 0;
-            color: #374151;
-        }
-        
-        .close-btn {
-            background: none;
-            border: none;
-            font-size: 1.5rem;
-            cursor: pointer;
-            color: #6b7280;
-            width: 32px;
-            height: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 6px;
-            transition: all 0.2s;
-        }
-        
-        .close-btn:hover {
-            background: #f3f4f6;
-            color: #374151;
-        }
-        
-        .modal-body {
-            padding: 1.5rem;
-        }
-        
-        .form-group {
-            margin-bottom: 1.25rem;
-        }
-        
-        .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-weight: 500;
-            color: #374151;
-            font-size: 0.9rem;
-        }
-        
-        .form-actions {
-            display: flex;
-            gap: 1rem;
-            justify-content: flex-end;
-            margin-top: 2rem;
-            padding-top: 1.5rem;
-            border-top: 1px solid #e5e7eb;
-        }
-        
-        .btn {
-            padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: 6px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            font-size: 0.9rem;
-        }
-        
-        .btn-primary {
-            background: #3b82f6;
-            color: white;
-        }
-        
-        .btn-primary:hover {
-            background: #2563eb;
-        }
-        
-        .btn-secondary {
-            background: #e5e7eb;
-            color: #374151;
-        }
-        
-        .btn-secondary:hover {
-            background: #d1d5db;
-        }
-        
-        .btn-success {
-            background: #10b981;
-            color: white;
-        }
-        
-        .btn-success:hover {
-            background: #059669;
-        }
-        
-        .btn-danger {
-            background: #ef4444;
-            color: white;
-        }
-        
-        .btn-danger:hover {
-            background: #dc2626;
-        }
-    `;
-    
-    document.head.appendChild(style);
+const tasksStyles = `
+<style>
+/* Tasks Module Styles */
+#tasksContainer {
+    padding: 1rem;
 }
 
-// ===== MODULE INITIALIZATION =====
-function initializeTasksModule() {
-    console.log('📋 Initializing tasks module');
-    
-    if (tasksInitialized) {
-        console.log('⚠️ Tasks module already initialized');
-        return;
+.tasks-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.tasks-filters {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.filter-btn {
+    padding: 0.5rem 1rem;
+    border: 1px solid #ddd;
+    background: white;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.filter-btn:hover {
+    background: #f8f9fa;
+}
+
+.filter-btn.active {
+    background: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+
+.tasks-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1rem;
+}
+
+.task-card {
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.task-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    transform: translateY(-2px);
+}
+
+.task-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.task-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.priority-icon {
+    font-size: 1.2rem;
+}
+
+.task-meta {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.task-category {
+    padding: 0.25rem 0.5rem;
+    background: #f0f0f0;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+}
+
+.task-status {
+    padding: 0.25rem 0.5rem;
+    color: white;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+}
+
+.task-info {
+    margin-bottom: 0.75rem;
+}
+
+.task-info p {
+    margin: 0.25rem 0;
+    font-size: 0.875rem;
+}
+
+.task-progress {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.progress-bar {
+    flex: 1;
+    height: 8px;
+    background: #e0e0e0;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: #4caf50;
+    transition: width 0.3s;
+}
+
+.progress-text {
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+/* Modal Styles */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 0.5rem;
+    width: 90%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modal-content.large {
+    max-width: 800px;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.modal-header h3 {
+    margin: 0;
+}
+
+.close {
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #666;
+}
+
+.close:hover {
+    color: #000;
+}
+
+.modal-body {
+    padding: 1rem;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-weight: 500;
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 0.375rem;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    margin-top: 1.5rem;
+}
+
+/* Task Details */
+.task-details-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 2rem;
+}
+
+.detail-section {
+    margin-bottom: 1.5rem;
+}
+
+.detail-section h4 {
+    margin-bottom: 0.5rem;
+}
+
+.progress-control {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.progress-control input[type="range"] {
+    flex: 1;
+}
+
+.notes-list {
+    max-height: 200px;
+    overflow-y: auto;
+    margin-bottom: 1rem;
+}
+
+.note-item {
+    background: #f8f9fa;
+    padding: 0.75rem;
+    border-radius: 0.375rem;
+    margin-bottom: 0.5rem;
+}
+
+.note-item p {
+    margin: 0 0 0.25rem 0;
+}
+
+.note-item small {
+    color: #666;
+}
+
+.add-note textarea {
+    width: 100%;
+    margin-bottom: 0.5rem;
+}
+
+.task-details-sidebar {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 0.375rem;
+}
+
+.detail-item {
+    margin-bottom: 0.75rem;
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 3rem;
+}
+
+.empty-state h3 {
+    color: #666;
+    margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+    color: #999;
+    margin-bottom: 1.5rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .tasks-list {
+        grid-template-columns: 1fr;
     }
     
-    try {
-        initializeTaskStyles();
-        tasksInitialized = true;
-        console.log('✅ Tasks module initialized successfully');
-        
-    } catch (error) {
-        console.error('❌ Error initializing tasks module:', error);
+    .task-details-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+`;
+
+// Add styles to page if not already added
+if (!document.getElementById('tasksStyles')) {
+    const styleElement = document.createElement('div');
+    styleElement.id = 'tasksStyles';
+    styleElement.innerHTML = tasksStyles;
+    document.head.appendChild(styleElement);
+}
+
+// ===== INITIALIZE WHEN READY =====
+// Wait for Firebase modules to be available
+function waitForFirebaseModules() {
+    if (window.firebaseModules && window.firebaseModules.database) {
+        console.log('✅ Firebase modules available');
+        initializeTasks();
+    } else {
+        console.log('⏳ Waiting for Firebase modules...');
+        setTimeout(waitForFirebaseModules, 100);
     }
 }
 
-// ===== EVENT LISTENERS =====
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('📋 Tasks module DOM ready');
-    initializeTasksModule();
-});
+// Check if we should initialize now or wait
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', waitForFirebaseModules);
+} else {
+    waitForFirebaseModules();
+}
 
-// ===== GLOBAL FUNCTION ASSIGNMENTS =====
-window.loadTasksData = loadTasksData;
-window.showCreateTaskModal = showCreateTaskModal;
-window.showUpdateProgressModal = showUpdateProgressModal;
-window.showTaskDetails = showTaskDetails;
-window.handleCreateTask = handleCreateTask;
-window.handleUpdateProgress = handleUpdateProgress;
-window.markTaskComplete = markTaskComplete;
-window.deleteTask = deleteTask;
-window.setTaskFilter = setTaskFilter;
-window.filterByCategory = filterByCategory;
-window.showTaskCalendar = showTaskCalendar;
-window.toggleCompleteProgress = toggleCompleteProgress;
-window.closeModal = closeModal;
+// Export for global access
+window.tasksModule = {
+    initializeTasks,
+    showCreateTaskModal,
+    filterTasks,
+    showTaskDetails,
+    updateTaskProgress,
+    updateTaskStatus,
+    addTaskNote
+};
 
-console.log('✅ Tasks.js module loaded successfully!');
+console.log('📋 Tasks module loaded successfully');
