@@ -1,14 +1,16 @@
-// simple-tasks.js - Task Management System (Phase 1) - FIXED VERSION
+// simple-tasks.js - Task Management System (Phase 1) - COMPLETE ORGANIZED VERSION
 console.log('📋 Task Management System loading...');
 
-// Global variables
+// ========================================
+// SECTION 1: GLOBAL VARIABLES AND CONFIGURATIONS
+// ========================================
 let tasksData = [];
 let currentFilter = 'all';
 // Use existing currentUser from index.html - don't redeclare
 let isAdmin = false;
 let draggedTask = null;
 
-// Task configurations
+// Task status configurations
 const TASK_STATUS = {
     todo: { label: 'Por Hacer', color: '#6b7280', icon: '📝' },
     in_progress: { label: 'En Progreso', color: '#3b82f6', icon: '🔄' },
@@ -16,6 +18,7 @@ const TASK_STATUS = {
     done: { label: 'Completado', color: '#10b981', icon: '✅' }
 };
 
+// Task priority configurations
 const TASK_PRIORITY = {
     low: { label: 'Baja', color: '#10b981', icon: '🟢' },
     medium: { label: 'Media', color: '#f59e0b', icon: '🟡' },
@@ -23,6 +26,9 @@ const TASK_PRIORITY = {
     urgent: { label: 'Urgente', color: '#dc2626', icon: '🚨' }
 };
 
+// ========================================
+// SECTION 2: MAIN INITIALIZATION
+// ========================================
 // Create the main function that will be called
 async function loadTasksMain() {
     console.log('✅ Loading tasks module...');
@@ -65,7 +71,9 @@ window.initializeTasksModule = loadTasksMain;
 
 console.log('✅ Task Management System override complete');
 
-// ===== UI RENDERING =====
+// ========================================
+// SECTION 3: UI RENDERING
+// ========================================
 function renderTasksUI() {
     const tabContent = document.getElementById('tasks');
     
@@ -155,21 +163,17 @@ function renderTasksUI() {
     addTaskStyles();
 }
 
-// ===== FIREBASE INTEGRATION WITH FIXES =====
+// ========================================
+// SECTION 4: FIREBASE INTEGRATION (FIXED)
+// ========================================
 function setupTasksListener() {
     console.log('🔍 Checking Firebase availability...');
     
-    // Check multiple possible Firebase configurations
-    const firebaseReady = (
-        (window.firebase && window.firebase.database) ||
-        (window.firebaseDb) ||
-        (typeof firebase !== 'undefined' && firebase.database)
-    );
-    
-    if (!firebaseReady) {
+    // Check if Firebase is available
+    if (!window.firebase || !window.firebase.database) {
         console.error('❌ Firebase not ready yet');
         
-        // Show loading state instead of error
+        // Show loading state
         const kanbanBoard = document.getElementById('kanbanBoard');
         if (kanbanBoard) {
             kanbanBoard.innerHTML = `
@@ -193,17 +197,8 @@ function setupTasksListener() {
     console.log('🔥 Firebase is ready! Setting up listener...');
     
     try {
-        // Try different Firebase references
-        let database;
-        if (window.firebase && window.firebase.database) {
-            database = window.firebase.database();
-        } else if (window.firebaseDb) {
-            database = window.firebaseDb;
-        } else if (typeof firebase !== 'undefined' && firebase.database) {
-            database = firebase.database();
-        }
-        
-        const tasksRef = database.ref('tasks');
+        // FIXED: Use firebase.database().ref() directly
+        const tasksRef = window.firebase.database().ref('tasks');
         
         tasksRef.on('value', (snapshot) => {
             const allTasks = snapshot.val() || {};
@@ -249,7 +244,9 @@ function setupTasksListener() {
     }
 }
 
-// ===== RENDER TASKS IN KANBAN =====
+// ========================================
+// SECTION 5: TASK RENDERING FUNCTIONS
+// ========================================
 function renderTasks() {
     // Clear all columns
     Object.keys(TASK_STATUS).forEach(status => {
@@ -291,7 +288,6 @@ function renderTasks() {
     });
 }
 
-// ===== RENDER INDIVIDUAL TASK CARD =====
 function renderTaskCard(task) {
     const priority = TASK_PRIORITY[task.priority || 'medium'];
     const dueDate = task.dueDate ? new Date(task.dueDate) : null;
@@ -332,7 +328,9 @@ function renderTaskCard(task) {
     `;
 }
 
-// ===== DRAG AND DROP HANDLERS =====
+// ========================================
+// SECTION 6: DRAG AND DROP HANDLERS
+// ========================================
 function handleDragStart(event, taskId) {
     draggedTask = tasksData.find(t => t.id === taskId);
     event.dataTransfer.effectAllowed = 'move';
@@ -353,24 +351,15 @@ async function handleDrop(event) {
     if (draggedTask.status === newStatus) return;
     
     try {
-        // Get Firebase reference using the same method as setupTasksListener
-        let database;
-        if (window.firebase && window.firebase.database) {
-            database = window.firebase.database();
-        } else if (window.firebaseDb) {
-            database = window.firebaseDb;
-        } else if (typeof firebase !== 'undefined' && firebase.database) {
-            database = firebase.database();
-        }
-        
-        const taskRef = database.ref(`tasks/${draggedTask.id}`);
+        // FIXED: Use firebase.database().ref() directly
+        const taskRef = window.firebase.database().ref(`tasks/${draggedTask.id}`);
         await taskRef.update({
             status: newStatus,
             lastUpdated: new Date().toISOString(),
             lastUpdatedBy: currentUser.uid
         });
         
-        console.log('✅ Task status updated');
+        console.log('✅ Task status updated via drag and drop');
     } catch (error) {
         console.error('❌ Error updating task:', error);
         showNotification('Error al actualizar tarea', 'error');
@@ -379,7 +368,9 @@ async function handleDrop(event) {
     draggedTask = null;
 }
 
-// ===== CREATE TASK MODAL =====
+// ========================================
+// SECTION 7: CREATE TASK MODAL
+// ========================================
 window.showCreateTaskModal = function() {
     const modal = `
         <div class="modal-overlay" onclick="closeModal(event)" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;">
@@ -445,7 +436,9 @@ window.showCreateTaskModal = function() {
     loadUsersForAssignment();
 };
 
-// ===== CREATE TASK HANDLER WITH FIREBASE FIX =====
+// ========================================
+// SECTION 8: CREATE TASK HANDLER (FIXED)
+// ========================================
 window.handleCreateTask = async function(event) {
     event.preventDefault();
     
@@ -467,17 +460,8 @@ window.handleCreateTask = async function(event) {
     };
     
     try {
-        // Get Firebase reference using the same method
-        let database;
-        if (window.firebase && window.firebase.database) {
-            database = window.firebase.database();
-        } else if (window.firebaseDb) {
-            database = window.firebaseDb;
-        } else if (typeof firebase !== 'undefined' && firebase.database) {
-            database = firebase.database();
-        }
-        
-        const tasksRef = database.ref('tasks');
+        // FIXED: Use firebase.database().ref() directly
+        const tasksRef = window.firebase.database().ref('tasks');
         await tasksRef.push(newTask);
         
         console.log('✅ Task created successfully');
@@ -489,7 +473,9 @@ window.handleCreateTask = async function(event) {
     }
 };
 
-// ===== SHOW TASK DETAILS =====
+// ========================================
+// SECTION 9: TASK DETAILS MODAL
+// ========================================
 window.showTaskDetails = function(taskId) {
     const task = tasksData.find(t => t.id === taskId);
     if (!task) return;
@@ -561,19 +547,13 @@ window.showTaskDetails = function(taskId) {
     document.getElementById('modalContainer').innerHTML = modal;
 };
 
-// ===== UPDATE TASK STATUS WITH FIREBASE FIX =====
+// ========================================
+// SECTION 10: UPDATE TASK STATUS (FIXED)
+// ========================================
 window.updateTaskStatus = async function(taskId, newStatus) {
     try {
-        let database;
-        if (window.firebase && window.firebase.database) {
-            database = window.firebase.database();
-        } else if (window.firebaseDb) {
-            database = window.firebaseDb;
-        } else if (typeof firebase !== 'undefined' && firebase.database) {
-            database = firebase.database();
-        }
-        
-        const taskRef = database.ref(`tasks/${taskId}`);
+        // FIXED: Use firebase.database().ref() directly
+        const taskRef = window.firebase.database().ref(`tasks/${taskId}`);
         await taskRef.update({
             status: newStatus,
             lastUpdated: new Date().toISOString(),
@@ -589,21 +569,15 @@ window.updateTaskStatus = async function(taskId, newStatus) {
     }
 };
 
-// ===== DELETE TASK WITH FIREBASE FIX =====
+// ========================================
+// SECTION 11: DELETE TASK (FIXED)
+// ========================================
 window.deleteTask = async function(taskId) {
     if (!confirm('¿Estás seguro de eliminar esta tarea?')) return;
     
     try {
-        let database;
-        if (window.firebase && window.firebase.database) {
-            database = window.firebase.database();
-        } else if (window.firebaseDb) {
-            database = window.firebaseDb;
-        } else if (typeof firebase !== 'undefined' && firebase.database) {
-            database = firebase.database();
-        }
-        
-        const taskRef = database.ref(`tasks/${taskId}`);
+        // FIXED: Use firebase.database().ref() directly
+        const taskRef = window.firebase.database().ref(`tasks/${taskId}`);
         await taskRef.remove();
         
         console.log('✅ Task deleted');
@@ -615,7 +589,9 @@ window.deleteTask = async function(taskId) {
     }
 };
 
-// ===== FILTERS =====
+// ========================================
+// SECTION 12: FILTER FUNCTIONS
+// ========================================
 function getFilteredTasks() {
     let filtered = [...tasksData];
     
@@ -655,7 +631,9 @@ window.clearFilters = function() {
     renderTasks();
 };
 
-// ===== LOAD USERS FOR ASSIGNMENT =====
+// ========================================
+// SECTION 13: USER MANAGEMENT FUNCTIONS
+// ========================================
 async function loadUsersForAssignment() {
     if (!window.FirebaseData) return;
     
@@ -679,7 +657,6 @@ async function loadUsersForAssignment() {
     }
 }
 
-// ===== UPDATE ASSIGNEE FILTER =====
 function updateAssigneeFilter() {
     if (!isAdmin) return;
     
@@ -703,7 +680,9 @@ function updateAssigneeFilter() {
     });
 }
 
-// ===== UTILITY FUNCTIONS =====
+// ========================================
+// SECTION 14: UTILITY FUNCTIONS
+// ========================================
 window.closeModal = function(event) {
     if (!event || event.target.classList.contains('modal-overlay')) {
         document.getElementById('modalContainer').innerHTML = '';
@@ -738,7 +717,9 @@ function showError(message) {
     }
 }
 
-// ===== ADD STYLES =====
+// ========================================
+// SECTION 15: STYLES
+// ========================================
 function addTaskStyles() {
     if (document.getElementById('task-management-styles')) return;
     
