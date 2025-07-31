@@ -864,6 +864,15 @@ window.firebaseModules = {
 
         window.FirebaseData = new SimpleFirebaseManager();
         window.dispatchEvent(new Event('firebaseReady'));
+        // Fix for tasks tab
+window.loadTasksData = function() {
+    console.log('📋 Loading tasks data from tab switch');
+    
+    // Initialize tasks module if not already done
+    if (window.initializeTasksModule && typeof window.initializeTasksModule === 'function') {
+        window.initializeTasksModule();
+    }
+};
     </script>
 
     <!-- Complete CRM System JavaScript -->
