@@ -1,8 +1,8 @@
-// tasks.js - CLEAN VERSION WITHOUT CONFLICTS
+// tasks.js - FIXED VERSION WITH UNIQUE VARIABLE NAMES
 console.log('📋 Tasks.js starting...');
 
-// Store tasks data
-let allTasks = [];
+// Store tasks data with unique name
+let tasksModuleData = [];
 
 // Main function called when clicking Tasks tab
 window.loadTasksData = function() {
@@ -46,7 +46,7 @@ function loadTasksFromFirebase() {
         // Check if we have the required modules
         if (!window.firebaseModules || !window.firebaseModules.database) {
             console.error('❌ Firebase modules not found');
-            showError('Firebase no está configurado correctamente');
+            showTaskError('Firebase no está configurado correctamente');
             return;
         }
         
@@ -61,35 +61,35 @@ function loadTasksFromFirebase() {
             console.log('📥 Data received from Firebase');
             
             const data = snapshot.val() || {};
-            allTasks = [];
+            tasksModuleData = [];
             
             // Convert to array
             Object.keys(data).forEach(key => {
-                allTasks.push({
+                tasksModuleData.push({
                     id: key,
                     ...data[key]
                 });
             });
             
-            console.log(`✅ Loaded ${allTasks.length} tasks`);
-            displayTasks();
+            console.log(`✅ Loaded ${tasksModuleData.length} tasks`);
+            displayTasksList();
         }, (error) => {
             console.error('❌ Firebase error:', error);
-            showError('Error al cargar las tareas: ' + error.message);
+            showTaskError('Error al cargar las tareas: ' + error.message);
         });
         
     } catch (error) {
         console.error('❌ Error:', error);
-        showError('Error: ' + error.message);
+        showTaskError('Error: ' + error.message);
     }
 }
 
 // Display tasks
-function displayTasks() {
+function displayTasksList() {
     const container = document.getElementById('tasksContainer');
     if (!container) return;
     
-    if (allTasks.length === 0) {
+    if (tasksModuleData.length === 0) {
         container.innerHTML = `
             <div style="text-align: center; padding: 40px;">
                 <h3>No hay tareas todavía</h3>
@@ -100,7 +100,7 @@ function displayTasks() {
     }
     
     // Show tasks
-    container.innerHTML = allTasks.map(task => `
+    container.innerHTML = tasksModuleData.map(task => `
         <div style="background: white; border: 1px solid #ddd; padding: 15px; margin-bottom: 10px; border-radius: 5px;">
             <h4 style="margin: 0 0 10px 0;">${task.title || 'Sin título'}</h4>
             <p style="margin: 5px 0;">Estado: ${task.status || 'pending'}</p>
@@ -148,7 +148,7 @@ window.createNewTask = async function() {
 };
 
 // Show error message
-function showError(message) {
+function showTaskError(message) {
     const container = document.getElementById('tasksContainer');
     if (container) {
         container.innerHTML = `
