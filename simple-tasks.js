@@ -4,7 +4,6 @@ console.log('📋 Task Management System loading...');
 // Global variables
 let tasksData = [];
 let currentFilter = 'all';
-let currentUser = null;
 let isAdmin = false;
 let draggedTask = null;
 
