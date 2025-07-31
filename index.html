@@ -477,8 +477,9 @@
                 <button class="tab" onclick="switchTab('pipeline')" id="pipelineTab">🎯 Pipeline</button>
                 <button class="tab" onclick="switchTab('reports')" id="reportsTab">📊 Reportes</button>
                 <button class="tab" onclick="switchTab('monitoring')" id="monitoringTab" style="display: none;">👀 Monitoreo</button>
-                <button class="tab" onclick="switchTab('socialMedia')" id="socialMediaTab">💬 Social Media</button>
+                <button onclick="switchTab('tasks')" class="tab">📋 Tareas</button>
                 <button class="tab" onclick="switchTab('config')" id="configTab" style="display: none;">⚙️ Config</button>
+                <button class="tab" onclick="switchTab('socialMedia')" id="socialMediaTab">💬 Social Media</button>
             </div>
 
             <!-- Tab: Contacts -->
@@ -653,6 +654,10 @@
                 <div id="individualSalespeopleActivity" style="margin-bottom: 2rem;">
                     <h3>👥 Actividad Individual</h3>
                     <div class="loading-spinner"></div> Cargando actividad individual...
+                </div>
+
+                <div id="tasks" class="tab-content" style="display: none;">
+                <div id="tasksContainer"></div>
                 </div>
                 
                 <div id="recentTeamActivity">
@@ -1194,47 +1199,49 @@
             }
         }
 
-        // ===== TAB NAVIGATION =====
-        function switchTab(tabName) {
-            console.log('📑 Switching to tab:', tabName);
-            
-            try {
-                // Hide all tab contents
-                document.querySelectorAll('.tab-content').forEach(content => {
-                    content.classList.add('hidden');
-                });
-                
-                // Remove active class from all tabs
-                document.querySelectorAll('.tab').forEach(tab => {
-                    tab.classList.remove('active');
-                });
-                
-                // Show target content
-                const targetContent = document.getElementById(tabName);
-                const targetTab = document.getElementById(tabName + 'Tab');
-                
-                if (targetContent) {
-                    targetContent.classList.remove('hidden');
-                    console.log('✅ Tab content shown:', tabName);
-                }
-                
-                if (targetTab) {
-                    targetTab.classList.add('active');
-                    console.log('✅ Tab activated:', tabName);
-                }
-                
-                // Load tab-specific data
-                if (tabName === 'leads') {
-                    updateLeadsTable();
-                } else if (tabName === 'config') {
-                    loadConfigData();
-                } else if (tabName === 'pipeline') {
-                    loadPipelineData();
-                } else if (tabName === 'reports') {
-                    loadReportsData();
-                }
-                
-                console.log('✅ Tab switched successfully:', tabName);
+// ===== TAB NAVIGATION =====
+function switchTab(tabName) {
+    console.log('📑 Switching to tab:', tabName);
+    
+    try {
+        // Hide all tab contents
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.classList.add('hidden');
+        });
+        
+        // Remove active class from all tabs
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.classList.remove('active');
+        });
+        
+        // Show target content
+        const targetContent = document.getElementById(tabName);
+        const targetTab = document.getElementById(tabName + 'Tab');
+        
+        if (targetContent) {
+            targetContent.classList.remove('hidden');
+            console.log('✅ Tab content shown:', tabName);
+        }
+        
+        if (targetTab) {
+            targetTab.classList.add('active');
+            console.log('✅ Tab activated:', tabName);
+        }
+        
+        // Load tab-specific data
+        if (tabName === 'leads') {
+            updateLeadsTable();
+        } else if (tabName === 'config') {
+            loadConfigData();
+        } else if (tabName === 'pipeline') {
+            loadPipelineData();
+        } else if (tabName === 'reports') {
+            loadReportsData();
+        } else if (tabName === 'tasks') {
+            loadTasksData();
+        }
+        
+        console.log('✅ Tab switched successfully:', tabName);
                 
             } catch (error) {
                 console.error('❌ Error switching tab:', error);
@@ -2420,6 +2427,7 @@ console.log('✅ Sales ranking loaded successfully');
     <script src="fixes.js"></script>
     <script src="social.js"></script>
     <script src="pipeline.js"></script>
+    <script src="tasks.js"></script>
 
 </body>
 </html>
