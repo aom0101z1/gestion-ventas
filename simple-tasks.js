@@ -1,4 +1,4 @@
-// simple-tasks.js - Task Management System (Phase 1)
+// simple-tasks.js - Task Management System (Phase 1) - FIXED VERSION
 console.log('📋 Task Management System loading...');
 
 // Global variables
@@ -155,46 +155,98 @@ function renderTasksUI() {
     addTaskStyles();
 }
 
-// ===== FIREBASE INTEGRATION =====
+// ===== FIREBASE INTEGRATION WITH FIXES =====
 function setupTasksListener() {
-    if (!window.firebase || !window.firebase.database) {
-        console.error('❌ Firebase not available');
-        showError('Firebase no está disponible');
+    console.log('🔍 Checking Firebase availability...');
+    
+    // Check multiple possible Firebase configurations
+    const firebaseReady = (
+        (window.firebase && window.firebase.database) ||
+        (window.firebaseDb) ||
+        (typeof firebase !== 'undefined' && firebase.database)
+    );
+    
+    if (!firebaseReady) {
+        console.error('❌ Firebase not ready yet');
+        
+        // Show loading state instead of error
+        const kanbanBoard = document.getElementById('kanbanBoard');
+        if (kanbanBoard) {
+            kanbanBoard.innerHTML = `
+                <div style="width: 100%; text-align: center; padding: 40px;">
+                    <div style="background: #f3f4f6; padding: 20px; border-radius: 8px;">
+                        <div class="loading-spinner" style="width: 32px; height: 32px; margin: 0 auto 1rem;"></div>
+                        <h3>Conectando con Firebase...</h3>
+                        <p>Por favor espera un momento</p>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Try again in a moment
+        setTimeout(() => {
+            setupTasksListener();
+        }, 1000);
         return;
     }
     
-    console.log('🔥 Setting up Firebase listener...');
+    console.log('🔥 Firebase is ready! Setting up listener...');
     
-    const tasksRef = firebase.database().ref('tasks');
-    
-    tasksRef.on('value', (snapshot) => {
-        const allTasks = snapshot.val() || {};
-        tasksData = [];
-        
-        // Convert to array and filter based on user role
-        Object.keys(allTasks).forEach(taskId => {
-            const task = allTasks[taskId];
-            task.id = taskId;
-            
-            // Admin sees all, others see only their tasks
-            if (isAdmin || (currentUser && (task.assignedTo === currentUser.uid || task.createdBy === currentUser.uid))) {
-                tasksData.push(task);
-            }
-        });
-        
-        console.log(`✅ Loaded ${tasksData.length} tasks`);
-        
-        // Update assignee filter if admin
-        if (isAdmin) {
-            updateAssigneeFilter();
+    try {
+        // Try different Firebase references
+        let database;
+        if (window.firebase && window.firebase.database) {
+            database = window.firebase.database();
+        } else if (window.firebaseDb) {
+            database = window.firebaseDb;
+        } else if (typeof firebase !== 'undefined' && firebase.database) {
+            database = firebase.database();
         }
         
-        // Render tasks
-        renderTasks();
-    }, (error) => {
-        console.error('❌ Firebase error:', error);
-        showError('Error al cargar tareas: ' + error.message);
-    });
+        const tasksRef = database.ref('tasks');
+        
+        tasksRef.on('value', (snapshot) => {
+            const allTasks = snapshot.val() || {};
+            tasksData = [];
+            
+            // Convert to array and filter based on user role
+            Object.keys(allTasks).forEach(taskId => {
+                const task = allTasks[taskId];
+                task.id = taskId;
+                
+                // Admin sees all, others see only their tasks
+                if (isAdmin || (currentUser && (task.assignedTo === currentUser.uid || task.createdBy === currentUser.uid))) {
+                    tasksData.push(task);
+                }
+            });
+            
+            console.log(`✅ Loaded ${tasksData.length} tasks from Firebase`);
+            
+            // Update assignee filter if admin
+            if (isAdmin) {
+                updateAssigneeFilter();
+            }
+            
+            // Render tasks
+            renderTasks();
+            
+            // If this is the first load and no tasks, show a welcome message
+            if (tasksData.length === 0 && document.getElementById('column-todo')) {
+                document.getElementById('column-todo').innerHTML = `
+                    <div style="text-align: center; color: #9ca3af; padding: 40px;">
+                        <h4>¡Bienvenido al Sistema de Tareas!</h4>
+                        <p>Crea tu primera tarea usando el botón "➕ Nueva Tarea"</p>
+                    </div>
+                `;
+            }
+        }, (error) => {
+            console.error('❌ Firebase error:', error);
+            showError('Error al cargar tareas: ' + error.message);
+        });
+    } catch (error) {
+        console.error('❌ Error setting up listener:', error);
+        showError('Error al configurar Firebase: ' + error.message);
+    }
 }
 
 // ===== RENDER TASKS IN KANBAN =====
@@ -301,8 +353,17 @@ async function handleDrop(event) {
     if (draggedTask.status === newStatus) return;
     
     try {
-        // Update task status in Firebase
-        const taskRef = firebase.database().ref(`tasks/${draggedTask.id}`);
+        // Get Firebase reference using the same method as setupTasksListener
+        let database;
+        if (window.firebase && window.firebase.database) {
+            database = window.firebase.database();
+        } else if (window.firebaseDb) {
+            database = window.firebaseDb;
+        } else if (typeof firebase !== 'undefined' && firebase.database) {
+            database = firebase.database();
+        }
+        
+        const taskRef = database.ref(`tasks/${draggedTask.id}`);
         await taskRef.update({
             status: newStatus,
             lastUpdated: new Date().toISOString(),
@@ -384,7 +445,7 @@ window.showCreateTaskModal = function() {
     loadUsersForAssignment();
 };
 
-// ===== CREATE TASK HANDLER =====
+// ===== CREATE TASK HANDLER WITH FIREBASE FIX =====
 window.handleCreateTask = async function(event) {
     event.preventDefault();
     
@@ -406,7 +467,17 @@ window.handleCreateTask = async function(event) {
     };
     
     try {
-        const tasksRef = firebase.database().ref('tasks');
+        // Get Firebase reference using the same method
+        let database;
+        if (window.firebase && window.firebase.database) {
+            database = window.firebase.database();
+        } else if (window.firebaseDb) {
+            database = window.firebaseDb;
+        } else if (typeof firebase !== 'undefined' && firebase.database) {
+            database = firebase.database();
+        }
+        
+        const tasksRef = database.ref('tasks');
         await tasksRef.push(newTask);
         
         console.log('✅ Task created successfully');
@@ -477,10 +548,6 @@ window.showTaskDetails = function(taskId) {
                 
                 ${(isAdmin || task.createdBy === currentUser?.uid) ? `
                     <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
-                        <button onclick="showEditTaskModal('${task.id}')" 
-                                style="padding: 10px 20px; background: #f59e0b; color: white; border: none; border-radius: 6px; cursor: pointer;">
-                            ✏️ Editar
-                        </button>
                         <button onclick="deleteTask('${task.id}')" 
                                 style="padding: 10px 20px; background: #dc2626; color: white; border: none; border-radius: 6px; cursor: pointer;">
                             🗑️ Eliminar
@@ -494,10 +561,19 @@ window.showTaskDetails = function(taskId) {
     document.getElementById('modalContainer').innerHTML = modal;
 };
 
-// ===== UPDATE TASK STATUS =====
+// ===== UPDATE TASK STATUS WITH FIREBASE FIX =====
 window.updateTaskStatus = async function(taskId, newStatus) {
     try {
-        const taskRef = firebase.database().ref(`tasks/${taskId}`);
+        let database;
+        if (window.firebase && window.firebase.database) {
+            database = window.firebase.database();
+        } else if (window.firebaseDb) {
+            database = window.firebaseDb;
+        } else if (typeof firebase !== 'undefined' && firebase.database) {
+            database = firebase.database();
+        }
+        
+        const taskRef = database.ref(`tasks/${taskId}`);
         await taskRef.update({
             status: newStatus,
             lastUpdated: new Date().toISOString(),
@@ -513,12 +589,21 @@ window.updateTaskStatus = async function(taskId, newStatus) {
     }
 };
 
-// ===== DELETE TASK =====
+// ===== DELETE TASK WITH FIREBASE FIX =====
 window.deleteTask = async function(taskId) {
     if (!confirm('¿Estás seguro de eliminar esta tarea?')) return;
     
     try {
-        const taskRef = firebase.database().ref(`tasks/${taskId}`);
+        let database;
+        if (window.firebase && window.firebase.database) {
+            database = window.firebase.database();
+        } else if (window.firebaseDb) {
+            database = window.firebaseDb;
+        } else if (typeof firebase !== 'undefined' && firebase.database) {
+            database = firebase.database();
+        }
+        
+        const taskRef = database.ref(`tasks/${taskId}`);
         await taskRef.remove();
         
         console.log('✅ Task deleted');
@@ -703,6 +788,18 @@ function addTaskStyles() {
         
         .kanban-column:hover {
             box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+        }
+        
+        .loading-spinner {
+            border: 3px solid #f3f4f6;
+            border-radius: 50%;
+            border-top: 3px solid #3b82f6;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     `;
     
