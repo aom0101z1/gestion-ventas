@@ -701,6 +701,50 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- User Management Section - ADDED HERE -->
+                <div id="userManagement" style="background: #fef3c7; padding: 2rem; border-radius: 10px; margin-top: 2rem;">
+                    <h3>👥 Gestión de Usuarios</h3>
+                    
+                    <!-- User Creation Form -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 1rem;">
+                        <div>
+                            <h4>Crear Nuevo Usuario</h4>
+                            <form id="createUserForm" onsubmit="createNewUser(event)">
+                                <div class="form-group">
+                                    <label>Nombre Completo:</label>
+                                    <input type="text" id="newUserName" required placeholder="Juan Pérez">
+                                </div>
+                                <div class="form-group">
+                                    <label>Email:</label>
+                                    <input type="email" id="newUserEmail" required placeholder="usuario@ciudadbilingue.com">
+                                </div>
+                                <div class="form-group">
+                                    <label>Contraseña:</label>
+                                    <input type="password" id="newUserPassword" required minlength="6" placeholder="Mínimo 6 caracteres">
+                                </div>
+                                <div class="form-group">
+                                    <label>Rol:</label>
+                                    <select id="newUserRole" required>
+                                        <option value="vendedor">Vendedor</option>
+                                        <option value="director">Director</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-success" style="width: 100%;">
+                                    ➕ Crear Usuario
+                                </button>
+                            </form>
+                        </div>
+                        
+                        <!-- Users List -->
+                        <div>
+                            <h4>Usuarios Actuales</h4>
+                            <div id="usersList" style="max-height: 400px; overflow-y: auto;">
+                                <div class="loading-spinner"></div> Cargando usuarios...
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -1754,6 +1798,10 @@ function switchTab(tabName) {
             try {
                 console.log('⚙️ Loading config data');
                 await updateConveniosList();
+                // Load users list if director
+                if (userRole === 'director') {
+                    await loadUsersList();
+                }
             } catch (error) {
                 console.error('❌ Error loading config data:', error);
             }
@@ -1914,6 +1962,132 @@ function switchTab(tabName) {
             } catch (error) {
                 console.error('❌ Error deleting convenio:', error);
                 alert('❌ Error al eliminar convenio');
+            }
+        }
+
+        // ===== USER MANAGEMENT FUNCTIONS - ADDED HERE =====
+        async function loadUsersList() {
+            try {
+                const usersContainer = document.getElementById('usersList');
+                
+                if (!window.FirebaseData) {
+                    usersContainer.innerHTML = '<p style="color: #dc2626;">❌ Firebase no disponible</p>';
+                    return;
+                }
+                
+                const users = await window.FirebaseData.getAllUsers();
+                
+                if (!users || Object.keys(users).length === 0) {
+                    usersContainer.innerHTML = '<p style="color: #6b7280;">No hay usuarios registrados</p>';
+                    return;
+                }
+                
+                let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
+                
+                Object.entries(users).forEach(([uid, user]) => {
+                    const isCurrentUser = window.FirebaseData.currentUser?.uid === uid;
+                    html += `
+                        <div style="background: white; padding: 12px; border-radius: 8px; border: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <strong>${user.name || 'Sin nombre'}</strong>
+                                ${isCurrentUser ? '<span style="color: #3b82f6; font-size: 12px;"> (Tú)</span>' : ''}
+                                <div style="color: #6b7280; font-size: 14px;">
+                                    ${user.email} • ${user.role === 'director' ? '👔 Director' : '👤 Vendedor'}
+                                </div>
+                                <div style="color: #9ca3af; font-size: 12px;">
+                                    Creado: ${new Date(user.createdAt).toLocaleDateString('es-CO')}
+                                </div>
+                            </div>
+                            ${!isCurrentUser && userRole === 'director' ? `
+                                <button onclick="deleteUser('${uid}', '${user.name}')" 
+                                        class="btn" 
+                                        style="background: #dc2626; color: white; padding: 6px 12px; font-size: 14px;">
+                                    🗑️
+                                </button>
+                            ` : ''}
+                        </div>
+                    `;
+                });
+                
+                html += '</div>';
+                usersContainer.innerHTML = html;
+                
+            } catch (error) {
+                console.error('Error loading users:', error);
+                document.getElementById('usersList').innerHTML = 
+                    '<p style="color: #dc2626;">❌ Error al cargar usuarios</p>';
+            }
+        }
+
+        async function createNewUser(event) {
+            event.preventDefault();
+            
+            const name = document.getElementById('newUserName').value;
+            const email = document.getElementById('newUserEmail').value;
+            const password = document.getElementById('newUserPassword').value;
+            const role = document.getElementById('newUserRole').value;
+            
+            try {
+                // Show loading state
+                const submitBtn = event.target.querySelector('button[type="submit"]');
+                const originalText = submitBtn.innerHTML;
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '⏳ Creando usuario...';
+                
+                // Create user
+                await window.FirebaseData.createUser(email, password, {
+                    name: name,
+                    role: role
+                });
+                
+                // Clear form
+                event.target.reset();
+                
+                // Show success notification
+                showNotification(`✅ Usuario ${name} creado exitosamente`, 'success');
+                
+                // Reload users list
+                await loadUsersList();
+                
+            } catch (error) {
+                console.error('Error creating user:', error);
+                let errorMessage = 'Error al crear usuario';
+                
+                if (error.code === 'auth/email-already-in-use') {
+                    errorMessage = 'Este email ya está registrado';
+                } else if (error.code === 'auth/weak-password') {
+                    errorMessage = 'La contraseña es muy débil';
+                } else if (error.code === 'auth/invalid-email') {
+                    errorMessage = 'Email inválido';
+                }
+                
+                showNotification(`❌ ${errorMessage}`, 'error');
+            } finally {
+                // Restore button
+                const submitBtn = event.target.querySelector('button[type="submit"]');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '➕ Crear Usuario';
+            }
+        }
+
+        async function deleteUser(uid, userName) {
+            if (!confirm(`¿Estás seguro de eliminar al usuario ${userName}?`)) {
+                return;
+            }
+            
+            try {
+                // Note: Firebase doesn't allow deleting users from client-side
+                // You would need a Cloud Function for this
+                // For now, we can just disable the user in the database
+                
+                showNotification('⚠️ La eliminación de usuarios requiere permisos de administrador del servidor', 'warning');
+                
+                // Optionally, you could mark the user as inactive in the database:
+                // await window.FirebaseData.updateUserProfile(uid, { active: false });
+                
+            } catch (error) {
+                console.error('Error deleting user:', error);
+                showNotification('❌ Error al eliminar usuario', 'error');
             }
         }
 
