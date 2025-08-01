@@ -178,15 +178,11 @@ function renderPipelineColumn(status, config, leads) {
             <div class="pipeline-body" 
                  data-status="${status}"
                  style="
-                     padding: 1rem;
+                     padding: 0.75rem;
                      max-height: 450px;
                      min-height: 300px;
-                     display: flex;
-                     flex-direction: row;
-                     gap: 0.75rem;
-                     overflow-x: auto;
-                     overflow-y: hidden;
-                     white-space: nowrap;
+                     overflow-y: auto;
+                     overflow-x: hidden;
                  ">
                 ${leadCount === 0 ? renderEmptyColumn(status, config.color) : leads.map(lead => renderLeadCard(lead, config.color)).join('')}
             </div>
@@ -225,7 +221,7 @@ function renderLeadCard(lead, stageColor) {
     const timeAgo = getTimeAgo(lead.date, lead.time);
     
     return `
-        <div class="lead-card" 
+        <div class="lead-card collapsed" 
              id="lead-card-${lead.id}"
              data-lead-id="${lead.id}"
              draggable="true"
@@ -233,154 +229,185 @@ function renderLeadCard(lead, stageColor) {
                  background: #f9fafb;
                  border: 1px solid #e5e7eb;
                  border-radius: 8px;
-                 padding: 1rem;
-                 margin-bottom: 0;
+                 margin-bottom: 0.5rem;
                  cursor: move;
                  transition: all 0.2s ease;
                  position: relative;
-                 border-left: 3px solid ${priorityColor};
-                 flex-shrink: 0;
-                 width: 280px;
-                 display: inline-block;
-                 vertical-align: top;
-             "
-             onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,0.12)'; this.style.transform='translateY(-2px)'"
-             onmouseout="this.style.boxShadow='none'; this.style.transform='translateY(0)'">
+                 overflow: hidden;
+             ">
             
-            <!-- Lead Header -->
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
-                <div style="flex: 1; min-width: 0;">
+            <!-- Lead Header (Always Visible) -->
+            <div class="lead-header" 
+                 onclick="toggleLeadDetails(event, '${lead.id}')"
+                 style="
+                     display: flex;
+                     align-items: center;
+                     justify-content: space-between;
+                     padding: 0.75rem 1rem;
+                     cursor: pointer;
+                     background: #f9fafb;
+                     user-select: none;
+                 ">
+                <div style="
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    flex: 1;
+                    min-width: 0;
+                ">
                     <div style="
-                        font-weight: 600;
+                        background: ${priorityColor};
+                        width: 8px;
+                        height: 8px;
+                        border-radius: 50%;
+                        flex-shrink: 0;
+                    " title="Prioridad: ${lead.priority || 'Medium'}"></div>
+                    <span style="
+                        font-weight: 500;
                         color: #374151;
-                        margin-bottom: 0.25rem;
-                        font-size: 0.95rem;
+                        font-size: 0.9rem;
                         white-space: nowrap;
                         overflow: hidden;
                         text-overflow: ellipsis;
-                        cursor: pointer;
-                    " 
-                    title="${lead.name || 'Sin nombre'}"
-                    onclick="showLeadDetails('${lead.id}')">
+                    ">
                         ${lead.name || 'Sin nombre'}
-                    </div>
+                    </span>
+                </div>
+                <svg class="chevron" 
+                     style="
+                         width: 16px;
+                         height: 16px;
+                         transition: transform 0.2s ease;
+                         opacity: 0.5;
+                         flex-shrink: 0;
+                     "
+                     viewBox="0 0 24 24" 
+                     fill="none" 
+                     stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 9l6 6 6-6"/>
+                </svg>
+            </div>
+            
+            <!-- Lead Details (Collapsible) -->
+            <div class="lead-details" 
+                 style="
+                     max-height: 0;
+                     overflow: hidden;
+                     transition: max-height 0.3s ease;
+                     background: white;
+                 ">
+                <div style="
+                    padding: 1rem;
+                    border-top: 1px solid #e5e7eb;
+                ">
                     <div style="
-                        font-size: 0.8rem;
+                        font-size: 0.85rem;
                         color: #6b7280;
+                        margin-bottom: 0.25rem;
                         display: flex;
                         align-items: center;
                         gap: 0.25rem;
                     ">
-                        ${sourceIcon} ${(lead.source || 'No especificado').length > 20 ? (lead.source || 'No especificado').substring(0, 20) + '...' : (lead.source || 'No especificado')}
+                        ${sourceIcon} ${lead.source || 'No especificado'}
                     </div>
-                </div>
-                <div style="
-                    background: ${priorityColor};
-                    width: 8px;
-                    height: 8px;
-                    border-radius: 50%;
-                    margin-top: 0.25rem;
-                " title="Prioridad: ${lead.priority || 'Medium'}"></div>
-            </div>
-            
-            <!-- Lead Details -->
-            <div style="margin-bottom: 0.75rem;">
-                <div style="
-                    font-size: 0.85rem;
-                    color: #10b981;
-                    margin-bottom: 0.25rem;
-                    font-weight: 500;
-                ">
-                    📞 ${lead.phone || 'Sin teléfono'}
-                </div>
-                ${lead.email ? `
+                    <div style="
+                        font-size: 0.85rem;
+                        color: #10b981;
+                        margin-bottom: 0.25rem;
+                        font-weight: 500;
+                    ">
+                        📞 ${lead.phone || 'Sin teléfono'}
+                    </div>
+                    ${lead.email ? `
+                        <div style="
+                            font-size: 0.8rem;
+                            color: #6b7280;
+                            margin-bottom: 0.25rem;
+                        ">
+                            ✉️ ${lead.email}
+                        </div>
+                    ` : ''}
                     <div style="
                         font-size: 0.8rem;
                         color: #6b7280;
-                        margin-bottom: 0.25rem;
+                        margin-bottom: 0.5rem;
                     ">
-                        ✉️ ${lead.email}
+                        📍 ${lead.location || 'Sin ubicación'}
                     </div>
-                ` : ''}
-                <div style="
-                    font-size: 0.8rem;
-                    color: #6b7280;
-                ">
-                    📍 ${lead.location || 'Sin ubicación'}
+                    
+                    <!-- Lead Score and Time -->
+                    <div style="
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        margin-top: 0.5rem;
+                    ">
+                        <div style="
+                            background: ${stageColor}20;
+                            color: ${stageColor};
+                            padding: 0.2rem 0.5rem;
+                            border-radius: 12px;
+                            font-weight: 500;
+                            font-size: 0.75rem;
+                        ">
+                            🎯 ${lead.score || 50}/100
+                        </div>
+                        <div style="
+                            font-size: 0.75rem;
+                            color: #6b7280;
+                        ">
+                            ⏰ ${timeAgo}
+                        </div>
+                    </div>
+                    
+                    <!-- Quick Actions -->
+                    <div style="
+                        display: flex;
+                        gap: 0.5rem;
+                        margin-top: 0.75rem;
+                    ">
+                        <button onclick="event.stopPropagation(); openWhatsApp('${lead.phone}', '${lead.name}')" 
+                                style="
+                                    background: #25d366;
+                                    border: none;
+                                    border-radius: 6px;
+                                    padding: 0.4rem 0.8rem;
+                                    display: flex;
+                                    align-items: center;
+                                    gap: 0.25rem;
+                                    cursor: pointer;
+                                    font-size: 0.8rem;
+                                    color: white;
+                                    flex: 1;
+                                    justify-content: center;
+                                " 
+                                onmouseover="this.style.opacity='0.8'"
+                                onmouseout="this.style.opacity='1'">
+                            💬 WhatsApp
+                        </button>
+                        <button onclick="event.stopPropagation(); showLeadDetails('${lead.id}')" 
+                                style="
+                                    background: #3b82f6;
+                                    border: none;
+                                    border-radius: 6px;
+                                    padding: 0.4rem 0.8rem;
+                                    display: flex;
+                                    align-items: center;
+                                    gap: 0.25rem;
+                                    cursor: pointer;
+                                    font-size: 0.8rem;
+                                    color: white;
+                                    flex: 1;
+                                    justify-content: center;
+                                " 
+                                onmouseover="this.style.opacity='0.8'"
+                                onmouseout="this.style.opacity='1'">
+                            👁️ Ver Detalles
+                        </button>
+                    </div>
                 </div>
-            </div>
-            
-            <!-- Lead Score and Time -->
-            <div style="
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                font-size: 0.75rem;
-                color: #6b7280;
-            ">
-                <div style="
-                    background: ${stageColor}20;
-                    color: ${stageColor};
-                    padding: 0.2rem 0.5rem;
-                    border-radius: 12px;
-                    font-weight: 500;
-                ">
-                    🎯 ${lead.score || 50}/100
-                </div>
-                <div>
-                    ⏰ ${timeAgo}
-                </div>
-            </div>
-            
-            <!-- Quick Actions -->
-            <div style="
-                position: absolute;
-                top: 0.5rem;
-                right: 0.5rem;
-                opacity: 0;
-                transition: opacity 0.2s ease;
-                display: flex;
-                gap: 0.25rem;
-            " class="quick-actions">
-                <button onclick="event.stopPropagation(); openWhatsApp('${lead.phone}', '${lead.name}')" 
-                        style="
-                            background: #25d366;
-                            border: none;
-                            border-radius: 4px;
-                            width: 24px;
-                            height: 24px;
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                            cursor: pointer;
-                            font-size: 0.7rem;
-                        " title="WhatsApp">
-                    💬
-                </button>
-                <button onclick="event.stopPropagation(); editLeadQuick('${lead.id}')" 
-                        style="
-                            background: #3b82f6;
-                            border: none;
-                            border-radius: 4px;
-                            width: 24px;
-                            height: 24px;
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                            cursor: pointer;
-                            font-size: 0.7rem;
-                            color: white;
-                        " title="Editar">
-                    ✏️
-                </button>
             </div>
         </div>
-        
-        <style>
-            .lead-card:hover .quick-actions {
-                opacity: 1 !important;
-            }
-        </style>
     `;
 }
 
@@ -393,10 +420,6 @@ function renderEmptyColumn(status, color) {
             border: 2px dashed #e5e7eb;
             border-radius: 8px;
             margin: 0;
-            display: inline-block;
-            width: 280px;
-            flex-shrink: 0;
-            vertical-align: top;
         ">
             <div style="font-size: 2rem; margin-bottom: 1rem; opacity: 0.5;">
                 ${PIPELINE_STAGES[status].emoji}
@@ -724,6 +747,32 @@ function getPipelineHealthMessage(conversionRate, activeLeads) {
     }
 }
 
+// ===== LEAD DETAILS TOGGLE =====
+function toggleLeadDetails(event, leadId) {
+    event.stopPropagation(); // Prevent drag from triggering
+    
+    const leadCard = document.getElementById(`lead-card-${leadId}`);
+    if (!leadCard) return;
+    
+    const isExpanded = leadCard.classList.contains('expanded');
+    const leadDetails = leadCard.querySelector('.lead-details');
+    const chevron = leadCard.querySelector('.chevron');
+    
+    if (isExpanded) {
+        // Collapse
+        leadCard.classList.remove('expanded');
+        leadDetails.style.maxHeight = '0';
+        chevron.style.transform = 'rotate(0deg)';
+        leadCard.style.boxShadow = 'none';
+    } else {
+        // Expand
+        leadCard.classList.add('expanded');
+        leadDetails.style.maxHeight = '300px'; // Adjust based on content
+        chevron.style.transform = 'rotate(180deg)';
+        leadCard.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
+    }
+}
+
 // ===== DRAG AND DROP FUNCTIONALITY =====
 function initializeDragAndDrop() {
     console.log('🖱️ Initializing drag and drop for pipeline');
@@ -737,8 +786,20 @@ function initializeDragAndDrop() {
         
         .lead-card.dragging {
             opacity: 0.5;
-            transform: rotate(5deg);
+            transform: rotate(2deg);
             cursor: grabbing !important;
+        }
+        
+        .lead-card:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .lead-card.expanded {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        .lead-header:hover {
+            background: #f3f4f6 !important;
         }
         
         .pipeline-column.drag-over {
@@ -754,23 +815,23 @@ function initializeDragAndDrop() {
             background: rgba(59, 130, 246, 0.05);
         }
         
-        /* Add scrollbar styling for horizontal scroll */
+        /* Scrollbar styling for vertical scroll */
         .pipeline-body::-webkit-scrollbar {
-            height: 8px;
+            width: 6px;
         }
         
         .pipeline-body::-webkit-scrollbar-track {
             background: #f1f1f1;
-            border-radius: 4px;
+            border-radius: 3px;
         }
         
         .pipeline-body::-webkit-scrollbar-thumb {
-            background: #888;
-            border-radius: 4px;
+            background: #cbd5e1;
+            border-radius: 3px;
         }
         
         .pipeline-body::-webkit-scrollbar-thumb:hover {
-            background: #555;
+            background: #94a3b8;
         }
     `;
     
@@ -779,12 +840,13 @@ function initializeDragAndDrop() {
         document.head.appendChild(style);
     }
     
-    // Set up event listeners after rendering
-    setTimeout(() => {
-        setupDragAndDropListeners();
-    }, 100);
+    // REMOVE THIS - it's causing the timing conflict
+    // setTimeout(() => {
+    //     setupDragAndDropListeners();
+    // }, 100);
+    
+    console.log('✅ Drag and drop styles initialized');
 }
-
 function setupDragAndDropListeners() {
     console.log('📌 Setting up drag and drop listeners');
     
@@ -836,14 +898,19 @@ function setupDragAndDropListeners() {
 function handleDragStart(event, leadId) {
     console.log('🖱️ Drag started for lead:', leadId);
     
+    // Collapse any expanded cards before dragging
+    const leadCard = document.getElementById(`lead-card-${leadId}`);
+    if (leadCard && leadCard.classList.contains('expanded')) {
+        toggleLeadDetails(event, leadId);
+    }
+    
     draggedLead = leadId;
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData('text/plain', leadId);
     
     // Add dragging class
-    const card = document.getElementById(`lead-card-${leadId}`);
-    if (card) {
-        card.classList.add('dragging');
+    if (leadCard) {
+        leadCard.classList.add('dragging');
     }
     
     // Add visual feedback to columns
@@ -1183,6 +1250,7 @@ function setupPipelineEventListeners() {
 }
 
 // ===== MODULE INITIALIZATION =====
+// ===== MODULE INITIALIZATION =====
 function initializePipelineModule() {
     console.log('🚀 Initializing pipeline module');
     
@@ -1192,8 +1260,8 @@ function initializePipelineModule() {
     }
     
     try {
-        // Initialize drag and drop
-        initializeDragAndDrop();
+        // Only initialize styles here, NOT the event listeners
+        initializePipelineStyles();
         
         // Set initialization flag
         pipelineInitialized = true;
@@ -1205,11 +1273,79 @@ function initializePipelineModule() {
     }
 }
 
+// ===== NEW FUNCTION: Initialize only styles =====
+function initializePipelineStyles() {
+    console.log('🎨 Initializing pipeline styles');
+    
+    // Add drag and drop styles
+    const style = document.createElement('style');
+    style.textContent = `
+        .lead-card {
+            cursor: move !important;
+        }
+        
+        .lead-card.dragging {
+            opacity: 0.5;
+            transform: rotate(2deg);
+            cursor: grabbing !important;
+        }
+        
+        .lead-card:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .lead-card.expanded {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        .lead-header:hover {
+            background: #f3f4f6 !important;
+        }
+        
+        .pipeline-column.drag-over {
+            background: #f0f9ff !important;
+            border: 2px dashed #3b82f6 !important;
+        }
+        
+        .pipeline-column.drag-over .pipeline-header {
+            background: #dbeafe !important;
+        }
+        
+        .pipeline-body.drag-over {
+            background: rgba(59, 130, 246, 0.05);
+        }
+        
+        /* Scrollbar styling for vertical scroll */
+        .pipeline-body::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .pipeline-body::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+        
+        .pipeline-body::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        
+        .pipeline-body::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    `;
+    
+    if (!document.getElementById('pipeline-drag-styles')) {
+        style.id = 'pipeline-drag-styles';
+        document.head.appendChild(style);
+    }
+}
+
 // ===== EVENT LISTENERS =====
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🎯 Pipeline module DOM ready');
     
-    // Initialize when Firebase is ready
+    // Initialize styles when Firebase is ready
     if (window.FirebaseData) {
         initializePipelineModule();
     } else {
@@ -1245,6 +1381,7 @@ window.refreshPipeline = refreshPipeline;
 window.exportPipelineData = exportPipelineData;
 window.togglePipelineView = togglePipelineView;
 window.editLeadQuick = editLeadQuick;
+window.toggleLeadDetails = toggleLeadDetails;
 window.openWhatsApp = window.openWhatsApp || function(phone, name) { 
     console.log('Open WhatsApp for:', name, phone); 
     if (phone) {
@@ -1252,4 +1389,6 @@ window.openWhatsApp = window.openWhatsApp || function(phone, name) {
     }
 };
 
-console.log('✅ Pipeline.js module loaded successfully - Drag & Drop Fixed!');
+console.log('✅ Pipeline.js module loaded successfully - Collapsible Cards Implemented!');
+
+
