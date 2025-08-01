@@ -6,6 +6,35 @@
     <title>🏫 Ciudad Bilingue - CRM Complete</title>
 
     <style>
+      /* ===== AUTH CHECK LOADING ===== */
+        .auth-check-loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        }
+        
+        .auth-check-loading h2 {
+            margin-top: 2rem;
+            color: #374151;
+        }
+        
+        .auth-check-spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid #f3f4f6;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
         /* ===== RESET Y CONFIGURACIÓN BÁSICA ===== */
         * {
             margin: 0;
@@ -798,14 +827,19 @@ window.firebaseModules = {
                 console.log('🔥 SimpleFirebaseManager initialized');
                 
                 onAuthStateChanged(this.auth, (user) => {
-                    if (user) {
-                        this.currentUser = user;
-                        console.log('✅ Firebase user authenticated:', user.email);
-                    } else {
-                        this.currentUser = null;
-                        console.log('ℹ️ No Firebase user authenticated');
-                    }
-                });
+    if (user) {
+        this.currentUser = user;
+        console.log('✅ Firebase user authenticated:', user.email);
+        // Check if app needs to be auto-initialized
+        checkAuthAndAutoLogin(user);
+    } else {
+        this.currentUser = null;
+        console.log('ℹ️ No Firebase user authenticated');
+        // Show login screen
+        document.getElementById('authCheckLoading').style.display = 'none';
+        document.getElementById('loginScreen').classList.remove('hidden');
+    }
+});
             }
 
             async login(email, password) {
@@ -1120,6 +1154,36 @@ window.loadTasksData = function() {
                 console.log('📋 Loaded convenios:', convenios);
                 
                 cachedConvenios = convenios || [];
+                        async function checkAuthAndAutoLogin(user) {
+            try {
+                console.log('🔐 Checking authenticated user:', user.email);
+                
+                currentUser = user;
+                const profile = await window.FirebaseData.loadUserProfile();
+                
+                if (profile) {
+                    console.log('✅ Auto-login successful for:', profile.name);
+                    userRole = profile.role;
+                    
+                    // Hide auth check screen
+                    document.getElementById('authCheckLoading').style.display = 'none';
+                    
+                    // Initialize app directly
+                    await initializeMainApplication();
+                    
+                    showNotification(`✅ ¡Bienvenido de vuelta ${profile.name}!\n🔥 Sesión restaurada automáticamente`, 'success');
+                } else {
+                    // Profile not found, show login
+                    console.log('⚠️ User profile not found, showing login');
+                    document.getElementById('authCheckLoading').style.display = 'none';
+                    document.getElementById('loginScreen').classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error('❌ Auto-login error:', error);
+                document.getElementById('authCheckLoading').style.display = 'none';
+                document.getElementById('loginScreen').classList.remove('hidden');
+            }
+        }
                 
                 const profile = await window.FirebaseData.loadUserProfile();
                 if (profile && profile.role === 'director') {
@@ -1881,19 +1945,43 @@ function switchTab(tabName) {
         // ===== REFRESH ALL DATA =====
         async function refreshAllData() {
             try {
-                console.log('🔄 Refreshing all data');
+                console.log('🔄 Starting full data refresh from Firebase');
                 
+                // Show loading notification
+                showNotification('🔄 Sincronizando con Firebase...', 'info', 2000);
+                
+                // Get current active tab
+                const activeTab = document.querySelector('.tab-button.active');
+                const activeTabName = activeTab ? activeTab.textContent : '';
+                
+                // Refresh all data
                 await updateStats();
                 await updateLeadsTable();
+                await updateTodayContacts();
+                await updateConveniosList();
+                await loadSalesRanking();
                 
-                alert('✅ Datos actualizados');
+                // Refresh specific tab data
+                if (activeTabName.includes('Pipeline') && window.loadPipelineData) {
+                    await window.loadPipelineData();
+                }
+                
+                if (activeTabName.includes('Tareas') && window.loadTasksData) {
+                    await window.loadTasksData();
+                }
+                
+                if (userRole === 'director') {
+                    await loadUsersList();
+                }
+                
+                console.log('✅ Full data refresh completed');
+                showNotification('✅ Datos actualizados correctamente', 'success');
                 
             } catch (error) {
                 console.error('❌ Error refreshing data:', error);
-                alert('❌ Error al actualizar datos');
+                showNotification('❌ Error al actualizar datos', 'error');
             }
         }
-
         // ===== LOGOUT =====
         async function handleLogout() {
             try {
@@ -2178,9 +2266,48 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
             alert(`📋 Ver detalles del lead: ${leadId}\n\n✅ Sistema funcionando correctamente`);
         }
 
-        function deleteLead(leadId) {
-            if (confirm('¿Estás seguro de eliminar este lead?')) {
-                alert(`🗑️ Lead eliminado: ${leadId}\n\n✅ Sistema funcionando correctamente`);
+        async function deleteLead(leadId) {
+            try {
+                console.log('🗑️ Attempting to delete lead:', leadId);
+                
+                if (!window.FirebaseData) {
+                    showNotification('❌ Sistema no disponible', 'error');
+                    return;
+                }
+                
+                // Get lead info for confirmation
+                const allContacts = await window.FirebaseData.getAllContacts();
+                const lead = allContacts.find(c => c.id === leadId);
+                
+                if (!lead) {
+                    showNotification('❌ Lead no encontrado', 'error');
+                    return;
+                }
+                
+                // Confirm deletion
+                if (!confirm(`¿Estás seguro de eliminar el lead "${lead.name}"?\n\nEsta acción no se puede deshacer.`)) {
+                    return;
+                }
+                
+                // Delete from Firebase
+                await window.FirebaseData.deleteContact(leadId);
+                
+                console.log('✅ Lead deleted from Firebase:', leadId);
+                
+                // Update UI immediately
+                await updateLeadsTable();
+                await updateStats();
+                
+                // Update pipeline if it's loaded
+                if (window.loadPipelineData) {
+                    await window.loadPipelineData();
+                }
+                
+                showNotification(`✅ Lead eliminado correctamente: ${lead.name}`, 'success');
+                
+            } catch (error) {
+                console.error('❌ Error deleting lead:', error);
+                showNotification(`❌ Error al eliminar lead: ${error.message}`, 'error');
             }
         }
 
@@ -2624,4 +2751,5 @@ console.log('✅ Sales ranking loaded successfully');
 
 </body>
 </html>
+
 
