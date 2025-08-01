@@ -1249,6 +1249,7 @@ function setupPipelineEventListeners() {
 }
 
 // ===== MODULE INITIALIZATION =====
+// ===== MODULE INITIALIZATION =====
 function initializePipelineModule() {
     console.log('🚀 Initializing pipeline module');
     
@@ -1258,8 +1259,8 @@ function initializePipelineModule() {
     }
     
     try {
-        // Initialize drag and drop
-        initializeDragAndDrop();
+        // Only initialize styles here, NOT the event listeners
+        initializePipelineStyles();
         
         // Set initialization flag
         pipelineInitialized = true;
@@ -1271,11 +1272,79 @@ function initializePipelineModule() {
     }
 }
 
+// ===== NEW FUNCTION: Initialize only styles =====
+function initializePipelineStyles() {
+    console.log('🎨 Initializing pipeline styles');
+    
+    // Add drag and drop styles
+    const style = document.createElement('style');
+    style.textContent = `
+        .lead-card {
+            cursor: move !important;
+        }
+        
+        .lead-card.dragging {
+            opacity: 0.5;
+            transform: rotate(2deg);
+            cursor: grabbing !important;
+        }
+        
+        .lead-card:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .lead-card.expanded {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        .lead-header:hover {
+            background: #f3f4f6 !important;
+        }
+        
+        .pipeline-column.drag-over {
+            background: #f0f9ff !important;
+            border: 2px dashed #3b82f6 !important;
+        }
+        
+        .pipeline-column.drag-over .pipeline-header {
+            background: #dbeafe !important;
+        }
+        
+        .pipeline-body.drag-over {
+            background: rgba(59, 130, 246, 0.05);
+        }
+        
+        /* Scrollbar styling for vertical scroll */
+        .pipeline-body::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .pipeline-body::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+        
+        .pipeline-body::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        
+        .pipeline-body::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    `;
+    
+    if (!document.getElementById('pipeline-drag-styles')) {
+        style.id = 'pipeline-drag-styles';
+        document.head.appendChild(style);
+    }
+}
+
 // ===== EVENT LISTENERS =====
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🎯 Pipeline module DOM ready');
     
-    // Initialize when Firebase is ready
+    // Initialize styles when Firebase is ready
     if (window.FirebaseData) {
         initializePipelineModule();
     } else {
@@ -1320,3 +1389,4 @@ window.openWhatsApp = window.openWhatsApp || function(phone, name) {
 };
 
 console.log('✅ Pipeline.js module loaded successfully - Collapsible Cards Implemented!');
+
