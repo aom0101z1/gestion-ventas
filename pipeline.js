@@ -126,6 +126,7 @@ function renderPipelineColumn(status, config, leads) {
     
     return `
         <div class="pipeline-column" 
+             id="pipeline-column-${status.replace(/\s+/g, '-')}"
              data-status="${status}"
              style="
                  background: white;
@@ -135,9 +136,7 @@ function renderPipelineColumn(status, config, leads) {
                  border-top: 4px solid ${config.color};
                  min-height: 400px;
                  transition: all 0.3s ease;
-             "
-             ondragover="handleDragOver(event)"
-             ondrop="handleDrop(event, '${status}')">
+             ">
             
             <!-- Column Header -->
             <div class="pipeline-header" style="
@@ -176,12 +175,19 @@ function renderPipelineColumn(status, config, leads) {
             </div>
             
             <!-- Column Body -->
-            <div class="pipeline-body" style="
-                padding: 1rem;
-                max-height: 450px;
-                overflow-y: auto;
-                min-height: 300px;
-            ">
+            <div class="pipeline-body" 
+                 data-status="${status}"
+                 style="
+                     padding: 1rem;
+                     max-height: 450px;
+                     min-height: 300px;
+                     display: flex;
+                     flex-direction: row;
+                     gap: 0.75rem;
+                     overflow-x: auto;
+                     overflow-y: hidden;
+                     white-space: nowrap;
+                 ">
                 ${leadCount === 0 ? renderEmptyColumn(status, config.color) : leads.map(lead => renderLeadCard(lead, config.color)).join('')}
             </div>
             
@@ -220,6 +226,7 @@ function renderLeadCard(lead, stageColor) {
     
     return `
         <div class="lead-card" 
+             id="lead-card-${lead.id}"
              data-lead-id="${lead.id}"
              draggable="true"
              style="
@@ -227,14 +234,16 @@ function renderLeadCard(lead, stageColor) {
                  border: 1px solid #e5e7eb;
                  border-radius: 8px;
                  padding: 1rem;
-                 margin-bottom: 0.75rem;
-                 cursor: pointer;
+                 margin-bottom: 0;
+                 cursor: move;
                  transition: all 0.2s ease;
                  position: relative;
                  border-left: 3px solid ${priorityColor};
+                 flex-shrink: 0;
+                 width: 280px;
+                 display: inline-block;
+                 vertical-align: top;
              "
-             onclick="showLeadDetails('${lead.id}')"
-             ondragstart="handleDragStart(event, '${lead.id}')"
              onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,0.12)'; this.style.transform='translateY(-2px)'"
              onmouseout="this.style.boxShadow='none'; this.style.transform='translateY(0)'">
             
@@ -249,7 +258,10 @@ function renderLeadCard(lead, stageColor) {
                         white-space: nowrap;
                         overflow: hidden;
                         text-overflow: ellipsis;
-                    " title="${lead.name || 'Sin nombre'}">
+                        cursor: pointer;
+                    " 
+                    title="${lead.name || 'Sin nombre'}"
+                    onclick="showLeadDetails('${lead.id}')">
                         ${lead.name || 'Sin nombre'}
                     </div>
                     <div style="
@@ -380,7 +392,11 @@ function renderEmptyColumn(status, color) {
             padding: 3rem 1rem;
             border: 2px dashed #e5e7eb;
             border-radius: 8px;
-            margin: 1rem 0;
+            margin: 0;
+            display: inline-block;
+            width: 280px;
+            flex-shrink: 0;
+            vertical-align: top;
         ">
             <div style="font-size: 2rem; margin-bottom: 1rem; opacity: 0.5;">
                 ${PIPELINE_STAGES[status].emoji}
@@ -715,9 +731,14 @@ function initializeDragAndDrop() {
     // Add drag and drop styles
     const style = document.createElement('style');
     style.textContent = `
+        .lead-card {
+            cursor: move !important;
+        }
+        
         .lead-card.dragging {
             opacity: 0.5;
             transform: rotate(5deg);
+            cursor: grabbing !important;
         }
         
         .pipeline-column.drag-over {
@@ -728,20 +749,102 @@ function initializeDragAndDrop() {
         .pipeline-column.drag-over .pipeline-header {
             background: #dbeafe !important;
         }
+        
+        .pipeline-body.drag-over {
+            background: rgba(59, 130, 246, 0.05);
+        }
+        
+        /* Add scrollbar styling for horizontal scroll */
+        .pipeline-body::-webkit-scrollbar {
+            height: 8px;
+        }
+        
+        .pipeline-body::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        
+        .pipeline-body::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        
+        .pipeline-body::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
     `;
     
     if (!document.getElementById('pipeline-drag-styles')) {
         style.id = 'pipeline-drag-styles';
         document.head.appendChild(style);
     }
+    
+    // Set up event listeners after rendering
+    setTimeout(() => {
+        setupDragAndDropListeners();
+    }, 100);
+}
+
+function setupDragAndDropListeners() {
+    console.log('📌 Setting up drag and drop listeners');
+    
+    // Add listeners to all lead cards
+    document.querySelectorAll('.lead-card').forEach(card => {
+        card.addEventListener('dragstart', function(e) {
+            const leadId = this.getAttribute('data-lead-id');
+            handleDragStart(e, leadId);
+        });
+        
+        card.addEventListener('dragend', function(e) {
+            this.classList.remove('dragging');
+        });
+    });
+    
+    // Add listeners to all pipeline columns
+    document.querySelectorAll('.pipeline-column').forEach(column => {
+        column.addEventListener('dragover', handleDragOver);
+        column.addEventListener('drop', function(e) {
+            const status = this.getAttribute('data-status');
+            handleDrop(e, status);
+        });
+        column.addEventListener('dragleave', handleDragLeave);
+        column.addEventListener('dragenter', function(e) {
+            e.preventDefault();
+        });
+    });
+    
+    // Add listeners to pipeline bodies
+    document.querySelectorAll('.pipeline-body').forEach(body => {
+        body.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            this.classList.add('drag-over');
+        });
+        
+        body.addEventListener('dragleave', function(e) {
+            this.classList.remove('drag-over');
+        });
+        
+        body.addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.classList.remove('drag-over');
+        });
+    });
+    
+    console.log('✅ Drag and drop listeners set up');
 }
 
 function handleDragStart(event, leadId) {
     console.log('🖱️ Drag started for lead:', leadId);
     
     draggedLead = leadId;
+    event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData('text/plain', leadId);
-    event.target.classList.add('dragging');
+    
+    // Add dragging class
+    const card = document.getElementById(`lead-card-${leadId}`);
+    if (card) {
+        card.classList.add('dragging');
+    }
     
     // Add visual feedback to columns
     document.querySelectorAll('.pipeline-column').forEach(col => {
@@ -750,48 +853,118 @@ function handleDragStart(event, leadId) {
 }
 
 function handleDragOver(event) {
-    event.preventDefault();
-    event.currentTarget.classList.add('drag-over');
+    if (event.preventDefault) {
+        event.preventDefault();
+    }
+    
+    event.dataTransfer.dropEffect = 'move';
+    
+    const column = event.currentTarget;
+    if (column.classList.contains('pipeline-column')) {
+        column.classList.add('drag-over');
+    }
+    
+    return false;
 }
 
 function handleDragLeave(event) {
-    event.currentTarget.classList.remove('drag-over');
+    const column = event.currentTarget;
+    
+    // Check if we're actually leaving the column
+    const rect = column.getBoundingClientRect();
+    const x = event.clientX;
+    const y = event.clientY;
+    
+    if (x <= rect.left || x >= rect.right || y <= rect.top || y >= rect.bottom) {
+        column.classList.remove('drag-over');
+    }
 }
 
 async function handleDrop(event, newStatus) {
+    if (event.stopPropagation) {
+        event.stopPropagation();
+    }
+    
     event.preventDefault();
     
     const leadId = event.dataTransfer.getData('text/plain');
-    const column = event.currentTarget;
     
-    // Remove visual feedback
-    column.classList.remove('drag-over');
+    // Remove all visual feedback
+    document.querySelectorAll('.pipeline-column').forEach(col => {
+        col.classList.remove('drag-over');
+    });
+    
+    document.querySelectorAll('.pipeline-body').forEach(body => {
+        body.classList.remove('drag-over');
+    });
+    
     document.querySelectorAll('.lead-card').forEach(card => {
         card.classList.remove('dragging');
     });
     
     if (!leadId || !newStatus) {
-        console.error('❌ Invalid drop operation');
+        console.error('❌ Invalid drop operation - Lead ID:', leadId, 'Status:', newStatus);
+        return;
+    }
+    
+    // Find the current lead data
+    const currentLead = pipelineData.find(lead => lead.id === leadId);
+    if (!currentLead) {
+        console.error('❌ Lead not found:', leadId);
+        return;
+    }
+    
+    // Check if status is actually changing
+    if (currentLead.status === newStatus) {
+        console.log('ℹ️ Lead already in this status');
         return;
     }
     
     try {
-        console.log('🎯 Updating lead status:', leadId, 'to', newStatus);
+        console.log('🎯 Updating lead status:', leadId, 'from', currentLead.status, 'to', newStatus);
+        
+        // Optimistic UI update
+        currentLead.status = newStatus;
+        renderPipelineView(pipelineData);
+        
+        // Show notification function
+        const showNotification = window.showNotification || function(message, type, duration) {
+            console.log(`${type}: ${message}`);
+            alert(message);
+        };
         
         // Update in Firebase
-        await window.FirebaseData.updateContact(leadId, { status: newStatus });
-        
-        // Show success feedback
-        showNotification(`✅ Lead movido a "${newStatus}"`, 'success', 2000);
-        
-        // Refresh pipeline
-        setTimeout(() => {
-            loadPipelineData();
-        }, 500);
+        try {
+            await window.FirebaseData.updateContact(leadId, { status: newStatus });
+            showNotification(`✅ Lead movido a "${newStatus}"`, 'success', 2000);
+        } catch (firebaseError) {
+            console.error('❌ Firebase update error:', firebaseError);
+            
+            // Revert the optimistic update
+            currentLead.status = currentLead.status;
+            
+            // Check if it's a permission error
+            if (firebaseError.message && firebaseError.message.includes('permission')) {
+                showNotification('⚠️ No tienes permisos para mover este lead', 'warning', 3000);
+            } else {
+                showNotification(`❌ Error al mover lead: ${firebaseError.message}`, 'error', 3000);
+            }
+            
+            // Reload the pipeline to restore correct state
+            await loadPipelineData();
+        }
         
     } catch (error) {
         console.error('❌ Error updating lead status:', error);
+        
+        const showNotification = window.showNotification || function(message) {
+            alert(message);
+        };
+        
         showNotification(`❌ Error al mover lead: ${error.message}`, 'error');
+        
+        // Reload pipeline to ensure correct state
+        await loadPipelineData();
     }
     
     draggedLead = null;
@@ -810,13 +983,17 @@ async function refreshPipeline() {
     try {
         await loadPipelineData();
         
-        if (typeof showNotification === 'function') {
-            showNotification('✅ Pipeline actualizado', 'success', 2000);
-        }
+        const showNotification = window.showNotification || function(message) {
+            console.log(message);
+        };
+        
+        showNotification('✅ Pipeline actualizado', 'success', 2000);
     } catch (error) {
-        if (typeof showNotification === 'function') {
-            showNotification('❌ Error al actualizar pipeline', 'error');
-        }
+        const showNotification = window.showNotification || function(message) {
+            alert(message);
+        };
+        
+        showNotification('❌ Error al actualizar pipeline', 'error');
     } finally {
         if (container) {
             container.style.opacity = '1';
@@ -830,6 +1007,11 @@ async function addNewLeadToStage(stage) {
     // For now, just redirect to contacts tab
     if (typeof switchTab === 'function') {
         switchTab('contacts');
+        
+        const showNotification = window.showNotification || function(message) {
+            alert(message);
+        };
+        
         showNotification(`ℹ️ Agrega un nuevo contacto y se ubicará en "${stage}"`, 'info', 3000);
     } else {
         alert(`➕ Para agregar un lead a "${stage}", ve a la pestaña de Contactos`);
@@ -873,10 +1055,20 @@ function exportPipelineData() {
         link.click();
         
         console.log('📥 Pipeline data exported');
+        
+        const showNotification = window.showNotification || function(message) {
+            alert(message);
+        };
+        
         showNotification('📥 Pipeline exportado correctamente', 'success');
         
     } catch (error) {
         console.error('❌ Error exporting pipeline:', error);
+        
+        const showNotification = window.showNotification || function(message) {
+            alert(message);
+        };
+        
         showNotification('❌ Error al exportar pipeline', 'error');
     }
 }
@@ -984,10 +1176,8 @@ function showEmptyPipeline() {
 }
 
 function setupPipelineEventListeners() {
-    // Add global event listeners for drag and drop
-    document.querySelectorAll('.pipeline-column').forEach(column => {
-        column.addEventListener('dragleave', handleDragLeave);
-    });
+    // Set up drag and drop listeners
+    setupDragAndDropListeners();
     
     console.log('🎧 Pipeline event listeners setup complete');
 }
@@ -1042,86 +1232,24 @@ if (typeof module !== 'undefined' && module.exports) {
         pipelineStats
     };
 }
-// Make drag and drop functions globally available
-window.handleDragStart = function(event, leadId) {
-    console.log('🖱️ Drag started for lead:', leadId);
-    
-    draggedLead = leadId;
-    event.dataTransfer.effectAllowed = 'move';
-    event.dataTransfer.setData('text/plain', leadId);
-    event.target.classList.add('dragging');
-    event.target.style.opacity = '0.5';
-};
 
-window.handleDragOver = function(event) {
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
-    event.currentTarget.classList.add('drag-over');
-    event.currentTarget.style.background = '#f0f9ff';
-    event.currentTarget.style.border = '2px dashed #3b82f6';
-};
-
-window.handleDragLeave = function(event) {
-    event.currentTarget.classList.remove('drag-over');
-    event.currentTarget.style.background = '';
-    event.currentTarget.style.border = '';
-};
-
-window.handleDrop = async function(event, newStatus) {
-    event.preventDefault();
-    event.stopPropagation();
-    
-    const leadId = event.dataTransfer.getData('text/plain');
-    const column = event.currentTarget;
-    
-    // Remove visual feedback
-    column.classList.remove('drag-over');
-    column.style.background = '';
-    column.style.border = '';
-    
-    // Reset all dragging cards
-    document.querySelectorAll('.lead-card').forEach(card => {
-        card.classList.remove('dragging');
-        card.style.opacity = '';
-    });
-    
-    if (!leadId || !newStatus) {
-        console.error('❌ Invalid drop operation');
-        return;
-    }
-    
-    try {
-        console.log('🎯 Updating lead status:', leadId, 'to', newStatus);
-        
-        // Update in Firebase
-        await window.FirebaseData.updateContact(leadId, { status: newStatus });
-        
-        // Show success message
-        alert(`✅ Lead movido a "${newStatus}"`);
-        
-        // Refresh pipeline
-        setTimeout(() => {
-            loadPipelineData();
-        }, 500);
-        
-    } catch (error) {
-        console.error('❌ Error updating lead status:', error);
-        alert(`❌ Error al mover lead: ${error.message}`);
+// ===== GLOBAL FUNCTION ASSIGNMENTS =====
+// Make functions globally available for inline event handlers
+window.handleDragStart = handleDragStart;
+window.handleDragOver = handleDragOver;
+window.handleDrop = handleDrop;
+window.loadPipelineData = loadPipelineData;
+window.addNewLeadToStage = addNewLeadToStage;
+window.showLeadDetails = window.showLeadDetails || function(id) { console.log('Show lead details:', id); };
+window.refreshPipeline = refreshPipeline;
+window.exportPipelineData = exportPipelineData;
+window.togglePipelineView = togglePipelineView;
+window.editLeadQuick = editLeadQuick;
+window.openWhatsApp = window.openWhatsApp || function(phone, name) { 
+    console.log('Open WhatsApp for:', name, phone); 
+    if (phone) {
+        window.open(`https://wa.me/${phone.replace(/\D/g, '')}`, '_blank');
     }
 };
 
-// Also fix the event listeners on columns
-window.addEventListener('DOMContentLoaded', () => {
-    setTimeout(() => {
-        // Add event listeners to all pipeline columns
-        document.querySelectorAll('.pipeline-column').forEach(column => {
-            column.addEventListener('dragover', (e) => handleDragOver(e));
-            column.addEventListener('dragleave', (e) => handleDragLeave(e));
-            column.addEventListener('drop', (e) => {
-                const status = column.getAttribute('data-status');
-                handleDrop(e, status);
-            });
-        });
-    }, 1000);
-});
-console.log('✅ Pipeline.js module loaded successfully');
+console.log('✅ Pipeline.js module loaded successfully - Drag & Drop Fixed!');
