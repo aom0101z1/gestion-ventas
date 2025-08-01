@@ -840,12 +840,13 @@ function initializeDragAndDrop() {
         document.head.appendChild(style);
     }
     
-    // Set up event listeners after rendering
-    setTimeout(() => {
-        setupDragAndDropListeners();
-    }, 100);
+    // REMOVE THIS - it's causing the timing conflict
+    // setTimeout(() => {
+    //     setupDragAndDropListeners();
+    // }, 100);
+    
+    console.log('✅ Drag and drop styles initialized');
 }
-
 function setupDragAndDropListeners() {
     console.log('📌 Setting up drag and drop listeners');
     
@@ -1389,4 +1390,5 @@ window.openWhatsApp = window.openWhatsApp || function(phone, name) {
 };
 
 console.log('✅ Pipeline.js module loaded successfully - Collapsible Cards Implemented!');
+
 
