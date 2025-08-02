@@ -492,8 +492,150 @@ function renderLeadCard(lead, stageColor, targetDays) {
     `;
 }
 
-// ===== 🎯 WORKING HANDLEDROP FUNCTION (EXACT COPY FROM CONSOLE VERSION) =====
+// ===== ENHANCED DRAG AND DROP FUNCTIONALITY =====
 
+// ✅ ENHANCED UI update function that doesn't require full reload
+async function updatePipelineUI() {
+    console.log('🎨 Updating pipeline UI without full reload');
+    
+    try {
+        // Ensure we have the required functions and data
+        if (typeof groupContactsByStatus !== 'function') {
+            console.error('❌ groupContactsByStatus function not available');
+            await loadPipelineData();
+            return;
+        }
+        
+        if (!pipelineData || !Array.isArray(pipelineData)) {
+            console.error('❌ pipelineData not available');
+            await loadPipelineData();
+            return;
+        }
+        
+        // Group contacts by status
+        const statusGroups = groupContactsByStatus(pipelineData);
+        
+        // Update each column content
+        Object.entries(PIPELINE_STAGES).forEach(([status, config]) => {
+            const leads = statusGroups[status] || [];
+            const columnBody = document.getElementById(`pipeline-body-${status.replace(/\s+/g, '-')}`);
+            
+            if (columnBody) {
+                if (leads.length === 0) {
+                    // Check if renderEmptyColumnState exists, otherwise use simple fallback
+                    if (typeof renderEmptyColumnState === 'function') {
+                        columnBody.innerHTML = renderEmptyColumnState(status, config);
+                    } else {
+                        columnBody.innerHTML = `
+                            <div style="text-align: center; color: #9ca3af; padding: 2rem 1rem;">
+                                <p style="margin: 0;">No hay leads en esta etapa</p>
+                            </div>
+                        `;
+                    }
+                } else {
+                    // Check if renderLeadCard exists
+                    if (typeof renderLeadCard === 'function') {
+                        columnBody.innerHTML = leads.map(lead => renderLeadCard(lead, config.color, config.targetDays)).join('');
+                    } else {
+                        // Fallback to simple lead display
+                        columnBody.innerHTML = leads.map(lead => `
+                            <div class="lead-card" data-lead-id="${lead.id}" draggable="true">
+                                <h4>${lead.name}</h4>
+                                <p>${lead.phone}</p>
+                            </div>
+                        `).join('');
+                    }
+                }
+            }
+            
+            // Update column count
+            const columnHeader = document.querySelector(`#pipeline-column-${status.replace(/\s+/g, '-')} .pipeline-header [style*="background: rgba(255,255,255,0.2)"]`);
+            if (columnHeader) {
+                columnHeader.textContent = leads.length;
+            }
+        });
+        
+        // Recalculate and update statistics if function exists
+        if (typeof calculatePipelineStats === 'function') {
+            calculatePipelineStats(pipelineData);
+        }
+        
+        // Re-attach event listeners to new elements
+        setTimeout(() => {
+            if (typeof setupPipelineEventListeners === 'function') {
+                setupPipelineEventListeners();
+                console.log('✅ Pipeline UI updated and event listeners re-attached');
+            }
+        }, 100);
+        
+    } catch (error) {
+        console.error('❌ Error updating pipeline UI:', error);
+        // Fallback to full reload
+        if (typeof loadPipelineData === 'function') {
+            await loadPipelineData();
+        }
+    }
+}
+
+// ✅ Enhanced clean up drag visuals function
+function cleanupDragVisuals() {
+    console.log('🧹 Cleaning up drag visuals');
+    
+    try {
+        // Remove column visual feedback
+        document.querySelectorAll('.pipeline-column').forEach(col => {
+            col.classList.remove('drag-over', 'drag-enter', 'drag-active');
+            col.style.transform = '';
+            col.style.borderColor = '';
+            col.style.background = '';
+        });
+        
+        // Remove body visual feedback
+        document.querySelectorAll('.pipeline-body').forEach(body => {
+            body.classList.remove('drag-over');
+            body.style.backgroundColor = '';
+            body.style.border = '';
+        });
+        
+        // Remove card visual feedback
+        document.querySelectorAll('.lead-card').forEach(card => {
+            card.classList.remove('dragging');
+            card.style.opacity = '';
+            card.style.transform = '';
+        });
+        
+        // Remove drop previews
+        document.querySelectorAll('.drop-preview').forEach(preview => {
+            preview.remove();
+        });
+        
+        // Reset global cursor
+        document.body.style.cursor = '';
+    } catch (error) {
+        console.error('❌ Error cleaning up drag visuals:', error);
+    }
+}
+
+// ✅ Enhanced reset drag state function
+function resetDragState() {
+    console.log('🔄 Resetting drag state');
+    
+    try {
+        window.draggedLead = null;
+        
+        // Check if dragDropState exists before trying to reset it
+        if (typeof dragDropState !== 'undefined' && dragDropState) {
+            dragDropState.isDragging = false;
+            dragDropState.draggedElement = null;
+            dragDropState.originalParent = null;
+            dragDropState.dragStartTime = null;
+        }
+    } catch (error) {
+        console.error('❌ Error resetting drag state:', error);
+    }
+}
+
+// ✅ ENHANCED HANDLEDROP FUNCTION - THIS IS THE CRITICAL ONE
 async function handleDrop(event, newStatus) {
     console.log(`🎯 ENHANCED DROP HANDLER - Status: ${newStatus}`);
     
@@ -516,23 +658,53 @@ async function handleDrop(event, newStatus) {
     // Validate drop operation
     if (!leadId) {
         console.error('❌ No lead ID found for drop operation');
-        alert('❌ Error: ID de lead no encontrado');
+        if (window.showNotification) {
+            window.showNotification('❌ Error: ID de lead no encontrado', 'error');
+        } else {
+            alert('❌ Error: ID de lead no encontrado');
+        }
         resetDragState();
         return;
     }
     
-    if (!newStatus || !PIPELINE_STAGES[newStatus]) {
-        console.error('❌ Invalid target status:', newStatus);
-        alert('❌ Error: Estado de destino inválido');
+    // Check if PIPELINE_STAGES is available
+    if (!window.PIPELINE_STAGES && !PIPELINE_STAGES) {
+        console.error('❌ PIPELINE_STAGES not available');
         resetDragState();
         return;
     }
+    
+    const stages = window.PIPELINE_STAGES || PIPELINE_STAGES;
+    
+    if (!newStatus || !stages[newStatus]) {
+        console.error('❌ Invalid target status:', newStatus);
+        if (window.showNotification) {
+            window.showNotification('❌ Error: Estado de destino inválido', 'error');
+        } else {
+            alert('❌ Error: Estado de destino inválido');
+        }
+        resetDragState();
+        return;
+    }
+    
+    // Check if pipelineData is available
+    if (!window.pipelineData && !pipelineData) {
+        console.error('❌ pipelineData not available');
+        resetDragState();
+        return;
+    }
+    
+    const currentPipelineData = window.pipelineData || pipelineData;
     
     // Check if the lead is actually moving to a different status
-    const currentLead = pipelineData.find(lead => lead.id === leadId);
+    const currentLead = currentPipelineData.find(lead => lead.id === leadId);
     if (!currentLead) {
         console.error('❌ Lead not found in current data:', leadId);
-        alert('❌ Error: Lead no encontrado en los datos actuales');
+        if (window.showNotification) {
+            window.showNotification('❌ Error: Lead no encontrado en los datos actuales', 'error');
+        } else {
+            alert('❌ Error: Lead no encontrado en los datos actuales');
+        }
         resetDragState();
         return;
     }
@@ -678,7 +850,7 @@ async function handleDrop(event, newStatus) {
         
         showNotification(`❌ Error al mover lead: ${error.message}`, 'error');
         
-        // Show detailed error in console and alert
+        // Show detailed error in console
         console.error('🔍 Detailed error information:');
         console.error('   - Lead ID:', leadId);
         console.error('   - Target Status:', newStatus);
@@ -690,7 +862,9 @@ async function handleDrop(event, newStatus) {
         // Try to reload pipeline to ensure correct state
         console.log('🔄 Attempting to reload pipeline data...');
         try {
-            await loadPipelineData();
+            if (typeof loadPipelineData === 'function') {
+                await loadPipelineData();
+            }
         } catch (reloadError) {
             console.error('❌ Error reloading pipeline:', reloadError);
         }
@@ -701,436 +875,10 @@ async function handleDrop(event, newStatus) {
     }
 }
 
-// ✅ NEW: Enhanced UI update function that doesn't require full reload
-async function updatePipelineUI() {
-    console.log('🎨 Updating pipeline UI without full reload');
-    
-    try {
-        // Group contacts by status
-        const statusGroups = groupContactsByStatus(pipelineData);
-        
-        // Update each column content
-        Object.entries(PIPELINE_STAGES).forEach(([status, config]) => {
-            const leads = statusGroups[status] || [];
-            const columnBody = document.getElementById(`pipeline-body-${status.replace(/\s+/g, '-')}`);
-            
-            if (columnBody) {
-                if (leads.length === 0) {
-                    columnBody.innerHTML = renderEmptyColumnState(status, config);
-                } else {
-                    columnBody.innerHTML = leads.map(lead => renderLeadCard(lead, config.color, config.targetDays)).join('');
-                }
-            }
-            
-            // Update column count
-            const columnHeader = document.querySelector(`#pipeline-column-${status.replace(/\s+/g, '-')} .pipeline-header [style*="background: rgba(255,255,255,0.2)"]`);
-            if (columnHeader) {
-                columnHeader.textContent = leads.length;
-            }
-        });
-        
-        // Recalculate and update statistics
-        calculatePipelineStats(pipelineData);
-        
-        // Re-attach event listeners to new elements
-        setTimeout(() => {
-            setupPipelineEventListeners();
-            console.log('✅ Pipeline UI updated and event listeners re-attached');
-        }, 100);
-        
-    } catch (error) {
-        console.error('❌ Error updating pipeline UI:', error);
-        // Fallback to full reload
-        await loadPipelineData();
-    }
-}
+// ===== DRAG EVENT HANDLERS =====
 
-// ✅ ENHANCED: Clean up drag visuals function
-function cleanupDragVisuals() {
-    console.log('🧹 Cleaning up drag visuals');
-    
-    // Remove column visual feedback
-    document.querySelectorAll('.pipeline-column').forEach(col => {
-        col.classList.remove('drag-over', 'drag-enter', 'drag-active');
-        col.style.transform = '';
-        col.style.borderColor = '';
-        col.style.background = '';
-    });
-    
-    // Remove body visual feedback
-    document.querySelectorAll('.pipeline-body').forEach(body => {
-        body.classList.remove('drag-over');
-        body.style.backgroundColor = '';
-        body.style.border = '';
-    });
-    
-    // Remove card visual feedback
-    document.querySelectorAll('.lead-card').forEach(card => {
-        card.classList.remove('dragging');
-        card.style.opacity = '';
-        card.style.transform = '';
-    });
-    
-    // Remove drop previews
-    document.querySelectorAll('.drop-preview').forEach(preview => {
-        preview.remove();
-    });
-    
-    // Reset global cursor
-    document.body.style.cursor = '';
-}
-
-// ✅ ENHANCED: Reset drag state function
-function resetDragState() {
-    console.log('🔄 Resetting drag state');
-    
-    window.draggedLead = null;
-    
-    if (typeof dragDropState !== 'undefined') {
-        dragDropState.isDragging = false;
-        dragDropState.draggedElement = null;
-        dragDropState.originalParent = null;
-        dragDropState.dragStartTime = null;
-    }
-}
-
-// ===== 🛡️ FUNCTION PROTECTION SYSTEM =====
-
-// This ensures the working handleDrop doesn't get overwritten
-setTimeout(() => {
-    console.log('🛡️ Protecting handleDrop function from overwrites...');
-    
-    // Store the working version
-    const workingHandleDrop = handleDrop;
-    const workingUpdateUI = updatePipelineUI;
-    const workingCleanup = cleanupDragVisuals;
-    const workingReset = resetDragState;
-    
-    // Force global assignment
-    window.handleDrop = workingHandleDrop;
-    window.updatePipelineUI = workingUpdateUI;
-    window.cleanupDragVisuals = workingCleanup;
-    window.resetDragState = workingReset;
-    
-    // Protect against future overwrites
-    Object.defineProperty(window, 'handleDrop', {
-        value: workingHandleDrop,
-        writable: true,
-        enumerable: true,
-        configurable: true
-    });
-    
-    console.log('✅ handleDrop function protected and assigned globally');
-    
-}, 1000);
-
-// Additional protection on window load
-window.addEventListener('load', () => {
-    setTimeout(() => {
-        if (!window.handleDrop || !window.handleDrop.toString().includes('ENHANCED DROP HANDLER')) {
-            console.log('🔄 Re-installing working handleDrop...');
-            
-            // Re-apply the working function
-            window.handleDrop = handleDrop;
-            console.log('✅ Working handleDrop re-installed');
-        }
-    }, 2000);
-});
-
-// ===== ENHANCED DRAG AND DROP FUNCTIONALITY =====
-
-// ✅ ENHANCED: Comprehensive event listener setup with duplicate prevention
-function setupPipelineEventListeners() {
-    console.log('🎧 Setting up enhanced pipeline event listeners');
-    
-    try {
-        // First, clean up any existing listeners
-        cleanupExistingListeners();
-        
-        // Set up drag and drop listeners with enhanced error handling
-        setupDragAndDropListeners();
-        
-        // Set up additional pipeline-specific listeners
-        setupAdditionalEventListeners();
-        
-        console.log('🎧 Pipeline event listeners setup complete');
-    } catch (error) {
-        console.error('❌ Error setting up pipeline event listeners:', error);
-        throw error; // Re-throw to trigger retry mechanism
-    }
-}
-
-// ✅ ENHANCED: Clean up existing listeners to prevent duplicates
-function cleanupExistingListeners() {
-    console.log('🧹 Cleaning up existing event listeners');
-    
-    // Remove listeners from lead cards
-    document.querySelectorAll('.lead-card').forEach(card => {
-        if (card._dragStartHandler) {
-            card.removeEventListener('dragstart', card._dragStartHandler);
-            card.removeEventListener('dragend', card._dragEndHandler);
-            delete card._dragStartHandler;
-            delete card._dragEndHandler;
-        }
-    });
-    
-    // Remove listeners from pipeline columns
-    document.querySelectorAll('.pipeline-column').forEach(column => {
-        if (column._dragOverHandler) {
-            column.removeEventListener('dragover', column._dragOverHandler);
-            column.removeEventListener('drop', column._dropHandler);
-            column.removeEventListener('dragleave', column._dragLeaveHandler);
-            column.removeEventListener('dragenter', column._dragEnterHandler);
-            delete column._dragOverHandler;
-            delete column._dropHandler;
-            delete column._dragLeaveHandler;
-            delete column._dragEnterHandler;
-        }
-    });
-    
-    // Remove listeners from pipeline bodies
-    document.querySelectorAll('.pipeline-body').forEach(body => {
-        if (body._bodyDragOverHandler) {
-            body.removeEventListener('dragover', body._bodyDragOverHandler);
-            body.removeEventListener('dragleave', body._bodyDragLeaveHandler);
-            body.removeEventListener('drop', body._bodyDropHandler);
-            delete body._bodyDragOverHandler;
-            delete body._bodyDragLeaveHandler;
-            delete body._bodyDropHandler;
-        }
-    });
-}
-
-// ✅ ENHANCED: Robust drag and drop listener setup
-function setupDragAndDropListeners() {
-    console.log('📌 Setting up enhanced drag and drop listeners');
-    
-    // Add listeners to all lead cards
-    const leadCards = document.querySelectorAll('.lead-card');
-    console.log(`🔍 Found ${leadCards.length} lead cards to attach listeners to`);
-    
-    leadCards.forEach((card, index) => {
-        // Ensure the card has required attributes
-        if (!card.getAttribute('data-lead-id')) {
-            console.warn(`⚠️ Lead card ${index + 1} missing data-lead-id attribute`);
-            return;
-        }
-        
-        // Create and store event handlers
-        card._dragStartHandler = function(e) {
-            const leadId = this.getAttribute('data-lead-id');
-            const leadName = this.getAttribute('data-lead-name') || 'Unknown';
-            console.log(`🖱️ Drag started for lead card ${index + 1}: ${leadName} (${leadId})`);
-            handleDragStart(e, leadId);
-        };
-        
-        card._dragEndHandler = function(e) {
-            console.log(`🏁 Drag ended for card: ${index + 1}`);
-            handleDragEnd(e);
-        };
-        
-        // Add event listeners
-        card.addEventListener('dragstart', card._dragStartHandler);
-        card.addEventListener('dragend', card._dragEndHandler);
-        
-        // Ensure draggable attribute is set
-        card.setAttribute('draggable', 'true');
-        
-        // Add visual feedback on hover
-        card.addEventListener('mouseenter', function() {
-            if (!dragDropState.isDragging) {
-                this.style.transform = 'translateY(-2px)';
-                this.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-            }
-        });
-        
-        card.addEventListener('mouseleave', function() {
-            if (!dragDropState.isDragging) {
-                this.style.transform = '';
-                this.style.boxShadow = '';
-            }
-        });
-    });
-    
-    // Add listeners to all pipeline columns
-    const pipelineColumns = document.querySelectorAll('.pipeline-column');
-    console.log(`🔍 Found ${pipelineColumns.length} pipeline columns to attach listeners to`);
-    
-    pipelineColumns.forEach((column, index) => {
-        const status = column.getAttribute('data-status');
-        
-        if (!status) {
-            console.warn(`⚠️ Pipeline column ${index + 1} missing data-status attribute`);
-            return;
-        }
-        
-        console.log(`🎯 Setting up column ${index + 1} for status: "${status}"`);
-        
-        // Create and store event handlers
-        column._dragOverHandler = function(e) {
-            handleDragOver(e);
-        };
-        
-        column._dragLeaveHandler = function(e) {
-            handleDragLeave(e);
-        };
-        
-        column._dragEnterHandler = function(e) {
-            e.preventDefault();
-            if (dragDropState.isDragging) {
-                this.classList.add('drag-enter');
-            }
-        };
-        
-        column._dropHandler = function(e) {
-            const status = this.getAttribute('data-status');
-            console.log(`📥 Drop event in column: "${status}"`);
-            // Use the globally protected handleDrop
-            window.handleDrop(e, status);
-        };
-        
-        // Add event listeners
-        column.addEventListener('dragover', column._dragOverHandler);
-        column.addEventListener('drop', column._dropHandler);
-        column.addEventListener('dragleave', column._dragLeaveHandler);
-        column.addEventListener('dragenter', column._dragEnterHandler);
-    });
-    
-    // Add listeners to pipeline bodies with enhanced handling
-    const pipelineBodies = document.querySelectorAll('.pipeline-body');
-    console.log(`🔍 Found ${pipelineBodies.length} pipeline bodies to attach listeners to`);
-    
-    pipelineBodies.forEach((body, index) => {
-        const status = body.getAttribute('data-status');
-        
-        if (!status) {
-            console.warn(`⚠️ Pipeline body ${index + 1} missing data-status attribute`);
-            return;
-        }
-        
-        // Create and store event handlers
-        body._bodyDragOverHandler = function(e) {
-            e.preventDefault();
-            if (dragDropState.isDragging) {
-                this.classList.add('drag-over');
-                this.style.backgroundColor = '#f0f9ff';
-            }
-        };
-        
-        body._bodyDragLeaveHandler = function(e) {
-            // Only remove if actually leaving the element
-            const rect = this.getBoundingClientRect();
-            const x = e.clientX;
-            const y = e.clientY;
-            
-            if (x <= rect.left || x >= rect.right || y <= rect.top || y >= rect.bottom) {
-                this.classList.remove('drag-over');
-                this.style.backgroundColor = '';
-            }
-        };
-        
-        body._bodyDropHandler = function(e) {
-            e.preventDefault();
-            this.classList.remove('drag-over');
-            this.style.backgroundColor = '';
-            
-            // Get status from parent column if not directly available
-            const status = this.getAttribute('data-status') || 
-                          this.closest('.pipeline-column')?.getAttribute('data-status');
-            
-            if (status) {
-                // Use the globally protected handleDrop
-                window.handleDrop(e, status);
-            }
-        };
-        
-        // Add event listeners
-        body.addEventListener('dragover', body._bodyDragOverHandler);
-        body.addEventListener('dragleave', body._bodyDragLeaveHandler);
-        body.addEventListener('drop', body._bodyDropHandler);
-    });
-    
-    console.log('✅ Enhanced drag and drop listeners set up successfully');
-}
-
-// ✅ ENHANCED: Additional event listeners for better UX
-function setupAdditionalEventListeners() {
-    console.log('📌 Setting up additional event listeners');
-    
-    // Add keyboard support for accessibility
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && dragDropState.isDragging) {
-            cancelDragOperation();
-        }
-    });
-    
-    // Add touch support for mobile devices
-    setupTouchSupport();
-    
-    // Add button hover effects
-    setupButtonEffects();
-}
-
-// ✅ ENHANCED: Touch support for mobile drag and drop
-function setupTouchSupport() {
-    let touchStartTime = 0;
-    let touchElement = null;
-    
-    document.addEventListener('touchstart', function(e) {
-        touchStartTime = Date.now();
-        touchElement = e.target.closest('.lead-card');
-    });
-    
-    document.addEventListener('touchend', function(e) {
-        const touchDuration = Date.now() - touchStartTime;
-        
-        // Long press to initiate drag mode on mobile
-        if (touchDuration > 500 && touchElement) {
-            touchElement.classList.add('touch-drag-mode');
-            console.log('📱 Touch drag mode activated');
-        }
-    });
-}
-
-// ✅ ENHANCED: Button hover effects
-function setupButtonEffects() {
-    // Add hover effects to action buttons
-    document.addEventListener('mouseover', function(e) {
-        if (e.target.classList.contains('action-btn')) {
-            e.target.style.transform = 'scale(1.05)';
-        }
-        
-        if (e.target.classList.contains('add-lead-btn')) {
-            e.target.style.opacity = '0.8';
-        }
-    });
-    
-    document.addEventListener('mouseout', function(e) {
-        if (e.target.classList.contains('action-btn')) {
-            e.target.style.transform = '';
-        }
-        
-        if (e.target.classList.contains('add-lead-btn')) {
-            e.target.style.opacity = '';
-        }
-    });
-}
-
-// ✅ ENHANCED: Drag start handler with better state management
 function handleDragStart(event, leadId) {
-    console.log('🖱️ Enhanced drag started for lead:', leadId);
-    
-    if (!leadId) {
-        console.error('❌ No lead ID provided for drag start');
-        event.preventDefault();
-        return;
-    }
-    
-    // Initialize drag state
-    dragDropState.isDragging = true;
-    dragDropState.draggedElement = event.target;
-    dragDropState.originalParent = event.target.parentNode;
-    dragDropState.dragStartTime = Date.now();
+    console.log('🖱️ Drag started for lead:', leadId);
     
     // Collapse any expanded cards before dragging
     const leadCard = document.getElementById(`lead-card-${leadId}`);
@@ -1138,178 +886,237 @@ function handleDragStart(event, leadId) {
         toggleLeadDetails(event, leadId);
     }
     
-    // Set global dragged lead
+    // ✅ FIXED: Use global window variable
     window.draggedLead = leadId;
-    
-    // Set up data transfer
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData('text/plain', leadId);
-    event.dataTransfer.setData('application/x-lead-id', leadId);
     
-    // Add dragging visual feedback
+    // Add dragging class
     if (leadCard) {
         leadCard.classList.add('dragging');
-        leadCard.style.opacity = '0.5';
-        leadCard.style.transform = 'rotate(3deg) scale(0.95)';
     }
     
-    // Add visual feedback to all columns
+    // Add visual feedback to columns
     document.querySelectorAll('.pipeline-column').forEach(col => {
         col.style.transition = 'all 0.3s ease';
-        col.classList.add('drag-active');
     });
-    
-    // Add global drag cursor
-    document.body.style.cursor = 'grabbing';
-    
-    console.log(`✅ Drag state initialized for lead: ${leadId}`);
 }
 
-// ✅ ENHANCED: Drag end handler
-function handleDragEnd(event) {
-    console.log('🏁 Enhanced drag ended');
-    
-    const dragDuration = Date.now() - (dragDropState.dragStartTime || 0);
-    console.log(`⏱️ Drag duration: ${dragDuration}ms`);
-    
-    // Reset visual states
-    event.target.classList.remove('dragging');
-    event.target.style.opacity = '';
-    event.target.style.transform = '';
-    
-    // Reset column states
-    document.querySelectorAll('.pipeline-column').forEach(col => {
-        col.classList.remove('drag-active', 'drag-over', 'drag-enter');
-        col.style.transition = '';
-    });
-    
-    // Reset body states
-    document.querySelectorAll('.pipeline-body').forEach(body => {
-        body.classList.remove('drag-over');
-        body.style.backgroundColor = '';
-    });
-    
-    // Reset global cursor
-    document.body.style.cursor = '';
-    
-    // Reset drag state
-    resetDragState();
-}
-
-// ✅ ENHANCED: Drag over handler with better feedback
 function handleDragOver(event) {
-    if (!dragDropState.isDragging) {
-        return;
+    if (event.preventDefault) {
+        event.preventDefault();
     }
     
-    event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
     
     const column = event.currentTarget;
     if (column.classList.contains('pipeline-column')) {
         column.classList.add('drag-over');
-        
-        // Add subtle animation
-        column.style.transform = 'scale(1.02)';
-        column.style.borderColor = '#3b82f6';
-        
-        // Show preview of where the lead will be placed
-        const body = column.querySelector('.pipeline-body');
-        if (body && !body.querySelector('.drop-preview')) {
-            const preview = document.createElement('div');
-            preview.className = 'drop-preview';
-            preview.style.cssText = `
-                height: 2px;
-                background: #3b82f6;
-                margin: 0.5rem 0;
-                border-radius: 1px;
-                animation: pulse 1s infinite;
-            `;
-            body.appendChild(preview);
-        }
     }
     
     return false;
 }
 
-// ✅ ENHANCED: Drag leave handler with precise boundary detection
 function handleDragLeave(event) {
     const column = event.currentTarget;
     
-    // More precise boundary detection
+    // Check if we're actually leaving the column
     const rect = column.getBoundingClientRect();
     const x = event.clientX;
     const y = event.clientY;
     
     if (x <= rect.left || x >= rect.right || y <= rect.top || y >= rect.bottom) {
-        column.classList.remove('drag-over', 'drag-enter');
-        column.style.transform = '';
-        column.style.borderColor = '';
+        column.classList.remove('drag-over');
+    }
+}
+
+// ===== EVENT LISTENER SETUP =====
+
+function setupDragAndDropListeners() {
+    console.log('📌 Setting up drag and drop listeners');
+    
+    // Add listeners to all lead cards
+    document.querySelectorAll('.lead-card').forEach(card => {
+        card.addEventListener('dragstart', function(e) {
+            const leadId = this.getAttribute('data-lead-id');
+            handleDragStart(e, leadId);
+        });
         
-        // Remove drop preview
-        const preview = column.querySelector('.drop-preview');
-        if (preview) {
-            preview.remove();
+        card.addEventListener('dragend', function(e) {
+            this.classList.remove('dragging');
+        });
+    });
+    
+    // Add listeners to all pipeline columns
+    document.querySelectorAll('.pipeline-column').forEach(column => {
+        column.addEventListener('dragover', handleDragOver);
+        column.addEventListener('drop', function(e) {
+            const status = this.getAttribute('data-status');
+            handleDrop(e, status);
+        });
+        column.addEventListener('dragleave', handleDragLeave);
+        column.addEventListener('dragenter', function(e) {
+            e.preventDefault();
+        });
+    });
+    
+    // Add listeners to pipeline bodies
+    document.querySelectorAll('.pipeline-body').forEach(body => {
+        body.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            this.classList.add('drag-over');
+        });
+        
+        body.addEventListener('dragleave', function(e) {
+            this.classList.remove('drag-over');
+        });
+        
+        body.addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.classList.remove('drag-over');
+        });
+    });
+    
+    console.log('✅ Drag and drop listeners set up');
+}
+
+function setupPipelineEventListeners() {
+    // Set up drag and drop listeners
+    setupDragAndDropListeners();
+    
+    console.log('🎧 Pipeline event listeners setup complete');
+}
+
+// ===== UTILITY FUNCTIONS =====
+function groupContactsByStatus(contacts) {
+    const groups = {};
+    
+    // Initialize all stages
+    Object.keys(PIPELINE_STAGES).forEach(stage => {
+        groups[stage] = [];
+    });
+    
+    // Group contacts
+    contacts.forEach(contact => {
+        const status = contact.status || 'Nuevo';
+        if (groups[status]) {
+            groups[status].push(contact);
+        } else {
+            groups['Nuevo'].push(contact);
         }
+    });
+    
+    return groups;
+}
+
+function calculatePipelineStats(contacts) {
+    pipelineStats = {
+        total: contacts.length,
+        byStatus: {},
+        avgDaysInPipeline: 0,
+        conversionRate: 0,
+        avgScore: 0,
+        highPriorityCount: 0
+    };
+    
+    Object.keys(PIPELINE_STAGES).forEach(status => {
+        pipelineStats.byStatus[status] = contacts.filter(c => c.status === status).length;
+    });
+    
+    const conversions = pipelineStats.byStatus['Convertido'] || 0;
+    pipelineStats.conversionRate = contacts.length > 0 ? 
+        Math.round((conversions / contacts.length) * 100) : 0;
+    
+    if (contacts.length > 0) {
+        pipelineStats.avgScore = Math.round(
+            contacts.reduce((sum, lead) => sum + calculateLeadScore(lead), 0) / contacts.length
+        );
+        
+        pipelineStats.highPriorityCount = contacts.filter(
+            c => calculateLeadPriority(c).level === 'high'
+        ).length;
+        
+        const totalDays = contacts.reduce((sum, contact) => {
+            return sum + Math.floor((new Date() - new Date(contact.date)) / (1000 * 60 * 60 * 24));
+        }, 0);
+        pipelineStats.avgDaysInPipeline = Math.round(totalDays / contacts.length);
+    }
+}
+
+function calculateLeadPriority(lead) {
+    const daysOld = Math.floor((new Date() - new Date(lead.date)) / (1000 * 60 * 60 * 24));
+    const score = calculateLeadScore(lead);
+    
+    // Enhanced priority calculation
+    if (daysOld > 7 || score < 40) return { level: 'high', icon: '🔴', label: 'Alta' };
+    if (daysOld > 3 || score < 60) return { level: 'medium', icon: '🟡', label: 'Media' };
+    return { level: 'low', icon: '🟢', label: 'Baja' };
+}
+
+function calculateLeadScore(lead) {
+    let score = 50; // Base score
+    
+    // Recency boost/penalty
+    const daysOld = Math.floor((new Date() - new Date(lead.date)) / (1000 * 60 * 60 * 24));
+    if (daysOld <= 1) score += 30;
+    else if (daysOld <= 3) score += 20;
+    else if (daysOld <= 7) score += 10;
+    else if (daysOld > 14) score -= 20;
+    else if (daysOld > 30) score -= 30;
+    
+    // Contact info completeness
+    if (lead.email) score += 10;
+    if (lead.phone) score += 10;
+    if (lead.notes && lead.notes.length > 10) score += 5;
+    
+    // Source quality
+    if (lead.source) {
+        const source = lead.source.toLowerCase();
+        if (source.includes('referido') || source.includes('recomendación')) score += 15;
+        else if (source.includes('web') || source.includes('online')) score += 5;
+        else if (source.includes('facebook') || source.includes('instagram')) score += 8;
+    }
+    
+    // Status boost
+    if (lead.status === 'Interesado') score += 10;
+    else if (lead.status === 'Negociación') score += 15;
+    
+    return Math.max(0, Math.min(100, score));
+}
+
+function getScoreColor(score) {
+    if (score >= 80) return '#10b981';
+    if (score >= 60) return '#3b82f6';
+    if (score >= 40) return '#f59e0b';
+    return '#ef4444';
+}
+
+function getConversionInsight(conversionRate, activeLeads, highPriorityLeads) {
+    if (conversionRate >= 20) {
+        return `¡Excelente! Tasa de conversión del ${conversionRate}%. Mantén el enfoque en los ${activeLeads} leads activos, especialmente los ${highPriorityLeads} de alta prioridad.`;
+    } else if (conversionRate >= 10) {
+        return `Tasa de conversión del ${conversionRate}% es aceptable, pero hay oportunidad de mejora. Prioriza los ${highPriorityLeads} leads de alta prioridad de los ${activeLeads} activos.`;
+    } else {
+        return `La tasa de conversión del ${conversionRate}% requiere atención. Revisa estrategias de seguimiento y enfócate en los ${highPriorityLeads} leads de alta prioridad.`;
+    }
+}
+
+function formatDate(dateString) {
+    if (!dateString) return 'Sin fecha';
+    try {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('es-ES', { 
+            year: 'numeric', 
+            month: 'short', 
+            day: 'numeric' 
+        });
+    } catch (error) {
+        return 'Fecha inválida';
     }
 }
 
 // ===== ENHANCED UTILITY FUNCTIONS =====
 
-// ✅ Cancel drag operation
-function cancelDragOperation() {
-    console.log('❌ Cancelling drag operation');
-    cleanupDragVisuals();
-    resetDragState();
-    
-    const showNotification = window.showNotification || function(message) {
-        console.log(message);
-    };
-    
-    showNotification('Operación de arrastre cancelada', 'info');
-}
-
-// ✅ Validate drag and drop setup
-function validateDragDropSetup() {
-    setTimeout(() => {
-        const verifyCards = document.querySelectorAll('.lead-card[draggable="true"]');
-        const verifyColumns = document.querySelectorAll('.pipeline-column[data-status]');
-        const verifyBodies = document.querySelectorAll('.pipeline-body[data-status]');
-        
-        console.log(`✅ Verification: ${verifyCards.length} draggable cards, ${verifyColumns.length} drop columns, ${verifyBodies.length} drop bodies`);
-        
-        if (verifyCards.length === 0) {
-            console.warn('⚠️ WARNING: No draggable lead cards found!');
-            console.warn('   Check if lead cards have: draggable="true" and data-lead-id attributes');
-        }
-        
-        if (verifyColumns.length === 0) {
-            console.warn('⚠️ WARNING: No pipeline columns found!');
-            console.warn('   Check if columns have: class="pipeline-column" and data-status attributes');
-        }
-        
-        // Test if drag handlers are attached
-        let handlersAttached = 0;
-        verifyCards.forEach((card, i) => {
-            if (card._dragStartHandler) {
-                handlersAttached++;
-            } else {
-                console.warn(`⚠️ WARNING: Lead card ${i + 1} missing drag handlers`);
-            }
-        });
-        
-        console.log(`✅ ${handlersAttached}/${verifyCards.length} cards have drag handlers attached`);
-        
-        if (handlersAttached === verifyCards.length && verifyCards.length > 0) {
-            console.log('🎉 Drag and drop setup validation PASSED');
-        } else {
-            console.error('❌ Drag and drop setup validation FAILED');
-        }
-        
-    }, 500);
-}
-
-// ✅ Enhanced utility functions
 function escapeHtml(text) {
     if (!text) return '';
     const div = document.createElement('div');
@@ -1365,10 +1172,60 @@ function renderEmptyColumnState(status, config) {
     `;
 }
 
-// Continue with all the rest of your existing functions...
-// [All the remaining functions from your original file go here - renderPipelineSummary, renderPipelineControls, etc.]
+function validateDragDropSetup() {
+    setTimeout(() => {
+        const verifyCards = document.querySelectorAll('.lead-card[draggable="true"]');
+        const verifyColumns = document.querySelectorAll('.pipeline-column[data-status]');
+        const verifyBodies = document.querySelectorAll('.pipeline-body[data-status]');
+        
+        console.log(`✅ Verification: ${verifyCards.length} draggable cards, ${verifyColumns.length} drop columns, ${verifyBodies.length} drop bodies`);
+        
+        if (verifyCards.length === 0) {
+            console.warn('⚠️ WARNING: No draggable lead cards found!');
+            console.warn('   Check if lead cards have: draggable="true" and data-lead-id attributes');
+        }
+        
+        if (verifyColumns.length === 0) {
+            console.warn('⚠️ WARNING: No pipeline columns found!');
+            console.warn('   Check if columns have: class="pipeline-column" and data-status attributes');
+        }
+        
+        if (verifyCards.length > 0 && verifyColumns.length > 0) {
+            console.log('🎉 Drag and drop setup validation PASSED');
+        } else {
+            console.error('❌ Drag and drop setup validation FAILED');
+        }
+        
+    }, 500);
+}
 
-// ===== CONTINUING WITH EXISTING ENHANCED FUNCTIONS =====
+// ===== LEAD DETAILS TOGGLE =====
+function toggleLeadDetails(event, leadId) {
+    event.stopPropagation(); // Prevent drag from triggering
+    
+    const leadCard = document.getElementById(`lead-card-${leadId}`);
+    if (!leadCard) return;
+    
+    const isExpanded = leadCard.classList.contains('expanded');
+    const leadDetails = leadCard.querySelector('.lead-details');
+    const chevron = leadCard.querySelector('.chevron');
+    
+    if (isExpanded) {
+        // Collapse
+        leadCard.classList.remove('expanded');
+        leadDetails.style.maxHeight = '0';
+        chevron.style.transform = 'rotate(0deg)';
+        leadCard.style.boxShadow = '';
+    } else {
+        // Expand
+        leadCard.classList.add('expanded');
+        leadDetails.style.maxHeight = '300px';
+        chevron.style.transform = 'rotate(180deg)';
+        leadCard.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+    }
+}
+
+// ===== PIPELINE SUMMARY AND CONTROLS =====
 
 function renderPipelineSummary(contacts) {
     const totalLeads = contacts.length;
@@ -1528,161 +1385,7 @@ function renderPipelineControls() {
     `;
 }
 
-// ===== UTILITY FUNCTIONS =====
-function groupContactsByStatus(contacts) {
-    const groups = {};
-    
-    // Initialize all stages
-    Object.keys(PIPELINE_STAGES).forEach(stage => {
-        groups[stage] = [];
-    });
-    
-    // Group contacts
-    contacts.forEach(contact => {
-        const status = contact.status || 'Nuevo';
-        if (groups[status]) {
-            groups[status].push(contact);
-        } else {
-            groups['Nuevo'].push(contact);
-        }
-    });
-    
-    return groups;
-}
-
-function calculatePipelineStats(contacts) {
-    pipelineStats = {
-        total: contacts.length,
-        byStatus: {},
-        avgDaysInPipeline: 0,
-        conversionRate: 0,
-        avgScore: 0,
-        highPriorityCount: 0
-    };
-    
-    Object.keys(PIPELINE_STAGES).forEach(status => {
-        pipelineStats.byStatus[status] = contacts.filter(c => c.status === status).length;
-    });
-    
-    const conversions = pipelineStats.byStatus['Convertido'] || 0;
-    pipelineStats.conversionRate = contacts.length > 0 ? 
-        Math.round((conversions / contacts.length) * 100) : 0;
-    
-    if (contacts.length > 0) {
-        pipelineStats.avgScore = Math.round(
-            contacts.reduce((sum, lead) => sum + calculateLeadScore(lead), 0) / contacts.length
-        );
-        
-        pipelineStats.highPriorityCount = contacts.filter(
-            c => calculateLeadPriority(c).level === 'high'
-        ).length;
-        
-        const totalDays = contacts.reduce((sum, contact) => {
-            return sum + Math.floor((new Date() - new Date(contact.date)) / (1000 * 60 * 60 * 24));
-        }, 0);
-        pipelineStats.avgDaysInPipeline = Math.round(totalDays / contacts.length);
-    }
-}
-
-function calculateLeadPriority(lead) {
-    const daysOld = Math.floor((new Date() - new Date(lead.date)) / (1000 * 60 * 60 * 24));
-    const score = calculateLeadScore(lead);
-    
-    // Enhanced priority calculation
-    if (daysOld > 7 || score < 40) return { level: 'high', icon: '🔴', label: 'Alta' };
-    if (daysOld > 3 || score < 60) return { level: 'medium', icon: '🟡', label: 'Media' };
-    return { level: 'low', icon: '🟢', label: 'Baja' };
-}
-
-function calculateLeadScore(lead) {
-    let score = 50; // Base score
-    
-    // Recency boost/penalty
-    const daysOld = Math.floor((new Date() - new Date(lead.date)) / (1000 * 60 * 60 * 24));
-    if (daysOld <= 1) score += 30;
-    else if (daysOld <= 3) score += 20;
-    else if (daysOld <= 7) score += 10;
-    else if (daysOld > 14) score -= 20;
-    else if (daysOld > 30) score -= 30;
-    
-    // Contact info completeness
-    if (lead.email) score += 10;
-    if (lead.phone) score += 10;
-    if (lead.notes && lead.notes.length > 10) score += 5;
-    
-    // Source quality
-    if (lead.source) {
-        const source = lead.source.toLowerCase();
-        if (source.includes('referido') || source.includes('recomendación')) score += 15;
-        else if (source.includes('web') || source.includes('online')) score += 5;
-        else if (source.includes('facebook') || source.includes('instagram')) score += 8;
-    }
-    
-    // Status boost
-    if (lead.status === 'Interesado') score += 10;
-    else if (lead.status === 'Negociación') score += 15;
-    
-    return Math.max(0, Math.min(100, score));
-}
-
-function getScoreColor(score) {
-    if (score >= 80) return '#10b981';
-    if (score >= 60) return '#3b82f6';
-    if (score >= 40) return '#f59e0b';
-    return '#ef4444';
-}
-
-function getConversionInsight(conversionRate, activeLeads, highPriorityLeads) {
-    if (conversionRate >= 20) {
-        return `¡Excelente! Tasa de conversión del ${conversionRate}%. Mantén el enfoque en los ${activeLeads} leads activos, especialmente los ${highPriorityLeads} de alta prioridad.`;
-    } else if (conversionRate >= 10) {
-        return `Tasa de conversión del ${conversionRate}% es aceptable, pero hay oportunidad de mejora. Prioriza los ${highPriorityLeads} leads de alta prioridad de los ${activeLeads} activos.`;
-    } else {
-        return `La tasa de conversión del ${conversionRate}% requiere atención. Revisa estrategias de seguimiento y enfócate en los ${highPriorityLeads} leads de alta prioridad.`;
-    }
-}
-
-function formatDate(dateString) {
-    if (!dateString) return 'Sin fecha';
-    try {
-        const date = new Date(dateString);
-        return date.toLocaleDateString('es-ES', { 
-            year: 'numeric', 
-            month: 'short', 
-            day: 'numeric' 
-        });
-    } catch (error) {
-        return 'Fecha inválida';
-    }
-}
-
-// ===== LEAD DETAILS TOGGLE =====
-function toggleLeadDetails(event, leadId) {
-    event.stopPropagation(); // Prevent drag from triggering
-    
-    const leadCard = document.getElementById(`lead-card-${leadId}`);
-    if (!leadCard) return;
-    
-    const isExpanded = leadCard.classList.contains('expanded');
-    const leadDetails = leadCard.querySelector('.lead-details');
-    const chevron = leadCard.querySelector('.chevron');
-    
-    if (isExpanded) {
-        // Collapse
-        leadCard.classList.remove('expanded');
-        leadDetails.style.maxHeight = '0';
-        chevron.style.transform = 'rotate(0deg)';
-        leadCard.style.boxShadow = '';
-    } else {
-        // Expand
-        leadCard.classList.add('expanded');
-        leadDetails.style.maxHeight = '300px';
-        chevron.style.transform = 'rotate(180deg)';
-        leadCard.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-    }
-}
-
-// ===== ENHANCED PIPELINE ACTIONS =====
+// ===== PIPELINE ACTIONS =====
 async function refreshPipeline() {
     console.log('🔄 Refreshing pipeline');
     
@@ -2035,11 +1738,6 @@ function initializePipelineStyles() {
             z-index: 10;
         }
         
-        .lead-card.touch-drag-mode {
-            background: #fef3c7 !important;
-            border-color: #f59e0b !important;
-        }
-        
         /* Enhanced Column Styles */
         .pipeline-column.drag-active {
             transform: scale(1.02);
@@ -2066,16 +1764,6 @@ function initializePipelineStyles() {
             background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(147, 197, 253, 0.1) 100%);
             border: 2px dashed rgba(59, 130, 246, 0.3);
             border-radius: 8px;
-        }
-        
-        /* Drop Preview Animation */
-        .drop-preview {
-            animation: pulse 1s infinite;
-        }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
         }
         
         /* Loading Animation */
@@ -2114,18 +1802,6 @@ function initializePipelineStyles() {
             transform: scale(1.05);
         }
         
-        .whatsapp-btn:hover {
-            background: #22c55e !important;
-        }
-        
-        .edit-btn:hover {
-            background: #1d4ed8 !important;
-        }
-        
-        .duplicate-btn:hover {
-            background: #4b5563 !important;
-        }
-        
         /* Responsive Design */
         @media (max-width: 768px) {
             .pipeline-grid {
@@ -2141,14 +1817,6 @@ function initializePipelineStyles() {
         .lead-card:focus {
             outline: 2px solid #3b82f6;
             outline-offset: 2px;
-        }
-        
-        /* High contrast mode support */
-        @media (prefers-contrast: high) {
-            .pipeline-column.drag-over {
-                border-color: #000 !important;
-                border-width: 3px !important;
-            }
         }
         
         /* Reduced motion support */
@@ -2188,6 +1856,24 @@ window.addEventListener('error', function(e) {
     }
 });
 
+// ===== CRITICAL: FUNCTION PROTECTION =====
+// This ensures the enhanced handleDrop doesn't get overwritten
+setTimeout(() => {
+    // Force override the handleDrop function to prevent overwriting
+    window.handleDrop = handleDrop;
+    
+    // Also protect against future overwrites
+    Object.defineProperty(window, 'enhancedHandleDrop', {
+        value: handleDrop,
+        writable: false,
+        enumerable: false,
+        configurable: false
+    });
+    
+    console.log('🛡️ Enhanced handleDrop function protected from overwriting');
+    
+}, 1000); // Wait 1 second after page load
+
 // ===== MODULE EXPORTS =====
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
@@ -2198,10 +1884,11 @@ if (typeof module !== 'undefined' && module.exports) {
         calculateLeadScore,
         calculateLeadPriority,
         resetDragState,
-        validateDragDropSetup
+        validateDragDropSetup,
+        handleDrop
     };
 }
 
 console.log('✅ Enhanced Pipeline.js module loaded successfully with robust drag & drop functionality');
-console.log('🛡️ HandleDrop function protected against overwrites');
-console.log('🎯 Features: Enhanced drag & drop, better error handling, touch support, analytics ready');
+console.log('🎯 Features: Enhanced drag & drop, better error handling, function protection, comprehensive UI');
+console.log('🛡️ HandleDrop function is protected from being overwritten');
