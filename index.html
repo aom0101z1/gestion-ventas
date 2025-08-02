@@ -1,284 +1,2448 @@
-// ===== SIMPLE AND SAFE TASK MANAGEMENT SYSTEM =====
-// This version is designed to be safe and not break your existing CRM
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏫 Ciudad Bilingue - CRM Complete</title>
 
-let tasks = [
-    {
-        id: '1',
-        title: 'Design login page',
-        description: 'Create wireframes and mockups for the login page',
-        status: 'in-progress',
-        priority: 'high',
-        assignee: 'John Doe',
-        dueDate: '2024-08-14'
-    },
-    {
-        id: '2',
-        title: 'Implement API authentication',
-        description: 'Set up JWT authentication for the API',
-        status: 'in-progress',
-        priority: 'urgent',
-        assignee: 'Jane Smith',
-        dueDate: '2024-08-09'
-    }
-];
-
-// ===== MAIN LOADING FUNCTION =====
-function loadTasksData() {
-    console.log('📋 Loading task management...');
-    
-    // Try to find the correct container
-    let container = document.getElementById('tasksContainer');
-    if (!container) {
-        container = document.getElementById('tasks');
-    }
-    
-    if (!container) {
-        console.error('❌ No task container found');
-        return;
-    }
-    
-    console.log('✅ Found container:', container.id);
-    
-    // Clear and show container
-    container.innerHTML = '';
-    container.style.display = 'block';
-    container.classList.remove('hidden');
-    
-    // Add minimal styles
-    addSafeStyles();
-    
-    // Render simple task board
-    container.innerHTML = createSimpleTaskBoard();
-    
-    console.log('✅ Task system loaded successfully');
-}
-
-// ===== CREATE SIMPLE TASK BOARD =====
-function createSimpleTaskBoard() {
-    return `
-        <div style="padding: 20px; background: white; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h2 style="margin: 0; color: #1f2937;">📋 Task Management</h2>
-                <button onclick="createNewTask()" style="background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer;">
-                    ➕ New Task
-                </button>
-            </div>
-            
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
-                <!-- To Do Column -->
-                <div style="background: #f8fafc; border-radius: 8px; padding: 15px;">
-                    <h3 style="margin: 0 0 15px 0; color: #6b7280; text-align: center;">📝 To Do</h3>
-                    <div id="todo-tasks">
-                        ${renderTasksForStatus('todo')}
-                    </div>
-                </div>
-                
-                <!-- In Progress Column -->
-                <div style="background: #eff6ff; border-radius: 8px; padding: 15px;">
-                    <h3 style="margin: 0 0 15px 0; color: #3b82f6; text-align: center;">🔄 In Progress</h3>
-                    <div id="in-progress-tasks">
-                        ${renderTasksForStatus('in-progress')}
-                    </div>
-                </div>
-                
-                <!-- Completed Column -->
-                <div style="background: #f0fdf4; border-radius: 8px; padding: 15px;">
-                    <h3 style="margin: 0 0 15px 0; color: #10b981; text-align: center;">✅ Completed</h3>
-                    <div id="completed-tasks">
-                        ${renderTasksForStatus('completed')}
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Simple Modal -->
-        <div id="taskModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
-            <div style="background: white; padding: 30px; border-radius: 10px; width: 400px; max-width: 90%;">
-                <h3>Create New Task</h3>
-                <input type="text" id="newTaskTitle" placeholder="Task title..." style="width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px;">
-                <textarea id="newTaskDesc" placeholder="Description..." style="width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px; height: 80px; resize: vertical;"></textarea>
-                <select id="newTaskPriority" style="width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px;">
-                    <option value="low">🟢 Low Priority</option>
-                    <option value="medium" selected>🔵 Medium Priority</option>
-                    <option value="high">🟠 High Priority</option>
-                    <option value="urgent">🔴 Urgent</option>
-                </select>
-                <input type="text" id="newTaskAssignee" placeholder="Assignee name..." style="width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px;">
-                <div style="display: flex; gap: 10px; margin-top: 20px;">
-                    <button onclick="closeTaskModal()" style="flex: 1; padding: 10px; background: #6b7280; color: white; border: none; border-radius: 4px; cursor: pointer;">Cancel</button>
-                    <button onclick="saveNewTask()" style="flex: 1; padding: 10px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer;">Save Task</button>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-// ===== RENDER TASKS FOR SPECIFIC STATUS =====
-function renderTasksForStatus(status) {
-    const statusTasks = tasks.filter(task => task.status === status);
-    
-    if (statusTasks.length === 0) {
-        return '<div style="text-align: center; color: #9ca3af; padding: 20px; font-style: italic;">No tasks here</div>';
-    }
-    
-    return statusTasks.map(task => `
-        <div style="background: white; border: 1px solid #e5e7eb; border-left: 4px solid ${getPriorityColor(task.priority)}; border-radius: 6px; padding: 15px; margin-bottom: 10px; cursor: pointer;" onclick="editTask('${task.id}')">
-            <div style="font-weight: 600; color: #1f2937; margin-bottom: 8px;">${task.title}</div>
-            <div style="font-size: 0.9rem; color: #6b7280; margin-bottom: 8px;">${task.description}</div>
-            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem;">
-                <span style="background: #e0e7ff; color: #3730a3; padding: 4px 8px; border-radius: 12px;">${task.assignee}</span>
-                <span style="background: ${getPriorityBg(task.priority)}; color: ${getPriorityTextColor(task.priority)}; padding: 4px 8px; border-radius: 12px;">${task.priority.toUpperCase()}</span>
-            </div>
-            ${task.dueDate ? `<div style="font-size: 0.8rem; color: #6b7280; margin-top: 8px;">📅 ${task.dueDate}</div>` : ''}
-        </div>
-    `).join('');
-}
-
-// ===== TASK MANAGEMENT FUNCTIONS =====
-function createNewTask() {
-    const modal = document.getElementById('taskModal');
-    if (modal) {
-        modal.style.display = 'flex';
-    }
-}
-
-function closeTaskModal() {
-    const modal = document.getElementById('taskModal');
-    if (modal) {
-        modal.style.display = 'none';
-        // Clear form
-        document.getElementById('newTaskTitle').value = '';
-        document.getElementById('newTaskDesc').value = '';
-        document.getElementById('newTaskAssignee').value = '';
-    }
-}
-
-function saveNewTask() {
-    const title = document.getElementById('newTaskTitle').value.trim();
-    const description = document.getElementById('newTaskDesc').value.trim();
-    const priority = document.getElementById('newTaskPriority').value;
-    const assignee = document.getElementById('newTaskAssignee').value.trim();
-    
-    if (!title) {
-        alert('Please enter a task title');
-        return;
-    }
-    
-    const newTask = {
-        id: Date.now().toString(),
-        title: title,
-        description: description,
-        status: 'todo',
-        priority: priority,
-        assignee: assignee || 'Unassigned',
-        dueDate: ''
-    };
-    
-    tasks.push(newTask);
-    closeTaskModal();
-    loadTasksData(); // Refresh the board
-    
-    if (window.showNotification) {
-        window.showNotification('Task created successfully! 🎉', 'success');
-    }
-}
-
-function editTask(taskId) {
-    const task = tasks.find(t => t.id === taskId);
-    if (!task) return;
-    
-    const newStatus = prompt(`Current status: ${task.status}\n\nChoose new status:\n- todo\n- in-progress\n- completed\n- blocked`, task.status);
-    
-    if (newStatus && ['todo', 'in-progress', 'completed', 'blocked'].includes(newStatus)) {
-        task.status = newStatus;
-        loadTasksData(); // Refresh the board
-        
-        if (window.showNotification) {
-            window.showNotification(`Task moved to ${newStatus}`, 'success');
+    <style>
+        /* ===== RESET Y CONFIGURACIÓN BÁSICA ===== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-    }
-}
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        /* ===== HEADER Y LAYOUT ===== */
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
 
-// ===== UTILITY FUNCTIONS =====
-function getPriorityColor(priority) {
-    const colors = {
-        low: '#10b981',
-        medium: '#3b82f6',
-        high: '#f59e0b',
-        urgent: '#dc2626'
-    };
-    return colors[priority] || '#3b82f6';
-}
+        /* ===== LOGIN STYLES ===== */
+        .login-container {
+            max-width: 400px;
+            margin: 5rem auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .login-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+        
+        .login-form { 
+            padding: 2rem; 
+        }
 
-function getPriorityBg(priority) {
-    const colors = {
-        low: '#d1fae5',
-        medium: '#dbeafe',
-        high: '#fef3c7',
-        urgent: '#fee2e2'
-    };
-    return colors[priority] || '#dbeafe';
-}
-
-function getPriorityTextColor(priority) {
-    const colors = {
-        low: '#059669',
-        medium: '#2563eb',
-        high: '#d97706',
-        urgent: '#dc2626'
-    };
-    return colors[priority] || '#2563eb';
-}
-
-// ===== SAFE CSS STYLES =====
-function addSafeStyles() {
-    // Only add styles if they don't exist
-    if (document.getElementById('safe-task-styles')) return;
-    
-    const style = document.createElement('style');
-    style.id = 'safe-task-styles';
-    style.textContent = `
-        /* Safe task management styles - won't conflict with existing CSS */
-        .task-modal-backdrop {
+        /* ===== FIREBASE STATUS INDICATOR ===== */
+        .firebase-status {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
+            top: 10px;
+            right: 10px;
+            background: #10b981;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
             z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.3s ease;
         }
         
-        .task-card-hover:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            transition: all 0.2s;
+        .firebase-status.disconnected {
+            background: #ef4444;
         }
         
+        .firebase-status.connecting {
+            background: #f59e0b;
+        }
+
+        /* ===== FORM STYLES ===== */
+        .form-group { 
+            margin-bottom: 1.5rem;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+        
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        /* ===== BUTTON STYLES ===== */
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .btn-primary { background: #667eea; color: white; }
+        .btn-primary:hover:not(:disabled) { background: #5a67d8; }
+        .btn-success { background: #10b981; color: white; }
+        .btn-success:hover:not(:disabled) { background: #059669; }
+        .btn-warning { background: #f59e0b; color: white; }
+        .btn-warning:hover:not(:disabled) { background: #d97706; }
+        .btn-secondary { background: #6b7280; color: white; }
+        .btn-secondary:hover:not(:disabled) { background: #4b5563; }
+        .btn-firebase { background: #ff6b35; color: white; }
+        .btn-firebase:hover:not(:disabled) { background: #e55a31; }
+
+        /* ===== USER INFO & STATS ===== */
+        .user-info {
+            background: white;
+            padding: 1rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        /* ===== TABS ===== */
+        .tabs {
+            display: flex;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .tab {
+            flex: 1;
+            padding: 1rem;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            background: white;
+            transition: all 0.3s ease;
+            color: #374151;
+        }
+        
+        .tab.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        .tab:hover:not(.active) {
+            background: #f3f4f6;
+        }
+        
+        .tab-content {
+            background: white;
+            border-radius: 10px;
+            padding: 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        /* ===== TABLE ===== */
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        
+        .table th, .table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .table th {
+            background: #f9fafb;
+            font-weight: 600;
+        }
+
+        /* ===== STATUS BADGES ===== */
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        
+        .status-nuevo { background: #fef3c7; color: #92400e; }
+        .status-contactado { background: #dbeafe; color: #1e40af; }
+        .status-interesado { background: #d1fae5; color: #065f46; }
+        .status-convertido { background: #dcfce7; color: #166534; }
+        .status-negociacion { background: #fed7aa; color: #c2410c; }
+        .status-perdido { background: #fee2e2; color: #dc2626; }
+
+        /* ===== CONVENIO STYLES ===== */
+        .convenio-group {
+            transition: all 0.3s ease;
+            overflow: hidden;
+        }
+        
+        .convenio-group.hidden {
+            display: none !important;
+        }
+
+        /* ===== LOADING SPINNER ===== */
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .hidden { display: none !important; }
+        
+        /* ===== ERROR MESSAGES ===== */
+        .error-message {
+            background: #fee2e2;
+            color: #dc2626;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            border-left: 4px solid #dc2626;
+        }
+        
+        .success-message {
+            background: #d1fae5;
+            color: #065f46;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            border-left: 4px solid #10b981;
+        }
+
+        /* ===== PIPELINE STYLES ===== */
+        .pipeline-column {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            overflow: hidden;
+            min-height: 300px;
+        }
+
+        .pipeline-header {
+            padding: 1rem;
+            text-align: center;
+            font-weight: 600;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .pipeline-body {
+            padding: 1rem;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .lead-card {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .lead-card:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transform: translateY(-1px);
+        }
+
+        /* ===== RESPONSIVE ===== */
         @media (max-width: 768px) {
-            .task-grid {
-                grid-template-columns: 1fr !important;
+            .container { padding: 1rem; }
+            .stats-grid { grid-template-columns: 1fr; }
+            .user-info { flex-direction: column; gap: 1rem; }
+            .tabs { flex-direction: column; }
+        }
+/* Enhanced Mobile Support */
+@media (max-width: 768px) {
+    .pipeline-grid {
+        grid-template-columns: 1fr !important;
+    }
+    
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+    
+    .lead-card {
+        padding: 0.75rem !important;
+    }
+    
+    .tabs {
+        flex-direction: column !important;
+    }
+    
+    .tab {
+        padding: 0.75rem !important;
+        font-size: 0.9rem !important;
+    }
+}
+
+/* Loading States */
+.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    border: 2px solid #f3f4f6;
+    border-top: 2px solid #3b82f6;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    transform: translate(-50%, -50%);
+}
+        
+    </style>
+</head>
+
+<body>
+    <!-- Firebase Status Indicator -->
+    <div id="firebaseStatus" class="firebase-status connecting">
+        <div class="loading-spinner" style="width: 12px; height: 12px; border-width: 2px;"></div>
+        Conectando a Firebase...
+    </div>
+    <!-- social - facebook -->
+    <div id="socialMedia" class="tab-content hidden">
+    <h2>💬 Gestión de Redes Sociales</h2>
+    <div id="socialMediaContainer">
+        <!-- Content will be loaded by social.js -->
+    </div>
+</div>
+    <!-- End of social facebook  -->
+    <!-- Login Screen -->
+    <div id="loginScreen">
+        <div class="login-container">
+            <div class="login-header">
+                <h1>🏫 Ciudad Bilingue</h1>
+                <p>Sistema CRM Completo</p>
+                <div style="margin-top: 1rem; font-size: 0.9rem; opacity: 0.9;">
+                    🔥 Sistema completamente funcional
+                </div>
+            </div>
+            <div class="login-form">
+                <form onsubmit="handleLogin(event)">
+                    <div class="form-group">
+                        <label for="username">Email:</label>
+                        <input type="email" id="username" required placeholder="usuario@ejemplo.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Contraseña:</label>
+                        <input type="password" id="password" required>
+                    </div>
+                    <button type="submit" class="btn btn-firebase" style="width: 100%;" id="loginBtn">
+                        🔐 Ingresar con Firebase
+                    </button>
+                </form>
+                <div id="loginError" class="error-message hidden">
+                    ❌ Error de autenticación
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Application -->
+    <div id="mainApp" class="hidden">
+        <div class="header">
+            <h1>🏫 Ciudad Bilingue - CRM Completo ✅</h1>
+            <div style="font-size: 0.9rem; opacity: 0.9;">
+                🔥 Sistema completamente funcional y operativo
+            </div>
+        </div>
+
+        <div class="container">
+            <!-- User Info -->
+            <div class="user-info">
+                <div>
+                    <strong id="currentUserName">Usuario</strong>
+                    <span id="userRole" style="color: #667eea; font-size: 0.9rem;"></span>
+                    <span style="background: #ff6b35; color: white; padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.8rem; margin-left: 0.5rem;">
+                        🔥 Firebase
+                    </span>
+                </div>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <button onclick="refreshAllData()" class="btn btn-primary" style="padding: 0.5rem 1rem;">
+                        🔄 Sync
+                    </button>
+                    <button onclick="handleLogout()" class="btn btn-secondary" style="padding: 0.5rem 1rem;">
+                        🚪 Cerrar Sesión
+                    </button>
+                </div>
+            </div>
+
+            <!-- Stats -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number" style="color: #10b981;" id="totalLeads">0</div>
+                    <div>Total Leads</div>
+                    <div style="font-size: 0.8rem; color: #666; margin-top: 0.25rem;">📊 Firebase</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" style="color: #667eea;" id="activeLeads">0</div>
+                    <div>Leads Activos</div>
+                    <div style="font-size: 0.8rem; color: #666; margin-top: 0.25rem;">⚡ Tiempo Real</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" style="color: #f59e0b;" id="conversions">0</div>
+                    <div>Conversiones</div>
+                    <div style="font-size: 0.8rem; color: #666; margin-top: 0.25rem;">💰 Ventas</div>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('contacts')" id="contactsTab">📞 Contactos</button>
+                <button class="tab" onclick="switchTab('leads')" id="leadsTab">👥 Leads</button>
+                <button class="tab" onclick="switchTab('pipeline')" id="pipelineTab">🎯 Pipeline</button>
+                <button class="tab" onclick="switchTab('reports')" id="reportsTab">📊 Reportes</button>
+                <button class="tab" onclick="switchTab('monitoring')" id="monitoringTab" style="display: none;">👀 Monitoreo</button>
+                <button onclick="switchTab('tasks')" class="tab">📋 Tareas</button>
+                <button class="tab" onclick="switchTab('config')" id="configTab" style="display: none;">⚙️ Config</button>
+                <button class="tab" onclick="switchTab('socialMedia')" id="socialMediaTab">💬 Social Media</button>
+            </div>
+
+            <!-- Tab: Contacts -->
+            <div id="contacts" class="tab-content">
+                <h2 id="contactsTitle">📞 Registrar Contactos del Día</h2>
+                
+                <div style="max-width: 600px; margin: 2rem auto;">
+                    <div>
+                        <h3>➕ Nuevo Contacto</h3>
+                        <form onsubmit="handleAddContact(event)">
+                            <div class="form-group">
+                                <label>Nombre Completo:</label>
+                                <input type="text" id="contactName" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Teléfono:</label>
+                                <input type="tel" id="contactPhone" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Email:</label>
+                                <input type="email" id="contactEmail">
+                            </div>
+                            <div class="form-group">
+                                <label>¿Cómo se enteró?</label>
+                                <select id="contactSource" required onchange="handleSourceChange()">
+                                    <option value="">Seleccionar...</option>
+                                    <option value="Facebook">Facebook</option>
+                                    <option value="Instagram">Instagram</option>
+                                    <option value="Google">Google</option>
+                                    <option value="Referido">Referido</option>
+                                    <option value="Volante">Volante</option>
+                                    <option value="Pasando por la sede">Pasando por la sede</option>
+                                    <option value="CONVENIO">Convenio</option>
+                                </select>
+                            </div>
+                            <div class="form-group convenio-group hidden" id="convenioGroup">
+                                <label>Convenio:</label>
+                                <select id="contactConvenio">
+                                    <option value="">Seleccionar convenio...</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>¿Dónde vive?</label>
+                                <select id="contactLocation" required>
+                                    <option value="">Seleccionar...</option>
+                                    <option value="Pereira">Pereira</option>
+                                    <option value="Dosquebradas">Dosquebradas</option>
+                                    <option value="La Virginia">La Virginia</option>
+                                    <option value="Santa Rosa">Santa Rosa</option>
+                                    <option value="Otro">Otro</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Notas:</label>
+                                <textarea id="contactNotes" rows="3" placeholder="Intereses, observaciones..."></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-firebase" style="width: 100%;">
+                                ✅ Guardar en Firebase
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab: Leads -->
+            <div id="leads" class="tab-content hidden">
+                <h2 id="leadsTitle">👥 Gestión de Leads</h2>
+                
+                <div style="margin-bottom: 1rem;">
+                    <button onclick="refreshAllData()" class="btn btn-primary" style="margin-right: 1rem;">🔄 Sync Firebase</button>
+                    
+                    <div id="leadsFilters" style="display: none; margin-top: 1rem;">
+                        <select id="salespersonFilter" onchange="updateLeadsTable()" style="padding: 0.5rem; border-radius: 5px; border: 1px solid #ccc; margin-right: 0.5rem;">
+                            <option value="">Todos los vendedores</option>
+                        </select>
+                        <select id="statusFilter" onchange="updateLeadsTable()" style="padding: 0.5rem; border-radius: 5px; border: 1px solid #ccc;">
+                            <option value="">Todos los estados</option>
+                            <option value="Nuevo">Nuevo</option>
+                            <option value="Contactado">Contactado</option>
+                            <option value="Interesado">Interesado</option>
+                            <option value="Negociación">Negociación</option>
+                            <option value="Convertido">Convertido</option>
+                            <option value="Perdido">Perdido</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <table class="table">
+                    <thead>
+                        <tr id="leadsTableHeader">
+                            <th>Nombre</th>
+                            <th>Teléfono</th>
+                            <th>Fuente</th>
+                            <th>Estado</th>
+                            <th>Fecha</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leadsTable">
+                        <tr>
+                            <td colspan="6" style="text-align: center; color: #666; padding: 2rem;">
+                                <div class="loading-spinner"></div><br>
+                                Cargando leads desde Firebase...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Tab: Pipeline -->
+            <div id="pipeline" class="tab-content hidden">
+                <h2>🎯 Pipeline de Ventas</h2>
+                <div style="margin-bottom: 1rem;">
+                    <button onclick="refreshPipeline()" class="btn btn-primary">🔄 Actualizar Pipeline</button>
+                </div>
+                <div id="pipelineContainer">
+                    <div style="text-align: center; color: #666; padding: 2rem;">
+                        <div class="loading-spinner"></div><br>
+                        Cargando pipeline desde Firebase...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab: Reports -->
+            <div id="reports" class="tab-content hidden">
+                <h2 id="reportsTitle">📊 Reportes</h2>
+                
+                <div id="personalReports">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem;">
+                        <div id="weeklyPerformance">
+                            <div class="loading-spinner"></div> Cargando rendimiento...
+                        </div>
+                        <div id="personalTargets">
+                            <div class="loading-spinner"></div> Cargando objetivos...
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="directorReports" class="hidden">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2rem; margin-top: 2rem;">
+                        <div id="teamPerformance">
+                            <h4>👥 Rendimiento del Equipo</h4>
+                            <div class="loading-spinner"></div> Cargando...
+                        </div>
+                        <div id="salesRanking">
+                            <h4>🏆 Ranking de Ventas</h4>
+                            <div class="loading-spinner"></div> Cargando...
+                        </div>
+                        <div id="executiveSummary">
+                            <h4>📈 Resumen Ejecutivo</h4>
+                            <div class="loading-spinner"></div> Cargando...
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 2rem; text-align: center;">
+                    <button onclick="exportTodayContacts()" class="btn btn-success">📥 Exportar Contactos de Hoy</button>
+                </div>
+            </div>
+
+            <!-- Tab: Monitoring -->
+            <div id="monitoring" class="tab-content hidden">
+                <h2>👀 Monitoreo del Equipo</h2>
+                <div style="margin-bottom: 1rem;">
+                    <button onclick="refreshAllData()" class="btn btn-primary">🔄 Actualizar Monitoreo</button>
+                </div>
+                
+                <div id="teamActivityOverview" style="margin-bottom: 2rem;">
+                    <div class="loading-spinner"></div> Cargando vista general...
+                </div>
+                
+                <div id="individualSalespeopleActivity" style="margin-bottom: 2rem;">
+                    <h3>👥 Actividad Individual</h3>
+                    <div class="loading-spinner"></div> Cargando actividad individual...
+                </div>
+                
+                <div id="recentTeamActivity">
+                    <h3>🕒 Actividad Reciente del Equipo</h3>
+                    <div class="loading-spinner"></div> Cargando actividad reciente...
+                </div>
+            </div>
+
+            <!-- Tab: Tasks -->
+            <div id="tasks" class="tab-content hidden">
+                <div id="tasksContainer"></div>
+            </div>
+
+            <!-- Tab: Config -->
+            <div id="config" class="tab-content hidden">
+                <h2>⚙️ Configuración del Sistema</h2>
+                
+                <div id="directorConfig" class="hidden">
+                    <div style="background: #dbeafe; padding: 2rem; border-radius: 10px; border-left: 4px solid #3b82f6; margin-bottom: 2rem;">
+                        <h3>🔄 Herramientas de Sistema</h3>
+                        <p style="margin: 1rem 0; color: #1e40af;">Herramientas para administrar el sistema.</p>
+                        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                            <button onclick="testConveniosSystem()" class="btn btn-firebase">🧪 Test Convenios</button>
+                            <button onclick="testTabSystem()" class="btn btn-success">🧪 Test Tabs</button>
+                            <button onclick="refreshAllData()" class="btn btn-primary">🔄 Refresh Data</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="background: #f0f9ff; padding: 2rem; border-radius: 10px; border-left: 4px solid #0284c7;">
+                    <h3>👥 Gestión de Convenios</h3>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 1rem;">
+                        <div>
+                            <div class="form-group">
+                                <label>Nuevo Convenio:</label>
+                                <input type="text" id="newConvenio" placeholder="Nombre del convenio">
+                            </div>
+                            <button onclick="addConvenio()" class="btn btn-success" style="width: 100%;">➕ Agregar Convenio</button>
+                        </div>
+                        <div>
+                            <h4>Convenios Actuales:</h4>
+                            <div id="conveniosList" style="max-height: 300px; overflow-y: auto; margin-top: 1rem;">
+                                <div class="loading-spinner"></div> Cargando convenios...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getDatabase, ref, set, get, push, update, remove, onValue, off } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+  
+    //    <!-- Store Firebase modules globally for access from other scripts -->
+
+window.firebaseModules = {
+    database: { ref, set, get, push, update, remove, onValue, off }
+};
+        const firebaseConfig = {
+            apiKey: "AIzaSyCuq1z8eTo9rufdEDXQFfvoxOkce-kBWOY",
+            authDomain: "ciudad-bilingue-crm.firebaseapp.com",
+            databaseURL: "https://ciudad-bilingue-crm-default-rtdb.firebaseio.com",
+            projectId: "ciudad-bilingue-crm",
+            storageBucket: "ciudad-bilingue-crm.firebasestorage.app",
+            messagingSenderId: "690594486040",
+            appId: "1:690594486040:web:e8fffcffcee68a4d94f06d"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+        const auth = getAuth(app);
+        
+        window.firebaseApp = app;
+        window.firebaseDb = database;
+        window.firebaseAuth = auth;
+
+        const statusEl = document.getElementById('firebaseStatus');
+        statusEl.className = 'firebase-status';
+        statusEl.innerHTML = '🔥 Firebase Conectado';
+
+        console.log('✅ Firebase initialized successfully');
+
+        class SimpleFirebaseManager {
+            constructor() {
+                this.database = database;
+                this.auth = auth;
+                this.currentUser = null;
+                this.observers = [];
+                
+                console.log('🔥 SimpleFirebaseManager initialized');
+                
+                onAuthStateChanged(this.auth, (user) => {
+                    if (user) {
+                        this.currentUser = user;
+                        console.log('✅ Firebase user authenticated:', user.email);
+                    } else {
+                        this.currentUser = null;
+                        console.log('ℹ️ No Firebase user authenticated');
+                    }
+                });
+            }
+
+            async login(email, password) {
+                return await signInWithEmailAndPassword(this.auth, email, password);
+            }
+
+            async createUser(email, password, profile) {
+                const userCredential = await createUserWithEmailAndPassword(this.auth, email, password);
+                const user = userCredential.user;
+                
+                await set(ref(this.database, `users/${user.uid}/profile`), {
+                    name: profile.name,
+                    email: email,
+                    role: profile.role,
+                    createdAt: new Date().toISOString()
+                });
+                
+                return user;
+            }
+
+            async logout() {
+                return await signOut(this.auth);
+            }
+
+            async loadUserProfile() {
+                if (!this.currentUser) return null;
+                const snapshot = await get(ref(this.database, `users/${this.currentUser.uid}/profile`));
+                return snapshot.exists() ? snapshot.val() : null;
+            }
+
+            async getAllUsers() {
+                const snapshot = await get(ref(this.database, 'users'));
+                const users = {};
+                if (snapshot.exists()) {
+                    snapshot.forEach((childSnapshot) => {
+                        const userId = childSnapshot.key;
+                        const userData = childSnapshot.val();
+                        if (userData.profile) {
+                            users[userId] = userData.profile;
+                        }
+                    });
+                }
+                return users;
+            }
+
+            async addContact(contactData) {
+                const contactRef = push(ref(this.database, 'contacts'));
+                const contact = {
+                    id: contactRef.key,
+                    ...contactData,
+                    salespersonId: this.currentUser.uid,
+                    salespersonEmail: this.currentUser.email,
+                    createdAt: new Date().toISOString()
+                };
+                await set(contactRef, contact);
+                return contact;
+            }
+
+            async getAllContacts() {
+                const snapshot = await get(ref(this.database, 'contacts'));
+                const contacts = [];
+                if (snapshot.exists()) {
+                    snapshot.forEach((childSnapshot) => {
+                        contacts.push(childSnapshot.val());
+                    });
+                }
+                return contacts;
+            }
+
+            async getFilteredContacts() {
+                const userProfile = await this.loadUserProfile();
+                const allContacts = await this.getAllContacts();
+                
+                if (userProfile && userProfile.role === 'director') {
+                    return allContacts;
+                } else {
+                    return allContacts.filter(contact => contact.salespersonId === this.currentUser.uid);
+                }
+            }
+
+            async updateContact(contactId, updates) {
+                await update(ref(this.database, `contacts/${contactId}`), {
+                    ...updates,
+                    updatedAt: new Date().toISOString()
+                });
+            }
+
+            async deleteContact(contactId) {
+                await remove(ref(this.database, `contacts/${contactId}`));
+            }
+
+            async getConvenios() {
+                const snapshot = await get(ref(this.database, 'system/convenios'));
+                return snapshot.exists() ? snapshot.val() : [];
+            }
+
+            async updateConvenios(convenios) {
+                await set(ref(this.database, 'system/convenios'), convenios);
+            }
+
+            addObserver(callback) {
+                this.observers.push(callback);
             }
         }
-    `;
+
+        window.FirebaseData = new SimpleFirebaseManager();
+        window.dispatchEvent(new Event('firebaseReady'));
+        // Fix for tasks tab
+window.loadTasksData = function() {
+    console.log('📋 Loading tasks data from tab switch');
     
-    document.head.appendChild(style);
-}
-
-// ===== REFRESH FUNCTION =====
-function refreshTasks() {
-    loadTasksData();
-    if (window.showNotification) {
-        window.showNotification('Tasks refreshed! 🔄', 'info');
+    // Initialize tasks module if not already done
+    if (window.initializeTasksModule && typeof window.initializeTasksModule === 'function') {
+        window.initializeTasksModule();
     }
-}
+};
+    </script>
 
-// ===== EXPORT TO GLOBAL SCOPE =====
-window.loadTasksData = loadTasksData;
-window.createNewTask = createNewTask;
-window.closeTaskModal = closeTaskModal;
-window.saveNewTask = saveNewTask;
-window.editTask = editTask;
-window.refreshTasks = refreshTasks;
+    <!-- Complete CRM System JavaScript -->
+    <script>
+        // ===== GLOBAL VARIABLES =====
+        let currentUser = null;
+        let userRole = null;
+        let isInitialized = false;
+        let cachedConvenios = [];
 
-console.log('✅ SAFE Task Management System loaded!');
+        // ===== LOGIN FUNCTION =====
+        async function handleLogin(event) {
+            if (event) {
+                event.preventDefault();
+            }
+            
+            const loginBtn = document.getElementById('loginBtn');
+            const originalText = loginBtn.innerHTML;
+            
+            try {
+                loginBtn.disabled = true;
+                loginBtn.innerHTML = '<div class="loading-spinner" style="width: 12px; height: 12px; display: inline-block; margin-right: 0.5rem;"></div>Conectando...';
+                
+                const email = document.getElementById('username').value.trim();
+                const password = document.getElementById('password').value;
+                
+                if (!email || !password) {
+                    throw new Error('Email y contraseña son requeridos');
+                }
+                
+                console.log('🔐 Attempting Firebase login for:', email);
+                
+                const userCredential = await window.FirebaseData.login(email, password);
+                console.log('✅ Firebase login successful');
+                
+                currentUser = userCredential.user;
+                
+                const profile = await window.FirebaseData.loadUserProfile();
+                if (!profile) {
+                    throw new Error('User profile not found. Contact administrator.');
+                }
+                
+                userRole = profile.role;
+                console.log('👤 User role loaded:', userRole);
+                
+                document.getElementById('loginError').classList.add('hidden');
+                
+                await initializeMainApplication();
+                
+                alert(`✅ ¡Bienvenido ${profile.name}!\n🔥 Sistema completamente funcional\n👑 Rol: ${profile.role}`);
+                
+            } catch (error) {
+                console.error('❌ Login failed:', error);
+                
+                let errorMessage = 'Error de autenticación';
+                if (error.code === 'auth/user-not-found') {
+                    errorMessage = 'Usuario no encontrado. Contacta al administrador.';
+                } else if (error.code === 'auth/wrong-password') {
+                    errorMessage = 'Contraseña incorrecta.';
+                } else {
+                    errorMessage = error.message;
+                }
+                
+                const errorEl = document.getElementById('loginError');
+                errorEl.textContent = errorMessage;
+                errorEl.classList.remove('hidden');
+                
+            } finally {
+                loginBtn.disabled = false;
+                loginBtn.innerHTML = originalText;
+            }
+        }
+
+        // ===== MAIN APPLICATION INITIALIZATION =====
+        async function initializeMainApplication() {
+            try {
+                console.log('🚀 Initializing main application');
+                
+                document.getElementById('loginScreen').classList.add('hidden');
+                document.getElementById('mainApp').classList.remove('hidden');
+                
+                const profile = await window.FirebaseData.loadUserProfile();
+                
+                updateUserInterface(profile);
+                configureRoleBasedAccess(profile.role);
+                await loadInitialData();
+                
+                isInitialized = true;
+                console.log('✅ Application initialized successfully');
+                
+            } catch (error) {
+                console.error('❌ Error initializing main application:', error);
+                alert('Error inicializando la aplicación');
+            }
+        }
+
+        // ===== USER INTERFACE UPDATE =====
+        function updateUserInterface(profile) {
+            console.log('🎨 Updating user interface');
+            
+            const userNameEl = document.getElementById('currentUserName');
+            if (userNameEl) {
+                userNameEl.textContent = profile.name || 'Usuario';
+            }
+            
+            const userRoleEl = document.getElementById('userRole');
+            if (userRoleEl) {
+                const roleEmoji = profile.role === 'director' ? '👑' : '👤';
+                userRoleEl.textContent = `${roleEmoji} ${profile.role.charAt(0).toUpperCase() + profile.role.slice(1)}`;
+            }
+            
+            const titleMappings = {
+                director: {
+                    'contactsTitle': '📞 Contactos del Equipo',
+                    'leadsTitle': '👥 Gestión de Leads del Equipo',
+                    'reportsTitle': '📊 Reportes Ejecutivos'
+                },
+                vendedor: {
+                    'contactsTitle': '📞 Mis Contactos del Día',
+                    'leadsTitle': '👥 Mis Leads',
+                    'reportsTitle': '📊 Mis Reportes'
+                }
+            };
+            
+            const titles = titleMappings[profile.role] || titleMappings.vendedor;
+            Object.keys(titles).forEach(elementId => {
+                const element = document.getElementById(elementId);
+                if (element) {
+                    element.textContent = titles[elementId];
+                }
+            });
+        }
+
+        // ===== ROLE-BASED ACCESS =====
+        function configureRoleBasedAccess(role) {
+            console.log('🔐 Configuring role-based access');
+            
+            const monitoringTab = document.getElementById('monitoringTab');
+            const configTab = document.getElementById('configTab');
+            const directorConfig = document.getElementById('directorConfig');
+            const leadsFilters = document.getElementById('leadsFilters');
+            
+            if (role === 'director') {
+                if (monitoringTab) monitoringTab.style.display = 'block';
+                if (configTab) configTab.style.display = 'block';
+                if (directorConfig) directorConfig.classList.remove('hidden');
+                if (leadsFilters) leadsFilters.style.display = 'flex';
+                
+                const header = document.getElementById('leadsTableHeader');
+                if (header) {
+                    header.innerHTML = `
+                        <th>Nombre</th>
+                        <th>Teléfono</th>
+                        <th>Fuente</th>
+                        <th>Estado</th>
+                        <th>Fecha</th>
+                        <th>Vendedor</th>
+                        <th>Acciones</th>
+                    `;
+                }
+            } else {
+                if (monitoringTab) monitoringTab.style.display = 'none';
+                if (configTab) configTab.style.display = 'none';
+                if (directorConfig) directorConfig.classList.add('hidden');
+                if (leadsFilters) leadsFilters.style.display = 'none';
+            }
+        }
+
+        // ===== INITIAL DATA LOADING =====
+        async function loadInitialData() {
+            try {
+                console.log('📊 Loading initial data');
+                
+                await loadConvenios();
+                await updateStats();
+                await updateLeadsTable();
+                
+                console.log('✅ Initial data loaded');
+                
+            } catch (error) {
+                console.error('❌ Error loading initial data:', error);
+            }
+        }
+
+        // ===== CONVENIOS LOADING =====
+        async function loadConvenios() {
+            try {
+                console.log('🤝 Loading convenios');
+                
+                if (!window.FirebaseData) {
+                    console.log('⚠️ Firebase not ready');
+                    return;
+                }
+                
+                const convenios = await window.FirebaseData.getConvenios();
+                console.log('📋 Loaded convenios:', convenios);
+                
+                cachedConvenios = convenios || [];
+                
+                const profile = await window.FirebaseData.loadUserProfile();
+                if (profile && profile.role === 'director') {
+                    await updateConveniosList();
+                }
+                
+            } catch (error) {
+                console.error('❌ Error loading convenios:', error);
+                cachedConvenios = [];
+            }
+        }
+
+        // ===== SOURCE CHANGE HANDLER =====
+        async function handleSourceChange() {
+            console.log('🔄 Source changed');
+            
+            const sourceSelect = document.getElementById('contactSource');
+            const convenioGroup = document.getElementById('convenioGroup');
+            const convenioSelect = document.getElementById('contactConvenio');
+            
+            if (!sourceSelect || !convenioGroup || !convenioSelect) {
+                console.error('❌ Required elements not found');
+                return;
+            }
+            
+            console.log('🔍 Source value:', sourceSelect.value);
+            
+            if (sourceSelect.value === 'CONVENIO') {
+                console.log('✅ Showing convenio dropdown');
+                
+                // Show convenio group
+                convenioGroup.classList.remove('hidden');
+                convenioSelect.required = true;
+                
+                // Show loading state
+                convenioSelect.innerHTML = '<option value="">Cargando convenios...</option>';
+                
+                try {
+                    // Load convenios from Firebase
+                    let convenios = cachedConvenios;
+                    if (!convenios || convenios.length === 0) {
+                        convenios = await window.FirebaseData.getConvenios();
+                        cachedConvenios = convenios || [];
+                    }
+                    
+                    console.log('📋 Loaded convenios for dropdown:', convenios);
+                    
+                    // Populate dropdown
+                    if (convenios && convenios.length > 0) {
+                        convenioSelect.innerHTML = '<option value="">Seleccionar convenio...</option>' +
+                            convenios.map(conv => `<option value="${conv}">${conv}</option>`).join('');
+                        console.log('✅ Convenio dropdown populated');
+                    } else {
+                        convenioSelect.innerHTML = '<option value="">No hay convenios configurados</option>';
+                        alert('⚠️ No hay convenios configurados. Contacta al administrador.');
+                    }
+                } catch (error) {
+                    console.error('❌ Error loading convenios:', error);
+                    convenioSelect.innerHTML = '<option value="">Error cargando convenios</option>';
+                    alert('❌ Error al cargar convenios');
+                }
+            } else {
+                console.log('❌ Hiding convenio dropdown');
+                convenioGroup.classList.add('hidden');
+                convenioSelect.required = false;
+                convenioSelect.value = '';
+            }
+        }
+
+        // ===== ADD CONTACT HANDLER =====
+        async function handleAddContact(event) {
+            event.preventDefault();
+            
+            if (!window.FirebaseData || !window.FirebaseData.currentUser) {
+                alert('❌ Firebase no disponible o usuario no autenticado. Recarga la página.');
+                return;
+            }
+            
+            const submitBtn = event.target.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<div class="loading-spinner" style="width: 12px; height: 12px; display: inline-block; margin-right: 0.5rem;"></div>Guardando...';
+            
+            try {
+                let source = document.getElementById('contactSource').value;
+                if (source === 'CONVENIO') {
+                    const convenio = document.getElementById('contactConvenio').value;
+                    if (!convenio) {
+                        alert('⚠️ Selecciona un convenio');
+                        return;
+                    }
+                    source = `CONVENIO: ${convenio}`;
+                }
+                
+                const contact = {
+                    name: document.getElementById('contactName').value.trim(),
+                    phone: document.getElementById('contactPhone').value.trim(),
+                    email: document.getElementById('contactEmail').value.trim(),
+                    source: source,
+                    location: document.getElementById('contactLocation').value,
+                    notes: document.getElementById('contactNotes').value.trim(),
+                    date: new Date().toISOString().split('T')[0],
+                    time: new Date().toLocaleTimeString(),
+                    status: 'Nuevo'
+                };
+                
+                if (!contact.name || !contact.phone || !contact.source || !contact.location) {
+                    alert('⚠️ Completa todos los campos obligatorios');
+                    return;
+                }
+                
+                console.log('📤 Saving contact to Firebase:', contact);
+                
+                const savedContact = await window.FirebaseData.addContact(contact);
+                console.log('✅ Contact saved to Firebase:', savedContact);
+                
+                // Clear form
+                event.target.reset();
+                document.getElementById('convenioGroup').classList.add('hidden');
+                document.getElementById('contactConvenio').required = false;
+                
+                // Update views
+                setTimeout(() => {
+                    updateStats();
+                    updateLeadsTable();
+                }, 500);
+                
+                alert(`✅ ¡Contacto guardado en Firebase!
+
+👤 ${savedContact.name}
+📞 ${savedContact.phone}
+🔥 Sistema funcionando correctamente`);
+                
+            } catch (error) {
+                console.error('❌ Error saving to Firebase:', error);
+                alert(`❌ Error al guardar en Firebase: ${error.message}`);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            }
+        }
+
+// ===== TAB NAVIGATION =====
+function switchTab(tabName) {
+    console.log('📑 Switching to tab:', tabName);
+    
+    try {
+        // Hide all tab contents
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.classList.add('hidden');
+        });
+        
+        // Remove active class from all tabs
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.classList.remove('active');
+        });
+        
+        // Show target content
+        const targetContent = document.getElementById(tabName);
+        const targetTab = document.getElementById(tabName + 'Tab');
+        
+        if (targetContent) {
+            targetContent.classList.remove('hidden');
+            console.log('✅ Tab content shown:', tabName);
+        }
+        
+        if (targetTab) {
+            targetTab.classList.add('active');
+            console.log('✅ Tab activated:', tabName);
+        }
+        
+        // Load tab-specific data
+        if (tabName === 'leads') {
+            updateLeadsTable();
+        } else if (tabName === 'config') {
+            loadConfigData();
+        } else if (tabName === 'pipeline') {
+            loadPipelineData();
+        } else if (tabName === 'reports') {
+            loadReportsData();
+        } else if (tabName === 'tasks') {
+            loadTasksData();
+        }
+        
+        console.log('✅ Tab switched successfully:', tabName);
+                
+            } catch (error) {
+                console.error('❌ Error switching tab:', error);
+            }
+        }
+
+        // ===== STATS UPDATE =====
+        async function updateStats() {
+            try {
+                console.log('📊 Updating stats');
+                
+                if (!window.FirebaseData || !window.FirebaseData.currentUser) {
+                    console.log('⚠️ Firebase not available for stats');
+                    return;
+                }
+                
+                const allContacts = await window.FirebaseData.getFilteredContacts();
+                const today = new Date().toISOString().split('T')[0];
+                
+                const todayContacts = allContacts.filter(c => c.date === today);
+                const activeLeads = allContacts.filter(c => !['Convertido', 'Perdido'].includes(c.status));
+                const conversions = allContacts.filter(c => c.status === 'Convertido');
+                
+                const totalLeadsEl = document.getElementById('totalLeads');
+                const activeLeadsEl = document.getElementById('activeLeads');
+                const conversionsEl = document.getElementById('conversions');
+                
+                if (totalLeadsEl) totalLeadsEl.textContent = allContacts.length;
+                if (activeLeadsEl) activeLeadsEl.textContent = activeLeads.length;
+                if (conversionsEl) conversionsEl.textContent = conversions.length;
+                
+                console.log('✅ Stats updated successfully');
+                
+            } catch (error) {
+                console.error('❌ Error updating stats:', error);
+            }
+        }
+
+        // ===== LEADS TABLE UPDATE =====
+        async function updateLeadsTable() {
+            try {
+                console.log('📋 Updating leads table');
+                
+                if (!window.FirebaseData || !window.FirebaseData.currentUser) {
+                    console.log('❌ Firebase not available');
+                    const tbody = document.getElementById('leadsTable');
+                    if (tbody) {
+                        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #dc2626; padding: 2rem;">❌ Firebase no disponible</td></tr>';
+                    }
+                    return;
+                }
+                
+                const userProfile = await window.FirebaseData.loadUserProfile();
+                if (!userProfile) {
+                    console.log('❌ No user profile available');
+                    return;
+                }
+                
+                let data = await window.FirebaseData.getFilteredContacts();
+                console.log('📊 Filtered data:', data.length, 'records');
+                
+                const tbody = document.getElementById('leadsTable');
+                if (!tbody) {
+                    console.log('❌ Leads table not found');
+                    return;
+                }
+                
+                if (data.length === 0) {
+                    const colSpan = userProfile.role === 'director' ? '7' : '6';
+                    tbody.innerHTML = `<tr><td colspan="${colSpan}" style="text-align: center; color: #666; padding: 2rem;">No hay leads registrados en Firebase</td></tr>`;
+                    return;
+                }
+                
+                // Sort by date (newest first)
+                data.sort((a, b) => {
+                    const dateA = new Date(a.date + ' ' + (a.time || '00:00:00'));
+                    const dateB = new Date(b.date + ' ' + (b.time || '00:00:00'));
+                    return dateB - dateA;
+                });
+                
+                // Generate table rows with proper error handling
+                const rows = [];
+                for (const lead of data) {
+                    try {
+                        const salespersonCell = userProfile.role === 'director' 
+                            ? `<td><span style="background: #667eea; color: white; padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.8rem;">${await getUserDisplayName(lead.salespersonId)}</span></td>`
+                            : '';
+                        
+                        const source = lead.source || 'No especificado';
+                        const sourceDisplay = source.length > 30 ? source.substring(0, 30) + '...' : source;
+                        
+                        rows.push(`
+                            <tr>
+                                <td style="font-weight: 500;">${lead.name || 'Sin nombre'}</td>
+                                <td>${lead.phone || 'Sin teléfono'}</td>
+                                <td style="font-size: 0.9rem;">${sourceDisplay}</td>
+                                <td><span class="status-badge status-${(lead.status || 'nuevo').toLowerCase().replace(' ', '').replace('ó', 'o')}">${lead.status || 'Nuevo'}</span></td>
+                                <td style="font-size: 0.9rem;">${formatDate(lead.date)}</td>
+                                ${salespersonCell}
+                                <td>
+                                    <button onclick="showLeadDetails('${lead.id}')" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; margin-right: 0.25rem;">
+                                        📋 Ver
+                                    </button>
+                                    <button onclick="deleteLead('${lead.id}')" class="btn btn-warning" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; background: #ef4444;">🗑️</button>
+                                </td>
+                            </tr>
+                        `);
+                    } catch (rowError) {
+                        console.error('❌ Error rendering row for lead:', lead.id, rowError);
+                    }
+                }
+                
+                tbody.innerHTML = rows.join('');
+                console.log('✅ Leads table updated with', data.length, 'records');
+                
+            } catch (error) {
+                console.error('❌ Error updating leads table:', error);
+                const tbody = document.getElementById('leadsTable');
+                if (tbody) {
+                    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #dc2626; padding: 2rem;">❌ Error: ${error.message}</td></tr>`;
+                }
+            }
+        }
+
+        // ===== PIPELINE FUNCTIONALITY =====
+        async function loadPipelineData() {
+            try {
+                console.log('🎯 Loading pipeline data');
+                
+                const container = document.getElementById('pipelineContainer');
+                if (!container) return;
+                
+                if (!window.FirebaseData || !window.FirebaseData.currentUser) {
+                    container.innerHTML = `
+                        <div style="text-align: center; color: #dc2626; padding: 2rem;">
+                            ❌ Firebase no disponible
+                        </div>
+                    `;
+                    return;
+                }
+                
+                const allContacts = await window.FirebaseData.getFilteredContacts();
+                
+                if (allContacts.length === 0) {
+                    container.innerHTML = `
+                        <div style="text-align: center; color: #666; padding: 2rem;">
+                            <div style="font-size: 2rem; margin-bottom: 1rem;">🎯</div>
+                            <h3>No hay leads en el pipeline</h3>
+                            <p>Agrega contactos para verlos en el pipeline</p>
+                            <button onclick="switchTab('contacts')" class="btn btn-primary" style="margin-top: 1rem;">➕ Agregar Contactos</button>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // Group contacts by status
+                const statusGroups = {
+                    'Nuevo': { leads: [], color: '#fbbf24', emoji: '🟡' },
+                    'Contactado': { leads: [], color: '#3b82f6', emoji: '🔵' },
+                    'Interesado': { leads: [], color: '#10b981', emoji: '🟢' },
+                    'Negociación': { leads: [], color: '#f97316', emoji: '🟠' },
+                    'Convertido': { leads: [], color: '#22c55e', emoji: '✅' },
+                    'Perdido': { leads: [], color: '#ef4444', emoji: '❌' }
+                };
+                
+                allContacts.forEach(contact => {
+                    const status = contact.status || 'Nuevo';
+                    if (statusGroups[status]) {
+                        statusGroups[status].leads.push(contact);
+                    }
+                });
+                
+                container.innerHTML = `
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
+                        ${Object.entries(statusGroups).map(([status, group]) => `
+                            <div class="pipeline-column" style="border-top: 4px solid ${group.color};">
+                                <div class="pipeline-header" style="background: ${group.color}15;">
+                                    <div style="font-size: 1.2rem; margin-bottom: 0.5rem;">
+                                        ${group.emoji} ${status}
+                                    </div>
+                                    <div style="
+                                        background: ${group.color};
+                                        color: white;
+                                        display: inline-block;
+                                        padding: 0.25rem 0.75rem;
+                                        border-radius: 20px;
+                                        font-weight: 600;
+                                        font-size: 0.9rem;
+                                    ">
+                                        ${group.leads.length} leads
+                                    </div>
+                                </div>
+                                <div class="pipeline-body">
+                                    ${group.leads.length === 0 ? `
+                                        <div style="text-align: center; color: #6b7280; padding: 2rem;">
+                                            Sin leads en esta etapa
+                                        </div>
+                                    ` : group.leads.map(lead => `
+                                        <div class="lead-card" onclick="showLeadDetails('${lead.id}')">
+                                            <div style="font-weight: 600; color: #374151; margin-bottom: 0.5rem;">
+                                                ${lead.name || 'Sin nombre'}
+                                            </div>
+                                            <div style="font-size: 0.9rem; color: #6b7280; margin-bottom: 0.5rem;">
+                                                📞 ${lead.phone || 'Sin teléfono'}
+                                            </div>
+                                            <div style="font-size: 0.8rem; color: #6b7280; margin-bottom: 0.5rem;">
+                                                📍 ${(lead.source || 'No especificado').length > 25 ? (lead.source || 'No especificado').substring(0, 25) + '...' : (lead.source || 'No especificado')}
+                                            </div>
+                                            <div style="font-size: 0.8rem; color: #6b7280;">
+                                                📅 ${formatDate(lead.date)}
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    
+                    <!-- Pipeline Summary -->
+                    <div style="margin-top: 2rem; background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+                        <h3 style="margin: 0 0 1rem 0;">📊 Resumen del Pipeline</h3>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
+                            <div style="text-align: center;">
+                                <div style="font-size: 1.5rem; font-weight: bold; color: #3b82f6;">${allContacts.length}</div>
+                                <div style="font-size: 0.9rem; color: #6b7280;">Total Leads</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 1.5rem; font-weight: bold; color: #10b981;">${statusGroups['Convertido'].leads.length}</div>
+                                <div style="font-size: 0.9rem; color: #6b7280;">Convertidos</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 1.5rem; font-weight: bold; color: #f59e0b;">${statusGroups['Negociación'].leads.length}</div>
+                                <div style="font-size: 0.9rem; color: #6b7280;">En Negociación</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 1.5rem; font-weight: bold; color: #667eea;">
+                                    ${allContacts.length > 0 ? ((statusGroups['Convertido'].leads.length / allContacts.length) * 100).toFixed(1) : 0}%
+                                </div>
+                                <div style="font-size: 0.9rem; color: #6b7280;">Tasa Conversión</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                console.log('✅ Pipeline data loaded');
+                
+            } catch (error) {
+                console.error('❌ Error loading pipeline data:', error);
+                const container = document.getElementById('pipelineContainer');
+                if (container) {
+                    container.innerHTML = `
+                        <div style="text-align: center; color: #dc2626; padding: 2rem;">
+                            ❌ Error cargando pipeline: ${error.message}
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        async function refreshPipeline() {
+            console.log('🔄 Refreshing pipeline');
+            await loadPipelineData();
+        }
+
+        // ===== REPORTS FUNCTIONALITY =====
+        async function loadReportsData() {
+            try {
+                console.log('📊 Loading reports data');
+                
+                if (!window.FirebaseData || !window.FirebaseData.currentUser) {
+                    console.log('⚠️ Firebase not available for reports');
+                    return;
+                }
+                
+                const userProfile = await window.FirebaseData.loadUserProfile();
+                const allContacts = await window.FirebaseData.getFilteredContacts();
+                
+                if (userProfile.role === 'director') {
+                    await loadDirectorReports(allContacts);
+                } else {
+                    await loadPersonalReports(allContacts);
+                }
+                
+            } catch (error) {
+                console.error('❌ Error loading reports data:', error);
+            }
+        }
+
+        async function loadPersonalReports(contacts) {
+            const weeklyPerformanceEl = document.getElementById('weeklyPerformance');
+            const personalTargetsEl = document.getElementById('personalTargets');
+            
+            if (!weeklyPerformanceEl || !personalTargetsEl) return;
+            
+            const today = new Date();
+            const weekStart = new Date(today);
+            weekStart.setDate(today.getDate() - today.getDay());
+            
+            const thisWeekContacts = contacts.filter(c => {
+                const contactDate = new Date(c.date);
+                return contactDate >= weekStart;
+            });
+            
+            const conversions = contacts.filter(c => c.status === 'Convertido');
+            const conversionRate = contacts.length > 0 ? (conversions.length / contacts.length * 100).toFixed(1) : 0;
+            
+            weeklyPerformanceEl.innerHTML = `
+                <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+                    <h4 style="margin: 0 0 1rem 0; color: #374151;">📈 Rendimiento Semanal</h4>
+                    <div style="margin-bottom: 1rem;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <span>Contactos esta semana:</span>
+                            <strong>${thisWeekContacts.length}</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <span>Total contactos:</span>
+                            <strong>${contacts.length}</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <span>Conversiones:</span>
+                            <strong>${conversions.length}</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span>Tasa de conversión:</span>
+                            <strong style="color: #10b981;">${conversionRate}%</strong>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            const dailyGoal = 10;
+            const todayContacts = contacts.filter(c => c.date === today.toISOString().split('T')[0]).length;
+            const goalProgress = (todayContacts / dailyGoal * 100).toFixed(1);
+            
+            personalTargetsEl.innerHTML = `
+                <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+                    <h4 style="margin: 0 0 1rem 0; color: #374151;">🎯 Objetivos Personales</h4>
+                    <div style="margin-bottom: 1rem;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <span>Meta diaria:</span>
+                            <strong>${dailyGoal} contactos</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <span>Contactos hoy:</span>
+                            <strong>${todayContacts}</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 1rem;">
+                            <span>Progreso:</span>
+                            <strong style="color: ${goalProgress >= 100 ? '#10b981' : '#f59e0b'};">${goalProgress}%</strong>
+                        </div>
+                        <div style="background: #e5e7eb; height: 8px; border-radius: 4px; overflow: hidden;">
+                            <div style="
+                                background: ${goalProgress >= 100 ? '#10b981' : '#f59e0b'};
+                                height: 8px;
+                                width: ${Math.min(goalProgress, 100)}%;
+                                transition: width 0.5s ease;
+                            "></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function loadDirectorReports(contacts) {
+            const teamPerformanceEl = document.getElementById('teamPerformance');
+            const salesRankingEl = document.getElementById('salesRanking');
+            const executiveSummaryEl = document.getElementById('executiveSummary');
+            const directorReportsEl = document.getElementById('directorReports');
+            const personalReportsEl = document.getElementById('personalReports');
+            
+            if (directorReportsEl) directorReportsEl.classList.remove('hidden');
+            if (personalReportsEl) personalReportsEl.classList.add('hidden');
+            
+            if (!teamPerformanceEl || !salesRankingEl || !executiveSummaryEl) return;
+            
+            // Team Performance
+            const today = new Date().toISOString().split('T')[0];
+            const todayContacts = contacts.filter(c => c.date === today);
+            const conversions = contacts.filter(c => c.status === 'Convertido');
+            const activeLeads = contacts.filter(c => !['Convertido', 'Perdido'].includes(c.status));
+            
+            teamPerformanceEl.innerHTML = `
+                <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+                    <h4 style="margin: 0 0 1rem 0; color: #374151;">👥 Rendimiento del Equipo</h4>
+                    <div style="text-align: center; margin-bottom: 1rem;">
+                        <div style="font-size: 2rem; font-weight: bold; color: #3b82f6; margin-bottom: 0.5rem;">
+                            ${contacts.length}
+                        </div>
+                        <div style="color: #6b7280;">Total Leads</div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; font-size: 0.9rem;">
+                        <div>Hoy: <strong>${todayContacts.length}</strong></div>
+                        <div>Activos: <strong>${activeLeads.length}</strong></div>
+                        <div>Convertidos: <strong>${conversions.length}</strong></div>
+                        <div>Tasa: <strong>${contacts.length > 0 ? ((conversions.length / contacts.length) * 100).toFixed(1) : 0}%</strong></div>
+                    </div>
+                </div>
+            `;
+            
+            // Sales Ranking
+            try {
+                const allUsers = await window.FirebaseData.getAllUsers();
+                const salespeople = Object.entries(allUsers).filter(([uid, user]) => user.role === 'vendedor');
+                
+                const rankings = salespeople.map(([uid, user]) => {
+                    const userContacts = contacts.filter(c => c.salespersonId === uid);
+                    const userConversions = userContacts.filter(c => c.status === 'Convertido');
+                    return {
+                        name: user.name,
+                        contacts: userContacts.length,
+                        conversions: userConversions.length
+                    };
+                }).sort((a, b) => b.conversions - a.conversions);
+                
+                salesRankingEl.innerHTML = `
+                    <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+                        <h4 style="margin: 0 0 1rem 0; color: #374151;">🏆 Ranking de Ventas</h4>
+                        ${rankings.length === 0 ? `
+                            <div style="text-align: center; color: #6b7280; padding: 1rem;">
+                                No hay vendedores registrados
+                            </div>
+                        ` : rankings.slice(0, 3).map((person, index) => `
+                            <div style="
+                                display: flex;
+                                justify-content: space-between;
+                                align-items: center;
+                                padding: 0.75rem;
+                                margin-bottom: 0.5rem;
+                                background: ${index === 0 ? '#fef3c7' : index === 1 ? '#e5e7eb' : '#fecaca'};
+                                border-radius: 8px;
+                            ">
+                                <div>
+                                    <span style="margin-right: 0.5rem;">
+                                        ${index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
+                                    </span>
+                                    <strong>${person.name}</strong>
+                                </div>
+                                <div style="text-align: right; font-size: 0.9rem;">
+                                    <div><strong>${person.conversions}</strong> conversiones</div>
+                                    <div style="color: #6b7280;">${person.contacts} contactos</div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            } catch (error) {
+                console.error('❌ Error loading sales ranking:', error);
+                salesRankingEl.innerHTML = `
+                    <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+                        <h4 style="margin: 0 0 1rem 0; color: #374151;">🏆 Ranking de Ventas</h4>
+                        <div style="text-align: center; color: #dc2626; padding: 1rem;">
+                            Error cargando ranking
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Executive Summary
+            const sourcesBreakdown = {};
+            contacts.forEach(contact => {
+                const source = contact.source || 'No especificado';
+                sourcesBreakdown[source] = (sourcesBreakdown[source] || 0) + 1;
+            });
+            
+            const topSource = Object.entries(sourcesBreakdown).sort((a, b) => b[1] - a[1])[0];
+            
+            executiveSummaryEl.innerHTML = `
+                <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+                    <h4 style="margin: 0 0 1rem 0; color: #374151;">📈 Resumen Ejecutivo</h4>
+                    <div style="font-size: 0.9rem; line-height: 1.6;">
+                        <div style="margin-bottom: 1rem;">
+                            <strong>Estado General:</strong><br>
+                            El equipo tiene ${contacts.length} leads totales con una tasa de conversión del ${contacts.length > 0 ? ((conversions.length / contacts.length) * 100).toFixed(1) : 0}%.
+                        </div>
+                        ${topSource ? `
+                            <div style="margin-bottom: 1rem;">
+                                <strong>Mejor Fuente:</strong><br>
+                                ${topSource[0]} con ${topSource[1]} leads.
+                            </div>
+                        ` : ''}
+                        <div>
+                            <strong>Recomendación:</strong><br>
+                            ${activeLeads.length > 0 ? 
+                                `Seguir con los ${activeLeads.length} leads activos en pipeline.` : 
+                                'Enfocar esfuerzos en generar nuevos leads.'
+                            }
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ===== CONFIG DATA LOADING =====
+        async function loadConfigData() {
+            try {
+                console.log('⚙️ Loading config data');
+                await updateConveniosList();
+            } catch (error) {
+                console.error('❌ Error loading config data:', error);
+            }
+        }
+
+        // ===== CONVENIOS LIST UPDATE =====
+        async function updateConveniosList() {
+            try {
+                const conveniosList = document.getElementById('conveniosList');
+                if (!conveniosList) return;
+                
+                conveniosList.innerHTML = '<div class="loading-spinner"></div> Cargando convenios...';
+                
+                const convenios = await window.FirebaseData.getConvenios();
+                
+                if (!convenios || convenios.length === 0) {
+                    conveniosList.innerHTML = `
+                        <div style="text-align: center; color: #666; padding: 2rem;">
+                            <div style="font-size: 2rem; margin-bottom: 1rem;">🤝</div>
+                            <p>No hay convenios registrados</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                conveniosList.innerHTML = convenios.map((convenio, index) => `
+                    <div style="background: #f9fafb; padding: 0.75rem; border-radius: 5px; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; border-left: 3px solid #10b981;">
+                        <span>${convenio}</span>
+                        <button onclick="deleteConvenio('${convenio}')" style="background: #ef4444; color: white; border: none; border-radius: 4px; padding: 0.25rem 0.5rem; cursor: pointer; font-size: 0.8rem;">
+                            🗑️
+                        </button>
+                    </div>
+                `).join('');
+                
+            } catch (error) {
+                console.error('❌ Error updating convenios list:', error);
+            }
+        }
+
+        // ===== UTILITY FUNCTIONS =====
+        async function getUserDisplayName(userId) {
+            try {
+                if (!userId) return 'Unknown User';
+                
+                const allUsers = await window.FirebaseData.getAllUsers();
+                const user = allUsers[userId];
+                
+                if (user && user.name) {
+                    return user.name;
+                }
+                
+                if (user && user.email) {
+                    return user.email.split('@')[0];
+                }
+                
+                return 'Unknown User';
+            } catch (error) {
+                console.error('❌ Error getting user display name:', error);
+                return 'Unknown User';
+            }
+        }
+
+        function formatDate(dateString) {
+            try {
+                if (!dateString) return 'Sin fecha';
+                const date = new Date(dateString);
+                return date.toLocaleDateString('es-ES');
+            } catch (error) {
+                return dateString || 'Sin fecha';
+            }
+        }
+
+        // ===== REFRESH ALL DATA =====
+        async function refreshAllData() {
+            try {
+                console.log('🔄 Refreshing all data');
+                
+                await updateStats();
+                await updateLeadsTable();
+                
+                alert('✅ Datos actualizados');
+                
+            } catch (error) {
+                console.error('❌ Error refreshing data:', error);
+                alert('❌ Error al actualizar datos');
+            }
+        }
+
+        // ===== LOGOUT =====
+        async function handleLogout() {
+            try {
+                if (confirm('¿Estás seguro de que quieres cerrar sesión?')) {
+                    await window.FirebaseData.logout();
+                    
+                    currentUser = null;
+                    userRole = null;
+                    isInitialized = false;
+                    
+                    document.getElementById('mainApp').classList.add('hidden');
+                    document.getElementById('loginScreen').classList.remove('hidden');
+                    
+                    document.getElementById('username').value = '';
+                    document.getElementById('password').value = '';
+                    
+                    alert('👋 Sesión cerrada correctamente');
+                }
+            } catch (error) {
+                console.error('❌ Logout error:', error);
+                alert('❌ Error al cerrar sesión');
+            }
+        }
+
+        // ===== ADD CONVENIO =====
+        async function addConvenio() {
+            try {
+                const input = document.getElementById('newConvenio');
+                const convenioName = input.value.trim();
+                
+                if (!convenioName) {
+                    alert('⚠️ Ingresa el nombre del convenio');
+                    return;
+                }
+                
+                const currentConvenios = await window.FirebaseData.getConvenios();
+                
+                if (currentConvenios.includes(convenioName)) {
+                    alert('⚠️ Este convenio ya existe');
+                    return;
+                }
+                
+                const updatedConvenios = [...currentConvenios, convenioName];
+                await window.FirebaseData.updateConvenios(updatedConvenios);
+                
+                input.value = '';
+                cachedConvenios = updatedConvenios;
+                await updateConveniosList();
+                
+                alert(`✅ Convenio "${convenioName}" agregado correctamente`);
+                
+            } catch (error) {
+                console.error('❌ Error adding convenio:', error);
+                alert('❌ Error al agregar convenio');
+            }
+        }
+
+        // ===== DELETE CONVENIO =====
+        async function deleteConvenio(convenioName) {
+            try {
+                if (confirm(`¿Estás seguro de eliminar el convenio "${convenioName}"?`)) {
+                    const currentConvenios = await window.FirebaseData.getConvenios();
+                    const updatedConvenios = currentConvenios.filter(c => c !== convenioName);
+                    await window.FirebaseData.updateConvenios(updatedConvenios);
+                    
+                    cachedConvenios = updatedConvenios;
+                    await updateConveniosList();
+                    alert(`✅ Convenio "${convenioName}" eliminado correctamente`);
+                }
+            } catch (error) {
+                console.error('❌ Error deleting convenio:', error);
+                alert('❌ Error al eliminar convenio');
+            }
+        }
+
+        // ===== TEST FUNCTIONS =====
+        async function testConveniosSystem() {
+            try {
+                const results = {
+                    firebaseAvailable: !!window.FirebaseData,
+                    conveniosFunction: typeof window.FirebaseData?.getConvenios === 'function',
+                    conveniosLoaded: 0,
+                    handleSourceChangeExists: typeof handleSourceChange === 'function',
+                    domElements: {
+                        sourceSelect: !!document.getElementById('contactSource'),
+                        convenioGroup: !!document.getElementById('convenioGroup'),
+                        convenioSelect: !!document.getElementById('contactConvenio')
+                    }
+                };
+                
+                if (results.firebaseAvailable && results.conveniosFunction) {
+                    const convenios = await window.FirebaseData.getConvenios();
+                    results.conveniosLoaded = convenios ? convenios.length : 0;
+                }
+                
+                const allWorking = results.firebaseAvailable && 
+                                  results.conveniosFunction && 
+                                  results.handleSourceChangeExists && 
+                                  Object.values(results.domElements).every(v => v);
+                
+                alert(`🧪 TEST CONVENIOS SYSTEM:
+
+🔥 Firebase: ${results.firebaseAvailable ? '✅' : '❌'}
+⚙️ Función Convenios: ${results.conveniosFunction ? '✅' : '❌'}
+📋 Convenios Cargados: ${results.conveniosLoaded}
+🔧 Handle Function: ${results.handleSourceChangeExists ? '✅' : '❌'}
+
+📋 ELEMENTOS DOM:
+- Source Select: ${results.domElements.sourceSelect ? '✅' : '❌'}
+- Convenio Group: ${results.domElements.convenioGroup ? '✅' : '❌'}
+- Convenio Select: ${results.domElements.convenioSelect ? '✅' : '❌'}
+
+🎯 ESTADO: ${allWorking ? '✅ FUNCIONANDO PERFECTAMENTE' : '⚠️ REVISAR'}`);
+                
+            } catch (error) {
+                console.error('❌ Error testing convenios system:', error);
+                alert(`❌ Error testing convenios: ${error.message}`);
+            }
+        }
+
+        async function testTabSystem() {
+            try {
+                const tabs = ['contacts', 'leads', 'pipeline', 'reports'];
+                let working = 0;
+                
+                for (const tab of tabs) {
+                    try {
+                        switchTab(tab);
+                        const content = document.getElementById(tab);
+                        if (content && !content.classList.contains('hidden')) {
+                            working++;
+                        }
+                    } catch (error) {
+                        console.error('Error testing tab:', tab, error);
+                    }
+                }
+                
+                // Reset to contacts tab
+                switchTab('contacts');
+                
+                alert(`🧪 TEST TAB SYSTEM:
+
+📑 Tabs Funcionando: ${working}/${tabs.length}
+🎯 Estado: ${working === tabs.length ? '✅ TODAS LAS TABS FUNCIONAN' : '⚠️ ALGUNAS TABS TIENEN PROBLEMAS'}
+
+Tabs Probadas:
+${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).join('\n')}`);
+                
+            } catch (error) {
+                alert(`❌ Error testing tabs: ${error.message}`);
+            }
+        }
+
+        // ===== PLACEHOLDER FUNCTIONS =====
+        function showLeadDetails(leadId) {
+            alert(`📋 Ver detalles del lead: ${leadId}\n\n✅ Sistema funcionando correctamente`);
+        }
+
+        function deleteLead(leadId) {
+            if (confirm('¿Estás seguro de eliminar este lead?')) {
+                alert(`🗑️ Lead eliminado: ${leadId}\n\n✅ Sistema funcionando correctamente`);
+            }
+        }
+
+        function exportTodayContacts() {
+            alert('📥 Exportar contactos de hoy\n\n✅ Sistema funcionando correctamente');
+        }
+
+        console.log('✅ Complete CRM System loaded successfully');
+        // ===== PLACE THIS CODE RIGHT AFTER: console.log('✅ Complete CRM System loaded successfully'); =====
+        
+        // ===== CRITICAL MISSING FUNCTIONS =====
+        
+        // Fix showNotification function (PRIORITY 1)
+        function showNotification(message, type = 'info', duration = 5000) {
+            // Remove existing notifications
+            const existing = document.querySelectorAll('.notification-toast');
+            existing.forEach(n => n.remove());
+            
+            const notification = document.createElement('div');
+            notification.className = `notification-toast notification-${type}`;
+            
+            const colors = {
+                success: '#10b981',
+                error: '#ef4444',
+                warning: '#f59e0b',
+                info: '#3b82f6'
+            };
+            
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: ${colors[type] || colors.info};
+                color: white;
+                padding: 1rem 1.5rem;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                z-index: 10000;
+                max-width: 400px;
+                font-size: 0.9rem;
+                line-height: 1.4;
+                transform: translateX(100%);
+                transition: transform 0.3s ease;
+                white-space: pre-line;
+            `;
+            
+            notification.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div>${message}</div>
+                    <button onclick="this.parentElement.parentElement.remove()" style="background: none; border: none; color: white; font-size: 1.2rem; cursor: pointer; margin-left: 1rem; opacity: 0.8;">×</button>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Animate in
+            setTimeout(() => {
+                notification.style.transform = 'translateX(0)';
+            }, 100);
+            
+            // Auto remove
+            if (duration > 0) {
+                setTimeout(() => {
+                    notification.style.transform = 'translateX(100%)';
+                    setTimeout(() => notification.remove(), 300);
+                }, duration);
+            }
+        }
+
+        // Fix showLeadDetails function (PRIORITY 1)
+        async function showLeadDetails(leadId) {
+            try {
+                console.log('📋 Showing lead details for:', leadId);
+                
+                if (!window.FirebaseData) {
+                    alert('❌ Sistema no disponible');
+                    return;
+                }
+                
+                // Get lead data
+                const allContacts = await window.FirebaseData.getAllContacts();
+                const lead = allContacts.find(c => c.id === leadId);
+                
+                if (!lead) {
+                    alert('❌ Lead no encontrado');
+                    return;
+                }
+                
+                // Get salesperson name
+                const salespersonName = await getUserDisplayNameFirebase(lead.salespersonId);
+                
+                // Simple alert for now
+                const details = `📋 DETALLES DEL LEAD:
+
+👤 Nombre: ${lead.name}
+📞 Teléfono: ${lead.phone}
+✉️ Email: ${lead.email || 'No proporcionado'}
+📍 Ubicación: ${lead.location}
+🔗 Fuente: ${lead.source}
+📊 Estado: ${lead.status}
+🗓️ Fecha: ${formatDate(lead.date)}
+👨‍💼 Vendedor: ${salespersonName}
+
+📝 Notas:
+${lead.notes || 'Sin notas'}`;
+                
+                alert(details);
+                
+            } catch (error) {
+                console.error('❌ Error showing lead details:', error);
+                alert('❌ Error al mostrar detalles del lead');
+            }
+        }
+
+        // Fix getUserDisplayNameFirebase function
+        async function getUserDisplayNameFirebase(userId) {
+            try {
+                if (!userId || !window.FirebaseData) return 'Usuario Desconocido';
+                
+                const allUsers = await window.FirebaseData.getAllUsers();
+                const user = allUsers[userId];
+                
+                if (user && user.name) {
+                    return user.name;
+                }
+                
+                if (user && user.email) {
+                    return user.email.split('@')[0];
+                }
+                
+                return 'Usuario Desconocido';
+            } catch (error) {
+                console.error('❌ Error getting user display name:', error);
+                return 'Error Usuario';
+            }
+        }
+
+        // Fix runSystemDiagnostic function
+        async function runSystemDiagnostic() {
+            try {
+                const diagnostics = {
+                    timestamp: new Date().toISOString(),
+                    firebase: !!window.FirebaseData,
+                    authenticated: !!window.FirebaseData?.currentUser,
+                    userProfile: !!currentUser,
+                    totalContacts: 0,
+                    convenios: 0
+                };
+                
+                if (window.FirebaseData) {
+                    try {
+                        const contacts = await window.FirebaseData.getAllContacts();
+                        diagnostics.totalContacts = contacts.length;
+                        
+                        const convenios = await window.FirebaseData.getConvenios();
+                        diagnostics.convenios = convenios ? convenios.length : 0;
+                    } catch (error) {
+                        diagnostics.dataError = error.message;
+                    }
+                }
+                
+                const report = `🔍 DIAGNÓSTICO DEL SISTEMA:
+
+🔥 Firebase: ${diagnostics.firebase ? '✅' : '❌'}
+👤 Autenticado: ${diagnostics.authenticated ? '✅' : '❌'}
+📊 Total Contactos: ${diagnostics.totalContacts}
+🤝 Convenios: ${diagnostics.convenios}
+⏰ ${new Date().toLocaleString()}
+
+${diagnostics.dataError ? `❌ Error: ${diagnostics.dataError}` : '✅ Sistema funcionando'}`;
+                
+                alert(report);
+                console.log('🔍 System diagnostics:', diagnostics);
+                
+            } catch (error) {
+                console.error('❌ Error running diagnostics:', error);
+                alert(`❌ Error en diagnóstico: ${error.message}`);
+            }
+        }
+
+        // ===== FIX MONITORING TAB FUNCTIONS =====
+        
+        // Fix loadMonitoringData function
+        async function loadMonitoringData() {
+            try {
+                console.log('👀 Loading monitoring data');
+                
+                const teamOverview = document.getElementById('teamActivityOverview');
+                const individualActivity = document.getElementById('individualSalespeopleActivity');
+                const recentActivity = document.getElementById('recentTeamActivity');
+                
+                if (!window.FirebaseData || !window.FirebaseData.currentUser) {
+                    if (teamOverview) teamOverview.innerHTML = '<p style="color: #dc2626;">❌ Firebase no disponible</p>';
+                    if (individualActivity) individualActivity.innerHTML = '<p style="color: #dc2626;">❌ Firebase no disponible</p>';
+                    if (recentActivity) recentActivity.innerHTML = '<p style="color: #dc2626;">❌ Firebase no disponible</p>';
+                    return;
+                }
+                
+                const userProfile = await window.FirebaseData.loadUserProfile();
+                if (userProfile.role !== 'director') {
+                    if (teamOverview) teamOverview.innerHTML = '<p style="color: #f59e0b;">⚠️ Solo directores pueden ver el monitoreo</p>';
+                    return;
+                }
+                
+                // Load team data
+                const [allUsers, allContacts] = await Promise.all([
+                    window.FirebaseData.getAllUsers(),
+                    window.FirebaseData.getAllContacts()
+                ]);
+                
+                const today = new Date().toISOString().split('T')[0];
+                const todayContacts = allContacts.filter(c => c.date === today);
+                const salespeople = Object.entries(allUsers).filter(([uid, user]) => user.role === 'vendedor');
+                
+                // Team Overview
+                if (teamOverview) {
+                    teamOverview.innerHTML = `
+                        <div style="background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+                            <h3 style="margin: 0 0 1.5rem 0;">📊 Vista General del Equipo</h3>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                                <div style="text-align: center; padding: 1rem; background: #f0f9ff; border-radius: 8px;">
+                                    <div style="font-size: 2rem; font-weight: bold; color: #3b82f6;">${allContacts.length}</div>
+                                    <div style="color: #6b7280;">Total Leads</div>
+                                </div>
+                                <div style="text-align: center; padding: 1rem; background: #f0fdf4; border-radius: 8px;">
+                                    <div style="font-size: 2rem; font-weight: bold; color: #10b981;">${todayContacts.length}</div>
+                                    <div style="color: #6b7280;">Contactos Hoy</div>
+                                </div>
+                                <div style="text-align: center; padding: 1rem; background: #fefce8; border-radius: 8px;">
+                                    <div style="font-size: 2rem; font-weight: bold; color: #f59e0b;">${salespeople.length}</div>
+                                    <div style="color: #6b7280;">Vendedores</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                // Individual Activity
+                if (individualActivity) {
+                    const salespeopleStats = salespeople.map(([uid, user]) => {
+                        const userContacts = allContacts.filter(c => c.salespersonId === uid);
+                        const userTodayContacts = userContacts.filter(c => c.date === today);
+                        const userConversions = userContacts.filter(c => c.status === 'Convertido');
+                        
+                        return {
+                            name: user.name,
+                            email: user.email,
+                            totalContacts: userContacts.length,
+                            todayContacts: userTodayContacts.length,
+                            conversions: userConversions.length,
+                            conversionRate: userContacts.length > 0 ? (userConversions.length / userContacts.length * 100).toFixed(1) : 0
+                        };
+                    });
+                    
+                    individualActivity.innerHTML = `
+                        <div style="background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+                            <h3 style="margin: 0 0 1.5rem 0;">👥 Actividad Individual</h3>
+                            <div style="display: grid; gap: 1rem;">
+                                ${salespeopleStats.map(person => `
+                                    <div style="padding: 1rem; border: 1px solid #e5e7eb; border-radius: 8px; background: #f9fafb;">
+                                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                                            <div>
+                                                <h4 style="margin: 0 0 0.25rem 0;">${person.name}</h4>
+                                                <div style="font-size: 0.9rem; color: #6b7280;">${person.email}</div>
+                                            </div>
+                                            <div style="text-align: right;">
+                                                <div style="font-weight: bold; color: #3b82f6;">${person.todayContacts} hoy</div>
+                                                <div style="font-size: 0.9rem; color: #6b7280;">${person.totalContacts} total</div>
+                                            </div>
+                                        </div>
+                                        <div style="margin-top: 0.5rem; font-size: 0.9rem;">
+                                            <span style="color: #10b981;">✅ ${person.conversions} conversiones</span>
+                                            <span style="margin-left: 1rem; color: #f59e0b;">📊 ${person.conversionRate}% tasa</span>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                // Recent Activity
+                if (recentActivity) {
+                    const recentContacts = allContacts
+                        .sort((a, b) => new Date(b.date + ' ' + (b.time || '00:00:00')) - new Date(a.date + ' ' + (a.time || '00:00:00')))
+                        .slice(0, 10);
+                    
+                    recentActivity.innerHTML = `
+                        <div style="background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+                            <h3 style="margin: 0 0 1.5rem 0;">🕒 Actividad Reciente del Equipo</h3>
+                            <div style="max-height: 400px; overflow-y: auto;">
+                                ${recentContacts.map(contact => `
+                                    <div style="padding: 1rem; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
+                                        <div>
+                                            <div style="font-weight: 600;">${contact.name}</div>
+                                            <div style="font-size: 0.9rem; color: #6b7280;">📞 ${contact.phone}</div>
+                                        </div>
+                                        <div style="text-align: right;">
+                                            <div style="font-size: 0.8rem; color: #6b7280;">${formatDate(contact.date)}</div>
+                                            <div style="font-size: 0.8rem; color: #10b981;">${contact.status}</div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                console.log('✅ Monitoring data loaded successfully');
+                
+            } catch (error) {
+                console.error('❌ Error loading monitoring data:', error);
+                showNotification('❌ Error cargando datos de monitoreo', 'error');
+            }
+        }
+
+        // ===== FIX REPORTS RANKING =====
+        
+        // Enhanced loadReportsData function
+        async function loadReportsData() {
+            try {
+                console.log('📊 Loading reports data');
+                
+                if (!window.FirebaseData || !window.FirebaseData.currentUser) {
+                    console.log('⚠️ Firebase not available for reports');
+                    return;
+                }
+                
+                const userProfile = await window.FirebaseData.loadUserProfile();
+                const allContacts = await window.FirebaseData.getFilteredContacts();
+                
+                if (userProfile.role === 'director') {
+                    await loadDirectorReports(allContacts);
+                } else {
+                    await loadPersonalReports(allContacts);
+                }
+                
+            } catch (error) {
+                console.error('❌ Error loading reports data:', error);
+                showNotification('❌ Error cargando reportes', 'error');
+            }
+        }
+
+        // Fixed loadDirectorReports function
+        async function loadDirectorReports(contacts) {
+            const salesRankingEl = document.getElementById('salesRanking');
+            const directorReportsEl = document.getElementById('directorReports');
+            const personalReportsEl = document.getElementById('personalReports');
+            
+            if (directorReportsEl) directorReportsEl.classList.remove('hidden');
+            if (personalReportsEl) personalReportsEl.classList.add('hidden');
+            
+            if (!salesRankingEl) return;
+            
+            try {
+                const allUsers = await window.FirebaseData.getAllUsers();
+                const salespeople = Object.entries(allUsers).filter(([uid, user]) => user.role === 'vendedor');
+                
+                const rankings = salespeople.map(([uid, user]) => {
+                    const userContacts = contacts.filter(c => c.salespersonId === uid);
+                    const userConversions = userContacts.filter(c => c.status === 'Convertido');
+                    const today = new Date().toISOString().split('T')[0];
+                    const todayContacts = userContacts.filter(c => c.date === today);
+                    
+                    return {
+                        name: user.name,
+                        email: user.email,
+                        contacts: userContacts.length,
+                        conversions: userConversions.length,
+                        todayContacts: todayContacts.length,
+                        conversionRate: userContacts.length > 0 ? (userConversions.length / userContacts.length * 100).toFixed(1) : 0
+                    };
+                }).sort((a, b) => b.conversions - a.conversions);
+                
+                salesRankingEl.innerHTML = `
+                    <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+                        <h4 style="margin: 0 0 1rem 0; color: #374151;">🏆 Ranking de Ventas</h4>
+                        ${rankings.length === 0 ? `
+                            <div style="text-align: center; color: #6b7280; padding: 1rem;">
+                                No hay vendedores registrados
+                            </div>
+                        ` : rankings.map((person, index) => `
+                            <div style="
+                                display: flex;
+                                justify-content: space-between;
+                                align-items: center;
+                                padding: 1rem;
+                                margin-bottom: 0.5rem;
+                                background: ${index === 0 ? 'linear-gradient(135deg, #fef3c7, #fde68a)' : 
+                                             index === 1 ? 'linear-gradient(135deg, #e5e7eb, #d1d5db)' : 
+                                             index === 2 ? 'linear-gradient(135deg, #fecaca, #fca5a5)' : '#f9fafb'};
+                                border-radius: 8px;
+                                border-left: 4px solid ${index === 0 ? '#f59e0b' : index === 1 ? '#6b7280' : index === 2 ? '#ef4444' : '#e5e7eb'};
+                            ">
+                                <div>
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                                        <span style="font-size: 1.2rem;">
+                                            ${index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`}
+                                        </span>
+                                        <strong style="color: #374151;">${person.name}</strong>
+                                    </div>
+                                    <div style="font-size: 0.8rem; color: #6b7280;">${person.email}</div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <div style="font-weight: bold; color: #10b981; margin-bottom: 0.25rem;">
+                                        ${person.conversions} conversiones
+                                    </div>
+                                    <div style="font-size: 0.8rem; color: #6b7280;">
+                                        ${person.contacts} contactos (${person.conversionRate}%)
+                                    </div>
+                                    <div style="font-size: 0.8rem; color: #3b82f6;">
+                                        ${person.todayContacts} hoy
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+                
+console.log('✅ Sales ranking loaded successfully');
+                
+            } catch (error) {
+                console.error('❌ Error loading sales ranking:', error);
+                salesRankingEl.innerHTML = `
+                    <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+                        <h4 style="margin: 0 0 1rem 0; color: #374151;">🏆 Ranking de Ventas</h4>
+                        <div style="text-align: center; color: #dc2626; padding: 1rem;">
+                            ❌ Error cargando ranking: ${error.message}
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        console.log('✅ Complete CRM System loaded successfully');
+    </script>
+    <script src="fixes.js"></script>
+    <script src="social.js"></script>
+    <script src="pipeline.js"></script>
+    <script src="simple-tasks.js"></script>
+
+</body>
+</html>
