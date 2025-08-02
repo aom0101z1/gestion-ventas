@@ -1369,6 +1369,135 @@ function switchTab(tabName) {
             }
         }
 
+
+// ===== USER MANAGEMENT FUNCTIONS =====
+// Replace the xxxxxxxxxxxxx with these functions:
+
+// CREATE NEW USER
+async function handleCreateUser(event) {
+    event.preventDefault();
+    
+    const createBtn = event.target.querySelector('button[type="submit"]');
+    const originalText = createBtn.innerHTML;
+    
+    try {
+        createBtn.disabled = true;
+        createBtn.innerHTML = '<div class="loading-spinner" style="width: 12px; height: 12px; display: inline-block; margin-right: 0.5rem;"></div>Creando...';
+        
+        const name = document.getElementById('newUserName').value.trim();
+        const email = document.getElementById('newUserEmail').value.trim();
+        const password = document.getElementById('newUserPassword').value;
+        const role = document.getElementById('newUserRole').value;
+        
+        console.log('📝 Creating user:', { name, email, role });
+        
+        // Create user in Firebase
+        const newUser = await window.FirebaseData.createUser(email, password, {
+            name: name,
+            role: role
+        });
+        
+        console.log('✅ User created:', newUser.uid);
+        
+        // Clear form
+        event.target.reset();
+        
+        alert(`✅ Usuario creado exitosamente!\n\nNombre: ${name}\nEmail: ${email}\nRol: ${role}\n\nYa puede iniciar sesión.`);
+        
+        // Reload users list
+        setTimeout(() => loadUsersList(), 1000);
+        
+    } catch (error) {
+        console.error('❌ Error:', error);
+        
+        let errorMessage = 'Error al crear usuario';
+        if (error.message.includes('email-already-in-use')) {
+            errorMessage = 'Este email ya está registrado';
+        } else if (error.message.includes('weak-password')) {
+            errorMessage = 'La contraseña debe tener al menos 6 caracteres';
+        } else if (error.message.includes('invalid-email')) {
+            errorMessage = 'Email inválido';
+        }
+        
+        alert(`❌ ${errorMessage}`);
+    } finally {
+        createBtn.disabled = false;
+        createBtn.innerHTML = originalText;
+    }
+}
+
+// LOAD USERS LIST
+async function loadUsersList() {
+    try {
+        console.log('📋 Loading users list...');
+        
+        const usersListEl = document.getElementById('usersList');
+        if (!usersListEl) {
+            console.log('❌ usersList element not found');
+            return;
+        }
+        
+        usersListEl.innerHTML = '<div class="loading-spinner"></div> Cargando usuarios...';
+        
+        // Get all users
+        const users = await window.FirebaseData.getAllUsers();
+        console.log('👥 Users loaded:', users);
+        
+        if (!users || Object.keys(users).length === 0) {
+            usersListEl.innerHTML = '<p style="color: #6b7280;">No hay usuarios registrados</p>';
+            return;
+        }
+        
+        let html = '<div style="display: grid; gap: 0.5rem;">';
+        
+        Object.entries(users).forEach(([userId, user]) => {
+            const roleEmoji = user.role === 'director' ? '👑' : '👤';
+            const roleColor = user.role === 'director' ? '#f59e0b' : '#3b82f6';
+            const createdDate = user.createdAt ? new Date(user.createdAt).toLocaleDateString('es-ES') : 'N/A';
+            
+            html += `
+                <div style="
+                    background: #f9fafb;
+                    padding: 1rem;
+                    border-radius: 8px;
+                    border: 1px solid #e5e7eb;
+                ">
+                    <div style="font-weight: 600;">${user.name || 'Sin nombre'}</div>
+                    <div style="font-size: 0.875rem; color: #6b7280;">${user.email || 'Sin email'}</div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem;">
+                        <span style="
+                            background: ${roleColor};
+                            color: white;
+                            padding: 0.125rem 0.5rem;
+                            border-radius: 12px;
+                            font-size: 0.75rem;
+                            font-weight: 600;
+                        ">
+                            ${roleEmoji} ${user.role || 'vendedor'}
+                        </span>
+                        <span style="font-size: 0.75rem; color: #9ca3af;">
+                            ${createdDate}
+                        </span>
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+        usersListEl.innerHTML = html;
+        
+        console.log('✅ Users list loaded with', Object.keys(users).length, 'users');
+        
+    } catch (error) {
+        console.error('❌ Error loading users:', error);
+        const usersListEl = document.getElementById('usersList');
+        if (usersListEl) {
+            usersListEl.innerHTML = `<p style="color: #ef4444;">❌ Error: ${error.message}</p>`;
+        }
+    }
+}
+
+      
         // ===== STATS UPDATE =====
         async function updateStats() {
             try {
@@ -2620,6 +2749,7 @@ console.log('✅ Sales ranking loaded successfully');
 
 </body>
 </html>
+
 
 
 
