@@ -1,5 +1,5 @@
-// simple-tasks.js - WORKING VERSION FOR CIUDAD BILINGUE CRM
-// ===== GUARANTEED WORKING TASK MANAGEMENT =====
+// simple-tasks.js - ENHANCED WITH DRAG & DROP FUNCTIONALITY
+// ===== TASK MANAGEMENT WITH DRAG & DROP LIKE PIPELINE =====
 
 // Task data
 let taskData = [
@@ -37,31 +37,27 @@ let taskData = [
 
 // ===== MAIN FUNCTION - CALLED FROM TAB SWITCH =====
 function loadTasksData() {
-    console.log('📋 Loading tasks data - WORKING VERSION');
+    console.log('📋 Loading tasks data with DRAG & DROP');
     
-    // Find the container
     const container = document.getElementById('tasksContainer');
     if (!container) {
         console.error('❌ tasksContainer not found');
         return;
     }
     
-    console.log('✅ Found tasksContainer, rendering...');
-    
-    // Clear and render content
+    console.log('✅ Found tasksContainer, rendering with drag & drop...');
     container.innerHTML = renderTaskInterface();
-    
-    console.log('✅ Task interface rendered successfully');
+    console.log('✅ Task interface with drag & drop rendered successfully');
 }
 
-// ===== RENDER COMPLETE INTERFACE =====
+// ===== RENDER COMPLETE INTERFACE WITH DRAG & DROP =====
 function renderTaskInterface() {
     return `
         <!-- Task Dashboard -->
         <div style="background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 2rem;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
                 <h3 style="margin: 0; color: #1f2937; display: flex; align-items: center; gap: 0.5rem;">
-                    📋 Panel de Tareas del Equipo
+                    📋 Panel de Tareas del Equipo - Drag & Drop
                     <span style="background: #f3f4f6; color: #6b7280; padding: 0.25rem 0.5rem; border-radius: 12px; font-size: 0.8rem; font-weight: normal;">
                         ${taskData.length} tareas totales
                     </span>
@@ -100,8 +96,8 @@ function renderTaskInterface() {
             </div>
         </div>
 
-        <!-- Task Board -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+        <!-- DRAG & DROP TASK BOARD -->
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; height: 70vh; margin-bottom: 2rem;">
             ${renderTaskColumn('pending', '⏳ Pendientes', '#f59e0b')}
             ${renderTaskColumn('in-progress', '🔄 En Progreso', '#3b82f6')}
             ${renderTaskColumn('completed', '✅ Completadas', '#10b981')}
@@ -194,27 +190,35 @@ function renderTaskInterface() {
     `;
 }
 
-// ===== RENDER TASK COLUMN =====
+// ===== RENDER TASK COLUMN WITH DROP ZONE =====
 function renderTaskColumn(status, title, color) {
     const columnTasks = taskData.filter(task => task.status === status);
     
     return `
-        <div style="background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); overflow: hidden; border-top: 4px solid ${color};">
-            <div style="background: ${color}20; color: ${color}; padding: 1rem; text-align: center; font-weight: 600; border-bottom: 1px solid ${color}30;">
+        <div class="task-drop-zone" 
+             ondrop="dropTask(event)" 
+             ondragover="allowDropTask(event)"
+             data-status="${status}"
+             style="background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden; border-top: 4px solid ${color};">
+            
+            <div style="background: ${color}; color: white; padding: 1rem; text-align: center; font-weight: bold;">
                 ${title} (${columnTasks.length})
             </div>
-            <div style="padding: 1rem; min-height: 300px; max-height: 500px; overflow-y: auto;">
+            
+            <div style="padding: 1rem; height: calc(100% - 60px); overflow-y: auto;">
                 ${columnTasks.length === 0 ? 
-                    `<div style="text-align: center; color: #9ca3af; padding: 3rem; font-style: italic;">No hay tareas en esta columna</div>` :
-                    columnTasks.map(task => renderTaskCard(task)).join('')
+                    `<div style="text-align: center; color: #9ca3af; padding: 3rem; font-style: italic; border: 2px dashed #e5e7eb; border-radius: 8px; margin: 1rem 0;">
+                        Arrastra tareas aquí
+                    </div>` :
+                    columnTasks.map(task => renderDraggableTaskCard(task)).join('')
                 }
             </div>
         </div>
     `;
 }
 
-// ===== RENDER TASK CARD =====
-function renderTaskCard(task) {
+// ===== RENDER DRAGGABLE TASK CARD =====
+function renderDraggableTaskCard(task) {
     const priorityColors = {
         low: '#10b981',
         medium: '#3b82f6',
@@ -231,18 +235,22 @@ function renderTaskCard(task) {
     const isOverdue = new Date(task.dueDate) < new Date() && task.status !== 'completed';
     
     return `
-        <div onclick="showTaskDetails('${task.id}')" style="
-            background: ${isOverdue ? '#fef2f2' : '#f9fafb'};
-            border: 1px solid ${isOverdue ? '#fecaca' : '#e5e7eb'};
-            border-left: 4px solid ${priorityColors[task.priority]};
-            border-radius: 8px;
-            padding: 1rem;
-            margin-bottom: 1rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        " 
-        onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)'"
-        onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+        <div id="task-${task.id}" 
+             draggable="true" 
+             ondragstart="dragTask(event)"
+             onclick="toggleTaskInfo('${task.id}')"
+             style="
+                background: ${isOverdue ? '#fef2f2' : '#f9fafb'};
+                border: 1px solid ${isOverdue ? '#fecaca' : '#e5e7eb'};
+                border-left: 4px solid ${priorityColors[task.priority]};
+                border-radius: 8px;
+                padding: 1rem;
+                margin-bottom: 1rem;
+                cursor: pointer;
+                transition: all 0.2s ease;
+             " 
+             onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)'"
+             onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
             
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
                 <div style="font-weight: 600; color: #1f2937; flex: 1; line-height: 1.3;">
@@ -263,7 +271,7 @@ function renderTaskCard(task) {
                 </span>
             </div>
             
-            <div style="font-size: 0.9rem; color: #6b7280; margin-bottom: 1rem; line-height: 1.4;">
+            <div id="task-info-${task.id}" style="display: none; font-size: 0.9rem; color: #6b7280; margin-bottom: 1rem; line-height: 1.4;">
                 ${task.description}
             </div>
             
@@ -279,7 +287,71 @@ function renderTaskCard(task) {
     `;
 }
 
-// ===== TASK MANAGEMENT FUNCTIONS =====
+// ===== DRAG & DROP FUNCTIONS (BASED ON PIPELINE.JS PATTERN) =====
+
+// Function to allow drop (MANDATORY)
+function allowDropTask(ev) {
+    ev.preventDefault();
+}
+
+// Function drag start (saves the ID)
+function dragTask(ev) {
+    ev.dataTransfer.setData("text", ev.target.id);
+    console.log('🎯 Task drag started:', ev.target.id);
+}
+
+// Function drop (processes the drop)
+async function dropTask(ev) {
+    ev.preventDefault();
+    
+    const taskElementId = ev.dataTransfer.getData("text");
+    const taskId = taskElementId.replace('task-', '');
+    const newStatus = ev.currentTarget.dataset.status;
+    
+    console.log('🎯 Task drop:', taskId, 'to', newStatus);
+    
+    try {
+        // Find and update task in local data
+        const task = taskData.find(t => t.id === taskId);
+        if (!task) {
+            console.error('❌ Task not found:', taskId);
+            return;
+        }
+        
+        // Update task status
+        task.status = newStatus;
+        task.lastUpdated = new Date().toISOString();
+        
+        console.log('✅ Task status updated locally');
+        
+        // Show notification
+        if (window.showNotification) {
+            window.showNotification(`✅ Tarea movida a ${getStatusName(newStatus)}`, 'success');
+        }
+        
+        // Refresh the interface
+        setTimeout(() => loadTasksData(), 300);
+        
+        // TODO: If you want to persist to Firebase/backend, add here:
+        // await window.FirebaseData.updateTask(taskId, { status: newStatus });
+        
+    } catch (error) {
+        console.error('❌ Error moving task:', error);
+        if (window.showNotification) {
+            window.showNotification('❌ Error al mover tarea', 'error');
+        }
+    }
+}
+
+// Toggle task information
+function toggleTaskInfo(taskId) {
+    const info = document.getElementById(`task-info-${taskId}`);
+    if (info) {
+        info.style.display = info.style.display === 'none' ? 'block' : 'none';
+    }
+}
+
+// ===== EXISTING TASK MANAGEMENT FUNCTIONS =====
 function openNewTaskModal() {
     const modal = document.getElementById('taskModal');
     if (modal) {
@@ -345,38 +417,6 @@ function createQuickTask(type) {
     document.getElementById('modalTaskTitle').value = titles[type] || '';
 }
 
-function showTaskDetails(taskId) {
-    const task = taskData.find(t => t.id === taskId);
-    if (!task) return;
-    
-    const statusOptions = ['pending', 'in-progress', 'completed'];
-    const newStatus = prompt(`
-TAREA: ${task.title}
-
-Responsable: ${task.assignee}
-Estado actual: ${task.status}
-Prioridad: ${task.priority}
-Vence: ${task.dueDate}
-
-Descripción: ${task.description}
-
-Cambiar estado a:
-- pending (Pendiente)
-- in-progress (En Progreso)  
-- completed (Completada)
-
-Escribe el nuevo estado:`, task.status);
-    
-    if (newStatus && statusOptions.includes(newStatus)) {
-        task.status = newStatus;
-        loadTasksData(); // Refresh interface
-        
-        if (window.showNotification) {
-            window.showNotification(`✅ Tarea movida a: ${getStatusName(newStatus)}`, 'success');
-        }
-    }
-}
-
 // ===== UTILITY FUNCTIONS =====
 function getOverdueTasks() {
     const today = new Date();
@@ -401,9 +441,9 @@ function getTomorrowDate() {
 
 function getStatusName(status) {
     const names = {
-        'pending': 'Pendiente',
+        'pending': 'Pendientes',
         'in-progress': 'En Progreso',
-        'completed': 'Completada'
+        'completed': 'Completadas'
     };
     return names[status] || status;
 }
@@ -417,10 +457,13 @@ function clearModalForm() {
 
 // ===== EXPORT TO GLOBAL SCOPE =====
 window.loadTasksData = loadTasksData;
+window.allowDropTask = allowDropTask;
+window.dragTask = dragTask;
+window.dropTask = dropTask;
+window.toggleTaskInfo = toggleTaskInfo;
 window.openNewTaskModal = openNewTaskModal;
 window.closeTaskModal = closeTaskModal;
 window.saveNewTask = saveNewTask;
 window.createQuickTask = createQuickTask;
-window.showTaskDetails = showTaskDetails;
 
-console.log('✅ WORKING Task Management System loaded successfully!');
+console.log('✅ Enhanced Task Management System with Drag & Drop loaded successfully!');
