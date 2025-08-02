@@ -2000,12 +2000,80 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
             alert(`📋 Ver detalles del lead: ${leadId}\n\n✅ Sistema funcionando correctamente`);
         }
 
-        function deleteLead(leadId) {
-            if (confirm('¿Estás seguro de eliminar este lead?')) {
-                alert(`🗑️ Lead eliminado: ${leadId}\n\n✅ Sistema funcionando correctamente`);
+        async function deleteLead(leadId) {
+    try {
+        console.log('🗑️ Attempting to delete lead:', leadId);
+        
+        if (!window.FirebaseData) {
+            alert('❌ Sistema no disponible');
+            return;
+        }
+        
+        // Show confirmation dialog
+        const confirmDelete = confirm('¿Estás seguro de eliminar este lead?\n\n⚠️ Esta acción no se puede deshacer.');
+        
+        if (!confirmDelete) {
+            console.log('❌ Deletion cancelled by user');
+            return;
+        }
+        
+        // Show loading notification
+        if (typeof showNotification === 'function') {
+            showNotification('🔄 Eliminando lead...', 'info');
+        }
+        
+        // Delete from Firebase
+        const deleted = await window.FirebaseData.deleteContact(leadId);
+        
+        if (deleted) {
+            console.log('✅ Lead deleted successfully');
+            
+            // Show success notification
+            if (typeof showNotification === 'function') {
+                showNotification('✅ Lead eliminado correctamente', 'success');
+            } else {
+                alert('✅ Lead eliminado correctamente');
+            }
+            
+            // Refresh the leads table
+            if (typeof updateLeadsTable === 'function') {
+                setTimeout(() => updateLeadsTable(), 500);
+            }
+            
+            // Update stats
+            if (typeof updateStats === 'function') {
+                setTimeout(() => updateStats(), 500);
+            }
+            
+            // Refresh pipeline if on that tab
+            if (window.appState && window.appState.currentTab === 'pipeline' && typeof loadPipelineData === 'function') {
+                setTimeout(() => loadPipelineData(), 500);
+            }
+            
+        } else {
+            console.error('❌ Failed to delete lead');
+            if (typeof showNotification === 'function') {
+                showNotification('❌ Error al eliminar el lead', 'error');
+            } else {
+                alert('❌ Error al eliminar el lead');
             }
         }
-
+        
+    } catch (error) {
+        console.error('❌ Error deleting lead:', error);
+        
+        let errorMessage = 'Error al eliminar el lead';
+        if (error.message.includes('only delete your own contacts')) {
+            errorMessage = 'Solo puedes eliminar tus propios contactos';
+        }
+        
+        if (typeof showNotification === 'function') {
+            showNotification(`❌ ${errorMessage}`, 'error');
+        } else {
+            alert(`❌ ${errorMessage}`);
+        }
+    }
+}
         function exportTodayContacts() {
             alert('📥 Exportar contactos de hoy\n\n✅ Sistema funcionando correctamente');
         }
@@ -2446,4 +2514,5 @@ console.log('✅ Sales ranking loaded successfully');
 
 </body>
 </html>
+
 
