@@ -909,148 +909,291 @@ function handleDragLeave(event) {
 
 // ✅ ENHANCED: Drop handler with comprehensive error handling and validation
 async function handleDrop(event, newStatus) {
-    console.log(`🎯 Enhanced drop handler - Status: ${newStatus}`);
+    console.log(`🎯 ENHANCED DROP HANDLER - Status: ${newStatus}`);
     
     if (event.stopPropagation) {
         event.stopPropagation();
     }
     event.preventDefault();
     
-    if (!dragDropState.isDragging) {
-        console.log('⚠️ Drop event but not in dragging state');
-        return;
-    }
-    
     // Get lead ID from multiple sources for redundancy
-    const leadId = event.dataTransfer.getData('application/x-lead-id') || 
-                   event.dataTransfer.getData('text/plain') || 
+    const leadId = event.dataTransfer.getData('text/plain') || 
+                   event.dataTransfer.getData('application/x-lead-id') || 
                    window.draggedLead;
+    
+    console.log(`📝 Lead ID from drag data: ${leadId}`);
+    console.log(`📝 Window.draggedLead: ${window.draggedLead}`);
     
     // Comprehensive cleanup of visual states
     cleanupDragVisuals();
     
     // Validate drop operation
-    if (!leadId || !window.draggedLead) {
+    if (!leadId) {
         console.error('❌ No lead ID found for drop operation');
-        showDropError('ID de lead no encontrado');
+        alert('❌ Error: ID de lead no encontrado');
         resetDragState();
         return;
     }
     
     if (!newStatus || !PIPELINE_STAGES[newStatus]) {
         console.error('❌ Invalid target status:', newStatus);
-        showDropError('Estado de destino inválido');
+        alert('❌ Error: Estado de destino inválido');
         resetDragState();
         return;
     }
     
     // Check if the lead is actually moving to a different status
     const currentLead = pipelineData.find(lead => lead.id === leadId);
-    if (currentLead && currentLead.status === newStatus) {
+    if (!currentLead) {
+        console.error('❌ Lead not found in current data:', leadId);
+        alert('❌ Error: Lead no encontrado en los datos actuales');
+        resetDragState();
+        return;
+    }
+    
+    if (currentLead.status === newStatus) {
         console.log('ℹ️ Lead already in target status, no update needed');
         resetDragState();
         return;
     }
     
-    console.log(`🎯 Dropping lead ${leadId} into ${newStatus}`);
-    
-    // Show loading state
-    showDropLoading(leadId, newStatus);
+    console.log(`🎯 Moving lead "${currentLead.name}" from "${currentLead.status}" to "${newStatus}"`);
     
     try {
+        // Show loading indicator
+        const loadingIndicator = document.createElement('div');
+        loadingIndicator.id = 'drop-loading-indicator';
+        loadingIndicator.style.cssText = `
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #3b82f6;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        `;
+        loadingIndicator.innerHTML = `
+            <div style="
+                border: 2px solid transparent;
+                border-top: 2px solid white;
+                border-radius: 50%;
+                width: 16px;
+                height: 16px;
+                animation: spin 1s linear infinite;
+            "></div>
+            Moviendo a "${newStatus}"...
+        `;
+        document.body.appendChild(loadingIndicator);
+        
         // Validate Firebase connection
         if (!window.FirebaseData) {
-            throw new Error('Firebase no disponible');
+            throw new Error('Firebase no está disponible');
         }
         
-        // Update lead status in Firebase with additional metadata
+        if (!window.FirebaseData.currentUser) {
+            throw new Error('Usuario no autenticado');
+        }
+        
+        console.log('🔄 Attempting Firebase update...');
+        
+        // Update lead status in Firebase with comprehensive data
         const updateData = {
             status: newStatus,
             lastUpdated: new Date().toISOString(),
             statusChangedAt: new Date().toISOString(),
-            statusHistory: currentLead?.statusHistory || []
+            updatedBy: window.FirebaseData.currentUser.email || 'unknown'
         };
         
-        // Add to status history
-        updateData.statusHistory.push({
-            from: currentLead?.status || 'Unknown',
-            to: newStatus,
-            timestamp: new Date().toISOString(),
-            method: 'drag_drop'
-        });
+        console.log('📤 Update data being sent:', updateData);
         
+        // Attempt the Firebase update
         const success = await window.FirebaseData.updateContact(leadId, updateData);
         
-        if (success) {
-            console.log('✅ Lead status updated successfully');
-            
-            const showNotification = window.showNotification || function(message, type) {
-                console.log(`${type}: ${message}`);
-            };
-            
-            showNotification(`✅ Lead movido a "${newStatus}" exitosamente`, 'success');
+        console.log('📥 Firebase update result:', success);
+        
+        if (success || success !== false) {
+            console.log('✅ Lead status updated successfully in Firebase');
             
             // Update local data immediately for better UX
-            if (currentLead) {
-                currentLead.status = newStatus;
-                currentLead.lastUpdated = updateData.lastUpdated;
-            }
+            currentLead.status = newStatus;
+            currentLead.lastUpdated = updateData.lastUpdated;
+            currentLead.statusChangedAt = updateData.statusChangedAt;
             
-            // Reload pipeline data to reflect changes
-            await loadPipelineData();
+            // Show success notification
+            const showNotification = window.showNotification || function(message, type) {
+                console.log(`${type}: ${message}`);
+                // Create a temporary success message
+                const successDiv = document.createElement('div');
+                successDiv.style.cssText = `
+                    position: fixed;
+                    top: 70px;
+                    right: 20px;
+                    background: #10b981;
+                    color: white;
+                    padding: 12px 24px;
+                    border-radius: 8px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                    z-index: 10000;
+                `;
+                successDiv.textContent = message;
+                document.body.appendChild(successDiv);
+                setTimeout(() => successDiv.remove(), 3000);
+            };
+            
+            showNotification(`✅ ${currentLead.name} movido a "${newStatus}" exitosamente`, 'success');
+            
+            // Remove loading indicator
+            loadingIndicator.remove();
+            
+            // Force immediate UI update without full reload
+            await updatePipelineUI();
             
         } else {
-            throw new Error('Falló la actualización del contacto');
+            throw new Error('La actualización retornó false');
         }
         
     } catch (error) {
         console.error('❌ Error moving lead:', error);
         
+        // Remove loading indicator if it exists
+        const loadingIndicator = document.getElementById('drop-loading-indicator');
+        if (loadingIndicator) {
+            loadingIndicator.remove();
+        }
+        
+        // Show detailed error to user
         const showNotification = window.showNotification || function(message, type) {
             if (type === 'error') {
-                alert(`Error: ${message}`);
+                // Create a temporary error message
+                const errorDiv = document.createElement('div');
+                errorDiv.style.cssText = `
+                    position: fixed;
+                    top: 70px;
+                    right: 20px;
+                    background: #ef4444;
+                    color: white;
+                    padding: 12px 24px;
+                    border-radius: 8px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                    z-index: 10000;
+                    max-width: 300px;
+                `;
+                errorDiv.textContent = message;
+                document.body.appendChild(errorDiv);
+                setTimeout(() => errorDiv.remove(), 5000);
             }
         };
         
         showNotification(`❌ Error al mover lead: ${error.message}`, 'error');
         
-        // Show detailed error to user
-        showDropError(`Error al mover lead: ${error.message}`);
+        // Show detailed error in console and alert
+        console.error('🔍 Detailed error information:');
+        console.error('   - Lead ID:', leadId);
+        console.error('   - Target Status:', newStatus);
+        console.error('   - Current Lead:', currentLead);
+        console.error('   - Firebase Available:', !!window.FirebaseData);
+        console.error('   - User Authenticated:', !!window.FirebaseData?.currentUser);
+        console.error('   - Error:', error);
         
-        // Reload pipeline to ensure correct state
-        await loadPipelineData();
+        // Try to reload pipeline to ensure correct state
+        console.log('🔄 Attempting to reload pipeline data...');
+        try {
+            await loadPipelineData();
+        } catch (reloadError) {
+            console.error('❌ Error reloading pipeline:', reloadError);
+        }
         
     } finally {
         // Always reset drag state
         resetDragState();
-        hideDropLoading();
     }
 }
 
-// ===== ENHANCED UTILITY FUNCTIONS =====
-
-// ✅ Reset drag state
-function resetDragState() {
-    dragDropState.isDragging = false;
-    dragDropState.draggedElement = null;
-    dragDropState.originalParent = null;
-    dragDropState.dragStartTime = null;
-    window.draggedLead = null;
+// ✅ NEW: Enhanced UI update function that doesn't require full reload
+async function updatePipelineUI() {
+    console.log('🎨 Updating pipeline UI without full reload');
+    
+    try {
+        // Group contacts by status
+        const statusGroups = groupContactsByStatus(pipelineData);
+        
+        // Update each column content
+        Object.entries(PIPELINE_STAGES).forEach(([status, config]) => {
+            const leads = statusGroups[status] || [];
+            const columnBody = document.getElementById(`pipeline-body-${status.replace(/\s+/g, '-')}`);
+            
+            if (columnBody) {
+                if (leads.length === 0) {
+                    columnBody.innerHTML = renderEmptyColumnState(status, config);
+                } else {
+                    columnBody.innerHTML = leads.map(lead => renderLeadCard(lead, config.color, config.targetDays)).join('');
+                }
+            }
+            
+            // Update column count
+            const columnHeader = document.querySelector(`#pipeline-column-${status.replace(/\s+/g, '-')} .pipeline-header [style*="background: rgba(255,255,255,0.2)"]`);
+            if (columnHeader) {
+                columnHeader.textContent = leads.length;
+            }
+        });
+        
+        // Recalculate and update statistics
+        calculatePipelineStats(pipelineData);
+        
+        // Re-attach event listeners to new elements
+        setTimeout(() => {
+            setupPipelineEventListeners();
+            console.log('✅ Pipeline UI updated and event listeners re-attached');
+        }, 100);
+        
+    } catch (error) {
+        console.error('❌ Error updating pipeline UI:', error);
+        // Fallback to full reload
+        await loadPipelineData();
+    }
 }
 
-// ✅ Clean up drag visuals
+
+
+// ===== ENHANCED UTILITY FUNCTIONS =====
+
+// ✅ ENHANCED: Reset drag state function
+function resetDragState() {
+    console.log('🔄 Resetting drag state');
+    
+    window.draggedLead = null;
+    
+    if (typeof dragDropState !== 'undefined') {
+        dragDropState.isDragging = false;
+        dragDropState.draggedElement = null;
+        dragDropState.originalParent = null;
+        dragDropState.dragStartTime = null;
+    }
+}
+
+// ✅ ENHANCED: Clean up drag visuals function
 function cleanupDragVisuals() {
+    console.log('🧹 Cleaning up drag visuals');
+    
     // Remove column visual feedback
     document.querySelectorAll('.pipeline-column').forEach(col => {
         col.classList.remove('drag-over', 'drag-enter', 'drag-active');
         col.style.transform = '';
         col.style.borderColor = '';
+        col.style.background = '';
     });
     
     // Remove body visual feedback
     document.querySelectorAll('.pipeline-body').forEach(body => {
         body.classList.remove('drag-over');
         body.style.backgroundColor = '';
+        body.style.border = '';
     });
     
     // Remove card visual feedback
@@ -2110,3 +2253,4 @@ if (typeof module !== 'undefined' && module.exports) {
 console.log('✅ Enhanced Pipeline.js module loaded successfully with robust drag & drop functionality');
 console.log(`📊 Module size: ${Math.ceil(document.currentScript?.innerHTML?.length / 1000 || 0)}KB`);
 console.log('🎯 Features: Enhanced drag & drop, better error handling, touch support, analytics ready');
+
