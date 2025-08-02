@@ -1,24 +1,23 @@
-// ===== DRAG & DROP FIX PARA TAREAS - SOLO LAS FUNCIONES QUE FALTAN =====
+// ===== SOLO AGREGA ESTAS LÍNEAS AL FINAL DE TU simple-tasks.js =====
 
-// Solo agrega estas funciones al final de tu archivo simple-tasks.js existente:
-
-function handleDragStart(event, taskId) {
+// Funciones para drag & drop que faltan (agregar al final del archivo)
+window.handleDragStart = function(event, taskId) {
     draggedTask = taskId;
     event.target.style.opacity = '0.5';
     event.dataTransfer.setData('text/plain', taskId);
     console.log('🎯 Task drag started:', taskId);
-}
+};
 
-function handleDragOver(event) {
+window.handleDragOver = function(event) {
     event.preventDefault();
     event.currentTarget.style.backgroundColor = '#e3f2fd';
-}
+};
 
-function handleDragLeave(event) {
+window.handleDragLeave = function(event) {
     event.currentTarget.style.backgroundColor = '#f9fafb';
-}
+};
 
-async function handleDrop(event, newStatus) {
+window.handleDrop = async function(event, newStatus) {
     event.preventDefault();
     event.currentTarget.style.backgroundColor = '#f9fafb';
     
@@ -45,12 +44,6 @@ async function handleDrop(event, newStatus) {
     document.querySelectorAll('.task-card').forEach(card => {
         card.style.opacity = '1';
     });
-}
-
-// Exportar las funciones que faltan
-window.handleDragStart = handleDragStart;
-window.handleDragOver = handleDragOver;
-window.handleDragLeave = handleDragLeave;
-window.handleDrop = handleDrop;
+};
 
 console.log('✅ Task drag & drop functions added');
