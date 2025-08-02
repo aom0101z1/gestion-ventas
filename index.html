@@ -359,71 +359,76 @@
             .user-info { flex-direction: column; gap: 1rem; }
             .tabs { flex-direction: column; }
         }
-/* Enhanced Mobile Support */
-@media (max-width: 768px) {
-    .pipeline-grid {
-        grid-template-columns: 1fr !important;
-    }
-    
-    .stats-grid {
-        grid-template-columns: repeat(2, 1fr) !important;
-    }
-    
-    .lead-card {
-        padding: 0.75rem !important;
-    }
-    
-    .tabs {
-        flex-direction: column !important;
-    }
-    
-    .tab {
-        padding: 0.75rem !important;
-        font-size: 0.9rem !important;
-    }
-}
 
-/* Loading States */
-.loading {
-    opacity: 0.6;
-    pointer-events: none;
-}
+        /* Enhanced Mobile Support */
+        @media (max-width: 768px) {
+            .pipeline-grid {
+                grid-template-columns: 1fr !important;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr) !important;
+            }
+            
+            .lead-card {
+                padding: 0.75rem !important;
+            }
+            
+            .tabs {
+                flex-direction: column !important;
+            }
+            
+            .tab {
+                padding: 0.75rem !important;
+                font-size: 0.9rem !important;
+            }
+        }
 
-.loading::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 20px;
-    height: 20px;
-    border: 2px solid #f3f4f6;
-    border-top: 2px solid #3b82f6;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    transform: translate(-50%, -50%);
-}
+        /* Loading States */
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .loading::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #f3f4f6;
+            border-top: 2px solid #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            transform: translate(-50%, -50%);
+        }
         
     </style>
 </head>
 
 <body>
-     <div id="authCheckLoading" class="auth-check-loading" style="display: none;">
+    <!-- ✅ FIXED: Auth Check Loading Screen -->
+    <div id="authCheckLoading" class="auth-check-loading" style="display: none;">
         <div class="auth-check-spinner"></div>
         <h2>🔐 Verificando sesión...</h2>
     </div>
+    
     <!-- Firebase Status Indicator -->
     <div id="firebaseStatus" class="firebase-status connecting">
         <div class="loading-spinner" style="width: 12px; height: 12px; border-width: 2px;"></div>
         Conectando a Firebase...
     </div>
+    
     <!-- social - facebook -->
     <div id="socialMedia" class="tab-content hidden">
-    <h2>💬 Gestión de Redes Sociales</h2>
-    <div id="socialMediaContainer">
-        <!-- Content will be loaded by social.js -->
+        <h2>💬 Gestión de Redes Sociales</h2>
+        <div id="socialMediaContainer">
+            <!-- Content will be loaded by social.js -->
+        </div>
     </div>
-</div>
     <!-- End of social facebook  -->
+    
     <!-- Login Screen -->
     <div id="loginScreen">
         <div class="login-container">
@@ -735,7 +740,7 @@
                     </div>
                 </div>
 
-                <!-- User Management Section - ADDED HERE -->
+                <!-- User Management Section -->
                 <div id="userManagement" style="background: #fef3c7; padding: 2rem; border-radius: 10px; margin-top: 2rem;">
                     <h3>👥 Gestión de Usuarios</h3>
                     
@@ -787,12 +792,12 @@
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
         import { getDatabase, ref, set, get, push, update, remove, onValue, off } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
-  
-    //    <!-- Store Firebase modules globally for access from other scripts -->
 
-window.firebaseModules = {
-    database: { ref, set, get, push, update, remove, onValue, off }
-};
+        // Store Firebase modules globally for access from other scripts
+        window.firebaseModules = {
+            database: { ref, set, get, push, update, remove, onValue, off }
+        };
+        
         const firebaseConfig = {
             apiKey: "AIzaSyCuq1z8eTo9rufdEDXQFfvoxOkce-kBWOY",
             authDomain: "ciudad-bilingue-crm.firebaseapp.com",
@@ -827,19 +832,19 @@ window.firebaseModules = {
                 console.log('🔥 SimpleFirebaseManager initialized');
                 
                 onAuthStateChanged(this.auth, (user) => {
-    if (user) {
-        this.currentUser = user;
-        console.log('✅ Firebase user authenticated:', user.email);
-        // Check if app needs to be auto-initialized
-        checkAuthAndAutoLogin(user);
-    } else {
-        this.currentUser = null;
-        console.log('ℹ️ No Firebase user authenticated');
-        // Show login screen
-        document.getElementById('authCheckLoading').style.display = 'none';
-        document.getElementById('loginScreen').classList.remove('hidden');
-    }
-});
+                    if (user) {
+                        this.currentUser = user;
+                        console.log('✅ Firebase user authenticated:', user.email);
+                        // ✅ FIXED: Check if app needs to be auto-initialized
+                        checkAuthAndAutoLogin(user);
+                    } else {
+                        this.currentUser = null;
+                        console.log('ℹ️ No Firebase user authenticated');
+                        // Show login screen
+                        document.getElementById('authCheckLoading').style.display = 'none';
+                        document.getElementById('loginScreen').classList.remove('hidden');
+                    }
+                });
             }
 
             async login(email, password) {
@@ -927,8 +932,17 @@ window.firebaseModules = {
                 });
             }
 
+            // ✅ FIXED: Properly implemented deleteContact function
             async deleteContact(contactId) {
-                await remove(ref(this.database, `contacts/${contactId}`));
+                try {
+                    console.log('🗑️ Deleting contact:', contactId);
+                    await remove(ref(this.database, `contacts/${contactId}`));
+                    console.log('✅ Contact deleted successfully');
+                    return true;
+                } catch (error) {
+                    console.error('❌ Error deleting contact:', error);
+                    throw error;
+                }
             }
 
             async getConvenios() {
@@ -947,15 +961,16 @@ window.firebaseModules = {
 
         window.FirebaseData = new SimpleFirebaseManager();
         window.dispatchEvent(new Event('firebaseReady'));
+        
         // Fix for tasks tab
-window.loadTasksData = function() {
-    console.log('📋 Loading tasks data from tab switch');
-    
-    // Initialize tasks module if not already done
-    if (window.initializeTasksModule && typeof window.initializeTasksModule === 'function') {
-        window.initializeTasksModule();
-    }
-};
+        window.loadTasksData = function() {
+            console.log('📋 Loading tasks data from tab switch');
+            
+            // Initialize tasks module if not already done
+            if (window.initializeTasksModule && typeof window.initializeTasksModule === 'function') {
+                window.initializeTasksModule();
+            }
+        };
     </script>
 
     <!-- Complete CRM System JavaScript -->
@@ -965,6 +980,44 @@ window.loadTasksData = function() {
         let userRole = null;
         let isInitialized = false;
         let cachedConvenios = [];
+
+        // ✅ FIXED: Auto-login function to check existing auth and initialize app
+        async function checkAuthAndAutoLogin(user) {
+            try {
+                console.log('🔐 Auto-login check for user:', user.email);
+                
+                currentUser = user;
+                
+                // Load user profile
+                const profile = await window.FirebaseData.loadUserProfile();
+                if (!profile) {
+                    throw new Error('User profile not found');
+                }
+                
+                userRole = profile.role;
+                
+                // Update UI with user info
+                document.getElementById('currentUserName').textContent = profile.name;
+                document.getElementById('userRole').textContent = `(${profile.role})`;
+                
+                // Hide login and loading screens, show main app
+                document.getElementById('authCheckLoading').style.display = 'none';
+                document.getElementById('loginScreen').classList.add('hidden');
+                document.getElementById('mainApp').classList.remove('hidden');
+                
+                // Initialize the application
+                await initializeMainApplication();
+                
+                console.log('✅ Auto-login successful');
+                
+            } catch (error) {
+                console.error('❌ Auto-login failed:', error);
+                
+                // Show login screen
+                document.getElementById('authCheckLoading').style.display = 'none';
+                document.getElementById('loginScreen').classList.remove('hidden');
+            }
+        }
 
         // ===== LOGIN FUNCTION =====
         async function handleLogin(event) {
@@ -991,24 +1044,10 @@ window.loadTasksData = function() {
                 const userCredential = await window.FirebaseData.login(email, password);
                 console.log('✅ Firebase login successful');
                 
-                currentUser = userCredential.user;
-                
-                const profile = await window.FirebaseData.loadUserProfile();
-                if (!profile) {
-                    throw new Error('User profile not found. Contact administrator.');
-                }
-                
-                userRole = profile.role;
-                console.log('👤 User role loaded:', userRole);
-                
-                document.getElementById('loginError').classList.add('hidden');
-                
-                await initializeMainApplication();
-                
-                alert(`✅ ¡Bienvenido ${profile.name}!\n🔥 Sistema completamente funcional\n👑 Rol: ${profile.role}`);
+                // Firebase will trigger onAuthStateChanged which will call checkAuthAndAutoLogin
                 
             } catch (error) {
-                console.error('❌ Login failed:', error);
+                console.error('❌ Login error:', error);
                 
                 let errorMessage = 'Error de autenticación';
                 if (error.code === 'auth/user-not-found') {
@@ -1023,7 +1062,6 @@ window.loadTasksData = function() {
                 errorEl.textContent = errorMessage;
                 errorEl.classList.remove('hidden');
                 
-            } finally {
                 loginBtn.disabled = false;
                 loginBtn.innerHTML = originalText;
             }
@@ -1033,9 +1071,6 @@ window.loadTasksData = function() {
         async function initializeMainApplication() {
             try {
                 console.log('🚀 Initializing main application');
-                
-                document.getElementById('loginScreen').classList.add('hidden');
-                document.getElementById('mainApp').classList.remove('hidden');
                 
                 const profile = await window.FirebaseData.loadUserProfile();
                 
@@ -1048,7 +1083,7 @@ window.loadTasksData = function() {
                 
             } catch (error) {
                 console.error('❌ Error initializing main application:', error);
-                alert('Error inicializando la aplicación');
+                showNotification('❌ Error inicializando aplicación', 'error');
             }
         }
 
@@ -1154,36 +1189,6 @@ window.loadTasksData = function() {
                 console.log('📋 Loaded convenios:', convenios);
                 
                 cachedConvenios = convenios || [];
-                        async function checkAuthAndAutoLogin(user) {
-            try {
-                console.log('🔐 Checking authenticated user:', user.email);
-                
-                currentUser = user;
-                const profile = await window.FirebaseData.loadUserProfile();
-                
-                if (profile) {
-                    console.log('✅ Auto-login successful for:', profile.name);
-                    userRole = profile.role;
-                    
-                    // Hide auth check screen
-                    document.getElementById('authCheckLoading').style.display = 'none';
-                    
-                    // Initialize app directly
-                    await initializeMainApplication();
-                    
-                    showNotification(`✅ ¡Bienvenido de vuelta ${profile.name}!\n🔥 Sesión restaurada automáticamente`, 'success');
-                } else {
-                    // Profile not found, show login
-                    console.log('⚠️ User profile not found, showing login');
-                    document.getElementById('authCheckLoading').style.display = 'none';
-                    document.getElementById('loginScreen').classList.remove('hidden');
-                }
-            } catch (error) {
-                console.error('❌ Auto-login error:', error);
-                document.getElementById('authCheckLoading').style.display = 'none';
-                document.getElementById('loginScreen').classList.remove('hidden');
-            }
-        }
                 
                 const profile = await window.FirebaseData.loadUserProfile();
                 if (profile && profile.role === 'director') {
@@ -1238,12 +1243,12 @@ window.loadTasksData = function() {
                         console.log('✅ Convenio dropdown populated');
                     } else {
                         convenioSelect.innerHTML = '<option value="">No hay convenios configurados</option>';
-                        alert('⚠️ No hay convenios configurados. Contacta al administrador.');
+                        showNotification('⚠️ No hay convenios configurados. Contacta al administrador.', 'warning');
                     }
                 } catch (error) {
                     console.error('❌ Error loading convenios:', error);
                     convenioSelect.innerHTML = '<option value="">Error cargando convenios</option>';
-                    alert('❌ Error al cargar convenios');
+                    showNotification('❌ Error al cargar convenios', 'error');
                 }
             } else {
                 console.log('❌ Hiding convenio dropdown');
@@ -1258,7 +1263,7 @@ window.loadTasksData = function() {
             event.preventDefault();
             
             if (!window.FirebaseData || !window.FirebaseData.currentUser) {
-                alert('❌ Firebase no disponible o usuario no autenticado. Recarga la página.');
+                showNotification('❌ Firebase no disponible o usuario no autenticado. Recarga la página.', 'error');
                 return;
             }
             
@@ -1272,7 +1277,7 @@ window.loadTasksData = function() {
                 if (source === 'CONVENIO') {
                     const convenio = document.getElementById('contactConvenio').value;
                     if (!convenio) {
-                        alert('⚠️ Selecciona un convenio');
+                        showNotification('⚠️ Selecciona un convenio', 'warning');
                         return;
                     }
                     source = `CONVENIO: ${convenio}`;
@@ -1291,7 +1296,7 @@ window.loadTasksData = function() {
                 };
                 
                 if (!contact.name || !contact.phone || !contact.source || !contact.location) {
-                    alert('⚠️ Completa todos los campos obligatorios');
+                    showNotification('⚠️ Completa todos los campos obligatorios', 'warning');
                     return;
                 }
                 
@@ -1311,64 +1316,62 @@ window.loadTasksData = function() {
                     updateLeadsTable();
                 }, 500);
                 
-                alert(`✅ ¡Contacto guardado en Firebase!
-
-👤 ${savedContact.name}
-📞 ${savedContact.phone}
-🔥 Sistema funcionando correctamente`);
+                showNotification(`✅ ¡Contacto guardado en Firebase!\n\n👤 ${savedContact.name}\n📞 ${savedContact.phone}`, 'success');
                 
             } catch (error) {
                 console.error('❌ Error saving to Firebase:', error);
-                alert(`❌ Error al guardar en Firebase: ${error.message}`);
+                showNotification(`❌ Error al guardar en Firebase: ${error.message}`, 'error');
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = originalText;
             }
         }
 
-// ===== TAB NAVIGATION =====
-function switchTab(tabName) {
-    console.log('📑 Switching to tab:', tabName);
-    
-    try {
-        // Hide all tab contents
-        document.querySelectorAll('.tab-content').forEach(content => {
-            content.classList.add('hidden');
-        });
-        
-        // Remove active class from all tabs
-        document.querySelectorAll('.tab').forEach(tab => {
-            tab.classList.remove('active');
-        });
-        
-        // Show target content
-        const targetContent = document.getElementById(tabName);
-        const targetTab = document.getElementById(tabName + 'Tab');
-        
-        if (targetContent) {
-            targetContent.classList.remove('hidden');
-            console.log('✅ Tab content shown:', tabName);
-        }
-        
-        if (targetTab) {
-            targetTab.classList.add('active');
-            console.log('✅ Tab activated:', tabName);
-        }
-        
-        // Load tab-specific data
-        if (tabName === 'leads') {
-            updateLeadsTable();
-        } else if (tabName === 'config') {
-            loadConfigData();
-        } else if (tabName === 'pipeline') {
-            loadPipelineData();
-        } else if (tabName === 'reports') {
-            loadReportsData();
-        } else if (tabName === 'tasks') {
-            loadTasksData();
-        }
-        
-        console.log('✅ Tab switched successfully:', tabName);
+        // ===== TAB NAVIGATION =====
+        function switchTab(tabName) {
+            console.log('📑 Switching to tab:', tabName);
+            
+            try {
+                // Hide all tab contents
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.add('hidden');
+                });
+                
+                // Remove active class from all tabs
+                document.querySelectorAll('.tab').forEach(tab => {
+                    tab.classList.remove('active');
+                });
+                
+                // Show target content
+                const targetContent = document.getElementById(tabName);
+                const targetTab = document.getElementById(tabName + 'Tab');
+                
+                if (targetContent) {
+                    targetContent.classList.remove('hidden');
+                    console.log('✅ Tab content shown:', tabName);
+                }
+                
+                if (targetTab) {
+                    targetTab.classList.add('active');
+                    console.log('✅ Tab activated:', tabName);
+                }
+                
+                // Load tab-specific data
+                if (tabName === 'leads') {
+                    updateLeadsTable();
+                } else if (tabName === 'config') {
+                    loadConfigData();
+                } else if (tabName === 'pipeline') {
+                    loadPipelineData();
+                } else if (tabName === 'reports') {
+                    loadReportsData();
+                } else if (tabName === 'tasks') {
+                    loadTasksData();
+                } else if (tabName === 'monitoring') {
+                    loadMonitoringData();
+                }
+                
+                console.log('✅ Tab switched successfully:', tabName);
                 
             } catch (error) {
                 console.error('❌ Error switching tab:', error);
@@ -1776,10 +1779,14 @@ function switchTab(tabName) {
                 const rankings = salespeople.map(([uid, user]) => {
                     const userContacts = contacts.filter(c => c.salespersonId === uid);
                     const userConversions = userContacts.filter(c => c.status === 'Convertido');
+                    const todayContacts = userContacts.filter(c => c.date === today);
                     return {
                         name: user.name,
+                        email: user.email,
                         contacts: userContacts.length,
-                        conversions: userConversions.length
+                        conversions: userConversions.length,
+                        todayContacts: todayContacts.length,
+                        conversionRate: userContacts.length > 0 ? (userConversions.length / userContacts.length * 100).toFixed(1) : 0
                     };
                 }).sort((a, b) => b.conversions - a.conversions);
                 
@@ -1790,37 +1797,51 @@ function switchTab(tabName) {
                             <div style="text-align: center; color: #6b7280; padding: 1rem;">
                                 No hay vendedores registrados
                             </div>
-                        ` : rankings.slice(0, 3).map((person, index) => `
+                        ` : rankings.map((person, index) => `
                             <div style="
                                 display: flex;
                                 justify-content: space-between;
                                 align-items: center;
-                                padding: 0.75rem;
+                                padding: 1rem;
                                 margin-bottom: 0.5rem;
-                                background: ${index === 0 ? '#fef3c7' : index === 1 ? '#e5e7eb' : '#fecaca'};
+                                background: ${index === 0 ? 'linear-gradient(135deg, #fef3c7, #fde68a)' : 
+                                             index === 1 ? 'linear-gradient(135deg, #e5e7eb, #d1d5db)' : 
+                                             index === 2 ? 'linear-gradient(135deg, #fecaca, #fca5a5)' : '#f9fafb'};
                                 border-radius: 8px;
+                                border-left: 4px solid ${index === 0 ? '#f59e0b' : index === 1 ? '#6b7280' : index === 2 ? '#ef4444' : '#e5e7eb'};
                             ">
                                 <div>
-                                    <span style="margin-right: 0.5rem;">
-                                        ${index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
-                                    </span>
-                                    <strong>${person.name}</strong>
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                                        <span style="font-size: 1.2rem;">
+                                            ${index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`}
+                                        </span>
+                                        <strong style="color: #374151;">${person.name}</strong>
+                                    </div>
+                                    <div style="font-size: 0.8rem; color: #6b7280;">${person.email}</div>
                                 </div>
-                                <div style="text-align: right; font-size: 0.9rem;">
-                                    <div><strong>${person.conversions}</strong> conversiones</div>
-                                    <div style="color: #6b7280;">${person.contacts} contactos</div>
+                                <div style="text-align: right;">
+                                    <div style="font-weight: bold; color: #10b981; margin-bottom: 0.25rem;">
+                                        ${person.conversions} conversiones
+                                    </div>
+                                    <div style="font-size: 0.8rem; color: #6b7280;">
+                                        ${person.contacts} contactos (${person.conversionRate}%)
+                                    </div>
+                                    <div style="font-size: 0.8rem; color: #3b82f6;">
+                                        ${person.todayContacts} hoy
+                                    </div>
                                 </div>
                             </div>
                         `).join('')}
                     </div>
                 `;
+                
             } catch (error) {
                 console.error('❌ Error loading sales ranking:', error);
                 salesRankingEl.innerHTML = `
                     <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
                         <h4 style="margin: 0 0 1rem 0; color: #374151;">🏆 Ranking de Ventas</h4>
                         <div style="text-align: center; color: #dc2626; padding: 1rem;">
-                            Error cargando ranking
+                            ❌ Error cargando ranking: ${error.message}
                         </div>
                     </div>
                 `;
@@ -1861,636 +1882,7 @@ function switchTab(tabName) {
             `;
         }
 
-        // ===== CONFIG DATA LOADING =====
-        async function loadConfigData() {
-            try {
-                console.log('⚙️ Loading config data');
-                await updateConveniosList();
-                // Load users list if director
-                if (userRole === 'director') {
-                    await loadUsersList();
-                }
-            } catch (error) {
-                console.error('❌ Error loading config data:', error);
-            }
-        }
-
-        // ===== CONVENIOS LIST UPDATE =====
-        async function updateConveniosList() {
-            try {
-                const conveniosList = document.getElementById('conveniosList');
-                if (!conveniosList) return;
-                
-                conveniosList.innerHTML = '<div class="loading-spinner"></div> Cargando convenios...';
-                
-                const convenios = await window.FirebaseData.getConvenios();
-                
-                if (!convenios || convenios.length === 0) {
-                    conveniosList.innerHTML = `
-                        <div style="text-align: center; color: #666; padding: 2rem;">
-                            <div style="font-size: 2rem; margin-bottom: 1rem;">🤝</div>
-                            <p>No hay convenios registrados</p>
-                        </div>
-                    `;
-                    return;
-                }
-                
-                conveniosList.innerHTML = convenios.map((convenio, index) => `
-                    <div style="background: #f9fafb; padding: 0.75rem; border-radius: 5px; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; border-left: 3px solid #10b981;">
-                        <span>${convenio}</span>
-                        <button onclick="deleteConvenio('${convenio}')" style="background: #ef4444; color: white; border: none; border-radius: 4px; padding: 0.25rem 0.5rem; cursor: pointer; font-size: 0.8rem;">
-                            🗑️
-                        </button>
-                    </div>
-                `).join('');
-                
-            } catch (error) {
-                console.error('❌ Error updating convenios list:', error);
-            }
-        }
-
-        // ===== UTILITY FUNCTIONS =====
-        async function getUserDisplayName(userId) {
-            try {
-                if (!userId) return 'Unknown User';
-                
-                const allUsers = await window.FirebaseData.getAllUsers();
-                const user = allUsers[userId];
-                
-                if (user && user.name) {
-                    return user.name;
-                }
-                
-                if (user && user.email) {
-                    return user.email.split('@')[0];
-                }
-                
-                return 'Unknown User';
-            } catch (error) {
-                console.error('❌ Error getting user display name:', error);
-                return 'Unknown User';
-            }
-        }
-
-        function formatDate(dateString) {
-            try {
-                if (!dateString) return 'Sin fecha';
-                const date = new Date(dateString);
-                return date.toLocaleDateString('es-ES');
-            } catch (error) {
-                return dateString || 'Sin fecha';
-            }
-        }
-
-        // ===== REFRESH ALL DATA =====
-        async function refreshAllData() {
-            try {
-                console.log('🔄 Starting full data refresh from Firebase');
-                
-                // Show loading notification
-                showNotification('🔄 Sincronizando con Firebase...', 'info', 2000);
-                
-                // Get current active tab
-                const activeTab = document.querySelector('.tab-button.active');
-                const activeTabName = activeTab ? activeTab.textContent : '';
-                
-                // Refresh all data
-                await updateStats();
-                await updateLeadsTable();
-                await updateTodayContacts();
-                await updateConveniosList();
-                await loadSalesRanking();
-                
-                // Refresh specific tab data
-                if (activeTabName.includes('Pipeline') && window.loadPipelineData) {
-                    await window.loadPipelineData();
-                }
-                
-                if (activeTabName.includes('Tareas') && window.loadTasksData) {
-                    await window.loadTasksData();
-                }
-                
-                if (userRole === 'director') {
-                    await loadUsersList();
-                }
-                
-                console.log('✅ Full data refresh completed');
-                showNotification('✅ Datos actualizados correctamente', 'success');
-                
-            } catch (error) {
-                console.error('❌ Error refreshing data:', error);
-                showNotification('❌ Error al actualizar datos', 'error');
-            }
-        }
-        // ===== LOGOUT =====
-        async function handleLogout() {
-            try {
-                if (confirm('¿Estás seguro de que quieres cerrar sesión?')) {
-                    await window.FirebaseData.logout();
-                    
-                    currentUser = null;
-                    userRole = null;
-                    isInitialized = false;
-                    
-                    document.getElementById('mainApp').classList.add('hidden');
-                    document.getElementById('loginScreen').classList.remove('hidden');
-                    
-                    document.getElementById('username').value = '';
-                    document.getElementById('password').value = '';
-                    
-                    alert('👋 Sesión cerrada correctamente');
-                }
-            } catch (error) {
-                console.error('❌ Logout error:', error);
-                alert('❌ Error al cerrar sesión');
-            }
-        }
-
-        // ===== ADD CONVENIO =====
-        async function addConvenio() {
-            try {
-                const input = document.getElementById('newConvenio');
-                const convenioName = input.value.trim();
-                
-                if (!convenioName) {
-                    alert('⚠️ Ingresa el nombre del convenio');
-                    return;
-                }
-                
-                const currentConvenios = await window.FirebaseData.getConvenios();
-                
-                if (currentConvenios.includes(convenioName)) {
-                    alert('⚠️ Este convenio ya existe');
-                    return;
-                }
-                
-                const updatedConvenios = [...currentConvenios, convenioName];
-                await window.FirebaseData.updateConvenios(updatedConvenios);
-                
-                input.value = '';
-                cachedConvenios = updatedConvenios;
-                await updateConveniosList();
-                
-                alert(`✅ Convenio "${convenioName}" agregado correctamente`);
-                
-            } catch (error) {
-                console.error('❌ Error adding convenio:', error);
-                alert('❌ Error al agregar convenio');
-            }
-        }
-
-        // ===== DELETE CONVENIO =====
-        async function deleteConvenio(convenioName) {
-            try {
-                if (confirm(`¿Estás seguro de eliminar el convenio "${convenioName}"?`)) {
-                    const currentConvenios = await window.FirebaseData.getConvenios();
-                    const updatedConvenios = currentConvenios.filter(c => c !== convenioName);
-                    await window.FirebaseData.updateConvenios(updatedConvenios);
-                    
-                    cachedConvenios = updatedConvenios;
-                    await updateConveniosList();
-                    alert(`✅ Convenio "${convenioName}" eliminado correctamente`);
-                }
-            } catch (error) {
-                console.error('❌ Error deleting convenio:', error);
-                alert('❌ Error al eliminar convenio');
-            }
-        }
-
-        // ===== USER MANAGEMENT FUNCTIONS - ADDED HERE =====
-        async function loadUsersList() {
-            try {
-                const usersContainer = document.getElementById('usersList');
-                
-                if (!window.FirebaseData) {
-                    usersContainer.innerHTML = '<p style="color: #dc2626;">❌ Firebase no disponible</p>';
-                    return;
-                }
-                
-                const users = await window.FirebaseData.getAllUsers();
-                
-                if (!users || Object.keys(users).length === 0) {
-                    usersContainer.innerHTML = '<p style="color: #6b7280;">No hay usuarios registrados</p>';
-                    return;
-                }
-                
-                let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
-                
-                Object.entries(users).forEach(([uid, user]) => {
-                    const isCurrentUser = window.FirebaseData.currentUser?.uid === uid;
-                    html += `
-                        <div style="background: white; padding: 12px; border-radius: 8px; border: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <strong>${user.name || 'Sin nombre'}</strong>
-                                ${isCurrentUser ? '<span style="color: #3b82f6; font-size: 12px;"> (Tú)</span>' : ''}
-                                <div style="color: #6b7280; font-size: 14px;">
-                                    ${user.email} • ${user.role === 'director' ? '👔 Director' : '👤 Vendedor'}
-                                </div>
-                                <div style="color: #9ca3af; font-size: 12px;">
-                                    Creado: ${new Date(user.createdAt).toLocaleDateString('es-CO')}
-                                </div>
-                            </div>
-                            ${!isCurrentUser && userRole === 'director' ? `
-                                <button onclick="deleteUser('${uid}', '${user.name}')" 
-                                        class="btn" 
-                                        style="background: #dc2626; color: white; padding: 6px 12px; font-size: 14px;">
-                                    🗑️
-                                </button>
-                            ` : ''}
-                        </div>
-                    `;
-                });
-                
-                html += '</div>';
-                usersContainer.innerHTML = html;
-                
-            } catch (error) {
-                console.error('Error loading users:', error);
-                document.getElementById('usersList').innerHTML = 
-                    '<p style="color: #dc2626;">❌ Error al cargar usuarios</p>';
-            }
-        }
-
-        async function createNewUser(event) {
-            event.preventDefault();
-            
-            const name = document.getElementById('newUserName').value;
-            const email = document.getElementById('newUserEmail').value;
-            const password = document.getElementById('newUserPassword').value;
-            const role = document.getElementById('newUserRole').value;
-            
-            try {
-                // Show loading state
-                const submitBtn = event.target.querySelector('button[type="submit"]');
-                const originalText = submitBtn.innerHTML;
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = '⏳ Creando usuario...';
-                
-                // Create user
-                await window.FirebaseData.createUser(email, password, {
-                    name: name,
-                    role: role
-                });
-                
-                // Clear form
-                event.target.reset();
-                
-                // Show success notification
-                showNotification(`✅ Usuario ${name} creado exitosamente`, 'success');
-                
-                // Reload users list
-                await loadUsersList();
-                
-            } catch (error) {
-                console.error('Error creating user:', error);
-                let errorMessage = 'Error al crear usuario';
-                
-                if (error.code === 'auth/email-already-in-use') {
-                    errorMessage = 'Este email ya está registrado';
-                } else if (error.code === 'auth/weak-password') {
-                    errorMessage = 'La contraseña es muy débil';
-                } else if (error.code === 'auth/invalid-email') {
-                    errorMessage = 'Email inválido';
-                }
-                
-                showNotification(`❌ ${errorMessage}`, 'error');
-            } finally {
-                // Restore button
-                const submitBtn = event.target.querySelector('button[type="submit"]');
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = '➕ Crear Usuario';
-            }
-        }
-
-        async function deleteUser(uid, userName) {
-            if (!confirm(`¿Estás seguro de eliminar al usuario ${userName}?`)) {
-                return;
-            }
-            
-            try {
-                // Note: Firebase doesn't allow deleting users from client-side
-                // You would need a Cloud Function for this
-                // For now, we can just disable the user in the database
-                
-                showNotification('⚠️ La eliminación de usuarios requiere permisos de administrador del servidor', 'warning');
-                
-                // Optionally, you could mark the user as inactive in the database:
-                // await window.FirebaseData.updateUserProfile(uid, { active: false });
-                
-            } catch (error) {
-                console.error('Error deleting user:', error);
-                showNotification('❌ Error al eliminar usuario', 'error');
-            }
-        }
-
-        // ===== TEST FUNCTIONS =====
-        async function testConveniosSystem() {
-            try {
-                const results = {
-                    firebaseAvailable: !!window.FirebaseData,
-                    conveniosFunction: typeof window.FirebaseData?.getConvenios === 'function',
-                    conveniosLoaded: 0,
-                    handleSourceChangeExists: typeof handleSourceChange === 'function',
-                    domElements: {
-                        sourceSelect: !!document.getElementById('contactSource'),
-                        convenioGroup: !!document.getElementById('convenioGroup'),
-                        convenioSelect: !!document.getElementById('contactConvenio')
-                    }
-                };
-                
-                if (results.firebaseAvailable && results.conveniosFunction) {
-                    const convenios = await window.FirebaseData.getConvenios();
-                    results.conveniosLoaded = convenios ? convenios.length : 0;
-                }
-                
-                const allWorking = results.firebaseAvailable && 
-                                  results.conveniosFunction && 
-                                  results.handleSourceChangeExists && 
-                                  Object.values(results.domElements).every(v => v);
-                
-                alert(`🧪 TEST CONVENIOS SYSTEM:
-
-🔥 Firebase: ${results.firebaseAvailable ? '✅' : '❌'}
-⚙️ Función Convenios: ${results.conveniosFunction ? '✅' : '❌'}
-📋 Convenios Cargados: ${results.conveniosLoaded}
-🔧 Handle Function: ${results.handleSourceChangeExists ? '✅' : '❌'}
-
-📋 ELEMENTOS DOM:
-- Source Select: ${results.domElements.sourceSelect ? '✅' : '❌'}
-- Convenio Group: ${results.domElements.convenioGroup ? '✅' : '❌'}
-- Convenio Select: ${results.domElements.convenioSelect ? '✅' : '❌'}
-
-🎯 ESTADO: ${allWorking ? '✅ FUNCIONANDO PERFECTAMENTE' : '⚠️ REVISAR'}`);
-                
-            } catch (error) {
-                console.error('❌ Error testing convenios system:', error);
-                alert(`❌ Error testing convenios: ${error.message}`);
-            }
-        }
-
-        async function testTabSystem() {
-            try {
-                const tabs = ['contacts', 'leads', 'pipeline', 'reports'];
-                let working = 0;
-                
-                for (const tab of tabs) {
-                    try {
-                        switchTab(tab);
-                        const content = document.getElementById(tab);
-                        if (content && !content.classList.contains('hidden')) {
-                            working++;
-                        }
-                    } catch (error) {
-                        console.error('Error testing tab:', tab, error);
-                    }
-                }
-                
-                // Reset to contacts tab
-                switchTab('contacts');
-                
-                alert(`🧪 TEST TAB SYSTEM:
-
-📑 Tabs Funcionando: ${working}/${tabs.length}
-🎯 Estado: ${working === tabs.length ? '✅ TODAS LAS TABS FUNCIONAN' : '⚠️ ALGUNAS TABS TIENEN PROBLEMAS'}
-
-Tabs Probadas:
-${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).join('\n')}`);
-                
-            } catch (error) {
-                alert(`❌ Error testing tabs: ${error.message}`);
-            }
-        }
-
-        // ===== PLACEHOLDER FUNCTIONS =====
-        function showLeadDetails(leadId) {
-            alert(`📋 Ver detalles del lead: ${leadId}\n\n✅ Sistema funcionando correctamente`);
-        }
-
-        async function deleteLead(leadId) {
-            try {
-                console.log('🗑️ Attempting to delete lead:', leadId);
-                
-                if (!window.FirebaseData) {
-                    showNotification('❌ Sistema no disponible', 'error');
-                    return;
-                }
-                
-                // Get lead info for confirmation
-                const allContacts = await window.FirebaseData.getAllContacts();
-                const lead = allContacts.find(c => c.id === leadId);
-                
-                if (!lead) {
-                    showNotification('❌ Lead no encontrado', 'error');
-                    return;
-                }
-                
-                // Confirm deletion
-                if (!confirm(`¿Estás seguro de eliminar el lead "${lead.name}"?\n\nEsta acción no se puede deshacer.`)) {
-                    return;
-                }
-                
-                // Delete from Firebase
-                await window.FirebaseData.deleteContact(leadId);
-                
-                console.log('✅ Lead deleted from Firebase:', leadId);
-                
-                // Update UI immediately
-                await updateLeadsTable();
-                await updateStats();
-                
-                // Update pipeline if it's loaded
-                if (window.loadPipelineData) {
-                    await window.loadPipelineData();
-                }
-                
-                showNotification(`✅ Lead eliminado correctamente: ${lead.name}`, 'success');
-                
-            } catch (error) {
-                console.error('❌ Error deleting lead:', error);
-                showNotification(`❌ Error al eliminar lead: ${error.message}`, 'error');
-            }
-        }
-
-        function exportTodayContacts() {
-            alert('📥 Exportar contactos de hoy\n\n✅ Sistema funcionando correctamente');
-        }
-
-        console.log('✅ Complete CRM System loaded successfully');
-        // ===== PLACE THIS CODE RIGHT AFTER: console.log('✅ Complete CRM System loaded successfully'); =====
-        
-        // ===== CRITICAL MISSING FUNCTIONS =====
-        
-        // Fix showNotification function (PRIORITY 1)
-        function showNotification(message, type = 'info', duration = 5000) {
-            // Remove existing notifications
-            const existing = document.querySelectorAll('.notification-toast');
-            existing.forEach(n => n.remove());
-            
-            const notification = document.createElement('div');
-            notification.className = `notification-toast notification-${type}`;
-            
-            const colors = {
-                success: '#10b981',
-                error: '#ef4444',
-                warning: '#f59e0b',
-                info: '#3b82f6'
-            };
-            
-            notification.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background: ${colors[type] || colors.info};
-                color: white;
-                padding: 1rem 1.5rem;
-                border-radius: 8px;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-                z-index: 10000;
-                max-width: 400px;
-                font-size: 0.9rem;
-                line-height: 1.4;
-                transform: translateX(100%);
-                transition: transform 0.3s ease;
-                white-space: pre-line;
-            `;
-            
-            notification.innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                    <div>${message}</div>
-                    <button onclick="this.parentElement.parentElement.remove()" style="background: none; border: none; color: white; font-size: 1.2rem; cursor: pointer; margin-left: 1rem; opacity: 0.8;">×</button>
-                </div>
-            `;
-            
-            document.body.appendChild(notification);
-            
-            // Animate in
-            setTimeout(() => {
-                notification.style.transform = 'translateX(0)';
-            }, 100);
-            
-            // Auto remove
-            if (duration > 0) {
-                setTimeout(() => {
-                    notification.style.transform = 'translateX(100%)';
-                    setTimeout(() => notification.remove(), 300);
-                }, duration);
-            }
-        }
-
-        // Fix showLeadDetails function (PRIORITY 1)
-        async function showLeadDetails(leadId) {
-            try {
-                console.log('📋 Showing lead details for:', leadId);
-                
-                if (!window.FirebaseData) {
-                    alert('❌ Sistema no disponible');
-                    return;
-                }
-                
-                // Get lead data
-                const allContacts = await window.FirebaseData.getAllContacts();
-                const lead = allContacts.find(c => c.id === leadId);
-                
-                if (!lead) {
-                    alert('❌ Lead no encontrado');
-                    return;
-                }
-                
-                // Get salesperson name
-                const salespersonName = await getUserDisplayNameFirebase(lead.salespersonId);
-                
-                // Simple alert for now
-                const details = `📋 DETALLES DEL LEAD:
-
-👤 Nombre: ${lead.name}
-📞 Teléfono: ${lead.phone}
-✉️ Email: ${lead.email || 'No proporcionado'}
-📍 Ubicación: ${lead.location}
-🔗 Fuente: ${lead.source}
-📊 Estado: ${lead.status}
-🗓️ Fecha: ${formatDate(lead.date)}
-👨‍💼 Vendedor: ${salespersonName}
-
-📝 Notas:
-${lead.notes || 'Sin notas'}`;
-                
-                alert(details);
-                
-            } catch (error) {
-                console.error('❌ Error showing lead details:', error);
-                alert('❌ Error al mostrar detalles del lead');
-            }
-        }
-
-        // Fix getUserDisplayNameFirebase function
-        async function getUserDisplayNameFirebase(userId) {
-            try {
-                if (!userId || !window.FirebaseData) return 'Usuario Desconocido';
-                
-                const allUsers = await window.FirebaseData.getAllUsers();
-                const user = allUsers[userId];
-                
-                if (user && user.name) {
-                    return user.name;
-                }
-                
-                if (user && user.email) {
-                    return user.email.split('@')[0];
-                }
-                
-                return 'Usuario Desconocido';
-            } catch (error) {
-                console.error('❌ Error getting user display name:', error);
-                return 'Error Usuario';
-            }
-        }
-
-        // Fix runSystemDiagnostic function
-        async function runSystemDiagnostic() {
-            try {
-                const diagnostics = {
-                    timestamp: new Date().toISOString(),
-                    firebase: !!window.FirebaseData,
-                    authenticated: !!window.FirebaseData?.currentUser,
-                    userProfile: !!currentUser,
-                    totalContacts: 0,
-                    convenios: 0
-                };
-                
-                if (window.FirebaseData) {
-                    try {
-                        const contacts = await window.FirebaseData.getAllContacts();
-                        diagnostics.totalContacts = contacts.length;
-                        
-                        const convenios = await window.FirebaseData.getConvenios();
-                        diagnostics.convenios = convenios ? convenios.length : 0;
-                    } catch (error) {
-                        diagnostics.dataError = error.message;
-                    }
-                }
-                
-                const report = `🔍 DIAGNÓSTICO DEL SISTEMA:
-
-🔥 Firebase: ${diagnostics.firebase ? '✅' : '❌'}
-👤 Autenticado: ${diagnostics.authenticated ? '✅' : '❌'}
-📊 Total Contactos: ${diagnostics.totalContacts}
-🤝 Convenios: ${diagnostics.convenios}
-⏰ ${new Date().toLocaleString()}
-
-${diagnostics.dataError ? `❌ Error: ${diagnostics.dataError}` : '✅ Sistema funcionando'}`;
-                
-                alert(report);
-                console.log('🔍 System diagnostics:', diagnostics);
-                
-            } catch (error) {
-                console.error('❌ Error running diagnostics:', error);
-                alert(`❌ Error en diagnóstico: ${error.message}`);
-            }
-        }
-
-        // ===== FIX MONITORING TAB FUNCTIONS =====
-        
-        // Fix loadMonitoringData function
+        // ===== MONITORING FUNCTIONALITY =====
         async function loadMonitoringData() {
             try {
                 console.log('👀 Loading monitoring data');
@@ -2624,126 +2016,542 @@ ${diagnostics.dataError ? `❌ Error: ${diagnostics.dataError}` : '✅ Sistema f
             }
         }
 
-        // ===== FIX REPORTS RANKING =====
-        
-        // Enhanced loadReportsData function
-        async function loadReportsData() {
+        // ===== CONFIG DATA LOADING =====
+        async function loadConfigData() {
             try {
-                console.log('📊 Loading reports data');
-                
-                if (!window.FirebaseData || !window.FirebaseData.currentUser) {
-                    console.log('⚠️ Firebase not available for reports');
-                    return;
+                console.log('⚙️ Loading config data');
+                await updateConveniosList();
+                // Load users list if director
+                if (userRole === 'director') {
+                    await loadUsersList();
                 }
-                
-                const userProfile = await window.FirebaseData.loadUserProfile();
-                const allContacts = await window.FirebaseData.getFilteredContacts();
-                
-                if (userProfile.role === 'director') {
-                    await loadDirectorReports(allContacts);
-                } else {
-                    await loadPersonalReports(allContacts);
-                }
-                
             } catch (error) {
-                console.error('❌ Error loading reports data:', error);
-                showNotification('❌ Error cargando reportes', 'error');
+                console.error('❌ Error loading config data:', error);
             }
         }
 
-        // Fixed loadDirectorReports function
-        async function loadDirectorReports(contacts) {
-            const salesRankingEl = document.getElementById('salesRanking');
-            const directorReportsEl = document.getElementById('directorReports');
-            const personalReportsEl = document.getElementById('personalReports');
-            
-            if (directorReportsEl) directorReportsEl.classList.remove('hidden');
-            if (personalReportsEl) personalReportsEl.classList.add('hidden');
-            
-            if (!salesRankingEl) return;
-            
+        // ===== CONVENIOS LIST UPDATE =====
+        async function updateConveniosList() {
             try {
-                const allUsers = await window.FirebaseData.getAllUsers();
-                const salespeople = Object.entries(allUsers).filter(([uid, user]) => user.role === 'vendedor');
+                const conveniosList = document.getElementById('conveniosList');
+                if (!conveniosList) return;
                 
-                const rankings = salespeople.map(([uid, user]) => {
-                    const userContacts = contacts.filter(c => c.salespersonId === uid);
-                    const userConversions = userContacts.filter(c => c.status === 'Convertido');
-                    const today = new Date().toISOString().split('T')[0];
-                    const todayContacts = userContacts.filter(c => c.date === today);
-                    
-                    return {
-                        name: user.name,
-                        email: user.email,
-                        contacts: userContacts.length,
-                        conversions: userConversions.length,
-                        todayContacts: todayContacts.length,
-                        conversionRate: userContacts.length > 0 ? (userConversions.length / userContacts.length * 100).toFixed(1) : 0
-                    };
-                }).sort((a, b) => b.conversions - a.conversions);
+                conveniosList.innerHTML = '<div class="loading-spinner"></div> Cargando convenios...';
                 
-                salesRankingEl.innerHTML = `
-                    <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-                        <h4 style="margin: 0 0 1rem 0; color: #374151;">🏆 Ranking de Ventas</h4>
-                        ${rankings.length === 0 ? `
-                            <div style="text-align: center; color: #6b7280; padding: 1rem;">
-                                No hay vendedores registrados
-                            </div>
-                        ` : rankings.map((person, index) => `
-                            <div style="
-                                display: flex;
-                                justify-content: space-between;
-                                align-items: center;
-                                padding: 1rem;
-                                margin-bottom: 0.5rem;
-                                background: ${index === 0 ? 'linear-gradient(135deg, #fef3c7, #fde68a)' : 
-                                             index === 1 ? 'linear-gradient(135deg, #e5e7eb, #d1d5db)' : 
-                                             index === 2 ? 'linear-gradient(135deg, #fecaca, #fca5a5)' : '#f9fafb'};
-                                border-radius: 8px;
-                                border-left: 4px solid ${index === 0 ? '#f59e0b' : index === 1 ? '#6b7280' : index === 2 ? '#ef4444' : '#e5e7eb'};
-                            ">
-                                <div>
-                                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
-                                        <span style="font-size: 1.2rem;">
-                                            ${index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`}
-                                        </span>
-                                        <strong style="color: #374151;">${person.name}</strong>
-                                    </div>
-                                    <div style="font-size: 0.8rem; color: #6b7280;">${person.email}</div>
-                                </div>
-                                <div style="text-align: right;">
-                                    <div style="font-weight: bold; color: #10b981; margin-bottom: 0.25rem;">
-                                        ${person.conversions} conversiones
-                                    </div>
-                                    <div style="font-size: 0.8rem; color: #6b7280;">
-                                        ${person.contacts} contactos (${person.conversionRate}%)
-                                    </div>
-                                    <div style="font-size: 0.8rem; color: #3b82f6;">
-                                        ${person.todayContacts} hoy
-                                    </div>
-                                </div>
-                            </div>
-                        `).join('')}
+                const convenios = await window.FirebaseData.getConvenios();
+                
+                if (!convenios || convenios.length === 0) {
+                    conveniosList.innerHTML = `
+                        <div style="text-align: center; color: #666; padding: 2rem;">
+                            <div style="font-size: 2rem; margin-bottom: 1rem;">🤝</div>
+                            <p>No hay convenios registrados</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                conveniosList.innerHTML = convenios.map((convenio, index) => `
+                    <div style="background: #f9fafb; padding: 0.75rem; border-radius: 5px; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; border-left: 3px solid #10b981;">
+                        <span>${convenio}</span>
+                        <button onclick="deleteConvenio('${convenio}')" style="background: #ef4444; color: white; border: none; border-radius: 4px; padding: 0.25rem 0.5rem; cursor: pointer; font-size: 0.8rem;">
+                            🗑️
+                        </button>
                     </div>
-                `;
-                
-console.log('✅ Sales ranking loaded successfully');
+                `).join('');
                 
             } catch (error) {
-                console.error('❌ Error loading sales ranking:', error);
-                salesRankingEl.innerHTML = `
-                    <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-                        <h4 style="margin: 0 0 1rem 0; color: #374151;">🏆 Ranking de Ventas</h4>
-                        <div style="text-align: center; color: #dc2626; padding: 1rem;">
-                            ❌ Error cargando ranking: ${error.message}
-                        </div>
-                    </div>
-                `;
+                console.error('❌ Error updating convenios list:', error);
             }
+        }
+
+        // ===== USER MANAGEMENT FUNCTIONS =====
+        async function loadUsersList() {
+            try {
+                const usersContainer = document.getElementById('usersList');
+                
+                if (!window.FirebaseData) {
+                    usersContainer.innerHTML = '<p style="color: #dc2626;">❌ Firebase no disponible</p>';
+                    return;
+                }
+                
+                const users = await window.FirebaseData.getAllUsers();
+                
+                if (!users || Object.keys(users).length === 0) {
+                    usersContainer.innerHTML = '<p style="color: #6b7280;">No hay usuarios registrados</p>';
+                    return;
+                }
+                
+                let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
+                
+                Object.entries(users).forEach(([uid, user]) => {
+                    const isCurrentUser = window.FirebaseData.currentUser?.uid === uid;
+                    html += `
+                        <div style="background: white; padding: 12px; border-radius: 8px; border: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <strong>${user.name || 'Sin nombre'}</strong>
+                                ${isCurrentUser ? '<span style="color: #3b82f6; font-size: 12px;"> (Tú)</span>' : ''}
+                                <div style="color: #6b7280; font-size: 14px;">
+                                    ${user.email} • ${user.role === 'director' ? '👔 Director' : '👤 Vendedor'}
+                                </div>
+                                <div style="color: #9ca3af; font-size: 12px;">
+                                    Creado: ${new Date(user.createdAt).toLocaleDateString('es-CO')}
+                                </div>
+                            </div>
+                            ${!isCurrentUser && userRole === 'director' ? `
+                                <button onclick="deleteUser('${uid}', '${user.name}')" 
+                                        class="btn" 
+                                        style="background: #dc2626; color: white; padding: 6px 12px; font-size: 14px;">
+                                    🗑️
+                                </button>
+                            ` : ''}
+                        </div>
+                    `;
+                });
+                
+                html += '</div>';
+                usersContainer.innerHTML = html;
+                
+            } catch (error) {
+                console.error('Error loading users:', error);
+                document.getElementById('usersList').innerHTML = 
+                    '<p style="color: #dc2626;">❌ Error al cargar usuarios</p>';
+            }
+        }
+
+        async function createNewUser(event) {
+            event.preventDefault();
+            
+            const name = document.getElementById('newUserName').value;
+            const email = document.getElementById('newUserEmail').value;
+            const password = document.getElementById('newUserPassword').value;
+            const role = document.getElementById('newUserRole').value;
+            
+            try {
+                // Show loading state
+                const submitBtn = event.target.querySelector('button[type="submit"]');
+                const originalText = submitBtn.innerHTML;
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '⏳ Creando usuario...';
+                
+                // Create user
+                await window.FirebaseData.createUser(email, password, {
+                    name: name,
+                    role: role
+                });
+                
+                // Clear form
+                event.target.reset();
+                
+                // Show success notification
+                showNotification(`✅ Usuario ${name} creado exitosamente`, 'success');
+                
+                // Reload users list
+                await loadUsersList();
+                
+            } catch (error) {
+                console.error('Error creating user:', error);
+                let errorMessage = 'Error al crear usuario';
+                
+                if (error.code === 'auth/email-already-in-use') {
+                    errorMessage = 'Este email ya está registrado';
+                } else if (error.code === 'auth/weak-password') {
+                    errorMessage = 'La contraseña es muy débil';
+                } else if (error.code === 'auth/invalid-email') {
+                    errorMessage = 'Email inválido';
+                }
+                
+                showNotification(`❌ ${errorMessage}`, 'error');
+            } finally {
+                // Restore button
+                const submitBtn = event.target.querySelector('button[type="submit"]');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '➕ Crear Usuario';
+            }
+        }
+
+        async function deleteUser(uid, userName) {
+            if (!confirm(`¿Estás seguro de eliminar al usuario ${userName}?`)) {
+                return;
+            }
+            
+            try {
+                // Note: Firebase doesn't allow deleting users from client-side
+                showNotification('⚠️ La eliminación de usuarios requiere permisos de administrador del servidor', 'warning');
+                
+            } catch (error) {
+                console.error('Error deleting user:', error);
+                showNotification('❌ Error al eliminar usuario', 'error');
+            }
+        }
+
+        // ===== UTILITY FUNCTIONS =====
+        async function getUserDisplayName(userId) {
+            try {
+                if (!userId) return 'Unknown User';
+                
+                const allUsers = await window.FirebaseData.getAllUsers();
+                const user = allUsers[userId];
+                
+                if (user && user.name) {
+                    return user.name;
+                }
+                
+                if (user && user.email) {
+                    return user.email.split('@')[0];
+                }
+                
+                return 'Unknown User';
+            } catch (error) {
+                console.error('❌ Error getting user display name:', error);
+                return 'Unknown User';
+            }
+        }
+
+        function formatDate(dateString) {
+            try {
+                if (!dateString) return 'Sin fecha';
+                const date = new Date(dateString);
+                if (isNaN(date.getTime())) return dateString;
+                return date.toLocaleDateString('es-ES');
+            } catch (error) {
+                return dateString || 'Sin fecha';
+            }
+        }
+
+        // ===== REFRESH ALL DATA =====
+        async function refreshAllData() {
+            try {
+                console.log('🔄 Starting full data refresh from Firebase');
+                
+                // Show loading notification
+                showNotification('🔄 Sincronizando con Firebase...', 'info', 2000);
+                
+                // Refresh all data
+                await updateStats();
+                await updateLeadsTable();
+                await loadConvenios();
+                
+                if (userRole === 'director') {
+                    await loadUsersList();
+                }
+                
+                console.log('✅ Full data refresh completed');
+                showNotification('✅ Datos actualizados correctamente', 'success');
+                
+            } catch (error) {
+                console.error('❌ Error refreshing data:', error);
+                showNotification('❌ Error al actualizar datos', 'error');
+            }
+        }
+
+        // ===== LOGOUT =====
+        async function handleLogout() {
+            try {
+                if (confirm('¿Estás seguro de que quieres cerrar sesión?')) {
+                    await window.FirebaseData.logout();
+                    
+                    currentUser = null;
+                    userRole = null;
+                    isInitialized = false;
+                    
+                    document.getElementById('mainApp').classList.add('hidden');
+                    document.getElementById('loginScreen').classList.remove('hidden');
+                    
+                    document.getElementById('username').value = '';
+                    document.getElementById('password').value = '';
+                    
+                    showNotification('👋 Sesión cerrada correctamente', 'success');
+                }
+            } catch (error) {
+                console.error('❌ Logout error:', error);
+                showNotification('❌ Error al cerrar sesión', 'error');
+            }
+        }
+
+        // ===== ADD CONVENIO =====
+        async function addConvenio() {
+            try {
+                const input = document.getElementById('newConvenio');
+                const convenioName = input.value.trim();
+                
+                if (!convenioName) {
+                    showNotification('⚠️ Ingresa el nombre del convenio', 'warning');
+                    return;
+                }
+                
+                const currentConvenios = await window.FirebaseData.getConvenios();
+                
+                if (currentConvenios.includes(convenioName)) {
+                    showNotification('⚠️ Este convenio ya existe', 'warning');
+                    return;
+                }
+                
+                const updatedConvenios = [...currentConvenios, convenioName];
+                await window.FirebaseData.updateConvenios(updatedConvenios);
+                
+                input.value = '';
+                cachedConvenios = updatedConvenios;
+                await updateConveniosList();
+                
+                showNotification(`✅ Convenio "${convenioName}" agregado correctamente`, 'success');
+                
+            } catch (error) {
+                console.error('❌ Error adding convenio:', error);
+                showNotification('❌ Error al agregar convenio', 'error');
+            }
+        }
+
+        // ===== DELETE CONVENIO =====
+        async function deleteConvenio(convenioName) {
+            try {
+                if (confirm(`¿Estás seguro de eliminar el convenio "${convenioName}"?`)) {
+                    const currentConvenios = await window.FirebaseData.getConvenios();
+                    const updatedConvenios = currentConvenios.filter(c => c !== convenioName);
+                    await window.FirebaseData.updateConvenios(updatedConvenios);
+                    
+                    cachedConvenios = updatedConvenios;
+                    await updateConveniosList();
+                    showNotification(`✅ Convenio "${convenioName}" eliminado correctamente`, 'success');
+                }
+            } catch (error) {
+                console.error('❌ Error deleting convenio:', error);
+                showNotification('❌ Error al eliminar convenio', 'error');
+            }
+        }
+
+        // ===== TEST FUNCTIONS =====
+        async function testConveniosSystem() {
+            try {
+                const results = {
+                    firebaseAvailable: !!window.FirebaseData,
+                    conveniosFunction: typeof window.FirebaseData?.getConvenios === 'function',
+                    conveniosLoaded: 0,
+                    handleSourceChangeExists: typeof handleSourceChange === 'function',
+                    domElements: {
+                        sourceSelect: !!document.getElementById('contactSource'),
+                        convenioGroup: !!document.getElementById('convenioGroup'),
+                        convenioSelect: !!document.getElementById('contactConvenio')
+                    }
+                };
+                
+                if (results.firebaseAvailable && results.conveniosFunction) {
+                    const convenios = await window.FirebaseData.getConvenios();
+                    results.conveniosLoaded = convenios ? convenios.length : 0;
+                }
+                
+                const allWorking = results.firebaseAvailable && 
+                                  results.conveniosFunction && 
+                                  results.handleSourceChangeExists && 
+                                  Object.values(results.domElements).every(v => v);
+                
+                showNotification(`🧪 TEST CONVENIOS SYSTEM:
+
+🔥 Firebase: ${results.firebaseAvailable ? '✅' : '❌'}
+⚙️ Función Convenios: ${results.conveniosFunction ? '✅' : '❌'}
+📋 Convenios Cargados: ${results.conveniosLoaded}
+🔧 Handle Function: ${results.handleSourceChangeExists ? '✅' : '❌'}
+
+📋 ELEMENTOS DOM:
+- Source Select: ${results.domElements.sourceSelect ? '✅' : '❌'}
+- Convenio Group: ${results.domElements.convenioGroup ? '✅' : '❌'}
+- Convenio Select: ${results.domElements.convenioSelect ? '✅' : '❌'}
+
+🎯 ESTADO: ${allWorking ? '✅ FUNCIONANDO PERFECTAMENTE' : '⚠️ REVISAR'}`, 'info', 8000);
+                
+            } catch (error) {
+                console.error('❌ Error testing convenios system:', error);
+                showNotification(`❌ Error testing convenios: ${error.message}`, 'error');
+            }
+        }
+
+        async function testTabSystem() {
+            try {
+                const tabs = ['contacts', 'leads', 'pipeline', 'reports'];
+                let working = 0;
+                
+                for (const tab of tabs) {
+                    try {
+                        switchTab(tab);
+                        const content = document.getElementById(tab);
+                        if (content && !content.classList.contains('hidden')) {
+                            working++;
+                        }
+                    } catch (error) {
+                        console.error('Error testing tab:', tab, error);
+                    }
+                }
+                
+                // Reset to contacts tab
+                switchTab('contacts');
+                
+                showNotification(`🧪 TEST TAB SYSTEM:
+
+📑 Tabs Funcionando: ${working}/${tabs.length}
+🎯 Estado: ${working === tabs.length ? '✅ TODAS LAS TABS FUNCIONAN' : '⚠️ ALGUNAS TABS TIENEN PROBLEMAS'}
+
+Tabs Probadas:
+${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).join('\n')}`, 'info', 6000);
+                
+            } catch (error) {
+                showNotification(`❌ Error testing tabs: ${error.message}`, 'error');
+            }
+        }
+
+        // ===== NOTIFICATION SYSTEM =====
+        function showNotification(message, type = 'info', duration = 5000) {
+            // Remove existing notifications
+            const existing = document.querySelectorAll('.notification-toast');
+            existing.forEach(n => n.remove());
+            
+            const notification = document.createElement('div');
+            notification.className = `notification-toast notification-${type}`;
+            
+            const colors = {
+                success: '#10b981',
+                error: '#ef4444',
+                warning: '#f59e0b',
+                info: '#3b82f6'
+            };
+            
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: ${colors[type] || colors.info};
+                color: white;
+                padding: 1rem 1.5rem;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                z-index: 10000;
+                max-width: 400px;
+                font-size: 0.9rem;
+                line-height: 1.4;
+                transform: translateX(100%);
+                transition: transform 0.3s ease;
+                white-space: pre-line;
+            `;
+            
+            notification.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div>${message}</div>
+                    <button onclick="this.parentElement.parentElement.remove()" style="background: none; border: none; color: white; font-size: 1.2rem; cursor: pointer; margin-left: 1rem; opacity: 0.8;">×</button>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Animate in
+            setTimeout(() => {
+                notification.style.transform = 'translateX(0)';
+            }, 100);
+            
+            // Auto remove
+            if (duration > 0) {
+                setTimeout(() => {
+                    notification.style.transform = 'translateX(100%)';
+                    setTimeout(() => notification.remove(), 300);
+                }, duration);
+            }
+        }
+
+        // ===== LEAD MANAGEMENT FUNCTIONS =====
+        async function showLeadDetails(leadId) {
+            try {
+                console.log('📋 Showing lead details for:', leadId);
+                
+                if (!window.FirebaseData) {
+                    showNotification('❌ Sistema no disponible', 'error');
+                    return;
+                }
+                
+                // Get lead data
+                const allContacts = await window.FirebaseData.getAllContacts();
+                const lead = allContacts.find(c => c.id === leadId);
+                
+                if (!lead) {
+                    showNotification('❌ Lead no encontrado', 'error');
+                    return;
+                }
+                
+                // Get salesperson name
+                const salespersonName = await getUserDisplayName(lead.salespersonId);
+                
+                // Create detailed view
+                const details = `📋 DETALLES DEL LEAD:
+
+👤 Nombre: ${lead.name}
+📞 Teléfono: ${lead.phone}
+✉️ Email: ${lead.email || 'No proporcionado'}
+📍 Ubicación: ${lead.location}
+🔗 Fuente: ${lead.source}
+📊 Estado: ${lead.status}
+🗓️ Fecha: ${formatDate(lead.date)}
+👨‍💼 Vendedor: ${salespersonName}
+
+📝 Notas:
+${lead.notes || 'Sin notas'}`;
+                
+                showNotification(details, 'info', 10000);
+                
+            } catch (error) {
+                console.error('❌ Error showing lead details:', error);
+                showNotification('❌ Error al mostrar detalles del lead', 'error');
+            }
+        }
+
+        // ✅ FIXED: Properly implemented deleteLead function
+        async function deleteLead(leadId) {
+            try {
+                console.log('🗑️ Attempting to delete lead:', leadId);
+                
+                if (!window.FirebaseData) {
+                    showNotification('❌ Sistema no disponible', 'error');
+                    return;
+                }
+                
+                // Get lead info for confirmation
+                const allContacts = await window.FirebaseData.getAllContacts();
+                const lead = allContacts.find(c => c.id === leadId);
+                
+                if (!lead) {
+                    showNotification('❌ Lead no encontrado', 'error');
+                    return;
+                }
+                
+                // Confirm deletion
+                if (!confirm(`¿Estás seguro de eliminar el lead "${lead.name}"?\n\nEsta acción no se puede deshacer.`)) {
+                    return;
+                }
+                
+                // ✅ FIXED: Use the corrected Firebase deleteContact method
+                await window.FirebaseData.deleteContact(leadId);
+                
+                console.log('✅ Lead deleted from Firebase:', leadId);
+                
+                // Update UI immediately
+                await updateLeadsTable();
+                await updateStats();
+                
+                // Update pipeline if it's loaded
+                if (window.loadPipelineData) {
+                    await window.loadPipelineData();
+                }
+                
+                showNotification(`✅ Lead eliminado correctamente: ${lead.name}`, 'success');
+                
+            } catch (error) {
+                console.error('❌ Error deleting lead:', error);
+                showNotification(`❌ Error al eliminar lead: ${error.message}`, 'error');
+            }
+        }
+
+        function exportTodayContacts() {
+            showNotification('📥 Función de exportación en desarrollo', 'info');
         }
 
         console.log('✅ Complete CRM System loaded successfully');
     </script>
+    
     <script src="fixes.js"></script>
     <script src="social.js"></script>
     <script src="pipeline.js"></script>
@@ -2751,5 +2559,3 @@ console.log('✅ Sales ranking loaded successfully');
 
 </body>
 </html>
-
-
