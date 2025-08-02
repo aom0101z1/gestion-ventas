@@ -741,49 +741,6 @@ window.firebaseModules = {
         console.log('✅ Firebase initialized successfully');
 
         class SimpleFirebaseManager {
-            // Check authentication state on page load
-onAuthStateChanged(auth, async (user) => {
-    console.log('🔐 Auth state changed:', user ? user.email : 'No user');
-    
-    if (user && !window.isInitialized) {
-        try {
-            console.log('🔄 Restoring user session for:', user.email);
-            
-            // Wait a bit for everything to load
-            setTimeout(async () => {
-                // Check if login screen is visible
-                const loginScreen = document.getElementById('loginScreen');
-                const mainApp = document.getElementById('mainApp');
-                
-                if (loginScreen && !loginScreen.classList.contains('hidden')) {
-                    console.log('✅ Auto-login from saved session');
-                    
-                    // Set current user
-                    window.currentUser = user;
-                    
-                    // Load user profile
-                    const profile = await window.FirebaseData.loadUserProfile();
-                    
-                    if (profile) {
-                        window.userRole = profile.role;
-                        
-                        // Hide login, show app
-                        loginScreen.classList.add('hidden');
-                        mainApp.classList.remove('hidden');
-                        
-                        // Initialize app
-                        await initializeMainApplication();
-                        
-                        console.log('✅ Session restored successfully');
-                    }
-                }
-            }, 1000);
-            
-        } catch (error) {
-            console.error('❌ Error restoring session:', error);
-        }
-    }
-});
             constructor() {
                 this.database = database;
                 this.auth = auth;
@@ -926,6 +883,50 @@ async deleteContact(contactId) {
 
         window.FirebaseData = new SimpleFirebaseManager();
         window.dispatchEvent(new Event('firebaseReady'));
+
+        // Check authentication state on page load
+onAuthStateChanged(auth, async (user) => {
+    console.log('🔐 Auth state changed:', user ? user.email : 'No user');
+    
+    if (user && !window.isInitialized) {
+        try {
+            console.log('🔄 Restoring user session for:', user.email);
+            
+            // Wait a bit for everything to load
+            setTimeout(async () => {
+                // Check if login screen is visible
+                const loginScreen = document.getElementById('loginScreen');
+                const mainApp = document.getElementById('mainApp');
+                
+                if (loginScreen && !loginScreen.classList.contains('hidden')) {
+                    console.log('✅ Auto-login from saved session');
+                    
+                    // Set current user
+                    window.currentUser = user;
+                    
+                    // Load user profile
+                    const profile = await window.FirebaseData.loadUserProfile();
+                    
+                    if (profile) {
+                        window.userRole = profile.role;
+                        
+                        // Hide login, show app
+                        loginScreen.classList.add('hidden');
+                        mainApp.classList.remove('hidden');
+                        
+                        // Initialize app
+                        await initializeMainApplication();
+                        
+                        console.log('✅ Session restored successfully');
+                    }
+                }
+            }, 1000);
+            
+        } catch (error) {
+            console.error('❌ Error restoring session:', error);
+        }
+    }
+});
         // Fix for tasks tab
 //window.loadTasksData = function() {
  //   console.log('📋 Loading tasks data from tab switch');
@@ -2575,6 +2576,7 @@ console.log('✅ Sales ranking loaded successfully');
 
 </body>
 </html>
+
 
 
 
