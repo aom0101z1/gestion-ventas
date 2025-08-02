@@ -1104,15 +1104,6 @@ onAuthStateChanged(auth, async (user) => {
                 }
             };
             
-            const titles = titleMappings[profile.role] || titleMappings.vendedor;
-            Object.keys(titles).forEach(elementId => {
-                const element = document.getElementById(elementId);
-                if (element) {
-                    element.textContent = titles[elementId];
-                }
-            });
-        }
-
         const titles = titleMappings[profile.role] || titleMappings.vendedor;
     Object.keys(titles).forEach(elementId => {
         const element = document.getElementById(elementId);
@@ -2629,6 +2620,7 @@ console.log('✅ Sales ranking loaded successfully');
 
 </body>
 </html>
+
 
 
 
