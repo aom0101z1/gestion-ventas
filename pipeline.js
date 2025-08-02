@@ -72,6 +72,11 @@ async function loadPipelineData() {
         
         if (allContacts.length === 0) {
             showEmptyPipeline();
+            // ✅ FIXED: Set up event listeners even for empty pipeline
+            setTimeout(() => {
+                setupPipelineEventListeners();
+                console.log('✅ Pipeline event listeners set up for empty state');
+            }, 100);
             return;
         }
         
@@ -81,8 +86,9 @@ async function loadPipelineData() {
         // Render pipeline view
         renderPipelineView(allContacts);
         
-        // Initialize drag and drop if supported
-        initializeDragAndDrop();
+        // ✅ REMOVED: Don't call initializeDragAndDrop() here
+        // The event listeners will be set up in renderPipelineView()
+        // initializeDragAndDrop(); // ❌ REMOVE THIS LINE
         
         console.log('✅ Pipeline data loaded successfully');
         
@@ -91,7 +97,6 @@ async function loadPipelineData() {
         showPipelineError(`Error cargando pipeline: ${error.message}`);
     }
 }
-
 // ===== PIPELINE RENDERING =====
 function renderPipelineView(contacts) {
     const container = document.getElementById('pipelineContainer');
@@ -1082,4 +1087,5 @@ if (typeof module !== 'undefined' && module.exports) {
 }
 
 console.log('✅ Pipeline.js module loaded successfully with drag & drop fixed');
+
 
