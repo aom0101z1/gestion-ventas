@@ -1082,7 +1082,7 @@ onAuthStateChanged(auth, async (user) => {
             
             const userNameEl = document.getElementById('currentUserName');
             if (userNameEl) {
-                userNameEl.textContent = profile.name || 'Usuario';
+                userNameEl.textContent = `Admin: ${profile.name || 'Usuario'}`;
             }
             
             const userRoleEl = document.getElementById('userRole');
@@ -2620,6 +2620,7 @@ console.log('✅ Sales ranking loaded successfully');
 
 </body>
 </html>
+
 
 
 
