@@ -1,351 +1,318 @@
-// ===== FIXED TASK MANAGEMENT - ROBUST CONTAINER DETECTION =====
+// improved-tasks.js - TASK MANAGEMENT FOR ENGLISH SCHOOL CRM
+// ===== INTEGRATED TASK MANAGEMENT SYSTEM =====
 
 let tasks = [
     {
         id: '1',
-        title: 'Follow up with Laura Pineda',
-        description: 'Contact interested lead from pipeline',
-        status: 'todo',
+        title: 'Seguimiento lead María González',
+        description: 'Contactar para agendar clase muestra',
+        status: 'pending',
         priority: 'high',
-        assignee: 'John Doe',
-        dueDate: '2024-08-14'
+        assignee: 'Ana López',
+        dueDate: '2024-08-15',
+        type: 'sales',
+        relatedLead: 'lead-123'
     },
     {
         id: '2',
-        title: 'Prepare marketing materials',
-        description: 'Create flyers for new English courses',
+        title: 'Llamar a estudiantes morosos',
+        description: 'Recordar pagos pendientes del mes',
         status: 'in-progress',
-        priority: 'medium',
-        assignee: 'Jane Smith',
-        dueDate: '2024-08-10'
+        priority: 'urgent',
+        assignee: 'Carlos Ruiz',
+        dueDate: '2024-08-12',
+        type: 'payment'
     },
     {
         id: '3',
-        title: 'Update CRM system',
-        description: 'Add new lead sources to system',
+        title: 'Preparar reporte semanal',
+        description: 'Reporte de conversiones y ventas',
         status: 'completed',
-        priority: 'low',
-        assignee: 'Admin',
-        dueDate: '2024-08-05'
+        priority: 'medium',
+        assignee: 'Director',
+        dueDate: '2024-08-10',
+        type: 'admin'
     }
 ];
 
-// ===== IMPROVED LOADING FUNCTION WITH BETTER CONTAINER DETECTION =====
+// ===== MAIN LOADING FUNCTION =====
 function loadTasksData() {
-    console.log('📋 STARTING loadTasksData...');
+    console.log('📋 Loading task management...');
     
-    try {
-        // Multiple strategies to find the container
-        let container = null;
-        
-        // Strategy 1: Look for tasksContainer inside tasks tab
-        const tasksTab = document.getElementById('tasks');
-        if (tasksTab) {
-            console.log('✅ Found tasks tab:', tasksTab);
-            container = tasksTab.querySelector('#tasksContainer') || 
-                       tasksTab.querySelector('.tasksContainer') ||
-                       tasksTab;
-        }
-        
-        // Strategy 2: Direct ID lookup
-        if (!container) {
-            container = document.getElementById('tasksContainer');
-            console.log('📦 Direct container lookup:', container);
-        }
-        
-        // Strategy 3: Create container if not found
-        if (!container && tasksTab) {
-            console.log('🔧 Creating tasksContainer...');
-            container = document.createElement('div');
-            container.id = 'tasksContainer';
-            tasksTab.appendChild(container);
-        }
-        
-        if (!container) {
-            console.error('❌ NO CONTAINER FOUND - Creating emergency container');
-            // Emergency: create container in body
-            container = document.createElement('div');
-            container.id = 'emergencyTasksContainer';
-            container.style.cssText = 'position: fixed; top: 100px; left: 20px; right: 20px; bottom: 20px; background: white; z-index: 1000; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);';
-            document.body.appendChild(container);
-        }
-        
-        console.log('📦 Using container:', container.id);
-        
-        // Force container to be visible
-        container.style.display = 'block';
-        container.classList.remove('hidden');
-        if (tasksTab) {
-            tasksTab.classList.remove('hidden');
-            tasksTab.style.display = 'block';
-        }
-        
-        // Clear any existing content
-        container.innerHTML = '';
-        
-        // Group tasks by status
-        const taskGroups = {
-            'todo': tasks.filter(t => t.status === 'todo'),
-            'in-progress': tasks.filter(t => t.status === 'in-progress'),
-            'review': tasks.filter(t => t.status === 'review'),
-            'completed': tasks.filter(t => t.status === 'completed')
-        };
-        
-        console.log('📊 Task groups:', taskGroups);
-        
-        // Render the task board
-        const taskBoardHTML = createTaskBoard(taskGroups);
-        container.innerHTML = taskBoardHTML;
-        
-        console.log('✅ Task board rendered successfully');
-        
-        // Show success message
-        if (window.showNotification) {
-            window.showNotification('📋 Task management loaded successfully!', 'success', 2000);
-        }
-        
-    } catch (error) {
-        console.error('❌ ERROR in loadTasksData:', error);
-        
-        // Emergency fallback
-        const fallbackHTML = `
-            <div style="padding: 20px; background: white; border-radius: 10px; margin: 20px;">
-                <h2>❌ Error Loading Tasks</h2>
-                <p>Error: ${error.message}</p>
-                <button onclick="location.reload()" style="background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">
-                    🔄 Reload Page
-                </button>
-                
-                <div style="margin-top: 20px; padding: 15px; background: #f0f0f0; border-radius: 5px;">
-                    <h3>Manual Task Board (Fallback)</h3>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 10px;">
-                        <div style="background: #fff3cd; padding: 10px; border-radius: 5px;">
-                            <h4>📝 To Do</h4>
-                            <div>• Follow up with Laura Pineda</div>
-                        </div>
-                        <div style="background: #cce5ff; padding: 10px; border-radius: 5px;">
-                            <h4>🔄 In Progress</h4>
-                            <div>• Prepare marketing materials</div>
-                        </div>
-                        <div style="background: #d4edda; padding: 10px; border-radius: 5px;">
-                            <h4>✅ Completed</h4>
-                            <div>• Update CRM system</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        // Try to put fallback somewhere
-        const anyContainer = document.getElementById('tasks') || document.getElementById('tasksContainer') || document.body;
-        if (anyContainer) {
-            anyContainer.innerHTML = fallbackHTML;
-        }
+    const container = document.getElementById('tasksContainer');
+    if (!container) {
+        console.error('❌ Tasks container not found');
+        return;
     }
+    
+    // Clear and render
+    container.innerHTML = createTaskInterface();
+    console.log('✅ Task system loaded successfully');
 }
 
-// ===== SIMPLIFIED TASK BOARD =====
-function createTaskBoard(taskGroups) {
+// ===== CREATE TASK INTERFACE =====
+function createTaskInterface() {
+    const taskStats = calculateTaskStats();
+    
     return `
-        <div style="padding: 20px;">
-            <!-- Header -->
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h2 style="margin: 0; color: #1f2937;">
-                    📋 Task Management
-                    <span style="background: #e5e7eb; color: #6b7280; padding: 4px 8px; border-radius: 12px; font-size: 0.8rem; margin-left: 10px;">
-                        ${Object.values(taskGroups).flat().length} tasks
-                    </span>
-                </h2>
-                <button onclick="createNewTask()" style="background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600;">
+        <!-- Task Header with Stats -->
+        <div style="background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 2rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h3 style="margin: 0; color: #1f2937;">📋 Panel de Tareas</h3>
+                <button onclick="openTaskModal()" class="btn btn-primary">
                     ➕ Nueva Tarea
                 </button>
             </div>
             
-            <!-- Task Board Grid -->
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; min-height: 60vh;">
-                ${renderTaskColumn('todo', '📝 Todo', taskGroups['todo'], '#fbbf24')}
-                ${renderTaskColumn('in-progress', '🔄 En Progreso', taskGroups['in-progress'], '#3b82f6')}
-                ${renderTaskColumn('review', '👀 Revisión', taskGroups['review'], '#f97316')}
-                ${renderTaskColumn('completed', '✅ Completado', taskGroups['completed'], '#10b981')}
-            </div>
-        </div>
-        
-        <!-- Simple Modal -->
-        <div id="taskModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000;">
-            <div style="display: flex; justify-content: center; align-items: center; height: 100%;">
-                <div style="background: white; padding: 30px; border-radius: 12px; width: 500px; max-width: 90%;">
-                    <h3 style="margin: 0 0 20px 0;">✨ Nueva Tarea</h3>
-                    
-                    <input type="text" id="newTaskTitle" placeholder="Título de la tarea..." style="width: 100%; padding: 12px; margin-bottom: 15px; border: 2px solid #e5e7eb; border-radius: 8px;">
-                    
-                    <textarea id="newTaskDesc" placeholder="Descripción..." style="width: 100%; padding: 12px; margin-bottom: 15px; border: 2px solid #e5e7eb; border-radius: 8px; height: 80px; resize: vertical;"></textarea>
-                    
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                        <select id="newTaskPriority" style="padding: 12px; border: 2px solid #e5e7eb; border-radius: 8px;">
-                            <option value="low">🟢 Baja</option>
-                            <option value="medium" selected>🔵 Media</option>
-                            <option value="high">🟠 Alta</option>
-                            <option value="urgent">🔴 Urgente</option>
-                        </select>
-                        
-                        <input type="text" id="newTaskAssignee" placeholder="Asignado a..." style="padding: 12px; border: 2px solid #e5e7eb; border-radius: 8px;">
-                    </div>
-                    
-                    <input type="date" id="newTaskDueDate" style="width: 100%; padding: 12px; margin-bottom: 20px; border: 2px solid #e5e7eb; border-radius: 8px;">
-                    
-                    <div style="display: flex; gap: 10px;">
-                        <button onclick="closeTaskModal()" style="flex: 1; padding: 12px; background: #6b7280; color: white; border: none; border-radius: 8px; cursor: pointer;">
-                            Cancelar
-                        </button>
-                        <button onclick="saveNewTask()" style="flex: 1; padding: 12px; background: #3b82f6; color: white; border: none; border-radius: 8px; cursor: pointer;">
-                            💾 Guardar
-                        </button>
-                    </div>
+            <!-- Quick Stats -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
+                <div style="text-align: center; padding: 1rem; background: #fef3c7; border-radius: 8px;">
+                    <div style="font-size: 1.5rem; font-weight: bold; color: #92400e;">${taskStats.pending}</div>
+                    <div style="color: #6b7280; font-size: 0.9rem;">Pendientes</div>
+                </div>
+                <div style="text-align: center; padding: 1rem; background: #dbeafe; border-radius: 8px;">
+                    <div style="font-size: 1.5rem; font-weight: bold; color: #1e40af;">${taskStats.inProgress}</div>
+                    <div style="color: #6b7280; font-size: 0.9rem;">En Progreso</div>
+                </div>
+                <div style="text-align: center; padding: 1rem; background: #dcfce7; border-radius: 8px;">
+                    <div style="font-size: 1.5rem; font-weight: bold; color: #166534;">${taskStats.completed}</div>
+                    <div style="color: #6b7280; font-size: 0.9rem;">Completadas</div>
+                </div>
+                <div style="text-align: center; padding: 1rem; background: #fee2e2; border-radius: 8px;">
+                    <div style="font-size: 1.5rem; font-weight: bold; color: #dc2626;">${taskStats.overdue}</div>
+                    <div style="color: #6b7280; font-size: 0.9rem;">Vencidas</div>
                 </div>
             </div>
         </div>
+
+        <!-- Task Filters -->
+        <div style="background: white; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 2rem;">
+            <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;">
+                <label style="color: #374151; font-weight: 600;">Filtros:</label>
+                <select id="taskTypeFilter" onchange="filterTasks()" style="padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 6px;">
+                    <option value="">Todos los tipos</option>
+                    <option value="sales">📞 Ventas</option>
+                    <option value="payment">💰 Pagos</option>
+                    <option value="admin">⚙️ Administración</option>
+                </select>
+                <select id="taskStatusFilter" onchange="filterTasks()" style="padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 6px;">
+                    <option value="">Todos los estados</option>
+                    <option value="pending">⏳ Pendiente</option>
+                    <option value="in-progress">🔄 En Progreso</option>
+                    <option value="completed">✅ Completada</option>
+                </select>
+                <select id="taskAssigneeFilter" onchange="filterTasks()" style="padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 6px;">
+                    <option value="">Todos los asignados</option>
+                    ${getUniqueAssignees().map(assignee => 
+                        `<option value="${assignee}">${assignee}</option>`
+                    ).join('')}
+                </select>
+            </div>
+        </div>
+
+        <!-- Task Board -->
+        <div id="taskBoard" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem;">
+            ${renderTaskColumns()}
+        </div>
+
+        <!-- Task Modal -->
+        ${createTaskModal()}
     `;
 }
 
-// ===== RENDER TASK COLUMN =====
-function renderTaskColumn(status, title, taskList, color) {
-    return `
-        <div class="drop-zone" 
-             ondrop="dropTask(event)" 
-             ondragover="allowDropTask(event)"
-             data-status="${status}"
-             style="background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); overflow: hidden; border-top: 4px solid ${color}; min-height: 400px;">
-            
-            <!-- Column Header -->
-            <div style="background: ${color}15; padding: 1rem; text-align: center; border-bottom: 1px solid #e5e7eb;">
-                <div style="font-weight: 600; color: #374151; margin-bottom: 0.5rem;">${title}</div>
-                <div style="background: ${color}; color: white; display: inline-block; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.8rem;">
-                    ${taskList.length}
+// ===== RENDER TASK COLUMNS =====
+function renderTaskColumns() {
+    const columns = [
+        { id: 'pending', title: '⏳ Pendientes', color: '#f59e0b' },
+        { id: 'in-progress', title: '🔄 En Progreso', color: '#3b82f6' },
+        { id: 'completed', title: '✅ Completadas', color: '#10b981' }
+    ];
+
+    return columns.map(column => {
+        const columnTasks = getFilteredTasks().filter(task => task.status === column.id);
+        
+        return `
+            <div style="background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); overflow: hidden;">
+                <div style="background: ${column.color}; color: white; padding: 1rem; text-align: center; font-weight: 600;">
+                    ${column.title} (${columnTasks.length})
+                </div>
+                <div style="padding: 1rem; min-height: 300px; max-height: 500px; overflow-y: auto;">
+                    ${columnTasks.length === 0 ? 
+                        '<div style="text-align: center; color: #9ca3af; padding: 2rem; font-style: italic;">No hay tareas</div>' :
+                        columnTasks.map(task => renderTaskCard(task)).join('')
+                    }
                 </div>
             </div>
-            
-            <!-- Tasks Container -->
-            <div style="padding: 1rem; max-height: 350px; overflow-y: auto;">
-                ${taskList.length === 0 ? `
-                    <div style="text-align: center; color: #9ca3af; padding: 2rem;">
-                        <div style="font-size: 2rem; margin-bottom: 1rem;">📝</div>
-                        <div>Sin tareas</div>
-                    </div>
-                ` : taskList.map(task => renderTaskCard(task)).join('')}
-            </div>
-        </div>
-    `;
+        `;
+    }).join('');
 }
 
 // ===== RENDER TASK CARD =====
 function renderTaskCard(task) {
     const priorityColors = {
         low: '#10b981',
-        medium: '#3b82f6',
+        medium: '#3b82f6', 
         high: '#f59e0b',
-        urgent: '#dc2626'
+        urgent: '#ef4444'
     };
-    
-    const priorityColor = priorityColors[task.priority] || '#3b82f6';
-    
+
+    const typeIcons = {
+        sales: '📞',
+        payment: '💰',
+        admin: '⚙️'
+    };
+
+    const isOverdue = new Date(task.dueDate) < new Date() && task.status !== 'completed';
+
     return `
-        <div id="task-${task.id}" 
-             draggable="true" 
-             ondragstart="dragTask(event)"
-             style="background: #f9fafb; border: 1px solid #e5e7eb; border-left: 4px solid ${priorityColor}; border-radius: 8px; padding: 12px; margin-bottom: 8px; cursor: move; transition: all 0.2s;"
-             onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(0,0,0,0.15)'"
-             onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+        <div style="
+            background: ${isOverdue ? '#fef2f2' : '#f9fafb'};
+            border: 1px solid ${isOverdue ? '#fecaca' : '#e5e7eb'};
+            border-left: 4px solid ${priorityColors[task.priority]};
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        " 
+        onclick="editTask('${task.id}')"
+        onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)'"
+        onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
             
-            <div style="font-weight: 600; color: #1f2937; margin-bottom: 6px;">${task.title}</div>
-            <div style="font-size: 0.9rem; color: #6b7280; margin-bottom: 8px;">${task.description}</div>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
+                <div style="font-weight: 600; color: #1f2937; flex: 1;">
+                    ${typeIcons[task.type] || '📋'} ${task.title}
+                </div>
+                <span style="
+                    background: ${priorityColors[task.priority]};
+                    color: white;
+                    padding: 0.2rem 0.5rem;
+                    border-radius: 12px;
+                    font-size: 0.7rem;
+                    font-weight: 600;
+                    text-transform: uppercase;
+                ">
+                    ${task.priority}
+                </span>
+            </div>
+            
+            <div style="font-size: 0.9rem; color: #6b7280; margin-bottom: 0.5rem; line-height: 1.4;">
+                ${task.description}
+            </div>
             
             <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem;">
-                <span style="background: #e0e7ff; color: #3730a3; padding: 3px 8px; border-radius: 12px;">
+                <span style="background: #e0e7ff; color: #3730a3; padding: 0.25rem 0.5rem; border-radius: 12px;">
                     👤 ${task.assignee}
                 </span>
-                ${task.dueDate ? `
-                    <span style="background: #f3f4f6; color: #6b7280; padding: 3px 8px; border-radius: 12px;">
-                        📅 ${new Date(task.dueDate).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' })}
-                    </span>
-                ` : ''}
+                <span style="color: ${isOverdue ? '#dc2626' : '#6b7280'}; font-weight: ${isOverdue ? '600' : 'normal'};">
+                    📅 ${formatTaskDate(task.dueDate)}
+                    ${isOverdue ? ' (VENCIDA)' : ''}
+                </span>
             </div>
         </div>
     `;
 }
 
-// ===== DRAG & DROP FUNCTIONS =====
-function allowDropTask(ev) {
-    ev.preventDefault();
+// ===== TASK MODAL =====
+function createTaskModal() {
+    return `
+        <div id="taskModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 10000; justify-content: center; align-items: center;">
+            <div style="background: white; padding: 2rem; border-radius: 12px; width: 500px; max-width: 90%; max-height: 90%; overflow-y: auto;">
+                <h3 style="margin: 0 0 1.5rem 0; color: #1f2937;">➕ Nueva Tarea</h3>
+                
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Título:</label>
+                    <input type="text" id="newTaskTitle" placeholder="Título de la tarea..." 
+                           style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1rem;">
+                </div>
+                
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Descripción:</label>
+                    <textarea id="newTaskDesc" placeholder="Descripción detallada..." 
+                              style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px; height: 100px; resize: vertical;"></textarea>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                    <div>
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Tipo:</label>
+                        <select id="newTaskType" style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px;">
+                            <option value="sales">📞 Ventas</option>
+                            <option value="payment">💰 Pagos</option>
+                            <option value="admin">⚙️ Administración</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Prioridad:</label>
+                        <select id="newTaskPriority" style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px;">
+                            <option value="low">🟢 Baja</option>
+                            <option value="medium" selected>🔵 Media</option>
+                            <option value="high">🟠 Alta</option>
+                            <option value="urgent">🔴 Urgente</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+                    <div>
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Asignado a:</label>
+                        <input type="text" id="newTaskAssignee" placeholder="Nombre del responsable..." 
+                               style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px;">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Fecha límite:</label>
+                        <input type="date" id="newTaskDueDate" 
+                               style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px;">
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 1rem;">
+                    <button onclick="closeTaskModal()" class="btn btn-secondary" style="flex: 1;">
+                        Cancelar
+                    </button>
+                    <button onclick="saveNewTask()" class="btn btn-primary" style="flex: 1;">
+                        💾 Guardar Tarea
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
 }
 
-function dragTask(ev) {
-    ev.dataTransfer.setData("text", ev.target.id);
-    console.log('🎯 Dragging task:', ev.target.id);
-}
-
-function dropTask(ev) {
-    ev.preventDefault();
-    
-    const taskElementId = ev.dataTransfer.getData("text");
-    const taskId = taskElementId.replace('task-', '');
-    const newStatus = ev.currentTarget.dataset.status;
-    
-    console.log('🎯 Dropping task:', taskId, 'to', newStatus);
-    
-    // Find and update task
-    const taskIndex = tasks.findIndex(t => t.id === taskId);
-    if (taskIndex !== -1) {
-        tasks[taskIndex].status = newStatus;
-        
-        // Show notification
-        if (window.showNotification) {
-            window.showNotification(`Tarea movida a ${newStatus} ✅`, 'success', 2000);
-        }
-        
-        // Reload board
-        setTimeout(() => loadTasksData(), 200);
-    }
-}
-
-// ===== MODAL FUNCTIONS =====
-function createNewTask() {
-    const modal = document.getElementById('taskModal');
-    if (modal) {
-        modal.style.display = 'block';
-    }
+// ===== TASK MANAGEMENT FUNCTIONS =====
+function openTaskModal() {
+    document.getElementById('taskModal').style.display = 'flex';
+    // Set default due date to tomorrow
+    document.getElementById('newTaskDueDate').value = getTomorrowDate();
 }
 
 function closeTaskModal() {
-    const modal = document.getElementById('taskModal');
-    if (modal) {
-        modal.style.display = 'none';
-        document.getElementById('newTaskTitle').value = '';
-        document.getElementById('newTaskDesc').value = '';
-        document.getElementById('newTaskAssignee').value = '';
-        document.getElementById('newTaskDueDate').value = '';
-    }
+    document.getElementById('taskModal').style.display = 'none';
+    clearTaskForm();
 }
 
 function saveNewTask() {
     const title = document.getElementById('newTaskTitle').value.trim();
     const description = document.getElementById('newTaskDesc').value.trim();
+    const type = document.getElementById('newTaskType').value;
     const priority = document.getElementById('newTaskPriority').value;
     const assignee = document.getElementById('newTaskAssignee').value.trim();
     const dueDate = document.getElementById('newTaskDueDate').value;
     
-    if (!title) {
-        alert('⚠️ Por favor ingresa un título');
+    if (!title || !assignee || !dueDate) {
+        alert('⚠️ Por favor completa todos los campos obligatorios');
         return;
     }
     
     const newTask = {
         id: Date.now().toString(),
-        title: title,
-        description: description || 'Sin descripción',
-        status: 'todo',
-        priority: priority,
-        assignee: assignee || 'Sin asignar',
-        dueDate: dueDate || null
+        title,
+        description,
+        type,
+        status: 'pending',
+        priority,
+        assignee,
+        dueDate,
+        createdAt: new Date().toISOString()
     };
     
     tasks.push(newTask);
@@ -353,30 +320,99 @@ function saveNewTask() {
     loadTasksData();
     
     if (window.showNotification) {
-        window.showNotification(`✅ Tarea "${title}" creada`, 'success');
+        window.showNotification(`✅ Tarea "${title}" creada exitosamente`, 'success');
     }
 }
 
-// ===== EXPORT FUNCTIONS =====
+function editTask(taskId) {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    
+    const newStatus = prompt(`Tarea: ${task.title}\nEstado actual: ${task.status}\n\nCambiar estado a:\n- pending (Pendiente)\n- in-progress (En Progreso)\n- completed (Completada)`, task.status);
+    
+    if (newStatus && ['pending', 'in-progress', 'completed'].includes(newStatus)) {
+        task.status = newStatus;
+        task.updatedAt = new Date().toISOString();
+        loadTasksData();
+        
+        if (window.showNotification) {
+            window.showNotification(`✅ Tarea movida a: ${getStatusName(newStatus)}`, 'success');
+        }
+    }
+}
+
+// ===== UTILITY FUNCTIONS =====
+function calculateTaskStats() {
+    const today = new Date();
+    return {
+        pending: tasks.filter(t => t.status === 'pending').length,
+        inProgress: tasks.filter(t => t.status === 'in-progress').length,
+        completed: tasks.filter(t => t.status === 'completed').length,
+        overdue: tasks.filter(t => new Date(t.dueDate) < today && t.status !== 'completed').length
+    };
+}
+
+function getFilteredTasks() {
+    let filtered = [...tasks];
+    
+    const typeFilter = document.getElementById('taskTypeFilter')?.value;
+    const statusFilter = document.getElementById('taskStatusFilter')?.value;
+    const assigneeFilter = document.getElementById('taskAssigneeFilter')?.value;
+    
+    if (typeFilter) filtered = filtered.filter(t => t.type === typeFilter);
+    if (statusFilter) filtered = filtered.filter(t => t.status === statusFilter);
+    if (assigneeFilter) filtered = filtered.filter(t => t.assignee === assigneeFilter);
+    
+    return filtered;
+}
+
+function filterTasks() {
+    const taskBoard = document.getElementById('taskBoard');
+    if (taskBoard) {
+        taskBoard.innerHTML = renderTaskColumns();
+    }
+}
+
+function getUniqueAssignees() {
+    return [...new Set(tasks.map(t => t.assignee))];
+}
+
+function formatTaskDate(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('es-ES', { 
+        day: '2-digit', 
+        month: '2-digit' 
+    });
+}
+
+function getTomorrowDate() {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.toISOString().split('T')[0];
+}
+
+function getStatusName(status) {
+    const names = {
+        'pending': 'Pendiente',
+        'in-progress': 'En Progreso', 
+        'completed': 'Completada'
+    };
+    return names[status] || status;
+}
+
+function clearTaskForm() {
+    document.getElementById('newTaskTitle').value = '';
+    document.getElementById('newTaskDesc').value = '';
+    document.getElementById('newTaskAssignee').value = '';
+    document.getElementById('newTaskDueDate').value = '';
+}
+
+// ===== EXPORT TO GLOBAL SCOPE =====
 window.loadTasksData = loadTasksData;
-window.createNewTask = createNewTask;
+window.openTaskModal = openTaskModal;
 window.closeTaskModal = closeTaskModal;
 window.saveNewTask = saveNewTask;
-window.allowDropTask = allowDropTask;
-window.dragTask = dragTask;
-window.dropTask = dropTask;
+window.editTask = editTask;
+window.filterTasks = filterTasks;
 
-// ===== MANUAL TEST FUNCTION =====
-window.testTasksManually = function() {
-    console.log('🧪 MANUAL TASK TEST STARTING...');
-    
-    // Force run loadTasksData
-    try {
-        loadTasksData();
-        console.log('✅ Manual test successful');
-    } catch (error) {
-        console.error('❌ Manual test failed:', error);
-    }
-};
-
-console.log('✅ FIXED Task Management loaded - Try window.testTasksManually() in console');
+console.log('✅ Enhanced Task Management System loaded!');
