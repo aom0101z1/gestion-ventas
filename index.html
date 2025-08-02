@@ -845,9 +845,27 @@ window.firebaseModules = {
                 });
             }
 
-            async deleteContact(contactId) {
-                await remove(ref(this.database, `contacts/${contactId}`));
-            }
+           // ADD THIS CODE TO YOUR INDEX.HTML
+// Find where your SimpleFirebaseManager class is defined (around line 1250-1300)
+// Add this deleteContact method inside the class, after the updateContact method:
+
+async deleteContact(contactId) {
+    if (!this.currentUser) throw new Error('User not authenticated');
+    
+    try {
+        // Delete from Firebase
+        await remove(ref(this.database, `contacts/${contactId}`));
+        console.log('✅ Contact deleted from Firebase:', contactId);
+        
+        // Notify any observers
+        this.observers.forEach(callback => callback());
+        
+        return true;
+    } catch (error) {
+        console.error('❌ Error deleting contact:', error);
+        throw error;
+    }
+}
 
             async getConvenios() {
                 const snapshot = await get(ref(this.database, 'system/convenios'));
@@ -2514,5 +2532,6 @@ console.log('✅ Sales ranking loaded successfully');
 
 </body>
 </html>
+
 
 
