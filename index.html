@@ -1310,6 +1310,12 @@ function switchTab(tabName) {
             updateLeadsTable();
         } else if (tabName === 'config') {
             loadConfigData();
+
+         if (window.userRole === 'director') {
+            initializeUserManagement();
+              }
+}
+            
         } else if (tabName === 'pipeline') {
             loadPipelineData();
         } else if (tabName === 'reports') {
@@ -2576,6 +2582,7 @@ console.log('✅ Sales ranking loaded successfully');
 
 </body>
 </html>
+
 
 
 
