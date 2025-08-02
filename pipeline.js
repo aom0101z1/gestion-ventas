@@ -117,8 +117,11 @@ function renderPipelineView(contacts) {
         ${renderPipelineControls()}
     `;
     
-    // Add event listeners after rendering
-    setupPipelineEventListeners();
+    // ✅ CRITICAL FIX: Add event listeners AFTER rendering
+    setTimeout(() => {
+        setupPipelineEventListeners();
+        console.log('✅ Pipeline event listeners re-attached after render');
+    }, 100);
 }
 
 function renderPipelineColumn(status, config, leads) {
@@ -1079,3 +1082,4 @@ if (typeof module !== 'undefined' && module.exports) {
 }
 
 console.log('✅ Pipeline.js module loaded successfully with drag & drop fixed');
+
