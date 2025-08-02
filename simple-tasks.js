@@ -1,10 +1,10 @@
-// ===== ENHANCED TASK MANAGEMENT SYSTEM - INTEGRATED WITH YOUR CMR =====
+// ===== COMPLETE TASK MANAGEMENT SYSTEM - FIXED FOR YOUR CRM =====
 
 let tasks = [
     {
         id: '1',
         title: 'Design login page',
-        description: 'Create wireframes and mockups for the login page using Figma. Include responsive design considerations and accessibility features.',
+        description: 'Create wireframes and mockups for the login page using Figma. Include responsive design considerations.',
         status: 'in-progress',
         priority: 'high',
         assignee: 'john',
@@ -16,7 +16,7 @@ let tasks = [
     {
         id: '2',
         title: 'Implement API authentication',
-        description: 'Set up JWT authentication for the API endpoints. Include refresh token logic and secure session management.',
+        description: 'Set up JWT authentication for the API endpoints. Include refresh token logic.',
         status: 'in-progress',
         priority: 'urgent',
         assignee: 'jane',
@@ -38,24 +38,37 @@ let employees = [
 
 let draggedTask = null;
 
-// Main function to load tasks
+// ===== MAIN LOADING FUNCTION (WORKS WITH YOUR CRM) =====
 async function loadTasksData() {
+    console.log('📋 Starting task management system...');
+    
     const tasksContainer = document.getElementById('tasks');
-    if (!tasksContainer) return;
+    if (!tasksContainer) {
+        console.error('❌ Tasks container not found!');
+        return;
+    }
 
+    // Clear existing content
     tasksContainer.innerHTML = '';
     tasksContainer.style.display = 'block';
     tasksContainer.classList.remove('hidden');
 
+    // Add styles first
     addTaskStyles();
-    renderTaskBoard();
+
+    // Create the complete task management interface
+    tasksContainer.innerHTML = createTaskInterface();
+
+    // Initialize all functionality
+    renderTasks();
+    setupEventListeners();
+    
+    console.log('✅ Task management system loaded successfully!');
 }
 
-// Render the complete task board
-function renderTaskBoard() {
-    const tasksContainer = document.getElementById('tasks');
-    
-    tasksContainer.innerHTML = `
+// ===== CREATE COMPLETE INTERFACE =====
+function createTaskInterface() {
+    return `
         <div class="task-management-container">
             <!-- Header Section -->
             <div class="task-header">
@@ -76,45 +89,132 @@ function renderTaskBoard() {
                 </div>
             </div>
             
-            <!-- Task Board -->
+            <!-- Task Board with 6 Columns -->
             <div class="task-board">
-                ${renderColumns()}
+                <!-- To Do Column -->
+                <div class="task-column">
+                    <div class="column-header" style="background: #6b7280;">
+                        <span>📝 To Do</span>
+                        <span class="count-badge" id="count-todo">0</span>
+                    </div>
+                    <div class="column-body" data-status="todo" id="column-todo">
+                        <div class="empty-state">No tasks here</div>
+                    </div>
+                </div>
+
+                <!-- In Progress Column -->
+                <div class="task-column">
+                    <div class="column-header" style="background: #3b82f6;">
+                        <span>🔄 In Progress</span>
+                        <span class="count-badge" id="count-in-progress">0</span>
+                    </div>
+                    <div class="column-body" data-status="in-progress" id="column-in-progress">
+                        <div class="empty-state">No tasks here</div>
+                    </div>
+                </div>
+
+                <!-- Review Column -->
+                <div class="task-column">
+                    <div class="column-header" style="background: #f59e0b;">
+                        <span>👀 Review</span>
+                        <span class="count-badge" id="count-review">0</span>
+                    </div>
+                    <div class="column-body" data-status="review" id="column-review">
+                        <div class="empty-state">No tasks here</div>
+                    </div>
+                </div>
+
+                <!-- Testing Column -->
+                <div class="task-column">
+                    <div class="column-header" style="background: #8b5cf6;">
+                        <span>🧪 Testing</span>
+                        <span class="count-badge" id="count-testing">0</span>
+                    </div>
+                    <div class="column-body" data-status="testing" id="column-testing">
+                        <div class="empty-state">No tasks here</div>
+                    </div>
+                </div>
+
+                <!-- Completed Column -->
+                <div class="task-column">
+                    <div class="column-header" style="background: #10b981;">
+                        <span>✅ Completed</span>
+                        <span class="count-badge" id="count-completed">0</span>
+                    </div>
+                    <div class="column-body" data-status="completed" id="column-completed">
+                        <div class="empty-state">No tasks here</div>
+                    </div>
+                </div>
+
+                <!-- Blocked Column -->
+                <div class="task-column">
+                    <div class="column-header" style="background: #ef4444;">
+                        <span>🚫 Blocked</span>
+                        <span class="count-badge" id="count-blocked">0</span>
+                    </div>
+                    <div class="column-body" data-status="blocked" id="column-blocked">
+                        <div class="empty-state">No tasks here</div>
+                    </div>
+                </div>
             </div>
             
             <!-- Create Task Modal -->
-            ${renderCreateTaskModal()}
+            <div class="task-modal" id="createTaskModal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Create New Task</h3>
+                        <button class="close-btn" onclick="closeTaskModal()">✕</button>
+                    </div>
+                    
+                    <form id="createTaskForm">
+                        <div class="form-group">
+                            <label>Task Title *</label>
+                            <input type="text" id="taskTitle" required placeholder="Enter task title...">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Description</label>
+                            <textarea id="taskDescription" placeholder="Describe the task details..."></textarea>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Priority</label>
+                                <select id="taskPriority">
+                                    <option value="low">🟢 Low</option>
+                                    <option value="medium" selected>🔵 Medium</option>
+                                    <option value="high">🟠 High</option>
+                                    <option value="urgent">🔴 Urgent</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Assign To</label>
+                                <select id="taskAssignee">
+                                    ${employees.map(emp => 
+                                        `<option value="${emp.id}">${emp.avatar} ${emp.name}</option>`
+                                    ).join('')}
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Due Date</label>
+                            <input type="date" id="taskDueDate" min="${new Date().toISOString().split('T')[0]}">
+                        </div>
+                        
+                        <div class="modal-actions">
+                            <button type="button" class="btn-secondary" onclick="closeTaskModal()">Cancel</button>
+                            <button type="submit" class="btn-primary">Create Task</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
     `;
-
-    renderTasks();
-    setupEventListeners();
 }
 
-// Render all columns
-function renderColumns() {
-    const columns = [
-        { id: 'todo', title: '📝 To Do', color: '#6b7280' },
-        { id: 'in-progress', title: '🔄 In Progress', color: '#3b82f6' },
-        { id: 'review', title: '👀 Review', color: '#f59e0b' },
-        { id: 'testing', title: '🧪 Testing', color: '#8b5cf6' },
-        { id: 'completed', title: '✅ Completed', color: '#10b981' },
-        { id: 'blocked', title: '🚫 Blocked', color: '#ef4444' }
-    ];
-
-    return columns.map(col => `
-        <div class="task-column">
-            <div class="column-header" style="background: ${col.color};">
-                <span>${col.title}</span>
-                <span class="count-badge" id="count-${col.id}">0</span>
-            </div>
-            <div class="column-body" data-status="${col.id}" id="column-${col.id}">
-                <div class="empty-state">No tasks here</div>
-            </div>
-        </div>
-    `).join('');
-}
-
-// Render tasks in columns
+// ===== RENDER TASKS IN COLUMNS =====
 function renderTasks() {
     const statuses = ['todo', 'in-progress', 'review', 'testing', 'completed', 'blocked'];
     
@@ -137,7 +237,7 @@ function renderTasks() {
     setupDragAndDrop();
 }
 
-// Render individual task card
+// ===== RENDER INDIVIDUAL TASK CARD =====
 function renderTaskCard(task) {
     const isOverdue = task.dueDate && new Date(task.dueDate) < new Date();
     const employee = employees.find(emp => emp.id === task.assignee);
@@ -198,64 +298,7 @@ function renderTaskCard(task) {
     `;
 }
 
-// Render create task modal
-function renderCreateTaskModal() {
-    return `
-        <div class="task-modal" id="createTaskModal">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3>Create New Task</h3>
-                    <button class="close-btn" onclick="closeTaskModal()">✕</button>
-                </div>
-                
-                <form id="createTaskForm">
-                    <div class="form-group">
-                        <label>Task Title *</label>
-                        <input type="text" id="taskTitle" required placeholder="Enter task title...">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Description</label>
-                        <textarea id="taskDescription" placeholder="Describe the task details..."></textarea>
-                    </div>
-                    
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Priority</label>
-                            <select id="taskPriority">
-                                <option value="low">🟢 Low</option>
-                                <option value="medium" selected>🔵 Medium</option>
-                                <option value="high">🟠 High</option>
-                                <option value="urgent">🔴 Urgent</option>
-                            </select>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label>Assign To</label>
-                            <select id="taskAssignee">
-                                ${employees.map(emp => 
-                                    `<option value="${emp.id}">${emp.avatar} ${emp.name}</option>`
-                                ).join('')}
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Due Date</label>
-                        <input type="date" id="taskDueDate" min="${new Date().toISOString().split('T')[0]}">
-                    </div>
-                    
-                    <div class="modal-actions">
-                        <button type="button" class="btn-secondary" onclick="closeTaskModal()">Cancel</button>
-                        <button type="submit" class="btn-primary">Create Task</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    `;
-}
-
-// Setup all event listeners
+// ===== EVENT LISTENERS SETUP =====
 function setupEventListeners() {
     // Create task form
     const form = document.getElementById('createTaskForm');
@@ -281,7 +324,7 @@ function setupEventListeners() {
     });
 }
 
-// Setup drag and drop functionality
+// ===== DRAG AND DROP FUNCTIONALITY =====
 function setupDragAndDrop() {
     // Task cards drag events
     document.querySelectorAll('.task-card').forEach(card => {
@@ -289,7 +332,6 @@ function setupDragAndDrop() {
             draggedTask = e.target.dataset.taskId;
             e.target.classList.add('dragging');
             e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/html', e.target.outerHTML);
         });
 
         card.addEventListener('dragend', (e) => {
@@ -326,7 +368,7 @@ function setupDragAndDrop() {
     });
 }
 
-// Task management functions
+// ===== TASK MANAGEMENT FUNCTIONS =====
 function createTask(e) {
     e.preventDefault();
     
@@ -350,6 +392,9 @@ function createTask(e) {
     renderTasks();
     closeTaskModal();
     showNotification('Task created successfully! 🎉', 'success');
+    
+    // Update header stats
+    updateTaskStats();
 }
 
 function moveTask(taskId, newStatus) {
@@ -361,6 +406,7 @@ function moveTask(taskId, newStatus) {
         
         renderTasks();
         showNotification(`Task moved from ${formatStatus(oldStatus)} to ${formatStatus(newStatus)}`, 'success');
+        updateTaskStats();
     }
 }
 
@@ -384,13 +430,30 @@ function editTask(taskId) {
         
         showCreateTaskModal();
         
-        // Delete the old task when creating the "new" one
+        // Change form behavior for editing
         const form = document.getElementById('createTaskForm');
+        const submitBtn = form.querySelector('button[type="submit"]');
+        submitBtn.textContent = 'Update Task';
+        
         form.onsubmit = (e) => {
             e.preventDefault();
-            deleteTask(taskId);
-            createTask(e);
-            form.onsubmit = createTask; // Reset to normal
+            
+            // Update task
+            task.title = document.getElementById('taskTitle').value.trim();
+            task.description = document.getElementById('taskDescription').value.trim();
+            task.priority = document.getElementById('taskPriority').value;
+            task.assignee = document.getElementById('taskAssignee').value;
+            task.assigneeName = employees.find(emp => emp.id === task.assignee)?.name || 'Unknown';
+            task.dueDate = document.getElementById('taskDueDate').value;
+            task.updatedAt = new Date().toISOString();
+            
+            renderTasks();
+            closeTaskModal();
+            showNotification('Task updated successfully! ✅', 'success');
+            
+            // Reset form behavior
+            form.onsubmit = createTask;
+            submitBtn.textContent = 'Create Task';
         };
     }
 }
@@ -400,6 +463,7 @@ function deleteTask(taskId) {
         tasks = tasks.filter(t => t.id !== taskId);
         renderTasks();
         showNotification('Task deleted successfully', 'info');
+        updateTaskStats();
     }
 }
 
@@ -418,7 +482,7 @@ function changePriority(taskId) {
     }
 }
 
-// Modal functions
+// ===== MODAL FUNCTIONS =====
 function showCreateTaskModal() {
     const modal = document.getElementById('createTaskModal');
     if (modal) {
@@ -432,15 +496,35 @@ function closeTaskModal() {
     if (modal) {
         modal.classList.remove('show');
         document.getElementById('createTaskForm').reset();
+        
+        // Reset form behavior if it was changed for editing
+        const form = document.getElementById('createTaskForm');
+        const submitBtn = form.querySelector('button[type="submit"]');
+        form.onsubmit = createTask;
+        submitBtn.textContent = 'Create Task';
     }
 }
 
 function refreshTasks() {
     renderTasks();
+    updateTaskStats();
     showNotification('Tasks refreshed! 🔄', 'info');
 }
 
-// Utility functions
+// ===== HELPER FUNCTIONS =====
+function updateTaskStats() {
+    const statsContainer = document.querySelector('.task-stats');
+    if (statsContainer) {
+        const totalTasks = tasks.length;
+        const activeTasks = tasks.filter(t => !['completed', 'blocked'].includes(t.status)).length;
+        
+        statsContainer.innerHTML = `
+            <span class="stat-item">Total: ${totalTasks}</span>
+            <span class="stat-item">Active: ${activeTasks}</span>
+        `;
+    }
+}
+
 function getPriorityIcon(priority) {
     const icons = { urgent: '🔴', high: '🟠', medium: '🔵', low: '🟢' };
     return icons[priority] || '🔵';
@@ -464,7 +548,7 @@ function showNotification(message, type = 'info') {
     }
 }
 
-// Add comprehensive CSS styles
+// ===== COMPREHENSIVE CSS STYLES =====
 function addTaskStyles() {
     if (document.getElementById('task-management-styles')) return;
 
@@ -521,6 +605,7 @@ function addTaskStyles() {
             cursor: pointer;
             font-weight: 500;
             transition: all 0.2s;
+            font-size: 0.9rem;
         }
         
         .btn-primary {
@@ -544,7 +629,7 @@ function addTaskStyles() {
         
         .task-board {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-template-columns: repeat(6, 1fr);
             gap: 1.5rem;
         }
         
@@ -555,7 +640,7 @@ function addTaskStyles() {
             overflow: hidden;
             display: flex;
             flex-direction: column;
-            max-height: 80vh;
+            min-height: 60vh;
         }
         
         .column-header {
@@ -847,6 +932,7 @@ function addTaskStyles() {
             border-radius: 6px;
             font-size: 0.9rem;
             transition: border-color 0.2s;
+            box-sizing: border-box;
         }
         
         .form-group input:focus,
@@ -871,9 +957,15 @@ function addTaskStyles() {
             border-top: 1px solid #e5e7eb;
         }
         
+        @media (max-width: 1200px) {
+            .task-board {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+        
         @media (max-width: 768px) {
             .task-board {
-                grid-template-columns: 1fr;
+                grid-template-columns: repeat(2, 1fr);
             }
             
             .task-header {
@@ -890,13 +982,26 @@ function addTaskStyles() {
                 grid-template-columns: 1fr;
             }
         }
+        
+        @media (max-width: 480px) {
+            .task-board {
+                grid-template-columns: 1fr;
+            }
+        }
     `;
     
     document.head.appendChild(style);
 }
 
-// Export to global scope
+// ===== INITIALIZE MODULE (FOR COMPATIBILITY) =====
+function initializeTasksModule() {
+    console.log('🚀 Initializing tasks module...');
+    loadTasksData();
+}
+
+// ===== EXPORT TO GLOBAL SCOPE =====
 window.loadTasksData = loadTasksData;
+window.initializeTasksModule = initializeTasksModule;
 window.showCreateTaskModal = showCreateTaskModal;
 window.closeTaskModal = closeTaskModal;
 window.refreshTasks = refreshTasks;
@@ -905,4 +1010,4 @@ window.editTask = editTask;
 window.deleteTask = deleteTask;
 window.changePriority = changePriority;
 
-console.log('✅ Enhanced Task Management System loaded successfully!');
+console.log('✅ Complete Task Management System loaded and ready!');
