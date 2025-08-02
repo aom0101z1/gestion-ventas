@@ -1309,13 +1309,7 @@ function switchTab(tabName) {
         if (tabName === 'leads') {
             updateLeadsTable();
         } else if (tabName === 'config') {
-            loadConfigData();
-
-         if (window.userRole === 'director') {
-            initializeUserManagement();
-              }
-}
-            
+            loadConfigData();         
         } else if (tabName === 'pipeline') {
             loadPipelineData();
         } else if (tabName === 'reports') {
@@ -2582,6 +2576,7 @@ console.log('✅ Sales ranking loaded successfully');
 
 </body>
 </html>
+
 
 
 
