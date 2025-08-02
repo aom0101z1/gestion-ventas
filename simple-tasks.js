@@ -57,7 +57,12 @@ function renderTasksUI() {
                         </h3>
                         <span id="count-${key}" style="background: ${status.color}20; color: ${status.color}; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold;">0</span>
                     </div>
-                    <div class="task-column" data-status="${key}" style="min-height: 300px; transition: background-color 0.2s;">
+                    <div class="task-column" 
+                         data-status="${key}" 
+                         ondrop="handleDrop(event, '${key}')" 
+                         ondragover="handleDragOver(event)"
+                         ondragleave="handleDragLeave(event)"
+                         style="min-height: 300px; transition: background-color 0.2s;">
                         <div style="text-align: center; color: #9ca3af; padding: 40px;">Cargando tareas...</div>
                     </div>
                 </div>
@@ -90,9 +95,7 @@ function setupTasksListener() {
         }
         
         renderTasks();
-        
-        // CLAVE: Setup eventos DESPUÉS del render
-        setTimeout(setupTaskEvents, 100);
+        // Ya no necesitamos setupTaskEvents ya que usamos event handlers inline
     });
 }
 
@@ -122,7 +125,10 @@ function renderTasks() {
                 column.innerHTML = '<div style="text-align: center; color: #9ca3af; padding: 40px;">No hay tareas</div>';
             } else {
                 column.innerHTML = tasks.map(task => `
-                    <div class="task-card" draggable="true" data-task-id="${task.id}" 
+                    <div class="task-card" 
+                         draggable="true" 
+                         data-task-id="${task.id}"
+                         ondragstart="handleDragStart(event, '${task.id}')"
                          style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; 
                                 padding: 12px; margin-bottom: 10px; cursor: pointer; transition: all 0.2s;">
                         
@@ -287,11 +293,70 @@ function refreshTasks() {
     setupTasksListener();
 }
 
+// Funciones para event handlers inline (evitar errores)
+function handleDragStart(event, taskId) {
+    window.draggedTask = taskId;
+    event.target.style.opacity = '0.5';
+    event.dataTransfer.setData('text/plain', taskId);
+    console.log('🎯 Task drag started:', taskId);
+}
+
+function handleDragOver(event) {
+    event.preventDefault();
+    event.currentTarget.style.backgroundColor = '#e3f2fd';
+}
+
+function handleDragLeave(event) {
+    event.currentTarget.style.backgroundColor = '';
+}
+
+async function handleDrop(event, newStatus) {
+    event.preventDefault();
+    event.currentTarget.style.backgroundColor = '';
+    
+    const taskId = event.dataTransfer.getData('text/plain') || window.draggedTask;
+    if (!taskId || !newStatus) return;
+    
+    console.log('🎯 Task drop:', taskId, 'to', newStatus);
+    
+    try {
+        const { ref, update } = window.firebaseModules.database;
+        const taskRef = ref(window.firebaseDb, `tasks/${taskId}`);
+        
+        await update(taskRef, {
+            status: newStatus,
+            lastUpdated: new Date().toISOString(),
+            lastUpdatedBy: currentUser.uid
+        });
+        
+        console.log('✅ Task moved successfully');
+        if (window.showNotification) {
+            window.showNotification('Tarea actualizada', 'success');
+        }
+        
+        // Reset drag state
+        window.draggedTask = null;
+        document.querySelectorAll('.task-card').forEach(card => {
+            card.style.opacity = '1';
+        });
+        
+    } catch (error) {
+        console.error('❌ Error moving task:', error);
+        if (window.showNotification) {
+            window.showNotification('Error al mover tarea', 'error');
+        }
+    }
+}
+
 // Export functions
 window.loadTasksData = loadTasksMain;
 window.showCreateTaskModal = showCreateTaskModal;
 window.createTask = createTask;
 window.closeModal = closeModal;
 window.refreshTasks = refreshTasks;
+window.handleDragStart = handleDragStart;
+window.handleDragOver = handleDragOver;
+window.handleDragLeave = handleDragLeave;
+window.handleDrop = handleDrop;
 
 console.log('✅ Tasks with working drag & drop loaded');
