@@ -1,10 +1,10 @@
-// pipeline.js - PIPELINE MANAGEMENT MODULE - COMPLETE VERSION
+// pipeline.js - PIPELINE MANAGEMENT MODULE - COMPLETE VERSION WITH TARGETED DRAG & DROP FIX
 // ===== SALES PIPELINE AND LEAD MANAGEMENT =====
 
-// Global variables for pipeline module
+// ✅ FIXED: Global variables for pipeline module - Changed draggedLead to global scope
 let pipelineData = [];
 let pipelineInitialized = false;
-let draggedLead = null;
+window.draggedLead = null; // ✅ FIXED: Changed from `let draggedLead = null;` to global scope
 let pipelineStats = {};
 
 // Pipeline configuration
@@ -132,425 +132,220 @@ function renderPipelineColumn(status, config, leads) {
                  background: white;
                  border-radius: 12px;
                  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-                 overflow: hidden;
-                 border-top: 4px solid ${config.color};
                  min-height: 400px;
-                 transition: all 0.3s ease;
+                 display: flex;
+                 flex-direction: column;
              ">
-            
-            <!-- Column Header -->
             <div class="pipeline-header" style="
-                background: ${config.color}15;
-                padding: 1.25rem;
-                text-align: center;
-                border-bottom: 1px solid #e5e7eb;
+                background: ${config.color};
+                color: white;
+                padding: 1rem;
+                border-radius: 12px 12px 0 0;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
             ">
-                <div style="
-                    font-size: 1.3rem;
-                    margin-bottom: 0.5rem;
-                    font-weight: 600;
-                    color: #374151;
-                ">
-                    ${config.emoji} ${status}
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="font-size: 1.2rem;">${config.emoji}</span>
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.1rem; font-weight: 600;">${status}</h3>
+                        <p style="margin: 0; font-size: 0.8rem; opacity: 0.9;">${config.description}</p>
+                    </div>
                 </div>
                 <div style="
-                    background: ${config.color};
-                    color: white;
-                    display: inline-block;
-                    padding: 0.4rem 1rem;
+                    background: rgba(255,255,255,0.2);
+                    padding: 0.25rem 0.75rem;
                     border-radius: 20px;
-                    font-weight: 600;
-                    font-size: 0.9rem;
-                    margin-bottom: 0.5rem;
-                ">
-                    ${leadCount} leads
-                </div>
-                <div style="
-                    font-size: 0.8rem;
-                    color: #6b7280;
-                    line-height: 1.3;
-                ">
-                    ${config.description}
-                </div>
+                    font-weight: bold;
+                ">${leadCount}</div>
             </div>
             
-            <!-- Column Body -->
-            <div class="pipeline-body" 
-                 data-status="${status}"
-                 style="
-                     padding: 0.75rem;
-                     max-height: 450px;
-                     min-height: 300px;
-                     overflow-y: auto;
-                     overflow-x: hidden;
-                 ">
-                ${leadCount === 0 ? renderEmptyColumn(status, config.color) : leads.map(lead => renderLeadCard(lead, config.color)).join('')}
-            </div>
-            
-            <!-- Column Footer -->
-            <div style="
-                padding: 0.75rem 1rem;
-                border-top: 1px solid #e5e7eb;
-                background: #f9fafb;
-                text-align: center;
+            <div class="pipeline-body" style="
+                padding: 1rem;
+                flex: 1;
+                overflow-y: auto;
+                max-height: 500px;
             ">
-                <button onclick="addNewLeadToStage('${status}')" 
-                        class="add-lead-btn"
-                        style="
-                            background: ${config.color};
-                            color: white;
-                            border: none;
-                            padding: 0.5rem 1rem;
-                            border-radius: 6px;
-                            font-size: 0.8rem;
-                            cursor: pointer;
-                            transition: all 0.2s ease;
-                        "
-                        onmouseover="this.style.opacity='0.8'"
-                        onmouseout="this.style.opacity='1'">
-                    ➕ Agregar Lead
-                </button>
+                ${leads.length === 0 ? `
+                    <div style="
+                        text-align: center;
+                        color: #9ca3af;
+                        padding: 2rem 1rem;
+                        border: 2px dashed #e5e7eb;
+                        border-radius: 8px;
+                        margin-top: 1rem;
+                    ">
+                        <p style="margin: 0;">No hay leads en esta etapa</p>
+                        <button onclick="addNewLeadToStage('${status}')" 
+                                style="
+                                    background: none;
+                                    border: none;
+                                    color: ${config.color};
+                                    font-size: 0.9rem;
+                                    cursor: pointer;
+                                    margin-top: 0.5rem;
+                                ">
+                            ➕ Agregar lead
+                        </button>
+                    </div>
+                ` : leads.map(lead => renderLeadCard(lead, config.color)).join('')}
             </div>
         </div>
     `;
 }
 
 function renderLeadCard(lead, stageColor) {
-    const priorityColor = getPriorityColor(lead.priority || 'Medium');
-    const sourceIcon = getSourceIcon(lead.source);
-    const timeAgo = getTimeAgo(lead.date, lead.time);
+    const priority = calculateLeadPriority(lead);
+    const score = calculateLeadScore(lead);
+    const daysOld = Math.floor((new Date() - new Date(lead.date)) / (1000 * 60 * 60 * 24));
     
     return `
-        <div class="lead-card collapsed" 
+        <div class="lead-card" 
              id="lead-card-${lead.id}"
              data-lead-id="${lead.id}"
              draggable="true"
              style="
-                 background: #f9fafb;
+                 background: white;
                  border: 1px solid #e5e7eb;
                  border-radius: 8px;
-                 margin-bottom: 0.5rem;
-                 cursor: move;
+                 padding: 1rem;
+                 margin-bottom: 0.75rem;
+                 cursor: grab;
                  transition: all 0.2s ease;
-                 position: relative;
-                 overflow: hidden;
+                 border-left: 4px solid ${stageColor};
              ">
             
-            <!-- Lead Header (Always Visible) -->
-            <div class="lead-header" 
-                 onclick="toggleLeadDetails(event, '${lead.id}')"
-                 style="
-                     display: flex;
-                     align-items: center;
-                     justify-content: space-between;
-                     padding: 0.75rem 1rem;
-                     cursor: pointer;
-                     background: #f9fafb;
-                     user-select: none;
-                 ">
-                <div style="
-                    display: flex;
-                    align-items: center;
-                    gap: 0.5rem;
-                    flex: 1;
-                    min-width: 0;
-                ">
-                    <div style="
-                        background: ${priorityColor};
-                        width: 8px;
-                        height: 8px;
-                        border-radius: 50%;
-                        flex-shrink: 0;
-                    " title="Prioridad: ${lead.priority || 'Medium'}"></div>
-                    <span style="
-                        font-weight: 500;
-                        color: #374151;
-                        font-size: 0.9rem;
-                        white-space: nowrap;
-                        overflow: hidden;
-                        text-overflow: ellipsis;
-                    ">
-                        ${lead.name || 'Sin nombre'}
-                    </span>
+            <div class="lead-header" onclick="toggleLeadDetails(event, '${lead.id}')" style="
+                display: flex;
+                justify-content: space-between;
+                align-items: start;
+                margin-bottom: 0.5rem;
+                cursor: pointer;
+            ">
+                <div style="flex: 1;">
+                    <h4 style="margin: 0 0 0.25rem 0; color: #1f2937; font-size: 0.95rem; font-weight: 600;">
+                        ${lead.name}
+                    </h4>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: #6b7280;">
+                        <span>📞 ${lead.phone}</span>
+                        ${priority.icon}
+                    </div>
                 </div>
-                <svg class="chevron" 
-                     style="
-                         width: 16px;
-                         height: 16px;
-                         transition: transform 0.2s ease;
-                         opacity: 0.5;
-                         flex-shrink: 0;
-                     "
-                     viewBox="0 0 24 24" 
-                     fill="none" 
-                     stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 9l6 6 6-6"/>
-                </svg>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <div style="
+                        background: ${getScoreColor(score)};
+                        color: white;
+                        padding: 0.125rem 0.5rem;
+                        border-radius: 12px;
+                        font-size: 0.7rem;
+                        font-weight: bold;
+                    ">${score}%</div>
+                    <span class="chevron" style="
+                        color: #9ca3af;
+                        transition: transform 0.2s;
+                        font-size: 0.8rem;
+                    ">▼</span>
+                </div>
             </div>
             
-            <!-- Lead Details (Collapsible) -->
-            <div class="lead-details" 
-                 style="
-                     max-height: 0;
-                     overflow: hidden;
-                     transition: max-height 0.3s ease;
-                     background: white;
-                 ">
-                <div style="
-                    padding: 1rem;
-                    border-top: 1px solid #e5e7eb;
-                ">
-                    <div style="
-                        font-size: 0.85rem;
-                        color: #6b7280;
-                        margin-bottom: 0.25rem;
-                        display: flex;
-                        align-items: center;
-                        gap: 0.25rem;
-                    ">
-                        ${sourceIcon} ${lead.source || 'No especificado'}
-                    </div>
-                    <div style="
-                        font-size: 0.85rem;
-                        color: #10b981;
-                        margin-bottom: 0.25rem;
-                        font-weight: 500;
-                    ">
-                        📞 ${lead.phone || 'Sin teléfono'}
-                    </div>
+            <div class="lead-details" style="
+                max-height: 0;
+                overflow: hidden;
+                transition: max-height 0.3s ease;
+            ">
+                <div style="padding-top: 0.5rem; border-top: 1px solid #f3f4f6;">
                     ${lead.email ? `
-                        <div style="
-                            font-size: 0.8rem;
-                            color: #6b7280;
-                            margin-bottom: 0.25rem;
-                        ">
-                            ✉️ ${lead.email}
+                        <div style="margin-bottom: 0.5rem; font-size: 0.8rem; color: #6b7280;">
+                            📧 ${lead.email}
                         </div>
                     ` : ''}
-                    <div style="
-                        font-size: 0.8rem;
-                        color: #6b7280;
-                        margin-bottom: 0.5rem;
-                    ">
-                        📍 ${lead.location || 'Sin ubicación'}
+                    
+                    <div style="margin-bottom: 0.5rem; font-size: 0.8rem; color: #6b7280;">
+                        🏢 ${(lead.source || 'No especificado').length > 25 ? 
+                            (lead.source || 'No especificado').substring(0, 25) + '...' : 
+                            (lead.source || 'No especificado')}
                     </div>
                     
-                    <!-- Lead Score and Time -->
-                    <div style="
-                        display: flex;
-                        justify-content: space-between;
-                        align-items: center;
-                        margin-top: 0.5rem;
-                    ">
-                        <div style="
-                            background: ${stageColor}20;
-                            color: ${stageColor};
-                            padding: 0.2rem 0.5rem;
-                            border-radius: 12px;
-                            font-weight: 500;
-                            font-size: 0.75rem;
-                        ">
-                            🎯 ${lead.score || 50}/100
-                        </div>
-                        <div style="
-                            font-size: 0.75rem;
-                            color: #6b7280;
-                        ">
-                            ⏰ ${timeAgo}
-                        </div>
+                    <div style="margin-bottom: 0.5rem; font-size: 0.8rem; color: #6b7280;">
+                        📅 ${formatDate(lead.date)} (${daysOld} días)
                     </div>
                     
-                    <!-- Quick Actions -->
-                    <div style="
-                        display: flex;
-                        gap: 0.5rem;
-                        margin-top: 0.75rem;
-                    ">
-                        <button onclick="event.stopPropagation(); openWhatsApp('${lead.phone}', '${lead.name}')" 
-                                style="
-                                    background: #25d366;
-                                    border: none;
-                                    border-radius: 6px;
-                                    padding: 0.4rem 0.8rem;
-                                    display: flex;
-                                    align-items: center;
-                                    gap: 0.25rem;
-                                    cursor: pointer;
-                                    font-size: 0.8rem;
-                                    color: white;
-                                    flex: 1;
-                                    justify-content: center;
-                                " 
-                                onmouseover="this.style.opacity='0.8'"
-                                onmouseout="this.style.opacity='1'">
-                            💬 WhatsApp
-                        </button>
-                        <button onclick="event.stopPropagation(); showLeadDetails('${lead.id}')" 
+                    ${lead.notes ? `
+                        <div style="margin-bottom: 0.5rem; font-size: 0.8rem; color: #4b5563;">
+                            📝 ${lead.notes.length > 50 ? lead.notes.substring(0, 50) + '...' : lead.notes}
+                        </div>
+                    ` : ''}
+                    
+                    <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem;">
+                        ${lead.phone ? `
+                            <button onclick="openWhatsApp('${lead.phone}', '${lead.name}')" 
+                                    style="
+                                        background: #25d366;
+                                        color: white;
+                                        border: none;
+                                        padding: 0.25rem 0.5rem;
+                                        border-radius: 4px;
+                                        font-size: 0.7rem;
+                                        cursor: pointer;
+                                    ">
+                                📱 WhatsApp
+                            </button>
+                        ` : ''}
+                        
+                        <button onclick="editLead('${lead.id}')" 
                                 style="
                                     background: #3b82f6;
-                                    border: none;
-                                    border-radius: 6px;
-                                    padding: 0.4rem 0.8rem;
-                                    display: flex;
-                                    align-items: center;
-                                    gap: 0.25rem;
-                                    cursor: pointer;
-                                    font-size: 0.8rem;
                                     color: white;
-                                    flex: 1;
-                                    justify-content: center;
-                                " 
-                                onmouseover="this.style.opacity='0.8'"
-                                onmouseout="this.style.opacity='1'">
-                            👁️ Ver Detalles
+                                    border: none;
+                                    padding: 0.25rem 0.5rem;
+                                    border-radius: 4px;
+                                    font-size: 0.7rem;
+                                    cursor: pointer;
+                                ">
+                            ✏️ Editar
                         </button>
                     </div>
                 </div>
-            </div>
-        </div>
-    `;
-}
-
-function renderEmptyColumn(status, color) {
-    return `
-        <div style="
-            text-align: center;
-            color: #6b7280;
-            padding: 3rem 1rem;
-            border: 2px dashed #e5e7eb;
-            border-radius: 8px;
-            margin: 0;
-        ">
-            <div style="font-size: 2rem; margin-bottom: 1rem; opacity: 0.5;">
-                ${PIPELINE_STAGES[status].emoji}
-            </div>
-            <div style="font-size: 0.9rem; margin-bottom: 0.5rem;">
-                No hay leads en esta etapa
-            </div>
-            <div style="font-size: 0.8rem; opacity: 0.7;">
-                Arrastra leads aquí o agrega nuevos
             </div>
         </div>
     `;
 }
 
 function renderPipelineSummary(contacts) {
-    const conversionRate = contacts.length > 0 ? 
-        ((contacts.filter(c => c.status === 'Convertido').length / contacts.length) * 100).toFixed(1) : 0;
-    
-    const averageScore = contacts.length > 0 ? 
-        (contacts.reduce((sum, c) => sum + (c.score || 50), 0) / contacts.length).toFixed(1) : 50;
-    
-    const activeLeads = contacts.filter(c => !['Convertido', 'Perdido'].includes(c.status)).length;
+    const totalLeads = contacts.length;
+    const conversions = contacts.filter(c => c.status === 'Convertido').length;
+    const conversionRate = totalLeads > 0 ? Math.round((conversions / totalLeads) * 100) : 0;
     
     return `
-        <div class="pipeline-summary" style="
-            background: white;
-            padding: 2rem;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-            margin-bottom: 2rem;
-        ">
-            <h3 style="
-                margin: 0 0 1.5rem 0;
-                color: #374151;
-                display: flex;
-                align-items: center;
-                gap: 0.5rem;
-            ">
-                📊 Resumen del Pipeline
-                <span style="
-                    background: #f3f4f6;
-                    color: #6b7280;
-                    padding: 0.25rem 0.5rem;
-                    border-radius: 12px;
-                    font-size: 0.8rem;
-                    font-weight: normal;
-                ">
-                    Actualizado ahora
-                </span>
-            </h3>
-            
-            <div style="
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                gap: 1.5rem;
-            ">
-                <div class="summary-card" style="
-                    text-align: center;
-                    padding: 1.5rem;
-                    background: linear-gradient(135deg, #3b82f6, #1e40af);
-                    color: white;
-                    border-radius: 12px;
-                ">
-                    <div style="font-size: 2.5rem; font-weight: bold; margin-bottom: 0.5rem;">
-                        ${contacts.length}
+        <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+            <h3 style="margin: 0 0 1rem 0; color: #1f2937;">📊 Resumen del Pipeline</h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                <div style="text-align: center; padding: 1rem; background: #f8fafc; border-radius: 8px;">
+                    <div style="font-size: 2rem; font-weight: bold; color: #3b82f6; margin-bottom: 0.5rem;">
+                        ${totalLeads}
                     </div>
-                    <div style="opacity: 0.9;">Total Leads</div>
+                    <div style="color: #6b7280;">Total de Leads</div>
                 </div>
                 
-                <div class="summary-card" style="
-                    text-align: center;
-                    padding: 1.5rem;
-                    background: linear-gradient(135deg, #10b981, #059669);
-                    color: white;
-                    border-radius: 12px;
-                ">
-                    <div style="font-size: 2.5rem; font-weight: bold; margin-bottom: 0.5rem;">
-                        ${contacts.filter(c => c.status === 'Convertido').length}
+                <div style="text-align: center; padding: 1rem; background: #f0fdf4; border-radius: 8px;">
+                    <div style="font-size: 2rem; font-weight: bold; color: #10b981; margin-bottom: 0.5rem;">
+                        ${conversions}
                     </div>
-                    <div style="opacity: 0.9;">Convertidos</div>
+                    <div style="color: #6b7280;">Convertidos</div>
                 </div>
                 
-                <div class="summary-card" style="
-                    text-align: center;
-                    padding: 1.5rem;
-                    background: linear-gradient(135deg, #f59e0b, #d97706);
-                    color: white;
-                    border-radius: 12px;
-                ">
-                    <div style="font-size: 2.5rem; font-weight: bold; margin-bottom: 0.5rem;">
+                <div style="text-align: center; padding: 1rem; background: #fefce8; border-radius: 8px;">
+                    <div style="font-size: 2rem; font-weight: bold; color: #eab308; margin-bottom: 0.5rem;">
                         ${conversionRate}%
                     </div>
-                    <div style="opacity: 0.9;">Tasa Conversión</div>
-                </div>
-                
-                <div class="summary-card" style="
-                    text-align: center;
-                    padding: 1.5rem;
-                    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
-                    color: white;
-                    border-radius: 12px;
-                ">
-                    <div style="font-size: 2.5rem; font-weight: bold; margin-bottom: 0.5rem;">
-                        ${activeLeads}
-                    </div>
-                    <div style="opacity: 0.9;">Leads Activos</div>
+                    <div style="color: #6b7280;">Tasa de Conversión</div>
                 </div>
             </div>
             
-            <!-- Pipeline Health Indicator -->
-            <div style="
-                margin-top: 2rem;
-                padding: 1rem;
-                background: ${getPipelineHealthColor(conversionRate)}15;
-                border-left: 4px solid ${getPipelineHealthColor(conversionRate)};
-                border-radius: 8px;
-            ">
-                <div style="
-                    font-weight: 600;
-                    color: ${getPipelineHealthColor(conversionRate)};
-                    margin-bottom: 0.5rem;
-                ">
-                    ${getPipelineHealthStatus(conversionRate)}
-                </div>
-                <div style="
-                    font-size: 0.9rem;
-                    color: #374151;
-                    line-height: 1.4;
-                ">
-                    ${getPipelineHealthMessage(conversionRate, activeLeads)}
-                </div>
+            <div style="margin-top: 1rem; padding: 1rem; background: #f1f5f9; border-radius: 8px;">
+                <p style="margin: 0; color: #475569; font-size: 0.9rem;">
+                    ${getConversionInsight(conversionRate, totalLeads - conversions)}
+                </p>
             </div>
         </div>
     `;
@@ -558,65 +353,32 @@ function renderPipelineSummary(contacts) {
 
 function renderPipelineControls() {
     return `
-        <div class="pipeline-controls" style="
-            background: white;
-            padding: 1.5rem;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        <div style="
             display: flex;
             justify-content: space-between;
             align-items: center;
-            flex-wrap: wrap;
-            gap: 1rem;
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
         ">
-            <div style="display: flex; gap: 1rem; align-items: center;">
-                <button onclick="refreshPipeline()" 
-                        class="btn btn-primary"
-                        style="padding: 0.75rem 1.5rem;">
-                    🔄 Actualizar Pipeline
+            <div style="display: flex; gap: 0.75rem;">
+                <button onclick="refreshPipeline()" class="btn btn-primary" style="padding: 0.5rem 1rem;">
+                    🔄 Actualizar
                 </button>
                 
-                <button onclick="showPipelineFilters()" 
-                        class="btn btn-secondary"
-                        style="padding: 0.75rem 1.5rem;">
+                <button onclick="showPipelineFilters()" class="btn btn-secondary" style="padding: 0.5rem 1rem;">
                     🔍 Filtros
                 </button>
                 
-                <button onclick="exportPipelineData()" 
-                        class="btn btn-success"
-                        style="padding: 0.75rem 1.5rem;">
-                    📥 Exportar
+                <button onclick="exportPipelineData()" class="btn btn-secondary" style="padding: 0.5rem 1rem;">
+                    📊 Exportar
                 </button>
             </div>
             
-            <div style="display: flex; gap: 0.5rem; align-items: center;">
-                <span style="font-size: 0.9rem; color: #6b7280;">Vista:</span>
-                <button onclick="togglePipelineView('kanban')" 
-                        class="view-toggle active"
-                        style="
-                            padding: 0.5rem 1rem;
-                            border: 1px solid #e5e7eb;
-                            background: #3b82f6;
-                            color: white;
-                            border-radius: 6px;
-                            cursor: pointer;
-                            font-size: 0.8rem;
-                        ">
-                    📋 Kanban
-                </button>
-                <button onclick="togglePipelineView('list')" 
-                        class="view-toggle"
-                        style="
-                            padding: 0.5rem 1rem;
-                            border: 1px solid #e5e7eb;
-                            background: white;
-                            color: #374151;
-                            border-radius: 6px;
-                            cursor: pointer;
-                            font-size: 0.8rem;
-                        ">
-                    📄 Lista
-                </button>
+            <div style="font-size: 0.9rem; color: #6b7280;">
+                Última actualización: ${new Date().toLocaleTimeString('es-ES')}
             </div>
         </div>
     `;
@@ -647,97 +409,57 @@ function groupContactsByStatus(contacts) {
 function calculatePipelineStats(contacts) {
     pipelineStats = {
         total: contacts.length,
-        byStage: {},
-        conversionRate: 0,
-        averageScore: 0,
-        topSources: {}
+        byStatus: {},
+        avgDaysInPipeline: 0,
+        conversionRate: 0
     };
     
-    // Count by stage
-    Object.keys(PIPELINE_STAGES).forEach(stage => {
-        pipelineStats.byStage[stage] = contacts.filter(c => (c.status || 'Nuevo') === stage).length;
+    Object.keys(PIPELINE_STAGES).forEach(status => {
+        pipelineStats.byStatus[status] = contacts.filter(c => c.status === status).length;
     });
     
-    // Calculate conversion rate
-    if (contacts.length > 0) {
-        const converted = contacts.filter(c => c.status === 'Convertido').length;
-        pipelineStats.conversionRate = (converted / contacts.length * 100).toFixed(1);
-    }
-    
-    // Calculate average score
-    if (contacts.length > 0) {
-        const totalScore = contacts.reduce((sum, c) => sum + (c.score || 50), 0);
-        pipelineStats.averageScore = (totalScore / contacts.length).toFixed(1);
-    }
-    
-    // Top sources
-    contacts.forEach(contact => {
-        const source = contact.source || 'No especificado';
-        pipelineStats.topSources[source] = (pipelineStats.topSources[source] || 0) + 1;
-    });
-    
-    console.log('📊 Pipeline stats calculated:', pipelineStats);
+    const conversions = pipelineStats.byStatus['Convertido'] || 0;
+    pipelineStats.conversionRate = contacts.length > 0 ? 
+        Math.round((conversions / contacts.length) * 100) : 0;
 }
 
-function getPriorityColor(priority) {
-    const colors = {
-        'High': '#ef4444',
-        'Medium': '#f59e0b',
-        'Low': '#6b7280'
-    };
-    return colors[priority] || colors['Medium'];
-}
-
-function getSourceIcon(source) {
-    if (!source) return '📍';
+function calculateLeadPriority(lead) {
+    const daysOld = Math.floor((new Date() - new Date(lead.date)) / (1000 * 60 * 60 * 24));
     
-    const icons = {
-        'Facebook': '📘',
-        'Instagram': '📸',
-        'Google': '🔍',
-        'Referido': '👥',
-        'Volante': '📄',
-        'Pasando por la sede': '🏢'
-    };
+    if (daysOld > 7) return { level: 'high', icon: '🔴', label: 'Alta' };
+    if (daysOld > 3) return { level: 'medium', icon: '🟡', label: 'Media' };
+    return { level: 'low', icon: '🟢', label: 'Baja' };
+}
+
+function calculateLeadScore(lead) {
+    let score = 50; // Base score
     
-    if (source.includes('CONVENIO')) return '🤝';
-    return icons[source] || '📍';
+    // Recency boost
+    const daysOld = Math.floor((new Date() - new Date(lead.date)) / (1000 * 60 * 60 * 24));
+    if (daysOld <= 1) score += 30;
+    else if (daysOld <= 3) score += 20;
+    else if (daysOld <= 7) score += 10;
+    else if (daysOld > 14) score -= 20;
+    
+    // Contact info completeness
+    if (lead.email) score += 10;
+    if (lead.phone) score += 10;
+    if (lead.notes) score += 5;
+    
+    // Source quality
+    if (lead.source && lead.source.toLowerCase().includes('referido')) score += 15;
+    
+    return Math.max(0, Math.min(100, score));
 }
 
-function getTimeAgo(dateString, timeString = null) {
-    try {
-        const fullDateTime = timeString ? `${dateString} ${timeString}` : dateString;
-        const date = new Date(fullDateTime);
-        const now = new Date();
-        
-        if (isNaN(date.getTime())) return 'Fecha inválida';
-        
-        const diffInSeconds = Math.floor((now - date) / 1000);
-        
-        if (diffInSeconds < 60) return 'Ahora';
-        if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m`;
-        if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h`;
-        if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)}d`;
-        return `${Math.floor(diffInSeconds / 2592000)}mes`;
-        
-    } catch (error) {
-        return 'Error';
-    }
-}
-
-function getPipelineHealthColor(conversionRate) {
-    if (conversionRate >= 20) return '#10b981';
-    if (conversionRate >= 10) return '#f59e0b';
+function getScoreColor(score) {
+    if (score >= 80) return '#10b981';
+    if (score >= 60) return '#3b82f6';
+    if (score >= 40) return '#f59e0b';
     return '#ef4444';
 }
 
-function getPipelineHealthStatus(conversionRate) {
-    if (conversionRate >= 20) return '🟢 Pipeline Saludable';
-    if (conversionRate >= 10) return '🟡 Pipeline Regular';
-    return '🔴 Pipeline Necesita Atención';
-}
-
-function getPipelineHealthMessage(conversionRate, activeLeads) {
+function getConversionInsight(conversionRate, activeLeads) {
     if (conversionRate >= 20) {
         return `Excelente tasa de conversión del ${conversionRate}%. Continúa con el buen trabajo y mantén el seguimiento de los ${activeLeads} leads activos.`;
     } else if (conversionRate >= 10) {
@@ -773,7 +495,7 @@ function toggleLeadDetails(event, leadId) {
     }
 }
 
-// ===== DRAG AND DROP FUNCTIONALITY =====
+// ===== DRAG AND DROP FUNCTIONALITY - FIXED =====
 function initializeDragAndDrop() {
     console.log('🖱️ Initializing drag and drop for pipeline');
     
@@ -840,13 +562,9 @@ function initializeDragAndDrop() {
         document.head.appendChild(style);
     }
     
-    // REMOVE THIS - it's causing the timing conflict
-    // setTimeout(() => {
-    //     setupDragAndDropListeners();
-    // }, 100);
-    
     console.log('✅ Drag and drop styles initialized');
 }
+
 function setupDragAndDropListeners() {
     console.log('📌 Setting up drag and drop listeners');
     
@@ -904,7 +622,8 @@ function handleDragStart(event, leadId) {
         toggleLeadDetails(event, leadId);
     }
     
-    draggedLead = leadId;
+    // ✅ FIXED: Use global window variable
+    window.draggedLead = leadId;
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData('text/plain', leadId);
     
@@ -947,6 +666,7 @@ function handleDragLeave(event) {
     }
 }
 
+// ✅ FIXED: Updated handleDrop to use global window variable
 async function handleDrop(event, newStatus) {
     if (event.stopPropagation) {
         event.stopPropagation();
@@ -954,7 +674,7 @@ async function handleDrop(event, newStatus) {
     
     event.preventDefault();
     
-    const leadId = event.dataTransfer.getData('text/plain');
+    const leadId = event.dataTransfer.getData('text/plain') || window.draggedLead;
     
     // Remove all visual feedback
     document.querySelectorAll('.pipeline-column').forEach(col => {
@@ -969,60 +689,37 @@ async function handleDrop(event, newStatus) {
         card.classList.remove('dragging');
     });
     
-    if (!leadId || !newStatus) {
-        console.error('❌ Invalid drop operation - Lead ID:', leadId, 'Status:', newStatus);
+    // ✅ FIXED: Check global window variable
+    if (!leadId || !window.draggedLead) {
+        console.error('❌ No lead ID found for drop');
+        window.draggedLead = null; // Reset
         return;
     }
     
-    // Find the current lead data
-    const currentLead = pipelineData.find(lead => lead.id === leadId);
-    if (!currentLead) {
-        console.error('❌ Lead not found:', leadId);
-        return;
-    }
-    
-    // Check if status is actually changing
-    if (currentLead.status === newStatus) {
-        console.log('ℹ️ Lead already in this status');
-        return;
-    }
+    console.log(`🎯 Dropping lead ${leadId} into ${newStatus}`);
     
     try {
-        console.log('🎯 Updating lead status:', leadId, 'from', currentLead.status, 'to', newStatus);
+        // Update lead status in Firebase
+        const success = await window.FirebaseData.updateContact(leadId, {
+            status: newStatus,
+            lastUpdated: new Date().toISOString()
+        });
         
-        // Optimistic UI update
-        currentLead.status = newStatus;
-        renderPipelineView(pipelineData);
-        
-        // Show notification function
-        const showNotification = window.showNotification || function(message, type, duration) {
-            console.log(`${type}: ${message}`);
-            alert(message);
-        };
-        
-        // Update in Firebase
-        try {
-            await window.FirebaseData.updateContact(leadId, { status: newStatus });
-            showNotification(`✅ Lead movido a "${newStatus}"`, 'success', 2000);
-        } catch (firebaseError) {
-            console.error('❌ Firebase update error:', firebaseError);
+        if (success) {
+            const showNotification = window.showNotification || function(message) {
+                console.log(message);
+            };
             
-            // Revert the optimistic update
-            currentLead.status = currentLead.status;
+            showNotification(`✅ Lead movido a "${newStatus}"`, 'success');
             
-            // Check if it's a permission error
-            if (firebaseError.message && firebaseError.message.includes('permission')) {
-                showNotification('⚠️ No tienes permisos para mover este lead', 'warning', 3000);
-            } else {
-                showNotification(`❌ Error al mover lead: ${firebaseError.message}`, 'error', 3000);
-            }
-            
-            // Reload the pipeline to restore correct state
+            // Reload pipeline data to reflect changes
             await loadPipelineData();
+        } else {
+            throw new Error('Failed to update contact');
         }
         
     } catch (error) {
-        console.error('❌ Error updating lead status:', error);
+        console.error('❌ Error moving lead:', error);
         
         const showNotification = window.showNotification || function(message) {
             alert(message);
@@ -1034,7 +731,8 @@ async function handleDrop(event, newStatus) {
         await loadPipelineData();
     }
     
-    draggedLead = null;
+    // ✅ FIXED: Reset global window variable
+    window.draggedLead = null;
 }
 
 // ===== PIPELINE ACTIONS =====
@@ -1102,144 +800,162 @@ function exportPipelineData() {
         const csvContent = [
             headers.join(','),
             ...pipelineData.map(lead => [
-                lead.id || '',
-                `"${lead.name || ''}"`,
-                lead.phone || '',
+                lead.id,
+                `"${lead.name}"`,
+                lead.phone,
                 lead.email || '',
                 `"${lead.source || ''}"`,
-                lead.status || '',
-                lead.date || '',
-                lead.priority || 'Medium',
-                lead.score || 50
+                lead.status || 'Nuevo',
+                lead.date,
+                calculateLeadPriority(lead).label,
+                calculateLeadScore(lead)
             ].join(','))
         ].join('\n');
         
-        // Download file
+        // Download CSV
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `pipeline_${new Date().toISOString().split('T')[0]}.csv`;
+        const url = URL.createObjectURL(blob);
+        
+        link.setAttribute('href', url);
+        link.setAttribute('download', `pipeline_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        
+        document.body.appendChild(link);
         link.click();
+        document.body.removeChild(link);
         
-        console.log('📥 Pipeline data exported');
-        
-        const showNotification = window.showNotification || function(message) {
-            alert(message);
-        };
-        
-        showNotification('📥 Pipeline exportado correctamente', 'success');
+        alert('✅ Pipeline exportado exitosamente');
         
     } catch (error) {
         console.error('❌ Error exporting pipeline:', error);
+        alert(`❌ Error al exportar: ${error.message}`);
+    }
+}
+
+// ===== LEAD ACTIONS =====
+function editLead(leadId) {
+    // Find the lead data
+    const lead = pipelineData.find(l => l.id === leadId);
+    if (!lead) {
+        alert('❌ Lead no encontrado');
+        return;
+    }
+    
+    // For now, just redirect to contacts tab and highlight the lead
+    if (typeof switchTab === 'function') {
+        switchTab('contacts');
+        
+        // Try to scroll to and highlight the lead in the contacts table
+        setTimeout(() => {
+            const leadRow = document.querySelector(`[data-contact-id="${leadId}"]`);
+            if (leadRow) {
+                leadRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                leadRow.style.background = '#fef3c7';
+                setTimeout(() => {
+                    leadRow.style.background = '';
+                }, 3000);
+            }
+        }, 500);
         
         const showNotification = window.showNotification || function(message) {
             alert(message);
         };
         
-        showNotification('❌ Error al exportar pipeline', 'error');
+        showNotification(`📝 Busca "${lead.name}" en la tabla de contactos para editar`, 'info', 4000);
     }
 }
 
-function togglePipelineView(viewType) {
-    console.log('👁️ Toggling pipeline view to:', viewType);
-    
-    // Update button states
-    document.querySelectorAll('.view-toggle').forEach(btn => {
-        btn.style.background = 'white';
-        btn.style.color = '#374151';
-    });
-    
-    event.target.style.background = '#3b82f6';
-    event.target.style.color = 'white';
-    
-    if (viewType === 'list') {
-        // Would implement list view
-        alert('📄 Vista de lista - Funcionalidad por implementar');
+function openWhatsApp(phone, name) {
+    if (!phone) {
+        alert('❌ Número de teléfono no disponible');
+        return;
     }
-    // Kanban view is already implemented
-}
-
-// ===== LEAD ACTIONS =====
-function editLeadQuick(leadId) {
-    console.log('✏️ Quick edit for lead:', leadId);
     
-    // For now, show lead details
-    if (typeof showLeadDetails === 'function') {
-        showLeadDetails(leadId);
-    } else {
-        alert(`✏️ Editar lead ${leadId} - Funcionalidad por implementar`);
-    }
+    const cleanPhone = phone.replace(/\D/g, '');
+    const message = encodeURIComponent(`Hola ${name}, soy de Ciudad Bilingüe. ¿Tienes un momento para conversar sobre nuestros servicios?`);
+    const whatsappUrl = `https://wa.me/${cleanPhone}?text=${message}`;
+    
+    window.open(whatsappUrl, '_blank');
 }
 
 // ===== LOADING AND ERROR STATES =====
 function showPipelineLoading() {
     const container = document.getElementById('pipelineContainer');
-    if (container) {
-        container.innerHTML = `
-            <div style="
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                min-height: 400px;
-                color: #6b7280;
-            ">
-                <div style="text-align: center;">
-                    <div class="loading-spinner" style="width: 32px; height: 32px; margin: 0 auto 1rem;"></div>
-                    <div>Cargando pipeline desde Firebase...</div>
-                </div>
+    if (!container) return;
+    
+    container.innerHTML = `
+        <div style="
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 400px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        ">
+            <div style="text-align: center;">
+                <div class="loading-spinner" style="
+                    border: 4px solid #f3f4f6;
+                    border-top: 4px solid #3b82f6;
+                    border-radius: 50%;
+                    width: 40px;
+                    height: 40px;
+                    animation: spin 1s linear infinite;
+                    margin: 0 auto 1rem auto;
+                "></div>
+                <p style="color: #6b7280; margin: 0;">Cargando pipeline...</p>
             </div>
-        `;
-    }
+        </div>
+    `;
 }
 
 function showPipelineError(message) {
     const container = document.getElementById('pipelineContainer');
-    if (container) {
-        container.innerHTML = `
-            <div style="
-                text-align: center;
-                color: #dc2626;
-                padding: 3rem;
-                background: white;
-                border-radius: 12px;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-            ">
-                <div style="font-size: 2rem; margin-bottom: 1rem;">⚠️</div>
-                <h3 style="margin: 0 0 1rem 0;">Error en Pipeline</h3>
-                <p style="margin: 0 0 1rem 0; color: #6b7280;">${message}</p>
-                <button onclick="loadPipelineData()" class="btn btn-primary">
-                    🔄 Reintentar
-                </button>
-            </div>
-        `;
-    }
+    if (!container) return;
+    
+    container.innerHTML = `
+        <div style="
+            padding: 2rem;
+            text-align: center;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        ">
+            <div style="color: #dc2626; font-size: 3rem; margin-bottom: 1rem;">❌</div>
+            <h3 style="color: #1f2937; margin-bottom: 0.5rem;">Error cargando pipeline</h3>
+            <p style="color: #6b7280; margin-bottom: 1.5rem;">${message}</p>
+            <button onclick="loadPipelineData()" class="btn btn-primary">
+                🔄 Reintentar
+            </button>
+        </div>
+    `;
 }
 
 function showEmptyPipeline() {
     const container = document.getElementById('pipelineContainer');
-    if (container) {
-        container.innerHTML = `
-            <div style="
-                text-align: center;
-                color: #6b7280;
-                padding: 4rem;
-                background: white;
-                border-radius: 12px;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-            ">
-                <div style="font-size: 3rem; margin-bottom: 1.5rem;">🎯</div>
-                <h3 style="margin: 0 0 1rem 0; color: #374151;">Pipeline Vacío</h3>
-                <p style="margin: 0 0 2rem 0; max-width: 400px; margin-left: auto; margin-right: auto; line-height: 1.5;">
-                    No hay leads en tu pipeline. Comienza agregando contactos para verlos organizados por etapas.
-                </p>
-                <button onclick="if (typeof switchTab === 'function') switchTab('contacts')" 
-                        class="btn btn-primary" 
-                        style="padding: 1rem 2rem; font-size: 1.1rem;">
-                    ➕ Agregar Primer Contacto
-                </button>
-            </div>
-        `;
-    }
+    if (!container) return;
+    
+    container.innerHTML = `
+        <div style="
+            padding: 3rem;
+            text-align: center;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        ">
+            <div style="font-size: 4rem; margin-bottom: 1rem;">📊</div>
+            <h3 style="color: #1f2937; margin-bottom: 0.5rem;">Pipeline vacío</h3>
+            <p style="color: #6b7280; margin-bottom: 2rem;">
+                Comienza agregando contactos para verlos organizados por etapas.
+            </p>
+            <button onclick="if (typeof switchTab === 'function') switchTab('contacts')" 
+                    class="btn btn-primary" 
+                    style="padding: 1rem 2rem; font-size: 1.1rem;">
+                ➕ Agregar Primer Contacto
+            </button>
+        </div>
+    `;
 }
 
 function setupPipelineEventListeners() {
@@ -1249,7 +965,6 @@ function setupPipelineEventListeners() {
     console.log('🎧 Pipeline event listeners setup complete');
 }
 
-// ===== MODULE INITIALIZATION =====
 // ===== MODULE INITIALIZATION =====
 function initializePipelineModule() {
     console.log('🚀 Initializing pipeline module');
@@ -1315,7 +1030,6 @@ function initializePipelineStyles() {
             background: rgba(59, 130, 246, 0.05);
         }
         
-        /* Scrollbar styling for vertical scroll */
         .pipeline-body::-webkit-scrollbar {
             width: 6px;
         }
@@ -1339,17 +1053,16 @@ function initializePipelineStyles() {
         style.id = 'pipeline-drag-styles';
         document.head.appendChild(style);
     }
+    
+    console.log('✅ Pipeline styles initialized');
 }
 
 // ===== EVENT LISTENERS =====
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🎯 Pipeline module DOM ready');
     
-    // Initialize styles when Firebase is ready
-    if (window.FirebaseData) {
+    if (typeof initializePipelineModule === 'function') {
         initializePipelineModule();
-    } else {
-        window.addEventListener('firebaseReady', initializePipelineModule);
     }
 });
 
@@ -1357,38 +1070,12 @@ document.addEventListener('DOMContentLoaded', () => {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         loadPipelineData,
+        initializePipelineModule,
         refreshPipeline,
-        handleDragStart,
-        handleDragOver,
-        handleDrop,
-        addNewLeadToStage,
         exportPipelineData,
-        togglePipelineView,
-        PIPELINE_STAGES,
-        pipelineStats
+        calculateLeadScore,
+        calculateLeadPriority
     };
 }
 
-// ===== GLOBAL FUNCTION ASSIGNMENTS =====
-// Make functions globally available for inline event handlers
-window.handleDragStart = handleDragStart;
-window.handleDragOver = handleDragOver;
-window.handleDrop = handleDrop;
-window.loadPipelineData = loadPipelineData;
-window.addNewLeadToStage = addNewLeadToStage;
-window.showLeadDetails = window.showLeadDetails || function(id) { console.log('Show lead details:', id); };
-window.refreshPipeline = refreshPipeline;
-window.exportPipelineData = exportPipelineData;
-window.togglePipelineView = togglePipelineView;
-window.editLeadQuick = editLeadQuick;
-window.toggleLeadDetails = toggleLeadDetails;
-window.openWhatsApp = window.openWhatsApp || function(phone, name) { 
-    console.log('Open WhatsApp for:', name, phone); 
-    if (phone) {
-        window.open(`https://wa.me/${phone.replace(/\D/g, '')}`, '_blank');
-    }
-};
-
-console.log('✅ Pipeline.js module loaded successfully - Collapsible Cards Implemented!');
-
-
+console.log('✅ Pipeline.js module loaded successfully with drag & drop fixed');
