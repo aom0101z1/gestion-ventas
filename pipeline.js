@@ -13,6 +13,11 @@ let dragDropState = {
     dragStartTime: null
 };
 
+// ✅ FIX: Add global event listener management
+let eventListenersAttached = false;
+let retryCount = 0;
+const MAX_RETRIES = 5;
+
 // Enhanced pipeline configuration with additional metadata
 const PIPELINE_STAGES = {
     'Nuevo': { 
@@ -100,7 +105,7 @@ async function loadPipelineData() {
             showEmptyPipeline();
             // ✅ ENHANCED: Set up event listeners even for empty pipeline
             setTimeout(() => {
-                setupPipelineEventListeners();
+                forceDragDropSetup();
                 console.log('✅ Pipeline event listeners set up for empty state');
             }, 100);
             return;
@@ -182,26 +187,97 @@ function renderPipelineView(contacts) {
         ${renderPipelineControls()}
     `;
     
-    // ✅ CRITICAL ENHANCED FIX: Set up event listeners after DOM is fully rendered
-    // Use longer timeout to ensure complex rendering is complete
-    setTimeout(() => {
-        try {
-            setupPipelineEventListeners();
-            validateDragDropSetup();
-            console.log('✅ Pipeline event listeners re-attached after render');
-        } catch (error) {
-            console.error('❌ Error setting up event listeners:', error);
-            // Retry once more after additional delay
-            setTimeout(() => {
-                try {
-                    setupPipelineEventListeners();
-                    console.log('✅ Pipeline event listeners retry successful');
-                } catch (retryError) {
-                    console.error('❌ Event listener retry failed:', retryError);
-                }
-            }, 300);
+    // ✅ CRITICAL FIX: Enhanced event listener setup with multiple retries
+    // Reset retry count and event listener flag
+    retryCount = 0;
+    eventListenersAttached = false;
+    
+    // Use multiple timeouts with increasing delays to ensure DOM is ready
+    setTimeout(() => forceDragDropSetup(), 100);
+    setTimeout(() => forceDragDropSetup(), 300);
+    setTimeout(() => forceDragDropSetup(), 500);
+    setTimeout(() => forceDragDropSetup(), 1000);
+}
+
+// ✅ NEW: Force drag and drop setup with retry logic
+function forceDragDropSetup() {
+    if (eventListenersAttached && retryCount < MAX_RETRIES) {
+        console.log('✅ Event listeners already attached');
+        return;
+    }
+    
+    retryCount++;
+    console.log(`🔧 Attempting drag and drop setup (attempt ${retryCount}/${MAX_RETRIES})`);
+    
+    try {
+        // Check if elements exist
+        const leadCards = document.querySelectorAll('.lead-card');
+        const pipelineColumns = document.querySelectorAll('.pipeline-column');
+        
+        if (leadCards.length === 0 && pipelineColumns.length === 0) {
+            console.warn(`⚠️ No elements found on attempt ${retryCount}, retrying...`);
+            if (retryCount < MAX_RETRIES) {
+                setTimeout(() => forceDragDropSetup(), 500);
+            }
+            return;
         }
-    }, 200);
+        
+        // Clear existing listeners first
+        clearAllEventListeners();
+        
+        // Set up fresh listeners
+        setupDragAndDropListeners();
+        
+        // Validate setup
+        validateDragDropSetup();
+        
+        // Mark as attached
+        eventListenersAttached = true;
+        
+        console.log(`✅ Drag and drop setup successful on attempt ${retryCount}`);
+        
+        // Show success notification
+        if (window.showNotification && retryCount > 1) {
+            window.showNotification('✅ Drag & Drop activado', 'success');
+        }
+        
+    } catch (error) {
+        console.error(`❌ Error on attempt ${retryCount}:`, error);
+        
+        if (retryCount < MAX_RETRIES) {
+            setTimeout(() => forceDragDropSetup(), 1000);
+        } else {
+            console.error('❌ Max retries reached, drag and drop setup failed');
+            if (window.showNotification) {
+                window.showNotification('❌ Error en Drag & Drop - Recarga la página', 'error');
+            }
+        }
+    }
+}
+
+// ✅ NEW: Clear all existing event listeners to prevent duplicates
+function clearAllEventListeners() {
+    console.log('🧹 Clearing existing event listeners');
+    
+    // Remove listeners from lead cards by cloning them
+    document.querySelectorAll('.lead-card').forEach(card => {
+        const newCard = card.cloneNode(true);
+        card.parentNode.replaceChild(newCard, card);
+    });
+    
+    // Remove listeners from pipeline columns by cloning them
+    document.querySelectorAll('.pipeline-column').forEach(column => {
+        // Only clone the column itself, not its children to preserve the cards
+        const columnListeners = column.cloneNode(false);
+        // Copy the children back
+        while (column.firstChild) {
+            columnListeners.appendChild(column.firstChild);
+        }
+        column.parentNode.replaceChild(columnListeners, column);
+    });
+    
+    // Reset flag
+    eventListenersAttached = false;
 }
 
 // ===== ENHANCED PIPELINE COLUMN RENDERING =====
@@ -560,13 +636,11 @@ async function updatePipelineUI() {
             calculatePipelineStats(pipelineData);
         }
         
-        // Re-attach event listeners to new elements
-        setTimeout(() => {
-            if (typeof setupPipelineEventListeners === 'function') {
-                setupPipelineEventListeners();
-                console.log('✅ Pipeline UI updated and event listeners re-attached');
-            }
-        }, 100);
+        // ✅ CRITICAL FIX: Re-attach event listeners after UI update
+        eventListenersAttached = false;
+        retryCount = 0;
+        setTimeout(() => forceDragDropSetup(), 100);
+        setTimeout(() => forceDragDropSetup(), 300);
         
     } catch (error) {
         console.error('❌ Error updating pipeline UI:', error);
@@ -1373,12 +1447,27 @@ function renderPipelineControls() {
                 ">
                     📈 Analytics
                 </button>
+                
+                <button onclick="forceDragDropSetup()" class="btn btn-warning" style="
+                    padding: 0.5rem 1rem;
+                    background: #f59e0b;
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                ">
+                    🔧 Fix Drag & Drop
+                </button>
             </div>
             
             <div style="display: flex; align-items: center; gap: 1rem; font-size: 0.85rem; color: #6b7280;">
                 <span>🕒 Última actualización: ${new Date().toLocaleTimeString('es-ES')}</span>
-                <span style="padding: 0.25rem 0.5rem; background: #f3f4f6; border-radius: 4px;">
-                    ✅ Drag & Drop Activo
+                <span style="padding: 0.25rem 0.5rem; background: ${eventListenersAttached ? '#f0fdf4' : '#fef2f2'}; color: ${eventListenersAttached ? '#16a34a' : '#dc2626'}; border-radius: 4px;">
+                    ${eventListenersAttached ? '✅ Drag & Drop Activo' : '❌ Drag & Drop Inactivo'}
                 </span>
             </div>
         </div>
@@ -1838,6 +1927,38 @@ function initializePipelineStyles() {
     console.log('✅ Enhanced pipeline styles initialized');
 }
 
+// ===== GLOBAL FUNCTIONS FOR CONSOLE DEBUGGING =====
+window.fixPipelineDragDrop = function() {
+    console.log('🔧 Manual pipeline drag drop fix triggered');
+    eventListenersAttached = false;
+    retryCount = 0;
+    forceDragDropSetup();
+};
+
+window.testPipelineDragDrop = function() {
+    console.log('🧪 Testing pipeline drag and drop...');
+    
+    const leadCards = document.querySelectorAll('.lead-card');
+    const pipelineColumns = document.querySelectorAll('.pipeline-column');
+    
+    console.log(`Found ${leadCards.length} lead cards and ${pipelineColumns.length} columns`);
+    console.log(`Event listeners attached: ${eventListenersAttached}`);
+    console.log(`Retry count: ${retryCount}/${MAX_RETRIES}`);
+    
+    if (leadCards.length > 0) {
+        const testCard = leadCards[0];
+        console.log('Test card draggable:', testCard.draggable);
+        console.log('Test card data-lead-id:', testCard.getAttribute('data-lead-id'));
+    }
+    
+    if (pipelineColumns.length > 0) {
+        const testColumn = pipelineColumns[0];
+        console.log('Test column data-status:', testColumn.getAttribute('data-status'));
+    }
+    
+    validateDragDropSetup();
+};
+
 // ===== EVENT LISTENERS =====
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🎯 Enhanced pipeline module DOM ready');
@@ -1855,6 +1976,48 @@ window.addEventListener('error', function(e) {
         cleanupDragVisuals();
     }
 });
+
+// ✅ ADD: DOM Observer to auto-fix drag and drop when UI changes
+const pipelineObserver = new MutationObserver((mutations) => {
+    let shouldRefreshDragDrop = false;
+    
+    mutations.forEach((mutation) => {
+        if (mutation.type === 'childList') {
+            const addedNodes = Array.from(mutation.addedNodes);
+            
+            addedNodes.forEach(node => {
+                if (node.nodeType === 1 && (
+                    node.classList?.contains('lead-card') ||
+                    node.classList?.contains('pipeline-column') ||
+                    node.querySelector?.('.lead-card') ||
+                    node.querySelector?.('.pipeline-column')
+                )) {
+                    shouldRefreshDragDrop = true;
+                }
+            });
+        }
+    });
+    
+    if (shouldRefreshDragDrop && !eventListenersAttached) {
+        console.log('🔄 Pipeline DOM changed, refreshing drag and drop...');
+        clearTimeout(window.pipelineRefreshTimeout);
+        window.pipelineRefreshTimeout = setTimeout(() => {
+            forceDragDropSetup();
+        }, 300);
+    }
+});
+
+// Start observing when pipeline container exists
+setTimeout(() => {
+    const pipelineContainer = document.getElementById('pipelineContainer');
+    if (pipelineContainer) {
+        pipelineObserver.observe(pipelineContainer, {
+            childList: true,
+            subtree: true
+        });
+        console.log('👁️ Pipeline DOM observer active');
+    }
+}, 2000);
 
 // ===== CRITICAL: FUNCTION PROTECTION =====
 // This ensures the enhanced handleDrop doesn't get overwritten
@@ -1885,10 +2048,12 @@ if (typeof module !== 'undefined' && module.exports) {
         calculateLeadPriority,
         resetDragState,
         validateDragDropSetup,
-        handleDrop
+        handleDrop,
+        forceDragDropSetup
     };
 }
 
 console.log('✅ Enhanced Pipeline.js module loaded successfully with robust drag & drop functionality');
 console.log('🎯 Features: Enhanced drag & drop, better error handling, function protection, comprehensive UI');
 console.log('🛡️ HandleDrop function is protected from being overwritten');
+console.log('🔧 Console commands: fixPipelineDragDrop(), testPipelineDragDrop()');
