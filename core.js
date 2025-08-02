@@ -286,6 +286,15 @@ async function loadTabData(tabName) {
                     await updateLeadsTable();
                 }
                 break;
+                 
+            case 'tasks':
+                if (typeof window.loadTasksData === 'function') {
+                    console.log('📋 Loading tasks data...');
+                    window.loadTasksData();
+                } else {
+                    console.error('❌ loadTasksData function not found');
+                }
+                break;
                 
             case 'config':
                 if (typeof loadConfigData === 'function') {
@@ -767,3 +776,4 @@ if (typeof module !== 'undefined' && module.exports) {
 }
 
 console.log('✅ Core.js module loaded successfully');
+
