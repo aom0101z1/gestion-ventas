@@ -1113,6 +1113,15 @@ onAuthStateChanged(auth, async (user) => {
             });
         }
 
+        const titles = titleMappings[profile.role] || titleMappings.vendedor;
+    Object.keys(titles).forEach(elementId => {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.textContent = titles[elementId];
+        }
+    });
+}
+
         // ===== ROLE-BASED ACCESS =====
         function configureRoleBasedAccess(role) {
             console.log('🔐 Configuring role-based access');
@@ -2620,6 +2629,7 @@ console.log('✅ Sales ranking loaded successfully');
 
 </body>
 </html>
+
 
 
 
