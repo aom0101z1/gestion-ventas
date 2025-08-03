@@ -380,11 +380,4 @@ if (typeof XLSX === 'undefined') {
     
 }
 
-// Create a test button that definitely works
-const testImportBtn = document.createElement('button');
-testImportBtn.textContent = '📥 Test Import';
-testImportBtn.style.cssText = 'position: fixed; top: 100px; right: 20px; padding: 1rem; background: #10b981; color: white; border: none; border-radius: 8px; z-index: 9999;';
-testImportBtn.onclick = () => window.showImportModal();
-document.body.appendChild(testImportBtn);
-
 console.log('✅ Excel import utility loaded');
