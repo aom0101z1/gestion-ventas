@@ -354,7 +354,7 @@ window.addEventListener('DOMContentLoaded', function() {
                             importBtn.className = 'btn btn-secondary';
                             importBtn.innerHTML = '📥 Importar Excel';
                             importBtn.style.cssText = 'padding: 0.5rem 1rem; background: #6b7280; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 0.5rem;';
-                            importBtn.onclick = () => {
+                          importBtn.addEventListener('click', function() {
                                 if (window.showImportModal) {
                                     window.showImportModal();
                                 } else {
