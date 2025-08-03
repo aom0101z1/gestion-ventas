@@ -356,16 +356,15 @@ window.addEventListener('DOMContentLoaded', function() {
                             importBtn.style.cssText = 'padding: 0.5rem 1rem; background: #6b7280; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 0.5rem;';
                             
                             // Fixed onclick handler
-                            importBtn.addEventListener('click', function(e) {
-                                e.preventDefault();
-                                console.log('📥 Import button clicked');
-                                if (typeof window.showImportModal === 'function') {
-                                    window.showImportModal();
-                                } else {
-                                    console.error('showImportModal not found');
-                                    alert('Error: Import function not loaded. Please refresh the page.');
+                            // Simple onclick that works
+                            importBtn.onclick = function() {
+                            console.log('📥 Import button clicked');
+                            if (window.showImportModal) {
+                                window.showImportModal();
+                            } else {
+                            alert('Import function not found!');
                                 }
-                            });
+                                };
                             
                             btnContainer.insertBefore(importBtn, btnContainer.firstChild);
                             console.log('✅ Import button added!');
