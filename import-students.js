@@ -377,6 +377,14 @@ if (typeof XLSX === 'undefined') {
     const script = document.createElement('script');
     script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
     document.head.appendChild(script);
+    
 }
+
+// Create a test button that definitely works
+const testImportBtn = document.createElement('button');
+testImportBtn.textContent = '📥 Test Import';
+testImportBtn.style.cssText = 'position: fixed; top: 100px; right: 20px; padding: 1rem; background: #10b981; color: white; border: none; border-radius: 8px; z-index: 9999;';
+testImportBtn.onclick = () => window.showImportModal();
+document.body.appendChild(testImportBtn);
 
 console.log('✅ Excel import utility loaded');
