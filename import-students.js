@@ -354,13 +354,19 @@ window.addEventListener('DOMContentLoaded', function() {
                             importBtn.className = 'btn btn-secondary';
                             importBtn.innerHTML = '📥 Importar Excel';
                             importBtn.style.cssText = 'padding: 0.5rem 1rem; background: #6b7280; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 0.5rem;';
-                          importBtn.onclick = () => {
-                                if (window.showImportModal) {
+                            
+                            // Fixed onclick handler
+                            importBtn.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                console.log('📥 Import button clicked');
+                                if (typeof window.showImportModal === 'function') {
                                     window.showImportModal();
                                 } else {
-                                    alert('Import function not found!');
+                                    console.error('showImportModal not found');
+                                    alert('Error: Import function not loaded. Please refresh the page.');
                                 }
-                            };
+                            });
+                            
                             btnContainer.insertBefore(importBtn, btnContainer.firstChild);
                             console.log('✅ Import button added!');
                         }
