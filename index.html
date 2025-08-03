@@ -2753,8 +2753,20 @@ console.log('✅ Sales ranking loaded successfully');
     <script src="attendance.js"></script>
     <script src="school-integration.js"></script>
 
+            <script>
+// This will show which files are loaded
+setTimeout(() => {
+    console.log('✅ Modules Check:');
+    console.log('Students:', !!window.StudentManager);
+    console.log('Payments:', !!window.PaymentManager);
+    console.log('Groups:', !!window.GroupsManager);
+    console.log('Teachers:', !!window.TeacherManager);
+}, 5000);
+</script>
+
 </body>
 </html>
+
 
 
 
