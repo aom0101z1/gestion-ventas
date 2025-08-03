@@ -331,25 +331,46 @@ window.startImport = async function() {
 };
 
 // Add import button to students tab
-window.addEventListener('DOMContentLoaded', function() {
+// Add this to the END of your import-students.js file
+// This ensures the button is added when the Students tab is opened
+
+// Override the loadStudentsTab function to add import button
+const originalLoadStudentsTab = window.loadStudentsTab;
+window.loadStudentsTab = async function() {
+    // Call the original function
+    if (originalLoadStudentsTab) {
+        await originalLoadStudentsTab();
+    }
+    
+    // Wait a moment for the tab to render
     setTimeout(() => {
-        const observer = new MutationObserver((mutations) => {
-            const studentsTab = document.getElementById('students');
-            if (studentsTab && !document.getElementById('importExcelBtn')) {
-                const header = studentsTab.querySelector('h2')?.parentElement;
-                if (header) {
-                    const btnContainer = header.querySelector('div');
-                    if (btnContainer) {
-                        const importBtn = document.createElement('button');
-                        importBtn.id = 'importExcelBtn';
-                        importBtn.className = 'btn btn-secondary';
-                        importBtn.innerHTML = '📥 Importar Excel';
-                        importBtn.onclick = showImportModal;
-                        btnContainer.insertBefore(importBtn, btnContainer.firstChild);
-                    }
+        // Check if import button exists
+        if (!document.getElementById('importExcelBtn')) {
+            const studentsHeader = document.querySelector('#studentsContainer h2')?.parentElement;
+            if (studentsHeader) {
+                const btnContainer = studentsHeader.querySelector('div');
+                if (btnContainer) {
+                    const importBtn = document.createElement('button');
+                    importBtn.id = 'importExcelBtn';
+                    importBtn.className = 'btn btn-secondary';
+                    importBtn.innerHTML = '📥 Importar Excel';
+                    importBtn.style.cssText = 'padding: 0.5rem 1rem; background: #6b7280; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 0.5rem;';
+                    importBtn.onclick = () => {
+                        if (window.showImportModal) {
+                            window.showImportModal();
+                        } else {
+                            alert('Import function not found!');
+                        }
+                    };
+                    btnContainer.insertBefore(importBtn, btnContainer.firstChild);
+                    console.log('✅ Import button added!');
                 }
             }
-        });
+        }
+    }, 500);
+};
+
+console.log('✅ Import button auto-add configured');
         
         observer.observe(document.body, { childList: true, subtree: true });
     }, 2000);
