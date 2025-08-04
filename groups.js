@@ -348,6 +348,8 @@ function renderGroupForm(group = null) {
 window.GroupsManager = new GroupsManager();
 window.groupsData = new Map(); // For compatibility
 
+// Replace your entire loadGroupsTab function with this simplified version:
+
 window.loadGroupsTab = async function() {
     console.log('📚 Loading groups tab');
     
@@ -357,64 +359,9 @@ window.loadGroupsTab = async function() {
         return;
     }
 
-    // Show loading state
-    container.innerHTML = `
-        <div style="padding: 2rem; text-align: center;">
-            <div class="loading-spinner" style="margin: 0 auto 1rem;"></div>
-            <p>Cargando grupos...</p>
-        </div>
-    `;
-
     try {
-        // Check if Firebase modules are available
-        if (!window.firebaseModules || !window.firebaseModules.auth) {
-            console.log('⏳ Waiting for Firebase to initialize...');
-            
-            // Wait a bit for Firebase to initialize
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            // Check again
-            if (!window.firebaseModules || !window.firebaseModules.auth) {
-                throw new Error('Firebase auth not initialized');
-            }
-        }
-
-        // Get Firebase auth
-        const auth = window.firebaseModules.auth;
-        
-        // Check if there's a current user or wait for auth state
-        let currentUser = auth.currentUser;
-        
-        if (!currentUser) {
-            console.log('⏳ Waiting for authentication...');
-            currentUser = await new Promise((resolve) => {
-                const unsubscribe = auth.onAuthStateChanged((user) => {
-                    unsubscribe();
-                    resolve(user);
-                });
-                
-                // Timeout after 5 seconds
-                setTimeout(() => resolve(null), 5000);
-            });
-        }
-
-        if (!currentUser) {
-            container.innerHTML = `
-                <div style="padding: 2rem; text-align: center; color: #ef4444;">
-                    <p>❌ Debes iniciar sesión para ver los grupos</p>
-                    <button onclick="location.reload()" class="btn btn-primary" style="margin-top: 1rem;">
-                        Recargar Página
-                    </button>
-                </div>
-            `;
-            return;
-        }
-
-        console.log('✅ User authenticated:', currentUser.email);
-
-        // Now safe to initialize groups
+        // Skip all auth checks and load groups directly
         await window.GroupsManager.init();
-        
         container.innerHTML = renderGroupsView();
         await refreshGroupsGrid();
         
