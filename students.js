@@ -243,55 +243,81 @@ function renderStudentForm(student = null) {
     `;
 }
 
-function renderStudentTable(students) {
+// Updated renderPaymentTable function for payments.js
+// This adds row numbers to the payments table
+
+function renderPaymentTable(students) {
     if (!students.length) {
-        return '<div style="text-align: center; padding: 2rem; color: #666;">No hay estudiantes registrados</div>';
+        return '<div style="text-align: center; padding: 2rem; color: #666;">No hay estudiantes</div>';
     }
 
     return `
         <table style="width: 100%; background: white; border-radius: 8px; overflow: hidden;">
             <thead style="background: #f3f4f6;">
                 <tr>
-                    <th style="padding: 0.75rem; text-align: left;">Nombre</th>
-                    <th style="padding: 0.75rem; text-align: left;">Documento</th>
-                    <th style="padding: 0.75rem; text-align: left;">Teléfono</th>
+                    <th style="padding: 0.75rem; text-align: center; width: 50px;">#</th>
+                    <th style="padding: 0.75rem; text-align: left;">Estado</th>
+                    <th style="padding: 0.75rem; text-align: left;">Estudiante</th>
                     <th style="padding: 0.75rem; text-align: left;">Grupo</th>
-                    <th style="padding: 0.75rem; text-align: left;">Pago</th>
+                    <th style="padding: 0.75rem; text-align: right;">Valor</th>
+                    <th style="padding: 0.75rem; text-align: center;">Día Pago</th>
                     <th style="padding: 0.75rem; text-align: center;">Acciones</th>
                 </tr>
             </thead>
             <tbody>
-                ${students.map(s => `
-                    <tr style="border-top: 1px solid #e5e7eb;">
-                        <td style="padding: 0.75rem;">${s.nombre || '-'}</td>
-                        <td style="padding: 0.75rem;">${s.tipoDoc || ''} ${s.numDoc || '-'}</td>
-                        <td style="padding: 0.75rem;">
-                            <a href="https://wa.me/57${s.telefono?.replace(/\D/g, '')}" 
-                               target="_blank" style="color: #059669;">
-                                ${s.telefono || '-'}
-                            </a>
-                        </td>
-                        <td style="padding: 0.75rem;">${s.grupo || 'Sin grupo'}</td>
-                        <td style="padding: 0.75rem;">
-                            ${s.tipoPago || '-'}<br>
-                            <small>$${(s.valor || 0).toLocaleString()}</small>
-                        </td>
-                        <td style="padding: 0.75rem; text-align: center;">
-                            <button onclick="editStudent('${s.id}')" class="btn btn-sm" 
-                                    style="background: #3b82f6; color: white; margin-right: 0.5rem;">
-                                ✏️
-                            </button>
-                            <button onclick="viewStudentPayments('${s.id}')" class="btn btn-sm"
-                                    style="background: #10b981; color: white; margin-right: 0.5rem;">
-                                💰
-                            </button>
-                            <button onclick="deleteStudent('${s.id}')" class="btn btn-sm"
-                                    style="background: #ef4444; color: white;">
-                                🗑️
-                            </button>
-                        </td>
-                    </tr>
-                `).join('')}
+                ${students.map((s, index) => {
+                    const status = window.PaymentManager.getPaymentStatus(s);
+                    const statusColors = {
+                        paid: '#10b981',
+                        upcoming: '#fbbf24',
+                        overdue: '#ef4444',
+                        none: '#6b7280'
+                    };
+                    
+                    return `
+                        <tr style="border-top: 1px solid #e5e7eb;">
+                            <td style="padding: 0.75rem; text-align: center; font-weight: bold; color: #6b7280;">
+                                ${index + 1}
+                            </td>
+                            <td style="padding: 0.75rem;">
+                                <span style="
+                                    display: inline-flex;
+                                    align-items: center;
+                                    gap: 0.5rem;
+                                    color: ${statusColors[status.type]};
+                                ">
+                                    ${status.type === 'paid' ? '✅' : 
+                                      status.type === 'overdue' ? '🔴' : 
+                                      status.type === 'upcoming' ? '🟡' : '❓'}
+                                    ${status.label}
+                                </span>
+                            </td>
+                            <td style="padding: 0.75rem;">
+                                <div>${s.nombre || '-'}</div>
+                                <small style="color: #6b7280;">${s.telefono || '-'}</small>
+                            </td>
+                            <td style="padding: 0.75rem;">${s.grupo || 'Sin grupo'}</td>
+                            <td style="padding: 0.75rem; text-align: right;">
+                                <strong>$${(s.valor || 0).toLocaleString()}</strong>
+                            </td>
+                            <td style="padding: 0.75rem; text-align: center;">
+                                ${s.diaPago || '-'}
+                            </td>
+                            <td style="padding: 0.75rem; text-align: center;">
+                                <button onclick="registerPayment('${s.id}')" 
+                                        class="btn btn-sm" 
+                                        style="background: #10b981; color: white; margin-right: 0.5rem;">
+                                    ➕ Registrar
+                                </button>
+                                <button onclick="viewPaymentHistory('${s.id}')" 
+                                        class="btn btn-sm"
+                                        style="background: #3b82f6; color: white;">
+                                    📋 Recordar
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('')}
             </tbody>
         </table>
     `;
