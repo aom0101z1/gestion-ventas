@@ -387,7 +387,7 @@ window.assignStudentsModal = async function(groupId) {
     console.log('📚 Opening assign students modal for group:', groupId);
     
     // Get the group details
-    const group = window.groupsData.get(groupId);
+    const group = window.GroupsManager.groups.get(groupId);
     if (!group) {
         alert('Grupo no encontrado');
         return;
