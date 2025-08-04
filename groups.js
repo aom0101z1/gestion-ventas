@@ -1,6 +1,30 @@
 // groups.js - Groups Management Module
 console.log('👥 Loading groups module...');
 
+// Add this temporarily to your groups.js to debug:
+window.debugFirebase = function() {
+    console.log('=== Firebase Debug Info ===');
+    console.log('window.firebase:', window.firebase);
+    console.log('window.firebaseModules:', window.firebaseModules);
+    console.log('window.auth:', window.auth);
+    console.log('window.database:', window.database);
+    console.log('window.FirebaseData:', window.FirebaseData);
+    
+    if (window.firebase) {
+        console.log('firebase.auth:', window.firebase.auth);
+        console.log('firebase.database:', window.firebase.database);
+    }
+    
+    if (window.firebaseModules) {
+        console.log('firebaseModules.auth:', window.firebaseModules.auth);
+        console.log('firebaseModules.database:', window.firebaseModules.database);
+    }
+    console.log('=========================');
+};
+
+// Call it when groups module loads
+window.debugFirebase();
+
 // Groups Manager Class
 class GroupsManager {
     constructor() {
