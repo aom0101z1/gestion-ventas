@@ -762,13 +762,6 @@ window.deleteGroup = async function(groupId) {
     }
 };
 
-    if (!confirm('¿Quitar estudiante del grupo?')) return;
-    
-    await window.StudentManager.updateStudent(studentId, { grupo: '' });
-    await refreshGroupsGrid();
-    window.showNotification('✅ Estudiante removido del grupo', 'success');
-};
-
 async function saveGroupForm(groupId) {
     try {
         const scheduleSelect = document.getElementById('groupSchedule');
