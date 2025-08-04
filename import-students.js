@@ -1,9 +1,5 @@
-// import-students.js - Fixed version with retry limits and better error handling
+// import-students.js - Wait for module to load before adding button
 console.log('📥 Loading Excel import utility...');
-
-// Global retry counter to prevent infinite loops
-window.importButtonRetryCount = 0;
-window.importButtonMaxRetries = 5;
 
 // Excel Import Manager
 class ExcelImportManager {
@@ -18,10 +14,8 @@ class ExcelImportManager {
     // Process Excel file
     async processExcelFile(file) {
         try {
-            console.log('📄 Processing file:', file.name);
             const data = await this.readExcelFile(file);
             const students = this.parseStudentData(data);
-            console.log('✅ Parsed', students.length, 'students');
             return students;
         } catch (error) {
             console.error('❌ Error processing Excel:', error);
@@ -36,7 +30,6 @@ class ExcelImportManager {
             
             reader.onload = async (e) => {
                 try {
-                    // Check if XLSX is loaded
                     if (typeof XLSX === 'undefined') {
                         throw new Error('XLSX library not loaded. Please refresh the page.');
                     }
@@ -44,7 +37,6 @@ class ExcelImportManager {
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
                     
-                    // Get student sheet
                     const sheet = workbook.Sheets['Lista Estudiantes'];
                     if (!sheet) {
                         throw new Error('Hoja "Lista Estudiantes" no encontrada');
@@ -68,7 +60,7 @@ class ExcelImportManager {
         
         for (let i = 1; i < data.length; i++) {
             const row = data[i];
-            if (!row[0]) continue; // Skip empty rows
+            if (!row[0]) continue;
             
             const student = {
                 id: `STU-${Date.now()}-${i}`,
@@ -88,7 +80,6 @@ class ExcelImportManager {
                 pagos: {}
             };
             
-            // Process payment months
             Object.entries(this.monthColumns).forEach(([month, col]) => {
                 if (row[col]) {
                     student.pagos[month] = {
@@ -109,14 +100,12 @@ class ExcelImportManager {
         const errors = [];
         let imported = 0;
         
-        // Check if StudentManager exists
         if (!window.StudentManager) {
             throw new Error('StudentManager not initialized. Please refresh the page.');
         }
         
         for (let i = 0; i < students.length; i++) {
             try {
-                // Check if student exists
                 const existingStudent = await this.checkExistingStudent(students[i].numDoc);
                 if (!existingStudent) {
                     await window.StudentManager.saveStudent(students[i]);
@@ -154,7 +143,7 @@ class ExcelImportManager {
 // Initialize Excel Importer
 window.ExcelImporter = new ExcelImportManager();
 
-// Modal System
+// Modal functions
 window.showImportModal = function(event) {
     if (event) {
         event.preventDefault();
@@ -163,13 +152,11 @@ window.showImportModal = function(event) {
     
     console.log('📥 Opening import modal');
     
-    // Remove any existing modal
     const existingModal = document.getElementById('importModal');
     if (existingModal) {
         existingModal.remove();
     }
     
-    // Create modal
     const modalContainer = document.createElement('div');
     modalContainer.id = 'importModal';
     modalContainer.style.cssText = `
@@ -242,7 +229,6 @@ window.showImportModal = function(event) {
     
     document.body.appendChild(modalContainer);
     
-    // Add file change listener
     setTimeout(() => {
         const fileInput = document.getElementById('excelFile');
         if (fileInput) {
@@ -253,7 +239,6 @@ window.showImportModal = function(event) {
     return false;
 };
 
-// Close modal
 window.closeImportModal = function() {
     const modal = document.getElementById('importModal');
     if (modal) {
@@ -261,7 +246,6 @@ window.closeImportModal = function() {
     }
 };
 
-// Preview import
 window.previewImport = async function() {
     const fileInput = document.getElementById('excelFile');
     const file = fileInput.files[0];
@@ -308,7 +292,6 @@ window.previewImport = async function() {
     }
 };
 
-// Start import
 window.startImport = async function() {
     if (!window.studentsToImport || !window.studentsToImport.length) return;
     
@@ -346,7 +329,6 @@ window.startImport = async function() {
         alert(message);
         closeImportModal();
         
-        // Reload students tab
         if (window.loadStudentsTab) {
             window.loadStudentsTab();
         }
@@ -358,148 +340,132 @@ window.startImport = async function() {
     }
 };
 
-// Add import button with retry limit
-window.addImportButtonToStudents = function() {
-    // Check retry limit
-    if (window.importButtonRetryCount >= window.importButtonMaxRetries) {
-        console.log('⚠️ Max retries reached for import button placement');
-        return;
-    }
+// Wait for students module to be fully loaded
+window.waitForStudentsModule = function(callback) {
+    let checkCount = 0;
+    const maxChecks = 30; // 30 seconds max wait
     
+    const checkInterval = setInterval(() => {
+        checkCount++;
+        
+        // Check if students table exists
+        const studentsTable = document.querySelector('#studentsContainer table');
+        const loadingIndicator = document.querySelector('.loading-spinner') || 
+                               document.querySelector('[style*="Cargando"]');
+        
+        if (studentsTable && !loadingIndicator) {
+            console.log('✅ Students module loaded successfully');
+            clearInterval(checkInterval);
+            callback();
+        } else if (checkCount >= maxChecks) {
+            console.error('❌ Timeout waiting for students module to load');
+            clearInterval(checkInterval);
+        } else {
+            console.log(`⏳ Waiting for students module... (${checkCount}/${maxChecks})`);
+        }
+    }, 1000);
+};
+
+// Add import button only after module is loaded
+window.addImportButtonSafely = function() {
     // Don't add if already exists
     if (document.getElementById('importExcelBtn')) {
         console.log('✅ Import button already exists');
-        window.importButtonRetryCount = 0; // Reset counter
         return;
     }
     
-    console.log(`🔍 Attempting to add import button (attempt ${window.importButtonRetryCount + 1}/${window.importButtonMaxRetries})`);
+    console.log('🔍 Looking for place to add import button...');
     
-    let buttonAdded = false;
-    
-    // Wait for students container to be visible
+    // Find the header area with buttons
     const studentsContainer = document.getElementById('studentsContainer');
-    if (!studentsContainer || studentsContainer.style.display === 'none') {
-        console.log('⏳ Students container not visible yet');
-        window.importButtonRetryCount++;
-        setTimeout(window.addImportButtonToStudents, 2000);
+    if (!studentsContainer) {
+        console.error('❌ Students container not found');
         return;
     }
     
-    // Look for the header with buttons
-    const headerElement = studentsContainer.querySelector('h2');
-    if (headerElement && headerElement.parentElement) {
-        // Find the div with buttons
-        const buttonContainers = headerElement.parentElement.querySelectorAll('div');
-        
-        for (let container of buttonContainers) {
-            // Check if this container has buttons
-            const existingButtons = container.querySelectorAll('button');
-            if (existingButtons.length > 0) {
-                // Create import button
-                const importBtn = document.createElement('button');
-                importBtn.id = 'importExcelBtn';
-                importBtn.className = 'btn btn-secondary';
-                importBtn.textContent = '📥 Importar Excel';
-                importBtn.style.cssText = `
-                    padding: 0.5rem 1rem;
-                    background-color: #6b7280;
-                    color: white;
-                    border: none;
-                    border-radius: 4px;
-                    cursor: pointer;
-                    margin-right: 0.5rem;
-                    font-family: inherit;
-                    font-size: inherit;
-                `;
-                
-                // Add click handler
-                importBtn.onclick = function(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    window.showImportModal(e);
-                    return false;
-                };
-                
-                // Insert before first button
-                container.insertBefore(importBtn, existingButtons[0]);
-                buttonAdded = true;
-                console.log('✅ Import button added successfully');
-                window.importButtonRetryCount = 0; // Reset counter
-                break;
-            }
+    // Look for existing buttons in the header
+    const headerButtons = studentsContainer.querySelectorAll('button');
+    let targetButton = null;
+    
+    for (let button of headerButtons) {
+        if (button.textContent.includes('Nuevo Estudiante') || 
+            button.textContent.includes('New Student')) {
+            targetButton = button;
+            break;
         }
     }
     
-    if (!buttonAdded) {
-        window.importButtonRetryCount++;
-        if (window.importButtonRetryCount < window.importButtonMaxRetries) {
-            console.log('⏳ Button container not found, retrying in 2 seconds...');
-            setTimeout(window.addImportButtonToStudents, 2000);
-        } else {
-            console.error('❌ Could not add import button after maximum retries');
-        }
+    if (targetButton && targetButton.parentElement) {
+        const importBtn = document.createElement('button');
+        importBtn.id = 'importExcelBtn';
+        importBtn.className = 'btn btn-secondary';
+        importBtn.innerHTML = '📥 Importar Excel';
+        importBtn.style.cssText = `
+            padding: 0.5rem 1rem;
+            background-color: #6b7280;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 0.5rem;
+            font-family: inherit;
+            font-size: inherit;
+        `;
+        
+        importBtn.onclick = function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            window.showImportModal(e);
+            return false;
+        };
+        
+        targetButton.parentElement.insertBefore(importBtn, targetButton);
+        console.log('✅ Import button added successfully');
+    } else {
+        console.error('❌ Could not find suitable location for import button');
     }
 };
 
-// Initialize when DOM is ready
+// Initialize - DO NOT interfere with module loading
 function initializeImportFeature() {
-    console.log('🚀 Initializing import feature');
+    console.log('🚀 Import feature initialization started');
     
-    // Reset retry counter
-    window.importButtonRetryCount = 0;
-    
-    // Hook into loadStudentsTab
+    // Only hook into loadStudentsTab, don't call it
     if (window.loadStudentsTab) {
         const originalLoadStudentsTab = window.loadStudentsTab;
         
         window.loadStudentsTab = async function() {
-            console.log('📋 Loading students tab');
+            console.log('📋 Students tab loading...');
             
-            // Call original function
-            if (originalLoadStudentsTab) {
-                await originalLoadStudentsTab.apply(this, arguments);
-            }
+            // Call original function first
+            const result = await originalLoadStudentsTab.apply(this, arguments);
             
-            // Add button after a delay
-            setTimeout(window.addImportButtonToStudents, 1000);
+            // Wait for module to be fully loaded before adding button
+            window.waitForStudentsModule(() => {
+                window.addImportButtonSafely();
+            });
+            
+            return result;
         };
-    }
-    
-    // Check if students tab is already visible
-    const studentsContainer = document.getElementById('studentsContainer');
-    if (studentsContainer && studentsContainer.style.display !== 'none') {
-        setTimeout(window.addImportButtonToStudents, 1000);
+        
+        console.log('✅ Hooked into loadStudentsTab');
     }
 }
 
-// Load when DOM is ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeImportFeature);
+// Initialize only when ready
+if (document.readyState === 'complete') {
+    initializeImportFeature();
 } else {
-    setTimeout(initializeImportFeature, 100);
+    window.addEventListener('load', initializeImportFeature);
 }
-
-// Fallback initialization
-window.addEventListener('load', function() {
-    setTimeout(function() {
-        if (!document.getElementById('importExcelBtn') && window.importButtonRetryCount === 0) {
-            console.log('📌 Import button missing after load, initializing...');
-            initializeImportFeature();
-        }
-    }, 3000);
-});
 
 // Load XLSX library
 if (typeof XLSX === 'undefined') {
     const script = document.createElement('script');
     script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
     script.onload = () => console.log('✅ XLSX library loaded');
-    script.onerror = () => {
-        console.error('❌ Failed to load XLSX library');
-        alert('Error: Could not load Excel library. Please refresh the page.');
-    };
+    script.onerror = () => console.error('❌ Failed to load XLSX library');
     document.head.appendChild(script);
 }
 
-console.log('✅ Excel import utility loaded with retry limits');
+console.log('✅ Excel import utility loaded - waiting for students module');
