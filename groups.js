@@ -381,8 +381,7 @@ window.updateLocationField = function() {
     }
 };
 
-// ===== REPLACE YOUR CURRENT assignStudentsModal FUNCTION WITH ALL OF THIS =====
-
+// REPLACE your current assignStudentsModal function with this fixed version:
 window.assignStudentsModal = async function(groupId) {
     console.log('📚 Opening assign students modal for group:', groupId);
     
@@ -460,8 +459,9 @@ window.assignStudentsModal = async function(groupId) {
                     </thead>
                     <tbody id="studentListBody">
                         ${allStudents.map(student => {
-                            const isInThisGroup = student.grupo === groupId;
-                            const hasOtherGroup = student.grupo && student.grupo !== groupId;
+                            // FIX: Compare with group.name instead of groupId
+                            const isInThisGroup = student.grupo === group.name;
+                            const hasOtherGroup = student.grupo && student.grupo !== group.name;
                             
                             return `
                                 <tr class="student-row" data-student-name="${(student.nombre || '').toLowerCase()}">
@@ -561,6 +561,7 @@ window.updateSelectionCount = function() {
 };
 
 // Function to assign selected students to the group
+// REPLACE your current assignSelectedStudents function with this fixed version:
 window.assignSelectedStudents = async function(groupId) {
     const checkboxes = document.querySelectorAll('.student-checkbox:checked:not(:disabled)');
     
@@ -569,7 +570,12 @@ window.assignSelectedStudents = async function(groupId) {
         return;
     }
     
-    const group = window.groupsData.get(groupId);
+    // FIX: Get group from GroupsManager instead of groupsData
+    const group = window.GroupsManager.groups.get(groupId);
+    if (!group) {
+        alert('Grupo no encontrado');
+        return;
+    }
     
     try {
         // Show loading
@@ -591,7 +597,8 @@ window.assignSelectedStudents = async function(groupId) {
         let assigned = 0;
         for (const checkbox of checkboxes) {
             const studentId = checkbox.dataset.studentId;
-            await window.StudentManager.updateStudent(studentId, { grupo: groupId });
+            // FIX: Update with group.name instead of groupId
+            await window.StudentManager.updateStudent(studentId, { grupo: group.name });
             assigned++;
         }
         
@@ -599,16 +606,16 @@ window.assignSelectedStudents = async function(groupId) {
         if (!group.students) group.students = [];
         
         // Get updated list of students in this group
-        const studentsInGroup = window.StudentManager.getStudents({ grupo: groupId });
+        // FIX: Filter by group.name instead of groupId
+        const studentsInGroup = window.StudentManager.getStudents().filter(s => s.grupo === group.name);
         group.students = studentsInGroup.map(s => s.id);
         
         // Save group changes
-       // Update the group in the GroupsManager
-window.GroupsManager.groups.set(groupId, group);
-// Save to Firebase
-const db = window.firebaseModules.database;
-const ref = db.ref(window.FirebaseData.database, `groups/${groupId}`);
-await db.update(ref, { students: group.students });
+        window.GroupsManager.groups.set(groupId, group);
+        // Save to Firebase
+        const db = window.firebaseModules.database;
+        const ref = db.ref(window.FirebaseData.database, `groups/${groupId}`);
+        await db.update(ref, { students: group.students });
         
         // Show success
         modal.innerHTML = `
