@@ -42,9 +42,39 @@ class GroupsManager {
     }
 
     // Load groups from Firebase
+// Replace your loadGroups method with this version that waits for auth:
+
 async loadGroups() {
     try {
         console.log('📂 Loading groups from Firebase...');
+        
+        // Wait a moment for Firebase to be ready
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Get Firebase auth reference - try multiple methods
+        let auth = null;
+        if (window.firebase && window.firebase.auth) {
+            auth = window.firebase.auth();
+        } else if (window.firebaseAuth) {
+            auth = window.firebaseAuth;
+        }
+        
+        if (auth) {
+            // Wait for auth state
+            const currentUser = auth.currentUser || await new Promise((resolve) => {
+                const unsubscribe = auth.onAuthStateChanged((user) => {
+                    unsubscribe();
+                    resolve(user);
+                });
+                setTimeout(() => resolve(null), 3000); // 3 second timeout
+            });
+            
+            if (!currentUser) {
+                console.warn('⚠️ No authenticated user, groups may not load');
+            } else {
+                console.log('✅ Authenticated as:', currentUser.email);
+            }
+        }
         
         const db = window.firebaseModules.database;
         const ref = db.ref(window.FirebaseData.database, 'groups');
@@ -71,7 +101,7 @@ async loadGroups() {
         console.log(`✅ Loaded ${this.groups.size} groups`);
     } catch (error) {
         console.error('❌ Error loading groups:', error);
-        // Don't throw the error, just log it
+        // Don't throw, just log
     }
 }
 
