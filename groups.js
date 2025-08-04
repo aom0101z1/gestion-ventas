@@ -629,17 +629,23 @@ window.assignSelectedStudents = async function(groupId) {
         // Show loading
         const modal = document.getElementById('assignStudentsModal');
         const originalContent = modal.innerHTML;
-        modal.innerHTML = `
-            <div style="
-                background: white;
-                padding: 3rem;
-                border-radius: 12px;
-                text-align: center;
-            ">
-                <div class="loading-spinner" style="margin: 0 auto 1rem;"></div>
-                <p>Asignando estudiantes al grupo ${group.name}...</p>
-            </div>
-        `;
+// Show success
+modal.innerHTML = `
+    <div style="
+        background: white;
+        padding: 3rem;
+        border-radius: 12px;
+        text-align: center;
+    ">
+        <div style="font-size: 3rem; color: #10b981; margin-bottom: 1rem;">✅</div>
+        <p style="font-size: 1.2rem; margin-bottom: 2rem;">
+            ${assigned} estudiantes asignados exitosamente al grupo ${group.name}
+        </p>
+        <button onclick="closeAssignStudentsModal(); refreshGroupsGrid();" class="btn btn-primary">
+            Aceptar
+        </button>
+    </div>
+`;
         
         // Update each selected student
         let assigned = 0;
