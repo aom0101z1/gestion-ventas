@@ -751,7 +751,7 @@ async function saveGroupForm(groupId) {
 // ===== ASSIGN STUDENTS TO GROUP FUNCTIONALITY =====
 
 // Function to show the assign students modal
-window.showAssignStudentsModal = async function(groupId) {
+window.assignStudentsModal = async function(groupId) {
     // ... (all the code from the first artifact)
 };
 
