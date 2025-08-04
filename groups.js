@@ -439,4 +439,42 @@ async function saveGroupForm(groupId) {
     }
 }
 
+
+// ===== ASSIGN STUDENTS TO GROUP FUNCTIONALITY =====
+
+// Function to show the assign students modal
+window.showAssignStudentsModal = async function(groupId) {
+    // ... (all the code from the first artifact)
+};
+
+// Function to close the modal
+window.closeAssignStudentsModal = function() {
+    // ...
+};
+
+// Function to select/deselect all students
+window.selectAllStudents = function(checked) {
+    // ...
+};
+
+// Function to filter students list
+window.filterStudentsList = function() {
+    // ...
+};
+
+// Function to update selection count
+window.updateSelectionCount = function() {
+    // ...
+};
+
+// Function to assign selected students to the group
+window.assignSelectedStudents = async function(groupId) {
+    // ...
+};
+
+// Add CSS for loading spinner
+if (!document.getElementById('assign-students-styles')) {
+    // ... (the CSS part)
+}
+
 console.log('✅ Groups module loaded successfully');
