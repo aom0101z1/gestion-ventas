@@ -330,10 +330,50 @@ window.loadGroupsTab = async function() {
         return;
     }
 
-    await window.GroupsManager.init();
-    
-    container.innerHTML = renderGroupsView();
-    await refreshGroupsGrid();
+    // Show loading state
+    container.innerHTML = `
+        <div style="padding: 2rem; text-align: center;">
+            <div class="loading-spinner" style="margin: 0 auto 1rem;"></div>
+            <p>Cargando grupos...</p>
+        </div>
+    `;
+
+    try {
+        // Wait for authentication
+        const auth = window.firebaseModules?.auth;
+        const currentUser = auth.currentUser || await new Promise((resolve) => {
+            const unsubscribe = auth.onAuthStateChanged((user) => {
+                unsubscribe();
+                resolve(user);
+            });
+        });
+
+        if (!currentUser) {
+            container.innerHTML = `
+                <div style="padding: 2rem; text-align: center; color: #ef4444;">
+                    <p>❌ Debes iniciar sesión para ver los grupos</p>
+                </div>
+            `;
+            return;
+        }
+
+        // Now safe to initialize groups
+        await window.GroupsManager.init();
+        
+        container.innerHTML = renderGroupsView();
+        await refreshGroupsGrid();
+        
+    } catch (error) {
+        console.error('❌ Error loading groups tab:', error);
+        container.innerHTML = `
+            <div style="padding: 2rem; text-align: center; color: #ef4444;">
+                <p>❌ Error al cargar grupos: ${error.message}</p>
+                <button onclick="loadGroupsTab()" class="btn btn-primary" style="margin-top: 1rem;">
+                    Reintentar
+                </button>
+            </div>
+        `;
+    }
 };
 
 window.refreshGroupsGrid = async function() {
