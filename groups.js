@@ -344,8 +344,19 @@ window.loadGroupsTab = async function() {
     }
 
     try {
-        // Skip all auth checks and load groups directly
+        // Initialize groups
         await window.GroupsManager.init();
+        
+        // Also check if teachers need to be loaded
+        if (window.TeacherManager && !window.TeacherManager.initialized) {
+            console.log('📚 Also loading teachers...');
+            try {
+                await window.TeacherManager.init();
+            } catch (err) {
+                console.warn('⚠️ Could not load teachers:', err);
+            }
+        }
+        
         container.innerHTML = renderGroupsView();
         await refreshGroupsGrid();
         
