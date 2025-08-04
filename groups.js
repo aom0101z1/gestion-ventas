@@ -566,6 +566,11 @@ window.closeAssignStudentsModal = function() {
     if (modal) {
         modal.remove();
     }
+    
+    // Ensure we stay in the groups tab
+    if (window.currentTab !== 'groups') {
+        window.showTab('groups');
+    }
 };
 
 window.selectAllStudents = function(checked) {
