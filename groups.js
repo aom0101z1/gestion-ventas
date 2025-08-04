@@ -603,7 +603,12 @@ window.assignSelectedStudents = async function(groupId) {
         group.students = studentsInGroup.map(s => s.id);
         
         // Save group changes
-        await window.GroupsManager.updateGroup(groupId, { students: group.students });
+       // Update the group in the GroupsManager
+window.GroupsManager.groups.set(groupId, group);
+// Save to Firebase
+const db = window.firebaseModules.database;
+const ref = db.ref(window.FirebaseData.database, `groups/${groupId}`);
+await db.update(ref, { students: group.students });
         
         // Show success
         modal.innerHTML = `
