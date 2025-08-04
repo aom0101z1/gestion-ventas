@@ -423,6 +423,8 @@ window.updateLocationField = function() {
     }
 };
 
+// Find your assignStudentsModal function and update this part:
+
 window.assignStudentsModal = async function(groupId) {
     console.log('📚 Opening assign students modal for group:', groupId);
     
@@ -547,7 +549,15 @@ window.assignStudentsModal = async function(groupId) {
         </div>
     `;
     
-    document.body.appendChild(modal);
+    // CHANGE THIS LINE - Instead of document.body, append to the groups container
+    const groupsContainer = document.getElementById('groupsContainer');
+    if (groupsContainer) {
+        groupsContainer.appendChild(modal);
+    } else {
+        // Fallback to body if container not found
+        document.body.appendChild(modal);
+    }
+    
     updateSelectionCount();
 };
 
