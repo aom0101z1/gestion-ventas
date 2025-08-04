@@ -94,50 +94,168 @@ class GroupsManager {
     // Load groups from Firebase
 // Replace your loadGroups method with this version that waits for auth:
 
-async loadGroups() {
+// Replace your entire loadGroups method with this comprehensive version:
+
+    // Add this function to check user permissions:
+
+window.checkUserPermissions = async function() {
+    console.log('=== Checking User Permissions ===');
+    
     try {
-        console.log('📂 Loading groups from Firebase...');
-        
-        // Wait a moment for Firebase to be ready
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Get Firebase auth reference - try multiple methods
+        // Find Firebase auth
         let auth = null;
         if (window.firebase && window.firebase.auth) {
             auth = window.firebase.auth();
-        } else if (window.firebaseAuth) {
-            auth = window.firebaseAuth;
         }
         
-        if (auth) {
-            // Wait for auth state
-            const currentUser = auth.currentUser || await new Promise((resolve) => {
-                const unsubscribe = auth.onAuthStateChanged((user) => {
-                    unsubscribe();
-                    resolve(user);
-                });
-                setTimeout(() => resolve(null), 3000); // 3 second timeout
-            });
-            
-            if (!currentUser) {
-                console.warn('⚠️ No authenticated user, groups may not load');
-            } else {
-                console.log('✅ Authenticated as:', currentUser.email);
-            }
+        if (!auth) {
+            console.error('❌ Firebase auth not found');
+            return;
         }
+        
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+            console.error('❌ No user logged in');
+            return;
+        }
+        
+        console.log('✅ Current user:', currentUser.email);
+        console.log('User UID:', currentUser.uid);
+        
+        // Try to read user's role from database
+        const db = window.firebaseModules.database;
+        const userRef = db.ref(window.FirebaseData.database, `users/${currentUser.uid}`);
+        
+        console.log('📥 Checking user data in database...');
+        
+        try {
+            const userSnapshot = await db.get(userRef);
+            
+            if (userSnapshot.exists()) {
+                const userData = userSnapshot.val();
+                console.log('✅ User data:', userData);
+                
+                if (userData.profile && userData.profile.role) {
+                    console.log('👤 User role:', userData.profile.role);
+                    
+                    if (userData.profile.role === 'director') {
+                        console.log('✅ User has director role - should have full access');
+                    } else {
+                        console.log('⚠️ User role is not director - may have limited access');
+                    }
+                } else {
+                    console.log('⚠️ No role found in user profile');
+                }
+            } else {
+                console.error('❌ No user data found in database');
+            }
+        } catch (error) {
+            console.error('❌ Error reading user data:', error);
+        }
+        
+        // Test group access
+        console.log('\n📥 Testing group access...');
+        try {
+            const groupRef = db.ref(window.FirebaseData.database, 'groups');
+            const testSnapshot = await db.get(groupRef);
+            console.log('✅ Can read groups!');
+        } catch (error) {
+            console.error('❌ Cannot read groups:', error.message);
+        }
+        
+    } catch (error) {
+        console.error('❌ Error checking permissions:', error);
+    }
+};
+
+// Run it immediately
+checkUserPermissions();
+
+async loadGroups() {
+    try {
+        console.log('📂 Starting to load groups from Firebase...');
+        
+        // First, let's find Firebase auth
+        let auth = null;
+        let authFound = false;
+        
+        // Try different ways to get Firebase auth
+        if (window.firebase && window.firebase.auth) {
+            auth = window.firebase.auth();
+            console.log('✅ Found auth via window.firebase.auth()');
+            authFound = true;
+        } else if (window.firebase && typeof window.firebase.auth === 'function') {
+            auth = window.firebase.auth();
+            console.log('✅ Found auth via window.firebase.auth() function');
+            authFound = true;
+        }
+        
+        if (!authFound) {
+            console.log('⚠️ Firebase auth not found in expected location');
+            console.log('Available Firebase modules:', Object.keys(window.firebase || {}));
+        }
+        
+        // If we found auth, wait for authentication
+        if (auth) {
+            console.log('⏳ Checking authentication status...');
+            
+            // Check current user
+            let currentUser = auth.currentUser;
+            console.log('Current user immediately:', currentUser ? currentUser.email : 'null');
+            
+            // If no current user, wait for auth state
+            if (!currentUser) {
+                console.log('⏳ Waiting for auth state change...');
+                currentUser = await new Promise((resolve) => {
+                    const unsubscribe = auth.onAuthStateChanged((user) => {
+                        console.log('Auth state changed:', user ? user.email : 'null');
+                        unsubscribe();
+                        resolve(user);
+                    });
+                    
+                    // Timeout after 5 seconds
+                    setTimeout(() => {
+                        console.log('⏱️ Auth wait timeout');
+                        unsubscribe();
+                        resolve(null);
+                    }, 5000);
+                });
+            }
+            
+            if (currentUser) {
+                console.log('✅ Authenticated as:', currentUser.email);
+                console.log('User UID:', currentUser.uid);
+            } else {
+                console.error('❌ No authenticated user found');
+                throw new Error('Usuario no autenticado. Por favor inicia sesión.');
+            }
+        } else {
+            console.warn('⚠️ Proceeding without auth check (may fail)');
+        }
+        
+        // Now try to load groups
+        console.log('📥 Attempting to load groups from database...');
         
         const db = window.firebaseModules.database;
         const ref = db.ref(window.FirebaseData.database, 'groups');
+        
+        console.log('Database reference created:', ref.toString());
+        
         const snapshot = await db.get(ref);
         
         if (snapshot.exists()) {
             const data = snapshot.val();
+            console.log('✅ Groups data received:', Object.keys(data || {}).length, 'groups');
+            
             Object.entries(data).forEach(([id, group]) => {
                 this.groups.set(id, group);
             });
+        } else {
+            console.log('⚠️ No groups data exists in database');
         }
         
         // Load schedules
+        console.log('📥 Loading schedules...');
         const schedRef = db.ref(window.FirebaseData.database, 'schedules');
         const schedSnapshot = await db.get(schedRef);
         
@@ -146,11 +264,27 @@ async loadGroups() {
             Object.entries(schedData).forEach(([id, schedule]) => {
                 this.schedules.set(id, schedule);
             });
+            console.log('✅ Schedules loaded');
         }
         
-        console.log(`✅ Loaded ${this.groups.size} groups`);
+        console.log(`✅ Successfully loaded ${this.groups.size} groups`);
+        
     } catch (error) {
         console.error('❌ Error loading groups:', error);
+        console.error('Error details:', {
+            message: error.message,
+            code: error.code,
+            stack: error.stack
+        });
+        
+        // Check if it's a permission error
+        if (error.message && error.message.includes('Permission denied')) {
+            console.error('🔒 This is a permission error. Check:');
+            console.error('1. User is authenticated');
+            console.error('2. User has correct role in Firebase');
+            console.error('3. Firebase rules allow access');
+        }
+        
         // Don't throw, just log
     }
 }
