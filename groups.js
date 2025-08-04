@@ -1,6 +1,9 @@
 // groups.js - Groups Management Module
 console.log('👥 Loading groups module...');
 
+// Add debugging to check if the file loads completely
+console.log('Groups module file start');
+
 // Groups Manager Class
 class GroupsManager {
     constructor() {
@@ -23,7 +26,8 @@ class GroupsManager {
             console.log('📂 Starting to load groups from Firebase...');
             
             // Add a small delay to ensure Firebase is fully initialized
-await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
             // First, let's find Firebase auth
             let auth = null;
             let authFound = false;
@@ -165,7 +169,9 @@ await new Promise(resolve => setTimeout(resolve, 1000));
     // Get groups with student count
     async getGroupsWithStats() {
         const groups = Array.from(this.groups.values());
-        const students = window.StudentManager.getStudents();
+        // Check if StudentManager exists before using it
+        const students = (window.StudentManager && window.StudentManager.getStudents) ? 
+            window.StudentManager.getStudents() : [];
         
         return groups.map(group => {
             const groupStudents = students.filter(s => s.grupo === group.name);
@@ -223,6 +229,7 @@ await new Promise(resolve => setTimeout(resolve, 1000));
 
 // UI Functions
 function renderGroupsView() {
+    console.log('Rendering groups view');
     return `
         <div style="padding: 1rem;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
@@ -235,7 +242,9 @@ function renderGroupsView() {
             <div id="groupFormContainer"></div>
             
             <div style="display: grid; gap: 1rem;" id="groupsGrid">
-                <!-- Groups will be rendered here -->
+                <div style="text-align: center; padding: 2rem; color: #666;">
+                    Cargando grupos...
+                </div>
             </div>
         </div>
     `;
@@ -243,7 +252,7 @@ function renderGroupsView() {
 
 function renderGroupCard(group) {
     const status = group.status;
-    const teacher = window.TeacherManager?.teachers.get(group.teacherId);
+    const teacher = window.TeacherManager?.teachers?.get(group.teacherId);
     
     return `
         <div style="background: white; border-radius: 8px; padding: 1.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
@@ -403,17 +412,28 @@ function renderGroupForm(group = null) {
 window.GroupsManager = new GroupsManager();
 window.groupsData = new Map(); // For compatibility
 
+// Main function to load groups tab - add debugging
 window.loadGroupsTab = async function() {
-    console.log('📚 Loading groups tab');
+    console.log('📚 loadGroupsTab called');
+    
+    // Debug: Check if function is accessible
+    console.log('loadGroupsTab is on window:', window.loadGroupsTab === loadGroupsTab);
     
     const container = document.getElementById('groupsContainer');
+    console.log('Groups container found:', !!container);
+    
     if (!container) {
-        console.error('❌ Groups container not found');
+        console.error('❌ Groups container not found!');
+        // Try to find any container
+        console.log('Available containers:', document.querySelectorAll('[id*="Container"]'));
         return;
     }
 
     try {
-        // Initialize groups
+        console.log('Setting initial content...');
+        container.innerHTML = renderGroupsView();
+        
+        console.log('Initializing GroupsManager...');
         await window.GroupsManager.init();
         
         // Also check if teachers need to be loaded
@@ -426,8 +446,9 @@ window.loadGroupsTab = async function() {
             }
         }
         
-        container.innerHTML = renderGroupsView();
+        console.log('Refreshing groups grid...');
         await refreshGroupsGrid();
+        console.log('✅ Groups tab loaded successfully');
         
     } catch (error) {
         console.error('❌ Error loading groups tab:', error);
@@ -442,9 +463,19 @@ window.loadGroupsTab = async function() {
     }
 };
 
+// Make sure it's accessible globally
+window.showGroupsTab = window.loadGroupsTab;
+window.loadGroups = window.loadGroupsTab;
+
 window.refreshGroupsGrid = async function() {
+    console.log('Refreshing groups grid...');
     const groups = await window.GroupsManager.getGroupsWithStats();
     const grid = document.getElementById('groupsGrid');
+    
+    if (!grid) {
+        console.error('Groups grid not found!');
+        return;
+    }
     
     if (!groups.length) {
         grid.innerHTML = '<div style="text-align: center; padding: 2rem; color: #666;">No hay grupos creados</div>';
@@ -465,6 +496,8 @@ window.refreshGroupsGrid = async function() {
     // Update global groupsData for student module
     window.groupsData.clear();
     groups.forEach(g => window.groupsData.set(g.name, g));
+    
+    console.log('✅ Groups grid refreshed with', groups.length, 'groups');
 };
 
 window.showGroupForm = function(groupId = null) {
@@ -514,8 +547,15 @@ window.assignStudentsModal = async function(groupId) {
     }
     
     // Initialize StudentManager if needed
-    if (!window.StudentManager.initialized) {
-        await window.StudentManager.init();
+    if (!window.StudentManager || !window.StudentManager.initialized) {
+        console.log('Initializing StudentManager...');
+        if (window.StudentManager) {
+            await window.StudentManager.init();
+        } else {
+            console.error('StudentManager not found!');
+            alert('Error: Módulo de estudiantes no cargado');
+            return;
+        }
     }
     
     // Get all students
@@ -922,3 +962,8 @@ window.checkUserPermissions = async function() {
 };
 
 console.log('✅ Groups module loaded successfully');
+console.log('Available functions:', {
+    loadGroupsTab: typeof window.loadGroupsTab,
+    showGroupsTab: typeof window.showGroupsTab,
+    GroupsManager: typeof window.GroupsManager
+});
