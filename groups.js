@@ -381,9 +381,317 @@ window.updateLocationField = function() {
     }
 };
 
-window.assignStudentsModal = function(groupId) {
-    // This would open a modal to assign students
-    window.showNotification('👥 Asignar estudiantes - Próximamente', 'info');
+// ===== REPLACE YOUR CURRENT assignStudentsModal FUNCTION WITH ALL OF THIS =====
+
+window.assignStudentsModal = async function(groupId) {
+    console.log('📚 Opening assign students modal for group:', groupId);
+    
+    // Get the group details
+    const group = window.groupsData.get(groupId);
+    if (!group) {
+        alert('Grupo no encontrado');
+        return;
+    }
+    
+    // Initialize StudentManager if needed
+    if (!window.StudentManager.initialized) {
+        await window.StudentManager.init();
+    }
+    
+    // Get all students
+    const allStudents = window.StudentManager.getStudents();
+    
+    // Create modal
+    const modal = document.createElement('div');
+    modal.id = 'assignStudentsModal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    `;
+    
+    modal.innerHTML = `
+        <div style="
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            max-width: 800px;
+            width: 90%;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        ">
+            <h2 style="margin: 0 0 1rem 0;">📚 Asignar Estudiantes a ${group.name}</h2>
+            
+            <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                <button onclick="selectAllStudents(true)" class="btn btn-sm" 
+                        style="background: #10b981; color: white;">
+                    ✅ Seleccionar Todos
+                </button>
+                <button onclick="selectAllStudents(false)" class="btn btn-sm"
+                        style="background: #6b7280; color: white;">
+                    ❌ Deseleccionar Todos
+                </button>
+                <input type="text" id="studentFilterInput" placeholder="Buscar estudiante..." 
+                       style="flex: 1; padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 4px;"
+                       onkeyup="filterStudentsList()">
+            </div>
+            
+            <div style="flex: 1; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 8px; padding: 1rem;">
+                <table style="width: 100%;">
+                    <thead>
+                        <tr style="border-bottom: 2px solid #e5e7eb;">
+                            <th style="padding: 0.5rem; text-align: center; width: 50px;">
+                                <input type="checkbox" id="selectAllCheckbox" onchange="selectAllStudents(this.checked)">
+                            </th>
+                            <th style="padding: 0.5rem; text-align: left;">Nombre</th>
+                            <th style="padding: 0.5rem; text-align: left;">Documento</th>
+                            <th style="padding: 0.5rem; text-align: left;">Teléfono</th>
+                            <th style="padding: 0.5rem; text-align: left;">Grupo Actual</th>
+                        </tr>
+                    </thead>
+                    <tbody id="studentListBody">
+                        ${allStudents.map(student => {
+                            const isInThisGroup = student.grupo === groupId;
+                            const hasOtherGroup = student.grupo && student.grupo !== groupId;
+                            
+                            return `
+                                <tr class="student-row" data-student-name="${(student.nombre || '').toLowerCase()}">
+                                    <td style="padding: 0.5rem; text-align: center;">
+                                        <input type="checkbox" 
+                                               class="student-checkbox" 
+                                               data-student-id="${student.id}"
+                                               ${isInThisGroup ? 'checked disabled' : ''}>
+                                    </td>
+                                    <td style="padding: 0.5rem;">
+                                        ${student.nombre || '-'}
+                                        ${isInThisGroup ? '<span style="color: #10b981; font-weight: bold;"> ✓</span>' : ''}
+                                    </td>
+                                    <td style="padding: 0.5rem;">${student.tipoDoc || ''} ${student.numDoc || '-'}</td>
+                                    <td style="padding: 0.5rem;">${student.telefono || '-'}</td>
+                                    <td style="padding: 0.5rem;">
+                                        ${isInThisGroup ? 
+                                            `<span style="color: #10b981; font-weight: bold;">${group.name}</span>` : 
+                                            hasOtherGroup ? 
+                                            `<span style="color: #f59e0b;">${student.grupo}</span>` : 
+                                            '<span style="color: #6b7280;">Sin grupo</span>'}
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem;">
+                <div id="selectionCount" style="color: #6b7280;">
+                    0 estudiantes seleccionados
+                </div>
+                <div style="display: flex; gap: 1rem;">
+                    <button onclick="closeAssignStudentsModal()" class="btn btn-secondary">
+                        Cancelar
+                    </button>
+                    <button onclick="assignSelectedStudents('${groupId}')" class="btn btn-primary">
+                        ✅ Asignar Estudiantes
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    updateSelectionCount();
+};
+
+// Function to close the modal
+window.closeAssignStudentsModal = function() {
+    const modal = document.getElementById('assignStudentsModal');
+    if (modal) {
+        modal.remove();
+    }
+};
+
+// Function to select/deselect all students
+window.selectAllStudents = function(checked) {
+    const checkboxes = document.querySelectorAll('.student-checkbox:not(:disabled)');
+    checkboxes.forEach(cb => cb.checked = checked);
+    
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    if (selectAllCheckbox) {
+        selectAllCheckbox.checked = checked;
+    }
+    
+    updateSelectionCount();
+};
+
+// Function to filter students list
+window.filterStudentsList = function() {
+    const filter = document.getElementById('studentFilterInput').value.toLowerCase();
+    const rows = document.querySelectorAll('.student-row');
+    
+    rows.forEach(row => {
+        const name = row.dataset.studentName;
+        row.style.display = name.includes(filter) ? '' : 'none';
+    });
+};
+
+// Function to update selection count
+window.updateSelectionCount = function() {
+    const checkboxes = document.querySelectorAll('.student-checkbox:checked:not(:disabled)');
+    const countElement = document.getElementById('selectionCount');
+    if (countElement) {
+        countElement.textContent = `${checkboxes.length} estudiantes seleccionados`;
+    }
+    
+    // Add event listeners to checkboxes if not already added
+    document.querySelectorAll('.student-checkbox').forEach(cb => {
+        if (!cb.hasListener) {
+            cb.addEventListener('change', updateSelectionCount);
+            cb.hasListener = true;
+        }
+    });
+};
+
+// Function to assign selected students to the group
+window.assignSelectedStudents = async function(groupId) {
+    const checkboxes = document.querySelectorAll('.student-checkbox:checked:not(:disabled)');
+    
+    if (checkboxes.length === 0) {
+        alert('Por favor selecciona al menos un estudiante');
+        return;
+    }
+    
+    const group = window.groupsData.get(groupId);
+    
+    try {
+        // Show loading
+        const modal = document.getElementById('assignStudentsModal');
+        const originalContent = modal.innerHTML;
+        modal.innerHTML = `
+            <div style="
+                background: white;
+                padding: 3rem;
+                border-radius: 12px;
+                text-align: center;
+            ">
+                <div class="loading-spinner" style="margin: 0 auto 1rem;"></div>
+                <p>Asignando estudiantes al grupo ${group.name}...</p>
+            </div>
+        `;
+        
+        // Update each selected student
+        let assigned = 0;
+        for (const checkbox of checkboxes) {
+            const studentId = checkbox.dataset.studentId;
+            await window.StudentManager.updateStudent(studentId, { grupo: groupId });
+            assigned++;
+        }
+        
+        // Update group student count
+        if (!group.students) group.students = [];
+        
+        // Get updated list of students in this group
+        const studentsInGroup = window.StudentManager.getStudents({ grupo: groupId });
+        group.students = studentsInGroup.map(s => s.id);
+        
+        // Save group changes
+        await window.GroupsManager.updateGroup(groupId, { students: group.students });
+        
+        // Show success
+        modal.innerHTML = `
+            <div style="
+                background: white;
+                padding: 3rem;
+                border-radius: 12px;
+                text-align: center;
+            ">
+                <div style="font-size: 3rem; color: #10b981; margin-bottom: 1rem;">✅</div>
+                <p style="font-size: 1.2rem; margin-bottom: 2rem;">
+                    ${assigned} estudiantes asignados exitosamente al grupo ${group.name}
+                </p>
+                <button onclick="closeAssignStudentsModal(); loadGroupsTab();" class="btn btn-primary">
+                    Aceptar
+                </button>
+            </div>
+        `;
+        
+    } catch (error) {
+        console.error('Error assigning students:', error);
+        alert('Error al asignar estudiantes: ' + error.message);
+        closeAssignStudentsModal();
+    }
+};
+
+// Add CSS for loading spinner
+if (!document.getElementById('assign-students-styles')) {
+    const style = document.createElement('style');
+    style.id = 'assign-students-styles';
+    style.textContent = `
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #e5e7eb;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .student-row:hover {
+            background-color: #f9fafb;
+        }
+        
+        .student-checkbox {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        
+        .student-checkbox:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+// ===== KEEP YOUR EXISTING FUNCTIONS BELOW =====
+
+window.removeFromGroup = async function(studentId, groupId) {
+    if (!confirm('¿Quitar estudiante del grupo?')) return;
+    
+    await window.StudentManager.updateStudent(studentId, { grupo: '' });
+    await refreshGroupsGrid();
+    window.showNotification('✅ Estudiante removido del grupo', 'success');
+};
+
+window.deleteGroup = async function(groupId) {
+    if (!confirm('¿Eliminar este grupo? Los estudiantes quedarán sin grupo asignado.')) return;
+    
+    try {
+        const db = window.firebaseModules.database;
+        const ref = db.ref(window.FirebaseData.database, `groups/${groupId}`);
+        await db.remove(ref);
+        
+        window.GroupsManager.groups.delete(groupId);
+        await refreshGroupsGrid();
+        window.showNotification('✅ Grupo eliminado', 'success');
+    } catch (error) {
+        console.error('❌ Error deleting group:', error);
+        window.showNotification('❌ Error al eliminar grupo', 'error');
+    }
 };
 
 window.removeFromGroup = async function(studentId, groupId) {
