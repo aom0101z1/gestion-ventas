@@ -1,80 +1,6 @@
 // groups.js - Groups Management Module
 console.log('👥 Loading groups module...');
 
-// Add this temporarily to your groups.js to debug:
-window.debugFirebase = function() {
-    console.log('=== Firebase Debug Info ===');
-    console.log('window.firebase:', window.firebase);
-    console.log('window.firebaseModules:', window.firebaseModules);
-    console.log('window.auth:', window.auth);
-    console.log('window.database:', window.database);
-    console.log('window.FirebaseData:', window.FirebaseData);
-    
-    if (window.firebase) {
-        console.log('firebase.auth:', window.firebase.auth);
-        console.log('firebase.database:', window.firebase.database);
-    }
-    
-    if (window.firebaseModules) {
-        console.log('firebaseModules.auth:', window.firebaseModules.auth);
-        console.log('firebaseModules.database:', window.firebaseModules.database);
-    }
-    console.log('=========================');
-};
-
-// Call it when groups module loads
-window.debugFirebase();
-
-// Add this debug function to your groups.js file (around line 25, after your existing debug code):
-
-window.findFirebaseAuth = function() {
-    console.log('=== Finding Firebase Auth ===');
-    
-    // Check common locations
-    const possiblePaths = [
-        'window.firebase.auth()',
-        'window.firebase.auth',
-        'window.firebaseAuth',
-        'window.auth',
-        'window.firebaseModules.auth',
-        'window.FirebaseAuth',
-        'firebase.auth()',
-        'firebase.auth'
-    ];
-    
-    possiblePaths.forEach(path => {
-        try {
-            const result = eval(path);
-            if (result) {
-                console.log(`✅ Found at ${path}:`, result);
-                
-                // Check if it has currentUser
-                if (result.currentUser) {
-                    console.log(`   - Current user:`, result.currentUser.email);
-                } else if (typeof result === 'function') {
-                    const authInstance = result();
-                    if (authInstance && authInstance.currentUser) {
-                        console.log(`   - Current user (from function):`, authInstance.currentUser.email);
-                    }
-                }
-            }
-        } catch (e) {
-            // Path doesn't exist
-        }
-    });
-    
-    // Also check the window object
-    console.log('\n=== Checking window object for "auth" properties ===');
-    Object.keys(window).forEach(key => {
-        if (key.toLowerCase().includes('auth') || key.toLowerCase().includes('firebase')) {
-            console.log(`window.${key}:`, window[key]);
-        }
-    });
-};
-
-// Call it immediately to see the results
-window.findFirebaseAuth();
-
 // Groups Manager Class
 class GroupsManager {
     constructor() {
@@ -92,202 +18,123 @@ class GroupsManager {
     }
 
     // Load groups from Firebase
-// Replace your loadGroups method with this version that waits for auth:
-
-// Replace your entire loadGroups method with this comprehensive version:
-
-    // Add this function to check user permissions:
-
-window.checkUserPermissions = async function() {
-    console.log('=== Checking User Permissions ===');
-    
-    try {
-        // Find Firebase auth
-        let auth = null;
-        if (window.firebase && window.firebase.auth) {
-            auth = window.firebase.auth();
-        }
-        
-        if (!auth) {
-            console.error('❌ Firebase auth not found');
-            return;
-        }
-        
-        const currentUser = auth.currentUser;
-        if (!currentUser) {
-            console.error('❌ No user logged in');
-            return;
-        }
-        
-        console.log('✅ Current user:', currentUser.email);
-        console.log('User UID:', currentUser.uid);
-        
-        // Try to read user's role from database
-        const db = window.firebaseModules.database;
-        const userRef = db.ref(window.FirebaseData.database, `users/${currentUser.uid}`);
-        
-        console.log('📥 Checking user data in database...');
-        
+    async loadGroups() {
         try {
-            const userSnapshot = await db.get(userRef);
+            console.log('📂 Starting to load groups from Firebase...');
             
-            if (userSnapshot.exists()) {
-                const userData = userSnapshot.val();
-                console.log('✅ User data:', userData);
+            // First, let's find Firebase auth
+            let auth = null;
+            let authFound = false;
+            
+            // Try different ways to get Firebase auth
+            if (window.firebase && window.firebase.auth) {
+                auth = window.firebase.auth();
+                console.log('✅ Found auth via window.firebase.auth()');
+                authFound = true;
+            } else if (window.firebase && typeof window.firebase.auth === 'function') {
+                auth = window.firebase.auth();
+                console.log('✅ Found auth via window.firebase.auth() function');
+                authFound = true;
+            }
+            
+            if (!authFound) {
+                console.log('⚠️ Firebase auth not found in expected location');
+                console.log('Available Firebase modules:', Object.keys(window.firebase || {}));
+            }
+            
+            // If we found auth, wait for authentication
+            if (auth) {
+                console.log('⏳ Checking authentication status...');
                 
-                if (userData.profile && userData.profile.role) {
-                    console.log('👤 User role:', userData.profile.role);
-                    
-                    if (userData.profile.role === 'director') {
-                        console.log('✅ User has director role - should have full access');
-                    } else {
-                        console.log('⚠️ User role is not director - may have limited access');
-                    }
+                // Check current user
+                let currentUser = auth.currentUser;
+                console.log('Current user immediately:', currentUser ? currentUser.email : 'null');
+                
+                // If no current user, wait for auth state
+                if (!currentUser) {
+                    console.log('⏳ Waiting for auth state change...');
+                    currentUser = await new Promise((resolve) => {
+                        const unsubscribe = auth.onAuthStateChanged((user) => {
+                            console.log('Auth state changed:', user ? user.email : 'null');
+                            unsubscribe();
+                            resolve(user);
+                        });
+                        
+                        // Timeout after 5 seconds
+                        setTimeout(() => {
+                            console.log('⏱️ Auth wait timeout');
+                            unsubscribe();
+                            resolve(null);
+                        }, 5000);
+                    });
+                }
+                
+                if (currentUser) {
+                    console.log('✅ Authenticated as:', currentUser.email);
+                    console.log('User UID:', currentUser.uid);
                 } else {
-                    console.log('⚠️ No role found in user profile');
+                    console.error('❌ No authenticated user found');
+                    // Don't throw, just continue - maybe rules allow anonymous access
                 }
             } else {
-                console.error('❌ No user data found in database');
+                console.warn('⚠️ Proceeding without auth check (may fail)');
             }
-        } catch (error) {
-            console.error('❌ Error reading user data:', error);
-        }
-        
-        // Test group access
-        console.log('\n📥 Testing group access...');
-        try {
-            const groupRef = db.ref(window.FirebaseData.database, 'groups');
-            const testSnapshot = await db.get(groupRef);
-            console.log('✅ Can read groups!');
-        } catch (error) {
-            console.error('❌ Cannot read groups:', error.message);
-        }
-        
-    } catch (error) {
-        console.error('❌ Error checking permissions:', error);
-    }
-};
-
-// Run it immediately
-checkUserPermissions();
-
-async loadGroups() {
-    try {
-        console.log('📂 Starting to load groups from Firebase...');
-        
-        // First, let's find Firebase auth
-        let auth = null;
-        let authFound = false;
-        
-        // Try different ways to get Firebase auth
-        if (window.firebase && window.firebase.auth) {
-            auth = window.firebase.auth();
-            console.log('✅ Found auth via window.firebase.auth()');
-            authFound = true;
-        } else if (window.firebase && typeof window.firebase.auth === 'function') {
-            auth = window.firebase.auth();
-            console.log('✅ Found auth via window.firebase.auth() function');
-            authFound = true;
-        }
-        
-        if (!authFound) {
-            console.log('⚠️ Firebase auth not found in expected location');
-            console.log('Available Firebase modules:', Object.keys(window.firebase || {}));
-        }
-        
-        // If we found auth, wait for authentication
-        if (auth) {
-            console.log('⏳ Checking authentication status...');
             
-            // Check current user
-            let currentUser = auth.currentUser;
-            console.log('Current user immediately:', currentUser ? currentUser.email : 'null');
+            // Now try to load groups
+            console.log('📥 Attempting to load groups from database...');
             
-            // If no current user, wait for auth state
-            if (!currentUser) {
-                console.log('⏳ Waiting for auth state change...');
-                currentUser = await new Promise((resolve) => {
-                    const unsubscribe = auth.onAuthStateChanged((user) => {
-                        console.log('Auth state changed:', user ? user.email : 'null');
-                        unsubscribe();
-                        resolve(user);
-                    });
-                    
-                    // Timeout after 5 seconds
-                    setTimeout(() => {
-                        console.log('⏱️ Auth wait timeout');
-                        unsubscribe();
-                        resolve(null);
-                    }, 5000);
+            const db = window.firebaseModules.database;
+            const ref = db.ref(window.FirebaseData.database, 'groups');
+            
+            console.log('Database reference created:', ref.toString());
+            
+            const snapshot = await db.get(ref);
+            
+            if (snapshot.exists()) {
+                const data = snapshot.val();
+                console.log('✅ Groups data received:', Object.keys(data || {}).length, 'groups');
+                
+                Object.entries(data).forEach(([id, group]) => {
+                    this.groups.set(id, group);
                 });
-            }
-            
-            if (currentUser) {
-                console.log('✅ Authenticated as:', currentUser.email);
-                console.log('User UID:', currentUser.uid);
             } else {
-                console.error('❌ No authenticated user found');
-                throw new Error('Usuario no autenticado. Por favor inicia sesión.');
+                console.log('⚠️ No groups data exists in database');
             }
-        } else {
-            console.warn('⚠️ Proceeding without auth check (may fail)');
-        }
-        
-        // Now try to load groups
-        console.log('📥 Attempting to load groups from database...');
-        
-        const db = window.firebaseModules.database;
-        const ref = db.ref(window.FirebaseData.database, 'groups');
-        
-        console.log('Database reference created:', ref.toString());
-        
-        const snapshot = await db.get(ref);
-        
-        if (snapshot.exists()) {
-            const data = snapshot.val();
-            console.log('✅ Groups data received:', Object.keys(data || {}).length, 'groups');
             
-            Object.entries(data).forEach(([id, group]) => {
-                this.groups.set(id, group);
+            // Load schedules
+            console.log('📥 Loading schedules...');
+            const schedRef = db.ref(window.FirebaseData.database, 'schedules');
+            const schedSnapshot = await db.get(schedRef);
+            
+            if (schedSnapshot.exists()) {
+                const schedData = schedSnapshot.val();
+                Object.entries(schedData).forEach(([id, schedule]) => {
+                    this.schedules.set(id, schedule);
+                });
+                console.log('✅ Schedules loaded');
+            }
+            
+            console.log(`✅ Successfully loaded ${this.groups.size} groups`);
+            
+        } catch (error) {
+            console.error('❌ Error loading groups:', error);
+            console.error('Error details:', {
+                message: error.message,
+                code: error.code,
+                stack: error.stack
             });
-        } else {
-            console.log('⚠️ No groups data exists in database');
+            
+            // Check if it's a permission error
+            if (error.message && error.message.includes('Permission denied')) {
+                console.error('🔒 This is a permission error. Check:');
+                console.error('1. User is authenticated');
+                console.error('2. User has correct role in Firebase');
+                console.error('3. Firebase rules allow access');
+            }
+            
+            // Don't throw, just log
         }
-        
-        // Load schedules
-        console.log('📥 Loading schedules...');
-        const schedRef = db.ref(window.FirebaseData.database, 'schedules');
-        const schedSnapshot = await db.get(schedRef);
-        
-        if (schedSnapshot.exists()) {
-            const schedData = schedSnapshot.val();
-            Object.entries(schedData).forEach(([id, schedule]) => {
-                this.schedules.set(id, schedule);
-            });
-            console.log('✅ Schedules loaded');
-        }
-        
-        console.log(`✅ Successfully loaded ${this.groups.size} groups`);
-        
-    } catch (error) {
-        console.error('❌ Error loading groups:', error);
-        console.error('Error details:', {
-            message: error.message,
-            code: error.code,
-            stack: error.stack
-        });
-        
-        // Check if it's a permission error
-        if (error.message && error.message.includes('Permission denied')) {
-            console.error('🔒 This is a permission error. Check:');
-            console.error('1. User is authenticated');
-            console.error('2. User has correct role in Firebase');
-            console.error('3. Firebase rules allow access');
-        }
-        
-        // Don't throw, just log
     }
-}
 
     // Create/Update group
     async saveGroup(groupData) {
@@ -475,6 +322,19 @@ function renderGroupCard(group) {
 function renderGroupForm(group = null) {
     const schedules = window.GroupsManager.getAvailableSchedules();
     
+    // Get teachers list
+    let teacherOptions = '<option value="">Sin asignar</option>';
+    
+    // Check if TeacherManager exists and has teachers
+    if (window.TeacherManager && window.TeacherManager.teachers && window.TeacherManager.teachers.size > 0) {
+        const teachers = Array.from(window.TeacherManager.teachers.values());
+        teacherOptions += teachers.map(t => `
+            <option value="${t.id}" ${group?.teacherId === t.id ? 'selected' : ''}>
+                ${t.name}
+            </option>
+        `).join('');
+    }
+    
     return `
         <div style="background: #f3f4f6; padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem;">
             <h3>${group ? '✏️ Editar' : '➕ Nuevo'} Grupo</h3>
@@ -508,12 +368,7 @@ function renderGroupForm(group = null) {
                 <div class="form-group">
                     <label>Profesor</label>
                     <select id="groupTeacher">
-                        <option value="">Sin asignar</option>
-                        ${window.TeacherManager ? Array.from(window.TeacherManager.teachers.values()).map(t => `
-                            <option value="${t.id}" ${group?.teacherId === t.id ? 'selected' : ''}>
-                                ${t.name}
-                            </option>
-                        `).join('') : ''}
+                        ${teacherOptions}
                     </select>
                 </div>
                 
@@ -545,8 +400,6 @@ function renderGroupForm(group = null) {
 // Global functions
 window.GroupsManager = new GroupsManager();
 window.groupsData = new Map(); // For compatibility
-
-// Replace your entire loadGroupsTab function with this simplified version:
 
 window.loadGroupsTab = async function() {
     console.log('📚 Loading groups tab');
@@ -647,8 +500,6 @@ window.updateLocationField = function() {
         document.getElementById('groupLocation').value = location;
     }
 };
-
-// Find your assignStudentsModal function and update this part:
 
 window.assignStudentsModal = async function(groupId) {
     console.log('📚 Opening assign students modal for group:', groupId);
@@ -774,18 +625,12 @@ window.assignStudentsModal = async function(groupId) {
         </div>
     `;
     
-    // CHANGE THIS LINE - Instead of document.body, append to the groups container
+    // Append to groups container instead of body
     const groupsContainer = document.getElementById('groupsContainer');
     if (groupsContainer) {
         groupsContainer.appendChild(modal);
     } else {
-        // Fallback to body if container not found
-        const groupsContainer = document.getElementById('groupsContainer');
-if (groupsContainer) {
-    groupsContainer.appendChild(modal);
-} else {
-    document.body.appendChild(modal);
-}
+        document.body.appendChild(modal);
     }
     
     updateSelectionCount();
@@ -795,11 +640,6 @@ window.closeAssignStudentsModal = function() {
     const modal = document.getElementById('assignStudentsModal');
     if (modal) {
         modal.remove();
-    }
-    
-    // Ensure we stay in the groups tab
-    if (window.currentTab !== 'groups') {
-        window.showTab('groups');
     }
 };
 
@@ -858,24 +698,17 @@ window.assignSelectedStudents = async function(groupId) {
     try {
         // Show loading
         const modal = document.getElementById('assignStudentsModal');
-        const originalContent = modal.innerHTML;
-// Show success
-modal.innerHTML = `
-    <div style="
-        background: white;
-        padding: 3rem;
-        border-radius: 12px;
-        text-align: center;
-    ">
-        <div style="font-size: 3rem; color: #10b981; margin-bottom: 1rem;">✅</div>
-        <p style="font-size: 1.2rem; margin-bottom: 2rem;">
-            ${assigned} estudiantes asignados exitosamente al grupo ${group.name}
-        </p>
-        <button onclick="closeAssignStudentsModal(); refreshGroupsGrid();" class="btn btn-primary">
-            Aceptar
-        </button>
-    </div>
-`;
+        modal.innerHTML = `
+            <div style="
+                background: white;
+                padding: 3rem;
+                border-radius: 12px;
+                text-align: center;
+            ">
+                <div class="loading-spinner" style="margin: 0 auto 1rem;"></div>
+                <p>Asignando estudiantes al grupo ${group.name}...</p>
+            </div>
+        `;
         
         // Update each selected student
         let assigned = 0;
@@ -894,6 +727,7 @@ modal.innerHTML = `
         
         // Save group changes
         window.GroupsManager.groups.set(groupId, group);
+        
         // Save to Firebase
         const db = window.firebaseModules.database;
         const ref = db.ref(window.FirebaseData.database, `groups/${groupId}`);
@@ -911,7 +745,7 @@ modal.innerHTML = `
                 <p style="font-size: 1.2rem; margin-bottom: 2rem;">
                     ${assigned} estudiantes asignados exitosamente al grupo ${group.name}
                 </p>
-                <button onclick="closeAssignStudentsModal(); loadGroupsTab();" class="btn btn-primary">
+                <button onclick="closeAssignStudentsModal(); refreshGroupsGrid();" class="btn btn-primary">
                     Aceptar
                 </button>
             </div>
@@ -1013,5 +847,76 @@ async function saveGroupForm(groupId) {
         window.showNotification('❌ Error al guardar grupo', 'error');
     }
 }
+
+// Check user permissions helper
+window.checkUserPermissions = async function() {
+    console.log('=== Checking User Permissions ===');
+    
+    try {
+        // Find Firebase auth
+        let auth = null;
+        if (window.firebase && window.firebase.auth) {
+            auth = window.firebase.auth();
+        }
+        
+        if (!auth) {
+            console.error('❌ Firebase auth not found');
+            return;
+        }
+        
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+            console.error('❌ No user logged in');
+            return;
+        }
+        
+        console.log('✅ Current user:', currentUser.email);
+        console.log('User UID:', currentUser.uid);
+        
+        // Try to read user's role from database
+        const db = window.firebaseModules.database;
+        const userRef = db.ref(window.FirebaseData.database, `users/${currentUser.uid}`);
+        
+        console.log('📥 Checking user data in database...');
+        
+        try {
+            const userSnapshot = await db.get(userRef);
+            
+            if (userSnapshot.exists()) {
+                const userData = userSnapshot.val();
+                console.log('✅ User data:', userData);
+                
+                if (userData.profile && userData.profile.role) {
+                    console.log('👤 User role:', userData.profile.role);
+                    
+                    if (userData.profile.role === 'director') {
+                        console.log('✅ User has director role - should have full access');
+                    } else {
+                        console.log('⚠️ User role is not director - may have limited access');
+                    }
+                } else {
+                    console.log('⚠️ No role found in user profile');
+                }
+            } else {
+                console.error('❌ No user data found in database');
+            }
+        } catch (error) {
+            console.error('❌ Error reading user data:', error);
+        }
+        
+        // Test group access
+        console.log('\n📥 Testing group access...');
+        try {
+            const groupRef = db.ref(window.FirebaseData.database, 'groups');
+            const testSnapshot = await db.get(groupRef);
+            console.log('✅ Can read groups!');
+        } catch (error) {
+            console.error('❌ Cannot read groups:', error.message);
+        }
+        
+    } catch (error) {
+        console.error('❌ Error checking permissions:', error);
+    }
+};
 
 console.log('✅ Groups module loaded successfully');
