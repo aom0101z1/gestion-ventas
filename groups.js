@@ -25,6 +25,56 @@ window.debugFirebase = function() {
 // Call it when groups module loads
 window.debugFirebase();
 
+// Add this debug function to your groups.js file (around line 25, after your existing debug code):
+
+window.findFirebaseAuth = function() {
+    console.log('=== Finding Firebase Auth ===');
+    
+    // Check common locations
+    const possiblePaths = [
+        'window.firebase.auth()',
+        'window.firebase.auth',
+        'window.firebaseAuth',
+        'window.auth',
+        'window.firebaseModules.auth',
+        'window.FirebaseAuth',
+        'firebase.auth()',
+        'firebase.auth'
+    ];
+    
+    possiblePaths.forEach(path => {
+        try {
+            const result = eval(path);
+            if (result) {
+                console.log(`✅ Found at ${path}:`, result);
+                
+                // Check if it has currentUser
+                if (result.currentUser) {
+                    console.log(`   - Current user:`, result.currentUser.email);
+                } else if (typeof result === 'function') {
+                    const authInstance = result();
+                    if (authInstance && authInstance.currentUser) {
+                        console.log(`   - Current user (from function):`, authInstance.currentUser.email);
+                    }
+                }
+            }
+        } catch (e) {
+            // Path doesn't exist
+        }
+    });
+    
+    // Also check the window object
+    console.log('\n=== Checking window object for "auth" properties ===');
+    Object.keys(window).forEach(key => {
+        if (key.toLowerCase().includes('auth') || key.toLowerCase().includes('firebase')) {
+            console.log(`window.${key}:`, window[key]);
+        }
+    });
+};
+
+// Call it immediately to see the results
+window.findFirebaseAuth();
+
 // Groups Manager Class
 class GroupsManager {
     constructor() {
