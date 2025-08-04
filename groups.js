@@ -18,51 +18,54 @@ class GroupsManager {
     }
 
     // Load groups from Firebase
-    async loadGroups() {
-        try {
-            // Wait for authentication if needed
-            const auth = window.firebaseModules.auth;
-            const currentUser = auth.currentUser || await new Promise((resolve) => {
-                const unsubscribe = auth.onAuthStateChanged((user) => {
-                    unsubscribe();
-                    resolve(user);
-                });
-            });
-
-            if (!currentUser) {
-                console.error('❌ No authenticated user');
-                return;
-            }
-
-            console.log('✅ Authenticated as:', currentUser.email);
-
-            const db = window.firebaseModules.database;
-            const ref = db.ref(window.FirebaseData.database, 'groups');
-            const snapshot = await db.get(ref);
-            
-            if (snapshot.exists()) {
-                const data = snapshot.val();
-                Object.entries(data).forEach(([id, group]) => {
-                    this.groups.set(id, group);
-                });
-            }
-            
-            // Load schedules
-            const schedRef = db.ref(window.FirebaseData.database, 'schedules');
-            const schedSnapshot = await db.get(schedRef);
-            
-            if (schedSnapshot.exists()) {
-                const schedData = schedSnapshot.val();
-                Object.entries(schedData).forEach(([id, schedule]) => {
-                    this.schedules.set(id, schedule);
-                });
-            }
-            
-            console.log(`✅ Loaded ${this.groups.size} groups`);
-        } catch (error) {
-            console.error('❌ Error loading groups:', error);
+async loadGroups() {
+    try {
+        // Check if Firebase is available
+        if (!window.firebaseModules || !window.firebaseModules.auth) {
+            console.error('❌ Firebase not initialized');
+            return;
         }
+
+        const auth = window.firebaseModules.auth;
+        
+        // Get current user
+        const currentUser = auth.currentUser;
+        
+        if (!currentUser) {
+            console.error('❌ No authenticated user');
+            return;
+        }
+
+        console.log('✅ Authenticated as:', currentUser.email);
+
+        const db = window.firebaseModules.database;
+        const ref = db.ref(window.FirebaseData.database, 'groups');
+        const snapshot = await db.get(ref);
+        
+        if (snapshot.exists()) {
+            const data = snapshot.val();
+            Object.entries(data).forEach(([id, group]) => {
+                this.groups.set(id, group);
+            });
+        }
+        
+        // Load schedules
+        const schedRef = db.ref(window.FirebaseData.database, 'schedules');
+        const schedSnapshot = await db.get(schedRef);
+        
+        if (schedSnapshot.exists()) {
+            const schedData = schedSnapshot.val();
+            Object.entries(schedData).forEach(([id, schedule]) => {
+                this.schedules.set(id, schedule);
+            });
+        }
+        
+        console.log(`✅ Loaded ${this.groups.size} groups`);
+    } catch (error) {
+        console.error('❌ Error loading groups:', error);
+        throw error; // Re-throw to be handled by the calling function
     }
+}
 
     // Create/Update group
     async saveGroup(groupData) {
