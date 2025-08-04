@@ -17,53 +17,53 @@ class GroupsManager {
         this.initialized = true;
     }
 
-  // In your groups.js file, update the loadGroups function:
-
-async loadGroups() {
-    try {
-        // Wait for authentication if needed
-        const auth = window.firebaseModules.auth;
-        const currentUser = auth.currentUser || await new Promise((resolve) => {
-            const unsubscribe = auth.onAuthStateChanged((user) => {
-                unsubscribe();
-                resolve(user);
+    // Load groups from Firebase
+    async loadGroups() {
+        try {
+            // Wait for authentication if needed
+            const auth = window.firebaseModules.auth;
+            const currentUser = auth.currentUser || await new Promise((resolve) => {
+                const unsubscribe = auth.onAuthStateChanged((user) => {
+                    unsubscribe();
+                    resolve(user);
+                });
             });
-        });
 
-        if (!currentUser) {
-            console.error('❌ No authenticated user');
-            return;
-        }
+            if (!currentUser) {
+                console.error('❌ No authenticated user');
+                return;
+            }
 
-        console.log('✅ Authenticated as:', currentUser.email);
+            console.log('✅ Authenticated as:', currentUser.email);
 
-        const db = window.firebaseModules.database;
-        const ref = db.ref(window.FirebaseData.database, 'groups');
-        const snapshot = await db.get(ref);
-        
-        if (snapshot.exists()) {
-            const data = snapshot.val();
-            Object.entries(data).forEach(([id, group]) => {
-                this.groups.set(id, group);
-            });
+            const db = window.firebaseModules.database;
+            const ref = db.ref(window.FirebaseData.database, 'groups');
+            const snapshot = await db.get(ref);
+            
+            if (snapshot.exists()) {
+                const data = snapshot.val();
+                Object.entries(data).forEach(([id, group]) => {
+                    this.groups.set(id, group);
+                });
+            }
+            
+            // Load schedules
+            const schedRef = db.ref(window.FirebaseData.database, 'schedules');
+            const schedSnapshot = await db.get(schedRef);
+            
+            if (schedSnapshot.exists()) {
+                const schedData = schedSnapshot.val();
+                Object.entries(schedData).forEach(([id, schedule]) => {
+                    this.schedules.set(id, schedule);
+                });
+            }
+            
+            console.log(`✅ Loaded ${this.groups.size} groups`);
+        } catch (error) {
+            console.error('❌ Error loading groups:', error);
         }
-        
-        // Load schedules
-        const schedRef = db.ref(window.FirebaseData.database, 'schedules');
-        const schedSnapshot = await db.get(schedRef);
-        
-        if (schedSnapshot.exists()) {
-            const schedData = schedSnapshot.val();
-            Object.entries(schedData).forEach(([id, schedule]) => {
-                this.schedules.set(id, schedule);
-            });
-        }
-        
-        console.log(`✅ Loaded ${this.groups.size} groups`);
-    } catch (error) {
-        console.error('❌ Error loading groups:', error);
     }
-}
+
     // Create/Update group
     async saveGroup(groupData) {
         try {
@@ -437,7 +437,6 @@ window.updateLocationField = function() {
     }
 };
 
-// REPLACE your current assignStudentsModal function with this fixed version:
 window.assignStudentsModal = async function(groupId) {
     console.log('📚 Opening assign students modal for group:', groupId);
     
@@ -515,7 +514,6 @@ window.assignStudentsModal = async function(groupId) {
                     </thead>
                     <tbody id="studentListBody">
                         ${allStudents.map(student => {
-                            // FIX: Compare with group.name instead of groupId
                             const isInThisGroup = student.grupo === group.name;
                             const hasOtherGroup = student.grupo && student.grupo !== group.name;
                             
@@ -567,7 +565,6 @@ window.assignStudentsModal = async function(groupId) {
     updateSelectionCount();
 };
 
-// Function to close the modal
 window.closeAssignStudentsModal = function() {
     const modal = document.getElementById('assignStudentsModal');
     if (modal) {
@@ -575,7 +572,6 @@ window.closeAssignStudentsModal = function() {
     }
 };
 
-// Function to select/deselect all students
 window.selectAllStudents = function(checked) {
     const checkboxes = document.querySelectorAll('.student-checkbox:not(:disabled)');
     checkboxes.forEach(cb => cb.checked = checked);
@@ -588,7 +584,6 @@ window.selectAllStudents = function(checked) {
     updateSelectionCount();
 };
 
-// Function to filter students list
 window.filterStudentsList = function() {
     const filter = document.getElementById('studentFilterInput').value.toLowerCase();
     const rows = document.querySelectorAll('.student-row');
@@ -599,7 +594,6 @@ window.filterStudentsList = function() {
     });
 };
 
-// Function to update selection count
 window.updateSelectionCount = function() {
     const checkboxes = document.querySelectorAll('.student-checkbox:checked:not(:disabled)');
     const countElement = document.getElementById('selectionCount');
@@ -616,8 +610,6 @@ window.updateSelectionCount = function() {
     });
 };
 
-// Function to assign selected students to the group
-// REPLACE your current assignSelectedStudents function with this fixed version:
 window.assignSelectedStudents = async function(groupId) {
     const checkboxes = document.querySelectorAll('.student-checkbox:checked:not(:disabled)');
     
@@ -626,7 +618,6 @@ window.assignSelectedStudents = async function(groupId) {
         return;
     }
     
-    // FIX: Get group from GroupsManager instead of groupsData
     const group = window.GroupsManager.groups.get(groupId);
     if (!group) {
         alert('Grupo no encontrado');
@@ -653,7 +644,6 @@ window.assignSelectedStudents = async function(groupId) {
         let assigned = 0;
         for (const checkbox of checkboxes) {
             const studentId = checkbox.dataset.studentId;
-            // FIX: Update with group.name instead of groupId
             await window.StudentManager.updateStudent(studentId, { grupo: group.name });
             assigned++;
         }
@@ -662,7 +652,6 @@ window.assignSelectedStudents = async function(groupId) {
         if (!group.students) group.students = [];
         
         // Get updated list of students in this group
-        // FIX: Filter by group.name instead of groupId
         const studentsInGroup = window.StudentManager.getStudents().filter(s => s.grupo === group.name);
         group.students = studentsInGroup.map(s => s.id);
         
@@ -735,8 +724,6 @@ if (!document.getElementById('assign-students-styles')) {
     document.head.appendChild(style);
 }
 
-// ===== KEEP YOUR EXISTING FUNCTIONS BELOW =====
-
 window.removeFromGroup = async function(studentId, groupId) {
     if (!confirm('¿Quitar estudiante del grupo?')) return;
     
@@ -788,44 +775,6 @@ async function saveGroupForm(groupId) {
         console.error('❌ Error saving group:', error);
         window.showNotification('❌ Error al guardar grupo', 'error');
     }
-}
-
-
-// ===== ASSIGN STUDENTS TO GROUP FUNCTIONALITY =====
-
-// Function to show the assign students modal
-window.assignStudentsModal = async function(groupId) {
-    // ... (all the code from the first artifact)
-};
-
-// Function to close the modal
-window.closeAssignStudentsModal = function() {
-    // ...
-};
-
-// Function to select/deselect all students
-window.selectAllStudents = function(checked) {
-    // ...
-};
-
-// Function to filter students list
-window.filterStudentsList = function() {
-    // ...
-};
-
-// Function to update selection count
-window.updateSelectionCount = function() {
-    // ...
-};
-
-// Function to assign selected students to the group
-window.assignSelectedStudents = async function(groupId) {
-    // ...
-};
-
-// Add CSS for loading spinner
-if (!document.getElementById('assign-students-styles')) {
-    // ... (the CSS part)
 }
 
 console.log('✅ Groups module loaded successfully');
