@@ -555,7 +555,12 @@ window.assignStudentsModal = async function(groupId) {
         groupsContainer.appendChild(modal);
     } else {
         // Fallback to body if container not found
-        document.body.appendChild(modal);
+        const groupsContainer = document.getElementById('groupsContainer');
+if (groupsContainer) {
+    groupsContainer.appendChild(modal);
+} else {
+    document.body.appendChild(modal);
+}
     }
     
     updateSelectionCount();
