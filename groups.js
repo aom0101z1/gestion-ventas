@@ -769,23 +769,6 @@ window.deleteGroup = async function(groupId) {
     window.showNotification('✅ Estudiante removido del grupo', 'success');
 };
 
-window.deleteGroup = async function(groupId) {
-    if (!confirm('¿Eliminar este grupo? Los estudiantes quedarán sin grupo asignado.')) return;
-    
-    try {
-        const db = window.firebaseModules.database;
-        const ref = db.ref(window.FirebaseData.database, `groups/${groupId}`);
-        await db.remove(ref);
-        
-        window.GroupsManager.groups.delete(groupId);
-        await refreshGroupsGrid();
-        window.showNotification('✅ Grupo eliminado', 'success');
-    } catch (error) {
-        console.error('❌ Error deleting group:', error);
-        window.showNotification('❌ Error al eliminar grupo', 'error');
-    }
-};
-
 async function saveGroupForm(groupId) {
     try {
         const scheduleSelect = document.getElementById('groupSchedule');
