@@ -2740,29 +2740,27 @@ console.log('✅ Sales ranking loaded successfully');
             }
         }
 
-        console.log('✅ Complete CRM System loaded successfully');
-    </script>
-    <script src="fixes.js"></script>
-    <script src="social.js"></script>
-    <script src="pipeline.js"></script>
-    <script src="simple-tasks.js"></script>
-    <script src="students.js"></script>
-    <script src="payments.js"></script>
-    <script src="groups.js"></script>
-    <script src="teachers.js"></script>
-    <script src="attendance.js"></script>
-    <script src="school-buttons.js"></script>
-    <script src="import-students.js"></script>
-    <script src="landing-page.js"></script>
-    <script src="emergency-fix.js"></script>
-    <script src="auth-integration.js"></script>
-    <script src="disable-permissions-temporarily.js"></script>
-    <script src="permission-management.js"></script>
-    <script src="config-integration.js"></script>
-    <script src="quick-fixes.js"></script>
-    <script src="init-permissions.js"></script>
 
-            <script>
+<!-- Core functionality - KEEP ALL -->
+<script src="fixes.js"></script>
+<script src="social.js"></script>
+<script src="pipeline.js"></script>
+<script src="simple-tasks.js"></script>
+<script src="students.js"></script>
+<script src="payments.js"></script>
+<script src="groups.js"></script>
+<script src="teachers.js"></script>
+<script src="attendance.js"></script>
+<script src="school-buttons.js"></script>
+<script src="import-students.js"></script>
+
+<!-- Emergency fixes - KEEP FOR NOW -->
+<script src="emergency-fix.js"></script>
+<script src="quick-fixes.js"></script>
+<script src="disable-permissions-temporarily.js"></script>
+
+<!-- Module check - KEEP -->
+<script>
 // This will show which files are loaded
 setTimeout(() => {
     console.log('✅ Modules Check:');
@@ -2770,12 +2768,9 @@ setTimeout(() => {
     console.log('Payments:', !!window.PaymentManager);
     console.log('Groups:', !!window.GroupsManager);
     console.log('Teachers:', !!window.TeacherManager);
-    
 }, 5000);
 </script>
 
-</body>
-</html>
 
 
 
