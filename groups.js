@@ -762,7 +762,6 @@ window.deleteGroup = async function(groupId) {
     }
 };
 
-window.removeFromGroup = async function(studentId, groupId) {
     if (!confirm('¿Quitar estudiante del grupo?')) return;
     
     await window.StudentManager.updateStudent(studentId, { grupo: '' });
