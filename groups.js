@@ -22,6 +22,8 @@ class GroupsManager {
         try {
             console.log('📂 Starting to load groups from Firebase...');
             
+            // Add a small delay to ensure Firebase is fully initialized
+await new Promise(resolve => setTimeout(resolve, 1000));
             // First, let's find Firebase auth
             let auth = null;
             let authFound = false;
