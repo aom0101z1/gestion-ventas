@@ -562,8 +562,8 @@ const InvoiceGenerator = {
         const formatCurrency = (num) => `$${num.toLocaleString('es-CO')}`;
 
         return `
-            <div class="invoice-print" style="width: 800px; padding: 20px; border: 2px solid #000; font-family: Arial, sans-serif; position: relative; background: white;">
-                <!-- Header -->
+return `
+    <div class="invoice-print" style="width: 500px; padding: 15px; border: 2px solid #000; font-family: Arial, sans-serif; position: relative; background: white; font-size: 12px;">                <!-- Header -->
                 <div style="text-align: center; margin-bottom: 20px;">
                     <!-- Logo -->
                     <div style="width: 100px; height: 100px; margin: 0 auto 10px; position: relative;">
