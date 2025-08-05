@@ -201,7 +201,7 @@ window.SimplePermissions = {
     await this.loadAllUserRoles();
   },
   
-  // Load all users for role management
+  // Load all users for role management - WITH SIMPLE COLLAPSIBLE
   async loadAllUserRoles() {
     try {
       const db = window.firebaseModules.database;
@@ -220,8 +220,18 @@ window.SimplePermissions = {
         });
       });
       
-      // Create simple table
-      document.getElementById('userRolesList').innerHTML = `
+      // Create table with simple collapsible
+      const container = document.getElementById('userRolesList');
+      
+      // Create title that's clickable
+      const title = document.createElement('h4');
+      title.style.cssText = 'cursor: pointer; user-select: none; margin: 0 0 1rem 0;';
+      title.innerHTML = '👥 Usuarios Actuales <span id="arrow" style="font-size: 0.8em;">▶</span>';
+      
+      // Create table
+      const tableWrapper = document.createElement('div');
+      tableWrapper.style.display = 'none'; // Start collapsed
+      tableWrapper.innerHTML = `
         <table style="width: 100%; background: white; border-radius: 4px;">
           <thead>
             <tr style="border-bottom: 1px solid #e5e7eb;">
@@ -258,8 +268,22 @@ window.SimplePermissions = {
           </tbody>
         </table>
       `;
+      
+      // Add click handler to title
+      title.onclick = function() {
+        const isHidden = tableWrapper.style.display === 'none';
+        tableWrapper.style.display = isHidden ? 'block' : 'none';
+        document.getElementById('arrow').textContent = isHidden ? '▼' : '▶';
+      };
+      
+      // Clear and add elements
+      container.innerHTML = '';
+      container.appendChild(title);
+      container.appendChild(tableWrapper);
+      
     } catch (error) {
       console.error('Error loading users:', error);
+      document.getElementById('userRolesList').innerHTML = 'Error cargando usuarios';
     }
   },
   
@@ -298,134 +322,32 @@ document.addEventListener('DOMContentLoaded', () => {
   setTimeout(() => {
     SimplePermissions.init();
     
-// Add role management when config is opened
-document.addEventListener('click', (e) => {
-  if (e.target.textContent?.includes('Config') || e.target.id?.includes('config')) {
-    setTimeout(() => {
-      SimplePermissions.addRoleManagement();
-      // Also check for the config tab specifically
-      const configTab = document.querySelector('[onclick*="config"]');
-      if (configTab) {
-        setTimeout(() => SimplePermissions.addRoleManagement(), 1000);
+    // Add role management when config is opened
+    document.addEventListener('click', (e) => {
+      if (e.target.textContent?.includes('Config') || e.target.id?.includes('config')) {
+        setTimeout(() => {
+          SimplePermissions.addRoleManagement();
+          // Also check for the config tab specifically
+          const configTab = document.querySelector('[onclick*="config"]');
+          if (configTab) {
+            setTimeout(() => SimplePermissions.addRoleManagement(), 1000);
+          }
+        }, 500);
       }
-    }, 500);
-  }
-});
-
-// Also check when switching tabs
-if (window.switchTab) {
-  const originalSwitchTab = window.switchTab;
-  window.switchTab = function(tab) {
-    originalSwitchTab(tab);
-    if (tab === 'config') {
-      setTimeout(() => SimplePermissions.addRoleManagement(), 1000);
+    });
+    
+    // Also check when switching tabs
+    if (window.switchTab) {
+      const originalSwitchTab = window.switchTab;
+      window.switchTab = function(tab) {
+        originalSwitchTab(tab);
+        if (tab === 'config') {
+          setTimeout(() => SimplePermissions.addRoleManagement(), 1000);
+        }
+      };
     }
-  };
-}
   }, 2000);
 });
-
-// Simple Collapsible for Usuarios Actuales
-let usuariosCollapsibleDone = false;
-
-function makeUsuariosCollapsible() {
-    // Prevent multiple runs
-    if (usuariosCollapsibleDone) return;
-    
-    // Only run in Config
-    if (!document.querySelector('#config') || document.querySelector('#config').style.display === 'none') {
-        return;
-    }
-    
-    // Look for the container with "Usuarios Actuales"
-    const containers = document.querySelectorAll('.flex.items-center');
-    let titleContainer = null;
-    
-    for (let container of containers) {
-        if (container.textContent && container.textContent.includes('Usuarios Actuales')) {
-            titleContainer = container;
-            break;
-        }
-    }
-    
-    if (!titleContainer) {
-        // Try again later
-        setTimeout(makeUsuariosCollapsible, 1000);
-        return;
-    }
-    
-    // Find the section that contains all users
-    const section = titleContainer.closest('.mt-6') || titleContainer.parentElement.parentElement;
-    
-    // Find all user divs (they contain emails)
-    const userDivs = [];
-    section.querySelectorAll('div').forEach(div => {
-        if (div.textContent.includes('@') && 
-            div.textContent.includes('Rol:') && 
-            !div.contains(titleContainer)) {
-            userDivs.push(div);
-        }
-    });
-    
-    if (userDivs.length === 0) return;
-    
-    // Create wrapper for users
-    const wrapper = document.createElement('div');
-    wrapper.style.overflow = 'hidden';
-    wrapper.style.transition = 'all 0.3s ease';
-    wrapper.style.maxHeight = '0';
-    
-    // Move users to wrapper
-    userDivs.forEach(div => wrapper.appendChild(div));
-    section.appendChild(wrapper);
-    
-    // Add arrow to title
-    const arrow = document.createElement('span');
-    arrow.textContent = ' ▶';
-    arrow.style.fontSize = '14px';
-    arrow.style.transition = 'transform 0.3s ease';
-    titleContainer.appendChild(arrow);
-    
-    // Make title clickable
-    titleContainer.style.cursor = 'pointer';
-    let isOpen = false;
-    
-    titleContainer.addEventListener('click', function(e) {
-        e.stopPropagation();
-        isOpen = !isOpen;
-        
-        if (isOpen) {
-            wrapper.style.maxHeight = wrapper.scrollHeight + 'px';
-            arrow.style.transform = 'rotate(90deg)';
-        } else {
-            wrapper.style.maxHeight = '0';
-            arrow.style.transform = 'rotate(0deg)';
-        }
-    });
-    
-    // Mark as done
-    usuariosCollapsibleDone = true;
-    console.log('✅ Usuarios Actuales is now collapsible!');
-}
-
-// Run when Config is shown
-const originalShowConfig = window.showConfig;
-if (originalShowConfig) {
-    window.showConfig = function() {
-        usuariosCollapsibleDone = false; // Reset flag
-        originalShowConfig.apply(this, arguments);
-        setTimeout(makeUsuariosCollapsible, 1500);
-    };
-}
-
-// Also check periodically if Config is open
-setInterval(() => {
-    if (document.querySelector('#config') && 
-        document.querySelector('#config').style.display !== 'none' && 
-        !usuariosCollapsibleDone) {
-        makeUsuariosCollapsible();
-    }
-}, 2000);
 
 // Add console helpers
 console.log('👔 Simple Permissions loaded!');
