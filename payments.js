@@ -741,13 +741,25 @@ window.loadPaymentsTab = async function() {
     document.getElementById('collectedAmount').textContent = `$${summary.collectedAmount.toLocaleString()}`;
 };
 
+// 1. FIX FOR MODAL POSITION - Replace your showPaymentModal function with this:
 window.showPaymentModal = function(studentId) {
     const student = window.StudentManager.students.get(studentId);
     if (!student) return;
     
+    // Remove any existing modal first
+    const existingModal = document.getElementById('paymentModal');
+    if (existingModal) existingModal.remove();
+    
     const modal = document.createElement('div');
     modal.innerHTML = renderPaymentModal(student);
-    document.body.appendChild(modal);
+    
+    // Try to append to payments container first, otherwise to body
+    const paymentsContainer = document.getElementById('paymentsContainer');
+    if (paymentsContainer) {
+        paymentsContainer.appendChild(modal.firstElementChild);
+    } else {
+        document.body.appendChild(modal.firstElementChild);
+    }
     
     document.getElementById('paymentForm').onsubmit = async (e) => {
         e.preventDefault();
