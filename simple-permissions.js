@@ -323,9 +323,49 @@ if (window.switchTab) {
   };
 }
   }, 2000);
-});
+}));
+
+// Make Usuarios Actuales collapsible
+setTimeout(() => {
+    const checkAndSetup = () => {
+        const usersList = document.querySelector('#usersList');
+        if (!usersList) return;
+        
+        const section = usersList.closest('.bg-white');
+        const title = section?.querySelector('h3');
+        
+        if (title && !title.classList.contains('collapsible-setup')) {
+            title.classList.add('collapsible-setup');
+            title.style.cursor = 'pointer';
+            title.innerHTML += ' <span id="toggle-arrow">▼</span>';
+            
+            title.onclick = () => {
+                const isHidden = usersList.style.display === 'none';
+                usersList.style.display = isHidden ? 'block' : 'none';
+                document.querySelector('#toggle-arrow').textContent = isHidden ? '▼' : '▶';
+                
+                // Load users if showing and empty
+                if (isHidden && usersList.children.length === 0) {
+                    loadUsuariosActuales();
+                }
+            };
+            
+            // Start collapsed
+            usersList.style.display = 'none';
+            document.querySelector('#toggle-arrow').textContent = '▶';
+        }
+    };
+    
+    // Check when Config is shown
+    const interval = setInterval(() => {
+        if (document.querySelector('#config').style.display !== 'none') {
+            checkAndSetup();
+            clearInterval(interval);
+        }
+    }, 500);
+}, 1000);
 
 // Add console helpers
-console.log('🔐 Simple Permissions loaded!');
+console.log('👔 Simple Permissions loaded!');
 console.log('Use SimplePermissions.disable() to turn off');
 console.log('Use SimplePermissions.enable() to turn on');
