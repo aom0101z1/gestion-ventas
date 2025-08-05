@@ -2754,100 +2754,6 @@ console.log('✅ Sales ranking loaded successfully');
 <script src="school-buttons.js"></script>
 <script src="import-students.js"></script>
 
-<!-- Emergency fixes - KEEP FOR NOW -->
-<script src="emergency-fix.js"></script>
-<script src="quick-fixes.js"></script>
-<script src="disable-permissions-temporarily.js"></script>
-
-// Add this directly to your index.html in a <script> tag at the end
-
-// Create a temporary login form
-function createLoginForm() {
-    const loginDiv = document.createElement('div');
-    loginDiv.id = 'tempLogin';
-    loginDiv.style.cssText = `
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: white;
-        padding: 2rem;
-        border-radius: 8px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-        z-index: 99999;
-        min-width: 300px;
-    `;
-    
-    loginDiv.innerHTML = `
-        <h2 style="margin: 0 0 1rem 0;">🔐 Login to CRM</h2>
-        <input type="email" id="loginEmail" placeholder="Email" value="admin@ciudadbilingue.com"
-               style="width: 100%; padding: 0.5rem; margin-bottom: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
-        <input type="password" id="loginPassword" placeholder="Password" 
-               style="width: 100%; padding: 0.5rem; margin-bottom: 1rem; border: 1px solid #ddd; border-radius: 4px;">
-        <button onclick="doLogin()" 
-                style="width: 100%; padding: 0.75rem; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
-            Login
-        </button>
-        <div id="loginError" style="color: red; margin-top: 0.5rem; display: none;"></div>
-    `;
-    
-    document.body.appendChild(loginDiv);
-}
-
-// Login function
-async function doLogin() {
-    const email = document.getElementById('loginEmail').value;
-    const password = document.getElementById('loginPassword').value;
-    const errorDiv = document.getElementById('loginError');
-    
-    try {
-        const auth = window.FirebaseData.auth;
-        await auth.signInWithEmailAndPassword(email, password);
-        
-        console.log('✅ Login successful!');
-        document.getElementById('tempLogin').remove();
-        
-        // Reload to initialize everything
-        window.location.reload();
-        
-    } catch (error) {
-        console.error('Login error:', error);
-        errorDiv.textContent = error.message;
-        errorDiv.style.display = 'block';
-    }
-}
-
-// Check if user is logged in
-window.FirebaseData.auth.onAuthStateChanged((user) => {
-    if (!user) {
-        // No user logged in, show login form
-        createLoginForm();
-    } else {
-        // User is logged in
-        console.log('✅ User authenticated:', user.email);
-        
-        // Remove login form if it exists
-        const loginForm = document.getElementById('tempLogin');
-        if (loginForm) {
-            loginForm.remove();
-        }
-        
-        // Show the school buttons if hidden
-        const schoolButtons = document.getElementById('schoolButtonBar');
-        if (schoolButtons) {
-            schoolButtons.style.display = 'flex';
-        }
-    }
-});
-
-// Also add keyboard support for Enter key
-document.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter' && document.getElementById('tempLogin')) {
-        doLogin();
-    }
-});
-
-<!-- Module check - KEEP -->
 <script>
 // This will show which files are loaded
 setTimeout(() => {
@@ -2857,5 +2763,7 @@ setTimeout(() => {
     console.log('Groups:', !!window.GroupsManager);
     console.log('Teachers:', !!window.TeacherManager);
 }, 5000);
-
 </script>
+
+</body>
+</html>
