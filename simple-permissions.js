@@ -325,118 +325,82 @@ if (window.switchTab) {
   }, 2000);
 }));
 
-// Debug version - Replace the previous code with this
-setTimeout(() => {
-    console.log('🔍 Starting collapsible setup...');
-    
-    const checkAndSetup = () => {
-        console.log('🔍 Checking for usersList...');
+// Simple solution - Try this instead
+function makeUsuariosCollapsible() {
+    // Wait a bit for everything to load
+    setTimeout(() => {
+        // Find the container with the email addresses
+        const containers = document.querySelectorAll('.bg-white.rounded-lg');
+        let targetContainer = null;
         
-        // Try different selectors
-        let usersList = document.querySelector('#usersList');
-        console.log('Found #usersList:', usersList);
-        
-        if (!usersList) {
-            // Try to find by class or other means
-            usersList = document.querySelector('.usuarios-list');
-            console.log('Found .usuarios-list:', usersList);
-        }
-        
-        // Look for any element that contains the users
-        if (!usersList) {
-            const allDivs = document.querySelectorAll('div');
-            allDivs.forEach(div => {
-                if (div.textContent.includes('admin@ciudadbilingue.com') && 
-                    div.textContent.includes('director')) {
-                    console.log('🎯 Found user container:', div);
-                    usersList = div;
-                }
-            });
-        }
-        
-        if (!usersList) {
-            console.log('❌ Could not find users list');
-            return;
-        }
-        
-        // Find the section title
-        let title = null;
-        
-        // Look for "Usuarios Actuales" or similar title
-        const allH3 = document.querySelectorAll('h3, h4, .text-lg');
-        allH3.forEach(h => {
-            if (h.textContent.includes('Usuario') && 
-                (h.textContent.includes('Actual') || h.textContent.includes('Gestión'))) {
-                console.log('🎯 Found title:', h.textContent);
-                title = h;
+        containers.forEach(container => {
+            if (container.textContent.includes('admin@ciudadbilingue.com') && 
+                container.textContent.includes('Nombre Completo')) {
+                targetContainer = container;
             }
         });
         
+        if (!targetContainer) {
+            console.log('Container not found, trying again...');
+            setTimeout(makeUsuariosCollapsible, 2000);
+            return;
+        }
+        
+        // Find or create a title for the users section
+        let title = targetContainer.querySelector('h3');
         if (!title) {
-            console.log('❌ Could not find title');
-            return;
+            // Create a title if it doesn't exist
+            title = document.createElement('h3');
+            title.className = 'text-lg font-semibold mb-4';
+            title.textContent = 'Usuarios Actuales';
+            targetContainer.insertBefore(title, targetContainer.firstChild);
         }
         
-        if (title.classList.contains('collapsible-setup')) {
-            console.log('✅ Already setup');
-            return;
-        }
-        
-        console.log('✅ Setting up collapsible...');
-        
-        title.classList.add('collapsible-setup');
+        // Make it collapsible
         title.style.cursor = 'pointer';
-        title.style.userSelect = 'none';
+        title.innerHTML = title.textContent + ' <span id="user-toggle">▼</span>';
         
-        // Add arrow
-        const arrow = document.createElement('span');
-        arrow.id = 'toggle-arrow';
-        arrow.textContent = ' ▼';
-        arrow.style.marginLeft = '10px';
-        title.appendChild(arrow);
+        // Get all content except the title
+        const content = Array.from(targetContainer.children).slice(1);
+        const contentWrapper = document.createElement('div');
+        contentWrapper.id = 'usuarios-content';
         
-        // Setup click handler
-        title.onclick = () => {
-            console.log('🖱️ Click detected');
-            const isHidden = usersList.style.display === 'none';
-            usersList.style.display = isHidden ? 'block' : 'none';
-            arrow.textContent = isHidden ? ' ▼' : ' ▶';
+        // Move content to wrapper
+        content.forEach(child => contentWrapper.appendChild(child));
+        targetContainer.appendChild(contentWrapper);
+        
+        // Add click functionality
+        title.onclick = function() {
+            const wrapper = document.getElementById('usuarios-content');
+            const arrow = document.getElementById('user-toggle');
             
-            // Try to load users if function exists
-            if (isHidden && typeof loadUsuariosActuales === 'function') {
-                console.log('📥 Loading usuarios...');
-                loadUsuariosActuales();
+            if (wrapper.style.display === 'none') {
+                wrapper.style.display = 'block';
+                arrow.textContent = '▼';
+            } else {
+                wrapper.style.display = 'none';
+                arrow.textContent = '▶';
             }
         };
         
-        // Start collapsed
-        usersList.style.display = 'none';
-        arrow.textContent = ' ▶';
+        console.log('✅ Usuarios collapsible setup complete!');
         
-        console.log('✅ Collapsible setup complete!');
+    }, 2000);
+}
+
+// Call it when Config is opened
+const originalShowConfig = window.showConfig;
+if (originalShowConfig) {
+    window.showConfig = function() {
+        originalShowConfig.apply(this, arguments);
+        setTimeout(makeUsuariosCollapsible, 1000);
     };
-    
-    // Try immediately
-    checkAndSetup();
-    
-    // Also try when Config is shown
-    let attempts = 0;
-    const interval = setInterval(() => {
-        attempts++;
-        console.log(`🔄 Attempt ${attempts} to find Config...`);
-        
-        if (document.querySelector('#config')?.style.display !== 'none') {
-            console.log('✅ Config is visible!');
-            setTimeout(checkAndSetup, 500);
-            clearInterval(interval);
-        }
-        
-        if (attempts > 10) {
-            console.log('❌ Giving up after 10 attempts');
-            clearInterval(interval);
-        }
-    }, 1000);
-}, 1000);
+}
+
+// Try now if Config is already open
+if (document.querySelector('#config')?.style.display !== 'none') {
+    makeUsuariosCollapsible();
+}
 
 // Add console helpers
 console.log('👔 Simple Permissions loaded!');
