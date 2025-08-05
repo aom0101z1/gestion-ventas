@@ -759,10 +759,6 @@
     import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
     import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject, listAll } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
   
-   
-    window.firebaseModules = {database: { ref, set, get, push, update, remove, onValue, off }
-    };
-    
     const firebaseConfig = {
         apiKey: "AIzaSyCuq1z8eTo9rufdEDXQFfvoxOkce-kBWOY",
         authDomain: "ciudad-bilingue-crm.firebaseapp.com",
@@ -778,7 +774,7 @@
     const auth = getAuth(app);
     const storage = getStorage(app);
     
-    // ✅ ONLY DEFINE window.firebaseModules ONCE, WITH EVERYTHING
+    // Set up window.firebaseModules with EVERYTHING
     window.firebaseModules = {
         database: { ref, set, get, push, update, remove, onValue, off },
         storage: { 
@@ -806,7 +802,45 @@
     console.log('✅ Firebase initialized successfully');
     console.log('✅ Firebase Storage initialized successfully');
     
-    // Continue with your SimpleFirebaseManager class...
+    // ===== ADD YOUR FIREBASEDATA MANAGER CLASS HERE =====
+    class FirebaseDataManager {
+        constructor() {
+            this.database = database;
+            this.auth = auth;
+            this.currentUser = null;
+            
+            console.log('🔥 FirebaseDataManager initialized');
+            
+            onAuthStateChanged(this.auth, (user) => {
+                if (user) {
+                    this.currentUser = user;
+                    console.log('✅ Firebase user authenticated:', user.email);
+                } else {
+                    this.currentUser = null;
+                    console.log('ℹ️ No Firebase user authenticated');
+                }
+            });
+        }
+        
+        // Add the login method
+        async login(email, password) {
+            try {
+                const userCredential = await signInWithEmailAndPassword(this.auth, email, password);
+                console.log('✅ Login successful:', userCredential.user.email);
+                return userCredential;
+            } catch (error) {
+                console.error('❌ Login error:', error);
+                throw error;
+            }
+        }
+        
+        // Add any other methods your app needs...
+    }
+    
+    // ===== CRITICAL: CREATE THE GLOBAL INSTANCE =====
+    window.FirebaseData = new FirebaseDataManager();
+    
+    console.log('✅ FirebaseData manager created and available globally');
 </script>
         
 
@@ -2843,6 +2877,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 </body>
 </html>
+
 
 
 
