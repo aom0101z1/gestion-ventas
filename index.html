@@ -761,6 +761,17 @@
 window.firebaseModules = {
     database: { ref, set, get, push, update, remove, onValue, off }
 };
+
+        // After: const storage = getStorage(app);
+// Add the storage module to the existing firebaseModules
+window.firebaseModules.storage = {
+    storage: storage,
+    storageRef: storageRef,
+    uploadBytes: uploadBytes,
+    getDownloadURL: getDownloadURL,
+    deleteObject: deleteObject,
+    listAll: listAll
+};
         const firebaseConfig = {
             apiKey: "AIzaSyCuq1z8eTo9rufdEDXQFfvoxOkce-kBWOY",
             authDomain: "ciudad-bilingue-crm.firebaseapp.com",
@@ -2818,5 +2829,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
 </body>
 </html>
+
 
 
