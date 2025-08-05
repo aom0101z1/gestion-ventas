@@ -1,23 +1,30 @@
 // firebase-config.js - Firebase Setup & Configuration
-import { initializeApp } from 'firebase/app';
-import { getDatabase, ref, set, get, push, update, remove, onValue, off } from 'firebase/database';
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
+// Use the already loaded Firebase modules from index.html instead of imports
+const { ref, set, get, push, update, remove, onValue, off } = window.firebaseModules.database;
+const database = window.firebaseDb;
+const auth = window.firebaseAuth;
 
-// Firebase configuration
-const firebaseConfig = {
-  apiKey: "AIzaSyCuq1z8eTo9rufdEDXQFfvoxOkce-kBWOY",
-  authDomain: "ciudad-bilingue-crm.firebaseapp.com",
-  databaseURL: "https://ciudad-bilingue-crm-default-rtdb.firebaseio.com",
-  projectId: "ciudad-bilingue-crm",
-  storageBucket: "ciudad-bilingue-crm.firebasestorage.app",
-  messagingSenderId: "690594486040",
-  appId: "1:690594486040:web:e8fffcffcee68a4d94f06d"
+// Get auth functions from the global Firebase auth object
+const signInWithEmailAndPassword = (auth, email, password) => {
+    return window.firebase.auth().signInWithEmailAndPassword(email, password);
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const database = getDatabase(app);
-const auth = getAuth(app);
+const createUserWithEmailAndPassword = (auth, email, password) => {
+    return window.firebase.auth().createUserWithEmailAndPassword(email, password);
+};
+
+const signOut = (auth) => {
+    return window.firebase.auth().signOut();
+};
+
+const onAuthStateChanged = (auth, callback) => {
+    return window.firebase.auth().onAuthStateChanged(callback);
+};
+
+// If the above doesn't work, try using the auth instance directly
+if (auth && auth.signInWithEmailAndPassword) {
+    // Auth methods are already on the auth object
+}
 
 // Firebase Database Structure:
 /*
@@ -49,22 +56,45 @@ class FirebaseDataManager {
         console.log('🔥 Firebase DataManager initialized');
         
         // Listen for auth state changes
-        onAuthStateChanged(this.auth, (user) => {
-            if (user) {
-                this.currentUser = user;
-                this.loadUserProfile();
-                this.setupContactsListener();
-            } else {
-                this.currentUser = null;
-                this.cleanup();
-            }
-        });
+        if (window.firebase && window.firebase.auth) {
+            window.firebase.auth().onAuthStateChanged((user) => {
+                if (user) {
+                    this.currentUser = user;
+                    this.loadUserProfile();
+                    this.setupContactsListener();
+                } else {
+                    this.currentUser = null;
+                    this.cleanup();
+                }
+            });
+        } else if (this.auth && this.auth.onAuthStateChanged) {
+            this.auth.onAuthStateChanged((user) => {
+                if (user) {
+                    this.currentUser = user;
+                    this.loadUserProfile();
+                    this.setupContactsListener();
+                } else {
+                    this.currentUser = null;
+                    this.cleanup();
+                }
+            });
+        }
     }
 
     // ===== AUTHENTICATION =====
     async login(email, password) {
         try {
-            const userCredential = await signInWithEmailAndPassword(this.auth, email, password);
+            let userCredential;
+            
+            // Try different methods to sign in
+            if (window.firebase && window.firebase.auth) {
+                userCredential = await window.firebase.auth().signInWithEmailAndPassword(email, password);
+            } else if (this.auth && this.auth.signInWithEmailAndPassword) {
+                userCredential = await this.auth.signInWithEmailAndPassword(email, password);
+            } else {
+                throw new Error('Authentication method not available');
+            }
+            
             console.log('✅ Firebase login successful:', userCredential.user.email);
             
             // Update last login
@@ -79,7 +109,16 @@ class FirebaseDataManager {
 
     async createUser(email, password, profile) {
         try {
-            const userCredential = await createUserWithEmailAndPassword(this.auth, email, password);
+            let userCredential;
+            
+            if (window.firebase && window.firebase.auth) {
+                userCredential = await window.firebase.auth().createUserWithEmailAndPassword(email, password);
+            } else if (this.auth && this.auth.createUserWithEmailAndPassword) {
+                userCredential = await this.auth.createUserWithEmailAndPassword(email, password);
+            } else {
+                throw new Error('User creation method not available');
+            }
+            
             const user = userCredential.user;
             
             // Create user profile in database
@@ -102,7 +141,13 @@ class FirebaseDataManager {
     async logout() {
         try {
             this.cleanup();
-            await signOut(this.auth);
+            
+            if (window.firebase && window.firebase.auth) {
+                await window.firebase.auth().signOut();
+            } else if (this.auth && this.auth.signOut) {
+                await this.auth.signOut();
+            }
+            
             console.log('✅ Firebase logout successful');
         } catch (error) {
             console.error('❌ Logout error:', error);
@@ -121,10 +166,28 @@ class FirebaseDataManager {
                 console.log('👤 User profile loaded:', profile);
                 return profile;
             }
-            return null;
+            
+            // If profile doesn't exist, create a default one
+            const defaultProfile = {
+                name: this.currentUser.email.split('@')[0],
+                email: this.currentUser.email,
+                role: 'director', // Default role
+                createdAt: new Date().toISOString(),
+                lastLogin: new Date().toISOString()
+            };
+            
+            await set(ref(this.database, `users/${this.currentUser.uid}/profile`), defaultProfile);
+            console.log('✅ Default profile created');
+            return defaultProfile;
+            
         } catch (error) {
             console.error('❌ Error loading user profile:', error);
-            return null;
+            // Return a minimal profile to prevent app crash
+            return {
+                name: this.currentUser?.email?.split('@')[0] || 'User',
+                email: this.currentUser?.email || '',
+                role: 'director'
+            };
         }
     }
 
@@ -454,4 +517,9 @@ class FirebaseDataManager {
 // Create global instance
 window.FirebaseData = new FirebaseDataManager();
 
-export default FirebaseDataManager;
+console.log('✅ FirebaseData Manager created and available globally');
+
+// Export for compatibility (won't work with regular script tag but doesn't hurt)
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = FirebaseDataManager;
+}
