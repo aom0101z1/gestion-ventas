@@ -759,10 +759,9 @@
     import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
     import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject, listAll } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
     
-    // ✅ PUT THIS BACK - but ADD STORAGE to it
+    // Keep your original structure
     window.firebaseModules = {
-        database: { ref, set, get, push, update, remove, onValue, off },
-        storage: { storage: null, storageRef, uploadBytes, getDownloadURL, deleteObject, listAll } // Temporary placeholder
+        database: { ref, set, get, push, update, remove, onValue, off }
     };
     
     const firebaseConfig = {
@@ -780,17 +779,33 @@
     const auth = getAuth(app);
     const storage = getStorage(app);
     
-    // ✅ UPDATE the storage reference now that it's initialized
-    window.firebaseModules.storage.storage = storage;
+    // Add storage to modules
+    window.firebaseModules.storage = { 
+        storage, 
+        storageRef, 
+        uploadBytes, 
+        getDownloadURL, 
+        deleteObject, 
+        listAll 
+    };
     
     window.firebaseApp = app;
     window.firebaseDb = database;
     window.firebaseAuth = auth;
     window.firebaseStorage = storage;
     
-    // Rest of your existing code that was working...
+    // YOUR ORIGINAL FIREBASEDATA CLASS - FIND THIS IN YOUR CODE
+    // It might be called SimpleFirebaseManager or FirebaseDataManager
+    // This is what's missing!
+    
+    // Look for something like this in your original code:
+    class YourFirebaseManagerClass {
+        // ... your original code
+    }
+    
+    // And this critical line:
+    window.FirebaseData = new YourFirebaseManagerClass();
 </script>
-        
 
         class SimpleFirebaseManager {
             constructor() {
@@ -2825,6 +2840,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 </body>
 </html>
+
 
 
 
