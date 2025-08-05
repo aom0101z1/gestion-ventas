@@ -1,4 +1,4 @@
-// payments.js - Payment Tracking Module with Color Status
+// payments.js - Payment Tracking Module with Color Status and Invoice Generation
 console.log('💰 Loading payments module...');
 
 // Payment Manager Class
@@ -177,6 +177,306 @@ class PaymentManager {
     }
 }
 
+// Invoice Generator for creating professional receipts
+const InvoiceGenerator = {
+    config: {
+        businessName: 'CIUDAD BILINGÜE',
+        nit: '9.764.924-1',
+        address: 'Cra 8. #22-52',
+        phones: '324 297 3737 - 315 640 6911',
+        email: 'contacto@ciudadbilingue.com',
+        whatsapp: '324 297 37 37'
+    },
+
+    // Generate invoice number: CB-2025-STD123-001
+    async generateInvoiceNumber(studentId) {
+        const year = new Date().getFullYear();
+        const studentPart = studentId.substring(0, 6).toUpperCase().replace('STU-', '');
+        
+        try {
+            const db = window.firebaseModules.database;
+            const counterRef = db.ref(window.FirebaseData.database, `invoiceCounters/${year}/${studentId}`);
+            const snapshot = await db.get(counterRef);
+            
+            let counter = 1;
+            if (snapshot.exists()) {
+                counter = snapshot.val() + 1;
+            }
+            
+            await db.set(counterRef, counter);
+            return `CB-${year}-${studentPart}-${String(counter).padStart(3, '0')}`;
+        } catch (error) {
+            return `CB-${year}-${studentPart}-${Date.now().toString().slice(-4)}`;
+        }
+    },
+
+    // Generate invoice from payment
+    async generateInvoice(payment, student) {
+        const invoiceNumber = await this.generateInvoiceNumber(student.id);
+        
+        const invoiceData = {
+            number: invoiceNumber,
+            paymentId: payment.id,
+            date: new Date(),
+            student: {
+                name: student.nombre || '',
+                nit: student.numDoc || '',
+                tipoDoc: student.tipoDoc || 'C.C',
+                address: student.direccion || '',
+                phone: student.telefono || ''
+            },
+            items: [{
+                quantity: 1,
+                description: `${payment.month.charAt(0).toUpperCase() + payment.month.slice(1)} ${payment.year} - ${student.grupo || 'Curso de Inglés'}`,
+                unitPrice: payment.amount,
+                total: payment.amount
+            }],
+            subtotal: payment.amount,
+            total: payment.amount,
+            paymentMethod: payment.method,
+            bank: payment.bank,
+            observations: payment.notes || '',
+            printedAt: new Date().toISOString()
+        };
+
+        // Save invoice to Firebase
+        await this.saveInvoice(invoiceData, student.id);
+        
+        // Update payment with invoice number
+        const db = window.firebaseModules.database;
+        const paymentRef = db.ref(window.FirebaseData.database, `payments/${payment.id}/invoiceNumber`);
+        await db.set(paymentRef, invoiceNumber);
+        
+        return invoiceData;
+    },
+
+    // Save invoice to Firebase
+    async saveInvoice(invoiceData, studentId) {
+        try {
+            const db = window.firebaseModules.database;
+            const invoiceRef = db.ref(window.FirebaseData.database, `invoices/${invoiceData.number}`);
+            await db.set(invoiceRef, {
+                ...invoiceData,
+                studentId: studentId,
+                createdAt: new Date().toISOString(),
+                createdBy: window.FirebaseData.auth?.currentUser?.email || 'unknown'
+            });
+
+            // Link to student
+            const studentInvoiceRef = db.ref(window.FirebaseData.database, `students/${studentId}/invoices/${invoiceData.number}`);
+            await db.set(studentInvoiceRef, true);
+
+            console.log('✅ Invoice saved:', invoiceData.number);
+        } catch (error) {
+            console.error('Error saving invoice:', error);
+        }
+    },
+
+    // Show invoice modal
+    showInvoiceModal(invoiceData) {
+        const existingModal = document.getElementById('invoiceModal');
+        if (existingModal) existingModal.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'invoiceModal';
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            overflow-y: auto;
+        `;
+
+        modal.innerHTML = `
+            <div style="background: white; padding: 20px; max-width: 850px; max-height: 90vh; overflow-y: auto; position: relative; margin: 20px;">
+                <button onclick="document.getElementById('invoiceModal').remove()" 
+                        style="position: absolute; right: 10px; top: 10px; background: red; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 4px;">✖</button>
+                
+                <div id="invoiceContent">
+                    ${this.getInvoiceHTML(invoiceData)}
+                </div>
+                
+                <div style="margin-top: 20px; text-align: center;" class="no-print">
+                    <button onclick="InvoiceGenerator.printInvoice()" 
+                            style="background: #3b82f6; color: white; padding: 10px 20px; margin: 0 10px; border: none; cursor: pointer; border-radius: 4px;">
+                        🖨️ Imprimir
+                    </button>
+                    <button onclick="InvoiceGenerator.saveAsPDF('${invoiceData.number}')" 
+                            style="background: #10b981; color: white; padding: 10px 20px; margin: 0 10px; border: none; cursor: pointer; border-radius: 4px;">
+                        📄 Guardar PDF
+                    </button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+    },
+
+    // Get invoice HTML
+    getInvoiceHTML(data) {
+        const formatDate = (date) => {
+            const d = new Date(date);
+            return {
+                day: d.getDate().toString().padStart(2, '0'),
+                month: (d.getMonth() + 1).toString().padStart(2, '0'),
+                year: d.getFullYear()
+            };
+        };
+
+        const dateInfo = formatDate(data.date);
+        const formatCurrency = (num) => `$${num.toLocaleString('es-CO')}`;
+
+        return `
+            <div class="invoice-print" style="width: 800px; padding: 20px; border: 2px solid #000; font-family: Arial, sans-serif; position: relative; background: white;">
+                <!-- Header -->
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <!-- Logo -->
+                    <div style="width: 100px; height: 100px; margin: 0 auto 10px; position: relative;">
+                        <svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                            <!-- Red circle -->
+                            <circle cx="50" cy="50" r="48" fill="#E53E3E" stroke="none"/>
+                            <!-- White inner circle -->
+                            <circle cx="50" cy="50" r="28" fill="white" stroke="none"/>
+                            <!-- Blue bar -->
+                            <rect x="0" y="40" width="100" height="20" fill="#2B6CB0"/>
+                            <!-- Text on blue bar -->
+                            <text x="50" y="54" font-family="Arial, sans-serif" font-size="8" font-weight="bold" fill="white" text-anchor="middle">CIUDAD BILINGÜE</text>
+                        </svg>
+                    </div>
+                    
+                    <h1 style="margin: 0; font-size: 32px;">${this.config.businessName}</h1>
+                    <p style="margin: 5px 0;">NIT. ${this.config.nit}</p>
+                    <p style="margin: 5px 0;">${this.config.address} &nbsp; Cel. ${this.config.phones}</p>
+                </div>
+
+                <!-- Invoice Number -->
+                <div style="position: absolute; right: 20px; top: 20px; border: 2px solid #000; padding: 10px 20px;">
+                    <div style="font-size: 12px;">COMPROBANTE DE PAGO</div>
+                    <div style="font-size: 18px; font-weight: bold;">${data.number}</div>
+                </div>
+
+                <!-- Date -->
+                <div style="position: absolute; right: 20px; top: 100px; border: 2px solid #000; padding: 10px;">
+                    <div style="font-size: 12px; text-align: center;">FECHA</div>
+                    <div style="display: flex; gap: 10px;">
+                        <div style="text-align: center;">
+                            <div style="border: 1px solid #000; padding: 5px 10px;">${dateInfo.day}</div>
+                            <small>DÍA</small>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="border: 1px solid #000; padding: 5px 10px;">${dateInfo.month}</div>
+                            <small>MES</small>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="border: 1px solid #000; padding: 5px 10px;">${dateInfo.year}</div>
+                            <small>AÑO</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Customer Info -->
+                <div style="margin: 100px 0 20px 0;">
+                    <div style="display: flex; margin-bottom: 10px;">
+                        <label style="font-weight: bold; width: 100px;">Señor:</label>
+                        <span style="flex: 1; border-bottom: 1px solid #000; padding: 0 5px;">${data.student.name}</span>
+                        <label style="font-weight: bold; width: 100px; margin-left: 20px;">${data.student.tipoDoc || 'NIT'}/C.C.:</label>
+                        <span style="flex: 1; border-bottom: 1px solid #000; padding: 0 5px;">${data.student.nit}</span>
+                    </div>
+                    <div style="display: flex; margin-bottom: 20px;">
+                        <label style="font-weight: bold; width: 100px;">Dirección:</label>
+                        <span style="flex: 1; border-bottom: 1px solid #000; padding: 0 5px;">${data.student.address || 'N/A'}</span>
+                        <label style="font-weight: bold; width: 100px; margin-left: 20px;">Cel.:</label>
+                        <span style="flex: 1; border-bottom: 1px solid #000; padding: 0 5px;">${data.student.phone}</span>
+                    </div>
+                </div>
+
+                <!-- Items Table -->
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                    <thead>
+                        <tr>
+                            <th style="border: 2px solid #000; padding: 10px; background: #f0f0f0; width: 80px;">CANT.</th>
+                            <th style="border: 2px solid #000; padding: 10px; background: #f0f0f0;">DESCRIPCIÓN</th>
+                            <th style="border: 2px solid #000; padding: 10px; background: #f0f0f0; width: 120px;">VR. UNITARIO</th>
+                            <th style="border: 2px solid #000; padding: 10px; background: #f0f0f0; width: 120px;">VR. TOTAL</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.items.map(item => `
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 10px; text-align: center;">${item.quantity}</td>
+                                <td style="border: 1px solid #000; padding: 10px;">${item.description}</td>
+                                <td style="border: 1px solid #000; padding: 10px; text-align: right;">${formatCurrency(item.unitPrice)}</td>
+                                <td style="border: 1px solid #000; padding: 10px; text-align: right;">${formatCurrency(item.total)}</td>
+                            </tr>
+                        `).join('')}
+                        <!-- Empty rows -->
+                        ${[...Array(Math.max(0, 5 - data.items.length))].map(() => `
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 10px; height: 30px;">&nbsp;</td>
+                                <td style="border: 1px solid #000; padding: 10px;">&nbsp;</td>
+                                <td style="border: 1px solid #000; padding: 10px;">&nbsp;</td>
+                                <td style="border: 1px solid #000; padding: 10px;">&nbsp;</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+
+                <!-- Totals -->
+                <div style="text-align: right;">
+                    <table style="margin-left: auto; width: 300px;">
+                        <tr>
+                            <td style="padding: 5px; font-weight: bold;">SUB-TOTAL</td>
+                            <td style="border: 1px solid #000; padding: 5px 10px; text-align: right; width: 150px;">
+                                ${formatCurrency(data.subtotal)}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 5px; font-weight: bold; font-size: 18px;">TOTAL</td>
+                            <td style="border: 2px solid #000; padding: 5px 10px; text-align: right; font-weight: bold; font-size: 18px;">
+                                ${formatCurrency(data.total)}
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+
+                <!-- Footer -->
+                <div style="margin-top: 20px; font-size: 12px; text-align: center;">
+                    <p style="margin: 5px 0;">Solicita la factura electrónica enviando este comprobante al correo: ${this.config.email}</p>
+                    <p style="margin: 5px 0;">o al whatsapp ${this.config.whatsapp}</p>
+                </div>
+
+                <!-- Observations -->
+                <div style="margin-top: 20px; border: 1px solid #000; padding: 10px; min-height: 60px;">
+                    <strong>OBSERVACIONES:</strong><br>
+                    ${data.observations || ''}
+                    ${data.paymentMethod ? `<br>Método de pago: ${data.paymentMethod}` : ''}
+                    ${data.bank ? ` - ${data.bank}` : ''}
+                </div>
+
+                <!-- Timestamp -->
+                <div style="margin-top: 10px; font-size: 10px; color: #666; text-align: right;">
+                    Impreso: ${new Date(data.printedAt).toLocaleString('es-CO')}
+                </div>
+            </div>
+        `;
+    },
+
+    printInvoice() {
+        window.print();
+    },
+
+    saveAsPDF(invoiceNumber) {
+        window.print();
+        alert(`Use "Guardar como PDF" en el diálogo de impresión.\nNombre sugerido: Comprobante_${invoiceNumber}.pdf`);
+    }
+};
+
 // UI Functions
 function renderPaymentDashboard() {
     return `
@@ -262,15 +562,15 @@ function renderPaymentTable(students) {
                                 ${s.diaPago || '-'}
                             </td>
                             <td style="padding: 0.75rem; text-align: center;">
-                                <button onclick="registerPayment('${s.id}')" 
+                                <button onclick="showPaymentModal('${s.id}')" 
                                         class="btn btn-sm" 
                                         style="background: #10b981; color: white; margin-right: 0.5rem;">
                                     ➕ Registrar
                                 </button>
-                                <button onclick="viewPaymentHistory('${s.id}')" 
+                                <button onclick="sendPaymentReminder('${s.id}')" 
                                         class="btn btn-sm"
                                         style="background: #3b82f6; color: white;">
-                                    📋 Recordar
+                                    📱 Recordar
                                 </button>
                             </td>
                         </tr>
@@ -353,6 +653,40 @@ function renderPaymentModal(student) {
         </div>
     `;
 }
+
+// Add function to view/regenerate invoices from payment history
+window.viewPaymentInvoice = async function(paymentId) {
+    try {
+        const payment = window.PaymentManager.payments.get(paymentId);
+        if (!payment) return;
+        
+        const student = window.StudentManager.students.get(payment.studentId);
+        if (!student) return;
+        
+        // Check if invoice exists
+        if (payment.invoiceNumber) {
+            // Load existing invoice
+            const db = window.firebaseModules.database;
+            const invoiceRef = db.ref(window.FirebaseData.database, `invoices/${payment.invoiceNumber}`);
+            const snapshot = await db.get(invoiceRef);
+            
+            if (snapshot.exists()) {
+                InvoiceGenerator.showInvoiceModal(snapshot.val());
+            } else {
+                // Regenerate if not found
+                const invoiceData = await InvoiceGenerator.generateInvoice(payment, student);
+                InvoiceGenerator.showInvoiceModal(invoiceData);
+            }
+        } else {
+            // Generate new invoice
+            const invoiceData = await InvoiceGenerator.generateInvoice(payment, student);
+            InvoiceGenerator.showInvoiceModal(invoiceData);
+        }
+    } catch (error) {
+        console.error('Error loading invoice:', error);
+        window.showNotification('❌ Error al cargar comprobante', 'error');
+    }
+};
 
 // Global functions
 window.PaymentManager = new PaymentManager();
@@ -467,6 +801,7 @@ window.exportPaymentReport = function() {
     // Implementation for CSV export would go here
 };
 
+// Enhanced processPayment function with automatic invoice generation
 async function processPayment(studentId) {
     try {
         const paymentData = {
@@ -477,10 +812,22 @@ async function processPayment(studentId) {
             notes: document.getElementById('payNotes').value
         };
         
-        await window.PaymentManager.recordPayment(studentId, paymentData);
+        // Record payment (existing functionality)
+        const payment = await window.PaymentManager.recordPayment(studentId, paymentData);
+        
+        // Get student data
+        const student = window.StudentManager.students.get(studentId);
+        
+        // Generate invoice automatically
+        const invoiceData = await InvoiceGenerator.generateInvoice(payment, student);
         
         window.showNotification('✅ Pago registrado exitosamente', 'success');
         closePaymentModal();
+        
+        // Show invoice modal immediately
+        InvoiceGenerator.showInvoiceModal(invoiceData);
+        
+        // Reload payments tab
         loadPaymentsTab();
     } catch (error) {
         console.error('❌ Error processing payment:', error);
@@ -489,3 +836,32 @@ async function processPayment(studentId) {
 }
 
 console.log('✅ Payments module loaded successfully');
+
+// Add print styles for invoices
+if (!document.getElementById('invoicePrintStyles')) {
+    const style = document.createElement('style');
+    style.id = 'invoicePrintStyles';
+    style.textContent = `
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            .invoice-print, .invoice-print * {
+                visibility: visible;
+            }
+            .invoice-print {
+                position: absolute;
+                left: 0;
+                top: 0;
+            }
+            .no-print {
+                display: none !important;
+            }
+            @page {
+                size: letter;
+                margin: 0.5in;
+            }
+        }
+    `;
+    document.head.appendChild(style);
+}
