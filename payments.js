@@ -864,4 +864,7 @@ if (!document.getElementById('invoicePrintStyles')) {
         }
     `;
     document.head.appendChild(style);
+    // Function mappings for backward compatibility
+window.registerPayment = window.showPaymentModal;
+window.viewPaymentHistory = window.sendPaymentReminder;
 }
