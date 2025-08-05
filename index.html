@@ -751,60 +751,62 @@
     </div> <!-- End of directorConfig -->
 </div> <!-- End of config tab -->
   
-<!-- Firebase SDK -->
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getDatabase, ref, set, get, push, update, remove, onValue, off } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject, listAll } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
 
-<script type="module">
-    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-    import { getDatabase, ref, set, get, push, update, remove, onValue, off } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
-    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
-    import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject, listAll } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
-    
-    // Keep your original structure
+  
+    //    <!-- Store Firebase modules globally for access from other scripts -->
+
+window.firebaseModules = {
+    database: { ref, set, get, push, update, remove, onValue, off }
+};
+        const firebaseConfig = {
+            apiKey: "AIzaSyCuq1z8eTo9rufdEDXQFfvoxOkce-kBWOY",
+            authDomain: "ciudad-bilingue-crm.firebaseapp.com",
+            databaseURL: "https://ciudad-bilingue-crm-default-rtdb.firebaseio.com",
+            projectId: "ciudad-bilingue-crm",
+            storageBucket: "ciudad-bilingue-crm.firebasestorage.app",
+            messagingSenderId: "690594486040",
+            appId: "1:690594486040:web:e8fffcffcee68a4d94f06d"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+        const auth = getAuth(app);
+        const storage = getStorage(app);  // Now app is defined
+
+         // Set up window.firebaseModules with EVERYTHING
     window.firebaseModules = {
-        database: { ref, set, get, push, update, remove, onValue, off }
+        database: { ref, set, get, push, update, remove, onValue, off },
+        storage: { 
+            storage, 
+            storageRef, 
+            uploadBytes, 
+            getDownloadURL, 
+            deleteObject, 
+            listAll 
+        }
     };
-    
-    const firebaseConfig = {
-        apiKey: "AIzaSyCuq1z8eTo9rufdEDXQFfvoxOkce-kBWOY",
-        authDomain: "ciudad-bilingue-crm.firebaseapp.com",
-        databaseURL: "https://ciudad-bilingue-crm-default-rtdb.firebaseio.com",
-        projectId: "ciudad-bilingue-crm",
-        storageBucket: "ciudad-bilingue-crm.firebasestorage.app",
-        messagingSenderId: "690594486040",
-        appId: "1:690594486040:web:e8fffcffcee68a4d94f06d"
-    };
-    
-    const app = initializeApp(firebaseConfig);
-    const database = getDatabase(app);
-    const auth = getAuth(app);
-    const storage = getStorage(app);
-    
-    // Add storage to modules
-    window.firebaseModules.storage = { 
-        storage, 
-        storageRef, 
-        uploadBytes, 
-        getDownloadURL, 
-        deleteObject, 
-        listAll 
-    };
-    
-    window.firebaseApp = app;
-    window.firebaseDb = database;
-    window.firebaseAuth = auth;
-    window.firebaseStorage = storage;
-    
-    // YOUR ORIGINAL FIREBASEDATA CLASS - FIND THIS IN YOUR CODE
-    // It might be called SimpleFirebaseManager or FirebaseDataManager
-    // This is what's missing!
-    
-    // Look for something like this in your original code:
-    class YourFirebaseManagerClass {
-        // ... your original code
+        
+        // Also add individual references for easy access
+        window.firebaseApp = app;
+        window.firebaseDb = database;
+        window.firebaseAuth = auth;
+        window.firebaseStorage = storage;
+
+       // Your status update
+    const statusEl = document.getElementById('firebaseStatus');
+    if (statusEl) {
+        statusEl.className = 'firebase-status';
+        statusEl.innerHTML = '🔥 Firebase Conectado';
     }
-    
-    // And this critical line:
-    window.FirebaseData = new YourFirebaseManagerClass();
+    console.log('✅ Firebase initialized successfully');
+    console.log('✅ Firebase Storage initialized successfully');
+            // Continue with your SimpleFirebaseManager class...
 </script>
 
         class SimpleFirebaseManager {
@@ -2840,6 +2842,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 </body>
 </html>
+
 
 
 
