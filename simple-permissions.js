@@ -325,208 +325,106 @@ if (window.switchTab) {
   }, 2000);
 });
 
-// Working solution for collapsible Usuarios Actuales
-setTimeout(() => {
-    const setupCollapsible = () => {
-        console.log('🔍 Starting collapsible setup...');
-        
-        // Find the Usuarios Actuales section more flexibly
-        const allElements = document.querySelectorAll('*');
-        let usuariosTitle = null;
-        
-        allElements.forEach(el => {
-            // Check text content and ensure it's not a script or style tag
-            if (el.textContent && 
-                el.textContent.trim() === 'Usuarios Actuales' && 
-                el.tagName !== 'SCRIPT' && 
-                el.tagName !== 'STYLE' &&
-                el.children.length === 0) {  // Ensure it's the actual text element
-                console.log('Found element with Usuarios Actuales text:', el);
-                usuariosTitle = el;
-            }
-        });
-        
-        if (!usuariosTitle) {
-            // Alternative: Look for the icon + text pattern
-            const possibleTitles = document.querySelectorAll('.flex.items-center');
-            possibleTitles.forEach(el => {
-                if (el.textContent.includes('Usuarios Actuales')) {
-                    console.log('Found via flex pattern:', el);
-                    usuariosTitle = el;
-                }
-            });
-        }
-        
-        if (!usuariosTitle) {
-            console.log('❌ Usuarios Actuales title still not found, retrying...');
-            setTimeout(setupCollapsible, 2000);
-            return;
-        }
-        
-        // Check if already setup
-        if (usuariosTitle.querySelector('.toggle-arrow') || usuariosTitle.classList.contains('collapsible-setup')) {
-            console.log('Already setup, skipping...');
-            return;
-        }
-        
-        console.log('✅ Found Usuarios Actuales title!', usuariosTitle);
-        
-        // Find the container - go up until we find the section container
-        let container = usuariosTitle.parentElement;
-        while (container && !container.classList.contains('mt-6')) {
-            container = container.parentElement;
-        }
-        
-        if (!container) {
-            container = usuariosTitle.closest('.mt-6') || usuariosTitle.parentElement;
-        }
-        
-        console.log('Container found:', container);
-        
-        // Find all user rows - they contain email addresses
-        const userRows = [];
-        const allDivs = container.querySelectorAll('div');
-        
-        allDivs.forEach(div => {
-            // Check if this div contains an email
-            if (div.textContent.includes('@') && 
-                div.textContent.includes('Rol:') && 
-                !div.contains(usuariosTitle)) {
-                userRows.push(div);
-            }
-        });
-        
-        console.log(`Found ${userRows.length} user rows`);
-        
-        if (userRows.length === 0) {
-            console.log('No user rows found, aborting...');
-            return;
-        }
-        
-        // Create wrapper for user list
-        const wrapper = document.createElement('div');
-        wrapper.id = 'usuarios-list-wrapper';
-        wrapper.style.overflow = 'hidden';
-        wrapper.style.transition = 'max-height 0.3s ease, opacity 0.3s ease';
-        
-        // Clone and move user rows to wrapper
-        const parent = userRows[0].parentNode;
-        userRows.forEach(row => {
-            wrapper.appendChild(row);
-        });
-        
-        // Insert wrapper after title's container
-        const titleContainer = usuariosTitle.closest('div');
-        titleContainer.parentNode.insertBefore(wrapper, titleContainer.nextSibling);
-        
-        // Make title clickable
-        usuariosTitle.style.cursor = 'pointer';
-        usuariosTitle.style.userSelect = 'none';
-        usuariosTitle.classList.add('collapsible-setup');
-        
-        // Add arrow - create it separately to avoid innerHTML issues
-        const arrow = document.createElement('span');
-        arrow.className = 'toggle-arrow';
-        arrow.textContent = ' ▼';
-        arrow.style.fontSize = '0.9em';
-        arrow.style.marginLeft = '10px';
-        arrow.style.display = 'inline-block';
-        arrow.style.transition = 'transform 0.3s ease';
-        usuariosTitle.appendChild(arrow);
-        
-        // Add hover effect to the whole title container
-        const titleDiv = usuariosTitle.closest('div');
-        titleDiv.addEventListener('mouseenter', () => {
-            titleDiv.style.backgroundColor = '#f3f4f6';
-            titleDiv.style.borderRadius = '4px';
-        });
-        
-        titleDiv.addEventListener('mouseleave', () => {
-            titleDiv.style.backgroundColor = 'transparent';
-        });
-        
-        // Toggle function
-        let isCollapsed = false;
-        
-        const toggleFunction = () => {
-            isCollapsed = !isCollapsed;
-            
-            if (isCollapsed) {
-                wrapper.style.maxHeight = '0px';
-                wrapper.style.opacity = '0';
-                wrapper.style.padding = '0';
-                arrow.style.transform = 'rotate(-90deg)';
-            } else {
-                wrapper.style.maxHeight = wrapper.scrollHeight + 'px';
-                wrapper.style.opacity = '1';
-                wrapper.style.padding = '';
-                arrow.style.transform = 'rotate(0deg)';
-                
-                // After animation, set to auto for dynamic content
-                setTimeout(() => {
-                    if (!isCollapsed) {
-                        wrapper.style.maxHeight = 'none';
-                    }
-                }, 300);
-            }
-        };
-        
-        // Add click to both title and its container
-        usuariosTitle.addEventListener('click', toggleFunction);
-        titleDiv.addEventListener('click', (e) => {
-            if (e.target !== usuariosTitle) {
-                toggleFunction();
-            }
-        });
-        
-        // Start collapsed (change to false to start expanded)
-        if (true) {
-            isCollapsed = true;
-            wrapper.style.maxHeight = '0px';
-            wrapper.style.opacity = '0';
-            wrapper.style.padding = '0';
-            arrow.style.transform = 'rotate(-90deg)';
-        }
-        
-        console.log('✅ Collapsible setup complete!');
-    };
+// Simple Collapsible for Usuarios Actuales
+let usuariosCollapsibleDone = false;
+
+function makeUsuariosCollapsible() {
+    // Prevent multiple runs
+    if (usuariosCollapsibleDone) return;
     
-    // Try after a delay to ensure Config is loaded
-    const attemptSetup = () => {
-        const configSection = document.querySelector('#config');
-        if (configSection && configSection.style.display !== 'none') {
-            console.log('Config is visible, setting up collapsible...');
-            setTimeout(setupCollapsible, 500);
-        } else {
-            console.log('Config not visible yet...');
+    // Only run in Config
+    if (!document.querySelector('#config') || document.querySelector('#config').style.display === 'none') {
+        return;
+    }
+    
+    // Look for the container with "Usuarios Actuales"
+    const containers = document.querySelectorAll('.flex.items-center');
+    let titleContainer = null;
+    
+    for (let container of containers) {
+        if (container.textContent && container.textContent.includes('Usuarios Actuales')) {
+            titleContainer = container;
+            break;
         }
-    };
+    }
     
-    // Try immediately
-    attemptSetup();
+    if (!titleContainer) {
+        // Try again later
+        setTimeout(makeUsuariosCollapsible, 1000);
+        return;
+    }
     
-    // Also monitor for Config being opened
-    const observer = new MutationObserver(() => {
-        const configSection = document.querySelector('#config');
-        if (configSection && configSection.style.display !== 'none') {
-            setupCollapsible();
+    // Find the section that contains all users
+    const section = titleContainer.closest('.mt-6') || titleContainer.parentElement.parentElement;
+    
+    // Find all user divs (they contain emails)
+    const userDivs = [];
+    section.querySelectorAll('div').forEach(div => {
+        if (div.textContent.includes('@') && 
+            div.textContent.includes('Rol:') && 
+            !div.contains(titleContainer)) {
+            userDivs.push(div);
         }
     });
     
-    const config = document.querySelector('#config');
-    if (config) {
-        observer.observe(config, { attributes: true, attributeFilter: ['style'] });
-    }
+    if (userDivs.length === 0) return;
     
-    // Also hook into showConfig if it exists
-    if (window.showConfig) {
-        const originalShowConfig = window.showConfig;
-        window.showConfig = function() {
-            originalShowConfig.apply(this, arguments);
-            setTimeout(setupCollapsible, 1000);
-        };
-    }
+    // Create wrapper for users
+    const wrapper = document.createElement('div');
+    wrapper.style.overflow = 'hidden';
+    wrapper.style.transition = 'all 0.3s ease';
+    wrapper.style.maxHeight = '0';
     
+    // Move users to wrapper
+    userDivs.forEach(div => wrapper.appendChild(div));
+    section.appendChild(wrapper);
+    
+    // Add arrow to title
+    const arrow = document.createElement('span');
+    arrow.textContent = ' ▶';
+    arrow.style.fontSize = '14px';
+    arrow.style.transition = 'transform 0.3s ease';
+    titleContainer.appendChild(arrow);
+    
+    // Make title clickable
+    titleContainer.style.cursor = 'pointer';
+    let isOpen = false;
+    
+    titleContainer.addEventListener('click', function(e) {
+        e.stopPropagation();
+        isOpen = !isOpen;
+        
+        if (isOpen) {
+            wrapper.style.maxHeight = wrapper.scrollHeight + 'px';
+            arrow.style.transform = 'rotate(90deg)';
+        } else {
+            wrapper.style.maxHeight = '0';
+            arrow.style.transform = 'rotate(0deg)';
+        }
+    });
+    
+    // Mark as done
+    usuariosCollapsibleDone = true;
+    console.log('✅ Usuarios Actuales is now collapsible!');
+}
+
+// Run when Config is shown
+const originalShowConfig = window.showConfig;
+if (originalShowConfig) {
+    window.showConfig = function() {
+        usuariosCollapsibleDone = false; // Reset flag
+        originalShowConfig.apply(this, arguments);
+        setTimeout(makeUsuariosCollapsible, 1500);
+    };
+}
+
+// Also check periodically if Config is open
+setInterval(() => {
+    if (document.querySelector('#config') && 
+        document.querySelector('#config').style.display !== 'none' && 
+        !usuariosCollapsibleDone) {
+        makeUsuariosCollapsible();
+    }
 }, 2000);
 
 // Add console helpers
