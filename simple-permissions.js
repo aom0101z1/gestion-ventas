@@ -325,44 +325,117 @@ if (window.switchTab) {
   }, 2000);
 }));
 
-// Make Usuarios Actuales collapsible
+// Debug version - Replace the previous code with this
 setTimeout(() => {
+    console.log('🔍 Starting collapsible setup...');
+    
     const checkAndSetup = () => {
-        const usersList = document.querySelector('#usersList');
-        if (!usersList) return;
+        console.log('🔍 Checking for usersList...');
         
-        const section = usersList.closest('.bg-white');
-        const title = section?.querySelector('h3');
+        // Try different selectors
+        let usersList = document.querySelector('#usersList');
+        console.log('Found #usersList:', usersList);
         
-        if (title && !title.classList.contains('collapsible-setup')) {
-            title.classList.add('collapsible-setup');
-            title.style.cursor = 'pointer';
-            title.innerHTML += ' <span id="toggle-arrow">▼</span>';
-            
-            title.onclick = () => {
-                const isHidden = usersList.style.display === 'none';
-                usersList.style.display = isHidden ? 'block' : 'none';
-                document.querySelector('#toggle-arrow').textContent = isHidden ? '▼' : '▶';
-                
-                // Load users if showing and empty
-                if (isHidden && usersList.children.length === 0) {
-                    loadUsuariosActuales();
-                }
-            };
-            
-            // Start collapsed
-            usersList.style.display = 'none';
-            document.querySelector('#toggle-arrow').textContent = '▶';
+        if (!usersList) {
+            // Try to find by class or other means
+            usersList = document.querySelector('.usuarios-list');
+            console.log('Found .usuarios-list:', usersList);
         }
+        
+        // Look for any element that contains the users
+        if (!usersList) {
+            const allDivs = document.querySelectorAll('div');
+            allDivs.forEach(div => {
+                if (div.textContent.includes('admin@ciudadbilingue.com') && 
+                    div.textContent.includes('director')) {
+                    console.log('🎯 Found user container:', div);
+                    usersList = div;
+                }
+            });
+        }
+        
+        if (!usersList) {
+            console.log('❌ Could not find users list');
+            return;
+        }
+        
+        // Find the section title
+        let title = null;
+        
+        // Look for "Usuarios Actuales" or similar title
+        const allH3 = document.querySelectorAll('h3, h4, .text-lg');
+        allH3.forEach(h => {
+            if (h.textContent.includes('Usuario') && 
+                (h.textContent.includes('Actual') || h.textContent.includes('Gestión'))) {
+                console.log('🎯 Found title:', h.textContent);
+                title = h;
+            }
+        });
+        
+        if (!title) {
+            console.log('❌ Could not find title');
+            return;
+        }
+        
+        if (title.classList.contains('collapsible-setup')) {
+            console.log('✅ Already setup');
+            return;
+        }
+        
+        console.log('✅ Setting up collapsible...');
+        
+        title.classList.add('collapsible-setup');
+        title.style.cursor = 'pointer';
+        title.style.userSelect = 'none';
+        
+        // Add arrow
+        const arrow = document.createElement('span');
+        arrow.id = 'toggle-arrow';
+        arrow.textContent = ' ▼';
+        arrow.style.marginLeft = '10px';
+        title.appendChild(arrow);
+        
+        // Setup click handler
+        title.onclick = () => {
+            console.log('🖱️ Click detected');
+            const isHidden = usersList.style.display === 'none';
+            usersList.style.display = isHidden ? 'block' : 'none';
+            arrow.textContent = isHidden ? ' ▼' : ' ▶';
+            
+            // Try to load users if function exists
+            if (isHidden && typeof loadUsuariosActuales === 'function') {
+                console.log('📥 Loading usuarios...');
+                loadUsuariosActuales();
+            }
+        };
+        
+        // Start collapsed
+        usersList.style.display = 'none';
+        arrow.textContent = ' ▶';
+        
+        console.log('✅ Collapsible setup complete!');
     };
     
-    // Check when Config is shown
+    // Try immediately
+    checkAndSetup();
+    
+    // Also try when Config is shown
+    let attempts = 0;
     const interval = setInterval(() => {
-        if (document.querySelector('#config').style.display !== 'none') {
-            checkAndSetup();
+        attempts++;
+        console.log(`🔄 Attempt ${attempts} to find Config...`);
+        
+        if (document.querySelector('#config')?.style.display !== 'none') {
+            console.log('✅ Config is visible!');
+            setTimeout(checkAndSetup, 500);
             clearInterval(interval);
         }
-    }, 500);
+        
+        if (attempts > 10) {
+            console.log('❌ Giving up after 10 attempts');
+            clearInterval(interval);
+        }
+    }, 1000);
 }, 1000);
 
 // Add console helpers
