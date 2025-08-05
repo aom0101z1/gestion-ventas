@@ -429,7 +429,7 @@ setTimeout(() => {
         });
         
         // Start expanded (change to true to start collapsed)
-        if (false) {
+        if (true) {
             isCollapsed = true;
             wrapper.style.maxHeight = '0px';
             wrapper.style.opacity = '0';
