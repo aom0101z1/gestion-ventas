@@ -323,7 +323,7 @@ if (window.switchTab) {
   };
 }
   }, 2000);
-}));
+});
 
 // Working solution based on your actual structure
 setTimeout(() => {
