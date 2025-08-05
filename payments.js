@@ -177,6 +177,212 @@ class PaymentManager {
     }
 }
 
+// ===== NEW: INVOICE STORAGE MANAGER FOR FIREBASE STORAGE =====
+class InvoiceStorageManager {
+    constructor() {
+        this.storage = null;
+        this.initialized = false;
+    }
+
+    // Initialize storage
+    async init() {
+        if (this.initialized) return;
+        
+        try {
+            // Check if storage module is loaded
+            if (!window.firebaseModules?.storage) {
+                console.warn('⚠️ Firebase Storage module not loaded - invoices will be saved to database only');
+                return false;
+            }
+            
+            this.storage = window.firebaseModules.storage.storage;
+            this.initialized = true;
+            console.log('✅ Invoice Storage Manager initialized');
+            return true;
+        } catch (error) {
+            console.error('❌ Error initializing storage:', error);
+            return false;
+        }
+    }
+
+    // Save invoice to Firebase Storage
+    async saveInvoiceToStorage(invoiceData, htmlContent) {
+        try {
+            if (!this.initialized) await this.init();
+            if (!this.storage) return null; // Storage not available
+            
+            const { storageRef, uploadBytes, getDownloadURL } = window.firebaseModules.storage;
+            
+            // Create folder structure: invoices/2025/01/CB-2025-STU123-001.html
+            const date = new Date();
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const fileName = `${invoiceData.number}.html`;
+            const path = `invoices/${year}/${month}/${fileName}`;
+            
+            // Create storage reference
+            const invoiceRef = storageRef(this.storage, path);
+            
+            // Create HTML file with full document structure
+            const fullHtml = `
+                <!DOCTYPE html>
+                <html lang="es">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Comprobante ${invoiceData.number}</title>
+                    <style>
+                        @page { size: letter; margin: 0.5in; }
+                        body { margin: 0; font-family: Arial, sans-serif; }
+                        * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+                    </style>
+                </head>
+                <body>
+                    ${htmlContent}
+                </body>
+                </html>
+            `;
+            
+            // Convert to blob
+            const blob = new Blob([fullHtml], { type: 'text/html' });
+            
+            // Upload file with metadata
+            const metadata = {
+                contentType: 'text/html',
+                customMetadata: {
+                    invoiceNumber: invoiceData.number,
+                    studentId: invoiceData.studentId || '',
+                    studentName: invoiceData.student.name || '',
+                    amount: String(invoiceData.total || 0),
+                    date: invoiceData.date.toISOString(),
+                    paymentId: invoiceData.paymentId || '',
+                    createdBy: window.FirebaseData?.currentUser?.email || 'unknown'
+                }
+            };
+            
+            // Upload to storage
+            const snapshot = await uploadBytes(invoiceRef, blob, metadata);
+            console.log('✅ Invoice uploaded to storage:', path);
+            
+            // Get download URL
+            const downloadUrl = await getDownloadURL(snapshot.ref);
+            
+            // Update invoice data with storage info
+            const storageInfo = {
+                storagePath: path,
+                downloadUrl: downloadUrl,
+                uploadedAt: new Date().toISOString(),
+                fileSize: blob.size,
+                storageRef: snapshot.ref.fullPath
+            };
+            
+            // Save storage info to database
+            await this.updateInvoiceDatabase(invoiceData.number, storageInfo);
+            
+            return {
+                success: true,
+                path: path,
+                downloadUrl: downloadUrl,
+                invoiceNumber: invoiceData.number
+            };
+            
+        } catch (error) {
+            console.error('⚠️ Storage save failed, invoice saved to database only:', error);
+            return null;
+        }
+    }
+
+    // Update invoice database with storage info
+    async updateInvoiceDatabase(invoiceNumber, storageInfo) {
+        try {
+            const db = window.firebaseModules.database;
+            const updates = {};
+            
+            // Update invoice record
+            updates[`invoices/${invoiceNumber}/storage`] = storageInfo;
+            
+            // Update index for quick lookups
+            updates[`invoiceIndex/${invoiceNumber}`] = {
+                path: storageInfo.storagePath,
+                url: storageInfo.downloadUrl,
+                uploadedAt: storageInfo.uploadedAt
+            };
+            
+            await db.update(db.ref(window.FirebaseData.database), updates);
+            console.log('✅ Database updated with storage info');
+            
+        } catch (error) {
+            console.error('❌ Error updating database:', error);
+        }
+    }
+
+    // Retrieve invoice from storage
+    async getInvoice(invoiceNumber) {
+        try {
+            if (!this.initialized) await this.init();
+            
+            // First check database for storage info
+            const db = window.firebaseModules.database;
+            const invoiceRef = db.ref(window.FirebaseData.database, `invoices/${invoiceNumber}`);
+            const snapshot = await db.get(invoiceRef);
+            
+            if (!snapshot.exists()) {
+                throw new Error('Invoice not found in database');
+            }
+            
+            const invoiceData = snapshot.val();
+            
+            // If we have a storage URL, return it
+            if (invoiceData.storage?.downloadUrl) {
+                return {
+                    data: invoiceData,
+                    url: invoiceData.storage.downloadUrl,
+                    path: invoiceData.storage.storagePath
+                };
+            }
+            
+            // If no storage URL, invoice might be old (pre-storage)
+            return {
+                data: invoiceData,
+                url: null,
+                path: null
+            };
+            
+        } catch (error) {
+            console.error('❌ Error retrieving invoice:', error);
+            throw error;
+        }
+    }
+
+    // Download invoice
+    async downloadInvoice(invoiceNumber) {
+        try {
+            const invoice = await this.getInvoice(invoiceNumber);
+            
+            if (invoice.url) {
+                // Open in new tab or trigger download
+                const link = document.createElement('a');
+                link.href = invoice.url;
+                link.target = '_blank';
+                link.download = `Comprobante_${invoiceNumber}.html`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                console.log('✅ Invoice download initiated');
+                return true;
+            } else {
+                console.warn('⚠️ No storage URL for invoice');
+                return false;
+            }
+            
+        } catch (error) {
+            console.error('❌ Error downloading invoice:', error);
+            throw error;
+        }
+    }
+}
+
 // Invoice Generator for creating professional receipts
 const InvoiceGenerator = {
     config: {
@@ -210,7 +416,7 @@ const InvoiceGenerator = {
         }
     },
 
-    // Generate invoice from payment
+    // Generate invoice from payment - ENHANCED WITH STORAGE
     async generateInvoice(payment, student) {
         const invoiceNumber = await this.generateInvoiceNumber(student.id);
         
@@ -236,16 +442,31 @@ const InvoiceGenerator = {
             paymentMethod: payment.method,
             bank: payment.bank,
             observations: payment.notes || '',
-            printedAt: new Date().toISOString()
+            printedAt: new Date().toISOString(),
+            studentId: student.id // Add studentId for storage
         };
 
-        // Save invoice to Firebase
+        // Save invoice to Firebase Database (existing functionality)
         await this.saveInvoice(invoiceData, student.id);
         
         // Update payment with invoice number
         const db = window.firebaseModules.database;
         const paymentRef = db.ref(window.FirebaseData.database, `payments/${payment.id}/invoiceNumber`);
         await db.set(paymentRef, invoiceNumber);
+        
+        // NEW: Try to save to Firebase Storage
+        try {
+            const htmlContent = this.getInvoiceHTML(invoiceData);
+            const storageResult = await window.InvoiceStorage.saveInvoiceToStorage(invoiceData, htmlContent);
+            
+            if (storageResult) {
+                console.log('✅ Invoice saved to cloud storage:', storageResult);
+                invoiceData.storageUrl = storageResult.downloadUrl;
+                invoiceData.storagePath = storageResult.path;
+            }
+        } catch (error) {
+            console.error('⚠️ Storage save failed, invoice saved to database only:', error);
+        }
         
         return invoiceData;
     },
@@ -293,6 +514,13 @@ const InvoiceGenerator = {
             overflow-y: auto;
         `;
 
+        // Check if invoice has storage URL for download button
+        const downloadButton = invoiceData.storageUrl ? 
+            `<button onclick="window.open('${invoiceData.storageUrl}', '_blank')" 
+                    style="background: #059669; color: white; padding: 10px 20px; margin: 0 10px; border: none; cursor: pointer; border-radius: 4px;">
+                ☁️ Descargar desde la nube
+            </button>` : '';
+
         modal.innerHTML = `
             <div style="background: white; padding: 20px; max-width: 850px; max-height: 90vh; overflow-y: auto; position: relative; margin: 20px;">
                 <button onclick="document.getElementById('invoiceModal').remove()" 
@@ -311,6 +539,7 @@ const InvoiceGenerator = {
                             style="background: #10b981; color: white; padding: 10px 20px; margin: 0 10px; border: none; cursor: pointer; border-radius: 4px;">
                         📄 Guardar PDF
                     </button>
+                    ${downloadButton}
                 </div>
             </div>
         `;
@@ -688,8 +917,37 @@ window.viewPaymentInvoice = async function(paymentId) {
     }
 };
 
-// Global functions
+// NEW: Enhanced functions for storage-enabled invoices
+window.viewStoredInvoice = async function(invoiceNumber) {
+    try {
+        const invoice = await window.InvoiceStorage.getInvoice(invoiceNumber);
+        
+        if (invoice.url) {
+            // Open cloud-stored invoice in new tab
+            window.open(invoice.url, '_blank');
+        } else if (invoice.data) {
+            // Show using existing modal
+            InvoiceGenerator.showInvoiceModal(invoice.data);
+        }
+    } catch (error) {
+        console.error('Error viewing invoice:', error);
+        window.showNotification('❌ Error al abrir comprobante', 'error');
+    }
+};
+
+window.downloadStoredInvoice = async function(invoiceNumber) {
+    try {
+        await window.InvoiceStorage.downloadInvoice(invoiceNumber);
+        window.showNotification('✅ Descarga iniciada', 'success');
+    } catch (error) {
+        console.error('Error downloading invoice:', error);
+        window.showNotification('❌ Error al descargar', 'error');
+    }
+};
+
+// Global instances
 window.PaymentManager = new PaymentManager();
+window.InvoiceStorage = new InvoiceStorageManager(); // NEW: Initialize storage manager
 
 window.loadPaymentsTab = async function() {
     console.log('💰 Loading payments tab');
@@ -701,6 +959,7 @@ window.loadPaymentsTab = async function() {
     }
 
     await window.PaymentManager.init();
+    await window.InvoiceStorage.init(); // NEW: Initialize storage
     
     const students = window.StudentManager.getStudents();
     const summary = await window.PaymentManager.getPaymentSummary();
@@ -830,7 +1089,7 @@ async function processPayment(studentId) {
         // Get student data
         const student = window.StudentManager.students.get(studentId);
         
-        // Generate invoice automatically
+        // Generate invoice automatically (NOW WITH STORAGE)
         const invoiceData = await InvoiceGenerator.generateInvoice(payment, student);
         
         window.showNotification('✅ Pago registrado exitosamente', 'success');
@@ -876,7 +1135,8 @@ if (!document.getElementById('invoicePrintStyles')) {
         }
     `;
     document.head.appendChild(style);
-    // Function mappings for backward compatibility
+}
+
+// Function mappings for backward compatibility
 window.registerPayment = window.showPaymentModal;
 window.viewPaymentHistory = window.sendPaymentReminder;
-}
