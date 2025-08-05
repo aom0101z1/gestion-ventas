@@ -298,12 +298,30 @@ document.addEventListener('DOMContentLoaded', () => {
   setTimeout(() => {
     SimplePermissions.init();
     
-    // Add role management when config is opened
-    document.addEventListener('click', (e) => {
-      if (e.target.textContent?.includes('Config')) {
-        setTimeout(() => SimplePermissions.addRoleManagement(), 500);
+// Add role management when config is opened
+document.addEventListener('click', (e) => {
+  if (e.target.textContent?.includes('Config') || e.target.id?.includes('config')) {
+    setTimeout(() => {
+      SimplePermissions.addRoleManagement();
+      // Also check for the config tab specifically
+      const configTab = document.querySelector('[onclick*="config"]');
+      if (configTab) {
+        setTimeout(() => SimplePermissions.addRoleManagement(), 1000);
       }
-    });
+    }, 500);
+  }
+});
+
+// Also check when switching tabs
+if (window.switchTab) {
+  const originalSwitchTab = window.switchTab;
+  window.switchTab = function(tab) {
+    originalSwitchTab(tab);
+    if (tab === 'config') {
+      setTimeout(() => SimplePermissions.addRoleManagement(), 1000);
+    }
+  };
+}
   }, 2000);
 });
 
