@@ -566,8 +566,8 @@ return `
     <div class="invoice-print" style="width: 500px; padding: 15px; border: 2px solid #000; font-family: Arial, sans-serif; position: relative; background: white; font-size: 12px;">                <!-- Header -->
                 <div style="text-align: center; margin-bottom: 20px;">
                     <!-- Logo -->
-                    <div style="width: 100px; height: 100px; margin: 0 auto 10px; position: relative;">
-                        <svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <div style="width: 60px; height: 60px; margin: 0 auto 10px; position: relative;">
+                        <svg width="60" height="60" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
                             <!-- Red circle -->
                             <circle cx="50" cy="50" r="48" fill="#E53E3E" stroke="none"/>
                             <!-- White inner circle -->
