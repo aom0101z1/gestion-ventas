@@ -750,14 +750,11 @@
         
     </div> <!-- End of directorConfig -->
 </div> <!-- End of config tab -->
-  
     <!-- Firebase SDK -->
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
         import { getDatabase, ref, set, get, push, update, remove, onValue, off } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
-        import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject, listAll } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
-
   
     //    <!-- Store Firebase modules globally for access from other scripts -->
 
@@ -777,37 +774,16 @@ window.firebaseModules = {
         const app = initializeApp(firebaseConfig);
         const database = getDatabase(app);
         const auth = getAuth(app);
-        const storage = getStorage(app);  // Now app is defined
-
-         // Set up window.firebaseModules with EVERYTHING
-    window.firebaseModules = {
-        database: { ref, set, get, push, update, remove, onValue, off },
-        storage: { 
-            storage, 
-            storageRef, 
-            uploadBytes, 
-            getDownloadURL, 
-            deleteObject, 
-            listAll 
-        }
-    };
         
-        // Also add individual references for easy access
         window.firebaseApp = app;
         window.firebaseDb = database;
         window.firebaseAuth = auth;
-        window.firebaseStorage = storage;
 
-       // Your status update
-    const statusEl = document.getElementById('firebaseStatus');
-    if (statusEl) {
+        const statusEl = document.getElementById('firebaseStatus');
         statusEl.className = 'firebase-status';
         statusEl.innerHTML = '🔥 Firebase Conectado';
-    }
-    console.log('✅ Firebase initialized successfully');
-    console.log('✅ Firebase Storage initialized successfully');
-            // Continue with your SimpleFirebaseManager class...
-</script>
+
+        console.log('✅ Firebase initialized successfully');
 
         class SimpleFirebaseManager {
             constructor() {
@@ -2842,18 +2818,3 @@ document.addEventListener('DOMContentLoaded', () => {
 
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
