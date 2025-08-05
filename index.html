@@ -2727,31 +2727,34 @@ ${diagnostics.dataError ? `❌ Error: ${diagnostics.dataError}` : '✅ Sistema f
                 
 console.log('✅ Sales ranking loaded successfully');
                 
-} catch (error) {
-    console.error('❌ Error loading sales ranking:', error);
-    salesRankingEl.innerHTML = `
-        <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-            <h4 style="margin: 0 0 1rem 0; color: #374151;">🏆 Ranking de Ventas</h4>
-            <div style="text-align: center; color: #dc2626; padding: 1rem;">
-                ❌ Error cargando ranking: ${error.message}
-            </div>
-        </div>
-    `;
-}
-                
-            <script src="fixes.js"></script>
-<script src="social.js"></script>
-<script src="pipeline.js"></script>
-<script src="simple-tasks.js"></script>
-<script src="students.js"></script>
-<script src="payments.js"></script>
-<script src="groups.js"></script>
-<script src="teachers.js"></script>
-<script src="attendance.js"></script>
-<script src="school-buttons.js"></script>
-<script src="import-students.js"></script>
+            } catch (error) {
+                console.error('❌ Error loading sales ranking:', error);
+                salesRankingEl.innerHTML = `
+                    <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+                        <h4 style="margin: 0 0 1rem 0; color: #374151;">🏆 Ranking de Ventas</h4>
+                        <div style="text-align: center; color: #dc2626; padding: 1rem;">
+                            ❌ Error cargando ranking: ${error.message}
+                        </div>
+                    </div>
+                `;
+            }
+        }
 
-<script>
+        console.log('✅ Complete CRM System loaded successfully');
+    </script>
+    <script src="fixes.js"></script>
+    <script src="social.js"></script>
+    <script src="pipeline.js"></script>
+    <script src="simple-tasks.js"></script>
+    <script src="students.js"></script>
+    <script src="payments.js"></script>
+    <script src="groups.js"></script>
+    <script src="teachers.js"></script>
+    <script src="attendance.js"></script>
+    <script src="school-buttons.js"></script>
+    <script src="import-students.js"></script>
+
+            <script>
 // This will show which files are loaded
 setTimeout(() => {
     console.log('✅ Modules Check:');
@@ -2759,10 +2762,10 @@ setTimeout(() => {
     console.log('Payments:', !!window.PaymentManager);
     console.log('Groups:', !!window.GroupsManager);
     console.log('Teachers:', !!window.TeacherManager);
+    
 }, 5000);
 </script>
 
 </body>
 </html>
-
 
