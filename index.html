@@ -2767,7 +2767,55 @@ setTimeout(() => {
 }, 5000);
 </script>
 
+<script>
+// Auto-load usuarios when config opens
+document.addEventListener('DOMContentLoaded', () => {
+    // Define the function
+    window.loadUsuariosActuales = function() {
+        const container = document.getElementById('usersList');
+        if (!container) return;
+        
+        const db = window.firebaseModules.database;
+        const usersRef = db.ref(window.FirebaseData.database, 'users');
+        
+        db.get(usersRef).then(snapshot => {
+            if (!snapshot.exists()) {
+                container.innerHTML = '<p>No hay usuarios registrados</p>';
+                return;
+            }
+            
+            let html = '';
+            snapshot.forEach(child => {
+                const data = child.val();
+                const email = data.email || data.profile?.email || 'Sin email';
+                const role = data.profile?.role || 'Sin rol';
+                
+                html += `
+                    <div style="padding: 0.75rem 0; border-bottom: 1px solid #e5e7eb;">
+                        <div style="font-weight: 500;">${email}</div>
+                        <div style="font-size: 0.875rem; color: #6b7280;">Rol: ${role}</div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }).catch(error => {
+            container.innerHTML = `<div style="color: red;">Error: ${error.message}</div>`;
+        });
+    };
+    
+    // Check periodically for the usersList
+    setInterval(() => {
+        const container = document.getElementById('usersList');
+        if (container && container.textContent.includes('Cargando usuarios')) {
+            loadUsuariosActuales();
+        }
+    }, 2000);
+});
+</script>
+
 </body>
 </html>
+
 
 
