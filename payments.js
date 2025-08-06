@@ -539,6 +539,30 @@ window.printHalfPageInvoice = function(event) {
                 }
                 .invoice-wrapper table {
                     font-size: 10px !important;
+                    table-layout: fixed !important;
+                }
+                /* FIXED: Column widths for half-page printing */
+                .invoice-wrapper table th:nth-child(1),
+                .invoice-wrapper table td:nth-child(1) {
+                    width: 8% !important;
+                    min-width: 0.6in !important;
+                    max-width: 0.6in !important;
+                }
+                .invoice-wrapper table th:nth-child(2),
+                .invoice-wrapper table td:nth-child(2) {
+                    width: 50% !important;
+                }
+                .invoice-wrapper table th:nth-child(3),
+                .invoice-wrapper table td:nth-child(3) {
+                    width: 21% !important;
+                    min-width: 1.2in !important;
+                    max-width: 1.2in !important;
+                }
+                .invoice-wrapper table th:nth-child(4),
+                .invoice-wrapper table td:nth-child(4) {
+                    width: 21% !important;
+                    min-width: 1.2in !important;
+                    max-width: 1.2in !important;
                 }
             }
             @media screen {
@@ -560,12 +584,16 @@ window.printHalfPageInvoice = function(event) {
         </style>
     `;
     
-    // Modify invoice content for half-page size with smaller fonts
+    // Modify invoice content for half-page size with fixed table structure
     const modifiedContent = invoiceContent.innerHTML
         .replace(/font-size:\s*\d+px/g, 'font-size: 10px')
-        .replace(/width:\s*\d+px/g, 'width: 100%')
+        .replace(/width:\s*500px/g, 'width: 100%')
         .replace(/max-width:\s*\d+px/g, 'max-width: 100%')
-        .replace(/padding:\s*15px/g, 'padding: 10px');
+        .replace(/padding:\s*20px/g, 'padding: 12px')
+        .replace(/padding:\s*15px/g, 'padding: 8px')
+        // Fix specific table column widths for half-page
+        .replace(/width:\s*50px;/g, 'width: 8% !important; min-width: 0.6in !important; max-width: 0.6in !important;')
+        .replace(/width:\s*80px;/g, 'width: 21% !important; min-width: 1.2in !important; max-width: 1.2in !important;');
     
     printWindow.document.write(`
         <!DOCTYPE html>
