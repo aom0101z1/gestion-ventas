@@ -556,7 +556,7 @@ window.loadStudentsTab = async function() {
 };
 
 // ============================================
-// SECTION 7: GLOBAL FUNCTIONS
+// SECTION 7: GLOBAL FUNCTIONS (UPDATED)
 // ============================================
 
 window.showStudentForm = function(studentId = null) {
@@ -584,14 +584,18 @@ window.cancelStudentForm = function() {
     document.getElementById('studentFormContainer').innerHTML = '';
 };
 
-// NEW: Toggle student status
+// UPDATED: Toggle student status - Now appends to studentsContainer
 window.toggleStatus = async function(id) {
     const student = window.StudentManager.students.get(id);
     if (!student) return;
     
     if (student.status === 'active') {
-        // Show modal for inactive details
-        document.body.insertAdjacentHTML('beforeend', renderInactiveModal(id));
+        // Show modal for inactive details - FIXED: Append to studentsContainer
+        const container = document.getElementById('studentsContainer');
+        const existingModal = document.getElementById('inactiveModal');
+        if (existingModal) existingModal.remove();
+        
+        container.insertAdjacentHTML('beforeend', renderInactiveModal(id));
         
         document.getElementById('inactiveForm').onsubmit = async (e) => {
             e.preventDefault();
@@ -619,18 +623,23 @@ window.toggleStatus = async function(id) {
     }
 };
 
-// NEW: Close inactive modal
+// UPDATED: Close inactive modal
 window.closeInactiveModal = function() {
     const modal = document.getElementById('inactiveModal');
     if (modal) modal.remove();
 };
 
-// NEW: Open payment notes modal
+// UPDATED: Open payment notes modal - Now appends to studentsContainer
 window.openPaymentNotes = async function(id) {
     const student = window.StudentManager.students.get(id);
     if (!student) return;
     
-    document.body.insertAdjacentHTML('beforeend', renderPaymentNotesModal(student));
+    // FIXED: Append to studentsContainer instead of body
+    const container = document.getElementById('studentsContainer');
+    const existingModal = document.getElementById('paymentNotesModal');
+    if (existingModal) existingModal.remove();
+    
+    container.insertAdjacentHTML('beforeend', renderPaymentNotesModal(student));
     
     document.getElementById('paymentNotesForm').onsubmit = async (e) => {
         e.preventDefault();
@@ -655,7 +664,7 @@ window.openPaymentNotes = async function(id) {
     };
 };
 
-// NEW: Close payment notes modal
+// UPDATED: Close payment notes modal
 window.closePaymentNotesModal = function() {
     const modal = document.getElementById('paymentNotesModal');
     if (modal) modal.remove();
