@@ -385,433 +385,319 @@ class InvoiceStorageManager {
 
 // ===== NEW: HALF-PAGE INVOICE GENERATOR (2 PER PAGE) =====
 // ===== NEW: HALF-PAGE INVOICE GENERATOR (2 PER PAGE) - COMPLETE IMPLEMENTATION =====
-class HalfPageInvoiceGenerator {
-    constructor() {
-        this.invoicesPerPage = 2;
-        this.config = {
-            businessName: 'CIUDAD BILINGÜE',
-            nit: '9.764.924-1',
-            address: 'Cra 8. #22-52',
-            phones: '324 297 3737 - 315 640 6911',
-            email: 'contacto@ciudadbilingue.com',
-            whatsapp: '324 297 37 37'
-        };
-    }
 
-    // Generate HTML for half-page invoices
-    generateHalfPageHTML(invoices) {
-        const pages = [];
-        
-        // Group invoices in pairs
-        for (let i = 0; i < invoices.length; i += this.invoicesPerPage) {
-            const pageInvoices = invoices.slice(i, i + this.invoicesPerPage);
-            pages.push(this.generatePage(pageInvoices));
-        }
-        
-        return `
-            <!DOCTYPE html>
-            <html lang="es">
-            <head>
-                <meta charset="UTF-8">
-                <title>Comprobantes de Pago - ${this.config.businessName}</title>
-                <style>${this.getStyles()}</style>
-            </head>
-            <body>
-                ${pages.join('')}
-                <script>
-                    window.onload = function() {
-                        setTimeout(() => {
-                            window.print();
-                        }, 500);
-                    };
-                </script>
-            </body>
-            </html>
-        `;
-    }
 
-    // Generate a single page with up to 2 invoices
-    generatePage(invoices) {
-        const invoiceHTML = invoices.map(invoice => 
-            this.generateSingleInvoice(invoice)
-        ).join('');
-        
-        // Add empty invoice slots if needed
-        let emptySlots = '';
-        if (invoices.length < this.invoicesPerPage) {
-            for (let i = invoices.length; i < this.invoicesPerPage; i++) {
-                emptySlots += '<div class="invoice-container empty"></div>';
-            }
-        }
-        
-        return `
-            <div class="page ${invoices.length > 0 ? 'page-break' : ''}">
-                ${invoiceHTML}
-                ${emptySlots}
-            </div>
-        `;
-    }
+// ===== SIMPLIFIED INVOICE PRINTING SOLUTION =====
 
-    // Generate a single invoice (half-page size)
-    generateSingleInvoice(invoice) {
-        const formatDate = (date) => {
-            const d = new Date(date);
-            return d.toLocaleDateString('es-CO');
-        };
-        
-        const formatCurrency = (num) => `$${(num || 0).toLocaleString('es-CO')}`;
-        
-        return `
-            <div class="invoice-container">
-                <!-- Header -->
-                <div class="invoice-header">
-                    <div class="logo-section">
-                        <div class="company-name">${this.config.businessName}</div>
-                        <div class="company-info">
-                            ${this.config.address}<br>
-                            Tel: ${this.config.phones}
-                        </div>
-                    </div>
-                    <div class="invoice-number-box">
-                        <div class="invoice-title">COMPROBANTE DE PAGO</div>
-                        <div class="invoice-number">${invoice.number}</div>
-                    </div>
-                </div>
-                
-                <!-- Details -->
-                <div class="invoice-details">
-                    <div class="detail-row">
-                        <span class="detail-label">Fecha:</span>
-                        <span class="detail-value">${formatDate(invoice.date)}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Estudiante:</span>
-                        <span class="detail-value">${invoice.studentName || invoice.student?.name || ''}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Documento:</span>
-                        <span class="detail-value">${invoice.documentType || 'C.C'} ${invoice.documentNumber || invoice.student?.nit || ''}</span>
-                    </div>
-                </div>
-                
-                <!-- Items Table -->
-                <table class="invoice-table">
-                    <thead>
-                        <tr>
-                            <th style="width: 50px;">CANT</th>
-                            <th>DESCRIPCIÓN</th>
-                            <th style="width: 100px;">VR. UNIT</th>
-                            <th style="width: 100px;">VR. TOTAL</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${this.generateInvoiceItems(invoice.items)}
-                    </tbody>
-                </table>
-                
-                <!-- Totals -->
-                <div class="totals-section">
-                    <div class="observations">
-                        <strong>Observaciones:</strong><br>
-                        <span style="font-size: 8pt;">
-                            ${invoice.paymentMethod || ''}
-                            ${invoice.bank ? ` - ${invoice.bank}` : ''}
-                            ${invoice.notes || invoice.observations || ''}
-                        </span>
-                    </div>
-                    <div class="totals-box">
-                        <div class="total-row">
-                            <span>SUB TOTAL:</span>
-                            <span>${formatCurrency(invoice.subtotal || invoice.total)}</span>
-                        </div>
-                        <div class="total-row grand-total">
-                            <span>TOTAL:</span>
-                            <span>${formatCurrency(invoice.total)}</span>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Cut line -->
-                <div class="cut-line">✂ - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</div>
-            </div>
-        `;
-    }
-
-    // Generate invoice items rows
-    generateInvoiceItems(items) {
-        if (!items || items.length === 0) {
-            items = [{
-                quantity: 1,
-                description: 'Mensualidad',
-                unitPrice: 0,
-                total: 0
-            }];
-        }
-        
-        const formatCurrency = (num) => `$${(num || 0).toLocaleString('es-CO')}`;
-        
-        let rows = items.map(item => `
-            <tr>
-                <td class="text-center">${item.quantity || 1}</td>
-                <td>${item.description}</td>
-                <td class="text-right">${formatCurrency(item.unitPrice)}</td>
-                <td class="text-right">${formatCurrency(item.total)}</td>
-            </tr>
-        `).join('');
-        
-        // Add empty rows to maintain layout
-        const emptyRowsNeeded = Math.max(0, 2 - items.length);
-        for (let i = 0; i < emptyRowsNeeded; i++) {
-            rows += '<tr><td colspan="4" style="height: 25px;">&nbsp;</td></tr>';
-        }
-        
-        return rows;
-    }
-
-    // Get CSS styles for half-page layout
-    getStyles() {
-        return `
-            * {
-                margin: 0;
-                padding: 0;
-                box-sizing: border-box;
-            }
-            
-            body {
-                font-family: Arial, sans-serif;
-                font-size: 10pt;
-                line-height: 1.3;
-            }
-            
+// Single Invoice Print Handler - Standard size
+window.printStandardInvoice = function() {
+    const invoiceContent = document.getElementById('invoiceContent');
+    if (!invoiceContent) return;
+    
+    // Create print window
+    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    
+    // Standard full-page invoice styles
+    const styles = `
+        <style>
             @media print {
+                @page {
+                    size: letter;
+                    margin: 0.5in;
+                }
+                body {
+                    font-family: Arial, sans-serif;
+                    margin: 0;
+                    padding: 0;
+                }
+                .invoice-print {
+                    width: 100%;
+                    max-width: 7.5in;
+                }
+            }
+            @media screen {
+                body {
+                    padding: 20px;
+                    font-family: Arial, sans-serif;
+                }
+            }
+        </style>
+    `;
+    
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Comprobante - ${new Date().toISOString()}</title>
+            ${styles}
+        </head>
+        <body>
+            ${invoiceContent.innerHTML}
+            <script>
+                window.onload = () => {
+                    setTimeout(() => {
+                        window.print();
+                        window.onafterprint = () => window.close();
+                    }, 500);
+                };
+            </script>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+};
+
+// Half-Page Invoice Print - FIXED for single invoices
+window.printHalfPageInvoice = function() {
+    const invoiceContent = document.getElementById('invoiceContent');
+    if (!invoiceContent) return;
+    
+    // Create print window
+    const printWindow = window.open('', '_blank', 'width=600,height=400');
+    
+    // Half-page specific styles
+    const styles = `
+        <style>
+            @media print {
+                @page {
+                    size: letter;
+                    margin: 0.25in;
+                }
                 body {
                     margin: 0;
                     padding: 0;
                 }
-                
-                .page-break {
-                    page-break-after: always;
-                }
-                
-                .invoice-container {
+                .invoice-wrapper {
+                    width: 8in;
+                    height: 5.25in;
+                    padding: 0.25in;
+                    font-size: 11px;
                     page-break-inside: avoid;
                 }
-                
-                .empty {
-                    visibility: hidden;
+                /* Hide second copy */
+                .invoice-copy-2 {
+                    display: none;
                 }
             }
-            
-            /* Page container - Letter size */
-            .page {
-                width: 8.5in;
-                min-height: 11in;
-                margin: 0 auto;
-                background: white;
-                display: flex;
-                flex-direction: column;
-            }
-            
-            /* Each invoice takes half page */
-            .invoice-container {
-                height: 5.5in;
-                width: 100%;
-                padding: 0.3in;
-                border-bottom: 1px dashed #999;
-                position: relative;
-                overflow: hidden;
-            }
-            
-            .invoice-container:last-child {
-                border-bottom: none;
-            }
-            
-            .invoice-header {
-                display: flex;
-                justify-content: space-between;
-                align-items: flex-start;
-                margin-bottom: 10px;
-                padding-bottom: 8px;
-                border-bottom: 2px solid #333;
-            }
-            
-            .company-name {
-                font-size: 18pt;
-                font-weight: bold;
-                color: #333;
-            }
-            
-            .company-info {
-                font-size: 8pt;
-                color: #666;
-                margin-top: 5px;
-            }
-            
-            .invoice-number-box {
-                border: 2px solid #333;
-                padding: 8px;
-                text-align: center;
-                min-width: 150px;
-            }
-            
-            .invoice-title {
-                font-size: 9pt;
-                margin-bottom: 5px;
-            }
-            
-            .invoice-number {
-                font-size: 11pt;
-                font-weight: bold;
-            }
-            
-            .invoice-details {
-                margin: 10px 0;
-            }
-            
-            .detail-row {
-                display: flex;
-                margin-bottom: 5px;
-                font-size: 9pt;
-            }
-            
-            .detail-label {
-                font-weight: bold;
-                width: 100px;
-            }
-            
-            .detail-value {
-                flex: 1;
-            }
-            
-            .invoice-table {
-                width: 100%;
-                border-collapse: collapse;
-                margin: 10px 0;
-                font-size: 9pt;
-            }
-            
-            .invoice-table th {
-                background: #f0f0f0;
-                border: 1px solid #333;
-                padding: 5px;
-                text-align: left;
-                font-weight: bold;
-            }
-            
-            .invoice-table td {
-                border: 1px solid #333;
-                padding: 5px;
-            }
-            
-            .text-right {
-                text-align: right;
-            }
-            
-            .text-center {
-                text-align: center;
-            }
-            
-            .totals-section {
-                margin-top: 10px;
-                display: flex;
-                justify-content: space-between;
-            }
-            
-            .observations {
-                flex: 1;
-                padding-right: 20px;
-                font-size: 9pt;
-            }
-            
-            .totals-box {
-                border: 2px solid #333;
-                padding: 8px;
-                min-width: 200px;
-            }
-            
-            .total-row {
-                display: flex;
-                justify-content: space-between;
-                margin-bottom: 3px;
-                font-size: 9pt;
-            }
-            
-            .total-row.grand-total {
-                font-weight: bold;
-                font-size: 11pt;
-                border-top: 1px solid #333;
-                padding-top: 5px;
-                margin-top: 5px;
-            }
-            
-            .cut-line {
-                position: absolute;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                text-align: center;
-                font-size: 8pt;
-                color: #999;
-                border-bottom: 1px dashed #999;
-            }
-            
             @media screen {
                 body {
-                    background: #f0f0f0;
-                    padding: 20px;
+                    font-family: Arial, sans-serif;
+                    margin: 0;
+                    padding: 10px;
                 }
-                
-                .page {
-                    box-shadow: 0 0 10px rgba(0,0,0,0.1);
-                    margin-bottom: 20px;
+                .invoice-wrapper {
+                    border: 1px solid #ccc;
+                    padding: 15px;
+                    margin-bottom: 10px;
+                    max-width: 600px;
                 }
             }
+        </style>
+    `;
+    
+    // Modify invoice content for half-page size
+    const modifiedContent = invoiceContent.innerHTML
+        .replace(/font-size:\s*\d+px/g, 'font-size: 11px')
+        .replace(/width:\s*\d+px/g, 'width: 100%')
+        .replace(/max-width:\s*\d+px/g, 'max-width: 100%');
+    
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Comprobante Media Carta</title>
+            ${styles}
+        </head>
+        <body>
+            <div class="invoice-wrapper invoice-copy-1">
+                ${modifiedContent}
+            </div>
+            <script>
+                window.onload = () => {
+                    setTimeout(() => {
+                        window.print();
+                        window.onafterprint = () => window.close();
+                    }, 500);
+                };
+            </script>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+};
+
+// Updated Invoice Generator with clean print methods
+const InvoiceGenerator = {
+    config: {
+        businessName: 'CIUDAD BILINGÜE',
+        nit: '9.764.924-1',
+        address: 'Cra 8. #22-52',
+        phones: '324 297 3737 - 315 640 6911'
+    },
+
+    // Show invoice modal with fixed buttons
+    showInvoiceModal(invoiceData) {
+        const existingModal = document.getElementById('invoiceModal');
+        if (existingModal) existingModal.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'invoiceModal';
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
         `;
-    }
+        
+        modal.innerHTML = `
+            <div style="background: white; padding: 20px; max-width: 650px; max-height: 90vh; overflow-y: auto; position: relative; margin: 20px;">
+                <button onclick="document.getElementById('invoiceModal').remove()" 
+                        style="position: absolute; right: 10px; top: 10px; background: red; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 4px;">✖</button>
+                
+                <div id="invoiceContent">
+                    ${this.getInvoiceHTML(invoiceData)}
+                </div>
+                
+                <div style="margin-top: 20px; text-align: center;">
+                    <button onclick="printStandardInvoice()" 
+                            style="background: #3b82f6; color: white; padding: 10px 20px; margin: 0 10px; border: none; cursor: pointer; border-radius: 4px;">
+                        🖨️ Imprimir Carta Completa
+                    </button>
+                    <button onclick="printHalfPageInvoice()" 
+                            style="background: #8b5cf6; color: white; padding: 10px 20px; margin: 0 10px; border: none; cursor: pointer; border-radius: 4px;">
+                        📄 Imprimir Media Carta
+                    </button>
+                    <button onclick="InvoiceGenerator.saveAsPDF('${invoiceData.number}')" 
+                            style="background: #10b981; color: white; padding: 10px 20px; margin: 0 10px; border: none; cursor: pointer; border-radius: 4px;">
+                        💾 Guardar PDF
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+    },
 
-    // Print multiple invoices
-    async printInvoices(invoices) {
-        // Create a new window for printing
-        const printWindow = window.open('', '_blank');
-        
-        if (!printWindow) {
-            alert('Por favor permite las ventanas emergentes para imprimir');
-            return;
-        }
-        
-        // Generate the HTML with all invoices
-        const html = this.generateHalfPageHTML(invoices);
-        
-        // Write to the new window
-        printWindow.document.write(html);
-        printWindow.document.close();
-        
-        // Print will be triggered automatically by the onload event in the HTML
-    }
-
-    // Create invoice from payment data
-    createInvoiceFromPayment(payment, student) {
-        return {
-            number: `CB-${new Date().getFullYear()}-${student.id.substring(0,6)}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
-            date: payment.date || new Date().toISOString(),
-            studentName: student.nombre,
-            documentType: student.tipoDoc || 'C.C',
-            documentNumber: student.numDoc,
-            items: [{
-                quantity: 1,
-                description: `Mensualidad ${payment.month || ''} - ${student.grupo || 'Curso'}`,
-                unitPrice: payment.amount,
-                total: payment.amount
-            }],
-            subtotal: payment.amount,
-            total: payment.amount,
-            paymentMethod: payment.method,
-            bank: payment.bank,
-            notes: payment.notes,
-            createdBy: window.FirebaseData?.currentUser?.email || 'Sistema'
+    // Clean invoice HTML generation
+    getInvoiceHTML(data) {
+        const formatDate = (date) => {
+            const d = new Date(date);
+            return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
         };
+
+        const formatCurrency = (num) => `$${num.toLocaleString('es-CO')}`;
+
+        return `
+            <div class="invoice-print" style="padding: 15px; border: 2px solid #000; font-family: Arial, sans-serif;">
+                <!-- Header -->
+                <div style="text-align: center; margin-bottom: 15px;">
+                    <h1 style="margin: 0; font-size: 24px;">${this.config.businessName}</h1>
+                    <p style="margin: 3px 0; font-size: 12px;">NIT. ${this.config.nit}</p>
+                    <p style="margin: 3px 0; font-size: 12px;">${this.config.address}</p>
+                    <p style="margin: 3px 0; font-size: 12px;">Tel: ${this.config.phones}</p>
+                </div>
+                
+                <!-- Invoice Info -->
+                <div style="border: 1px solid #000; padding: 10px; margin-bottom: 15px;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <div>
+                            <strong>COMPROBANTE N°:</strong> ${data.number}
+                        </div>
+                        <div>
+                            <strong>FECHA:</strong> ${formatDate(data.date)}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Student Info -->
+                <div style="margin-bottom: 15px;">
+                    <p><strong>Estudiante:</strong> ${data.studentName || data.student?.name || ''}</p>
+                    <p><strong>Documento:</strong> ${data.documentType || data.student?.tipoDoc || 'C.C'} ${data.documentNumber || data.student?.nit || ''}</p>
+                </div>
+                
+                <!-- Items Table -->
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
+                    <thead>
+                        <tr style="background: #f0f0f0;">
+                            <th style="border: 1px solid #000; padding: 5px;">Cant.</th>
+                            <th style="border: 1px solid #000; padding: 5px;">Descripción</th>
+                            <th style="border: 1px solid #000; padding: 5px;">Valor Unit.</th>
+                            <th style="border: 1px solid #000; padding: 5px;">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.items.map(item => `
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 5px; text-align: center;">${item.quantity}</td>
+                                <td style="border: 1px solid #000; padding: 5px;">${item.description}</td>
+                                <td style="border: 1px solid #000; padding: 5px; text-align: right;">${formatCurrency(item.unitPrice)}</td>
+                                <td style="border: 1px solid #000; padding: 5px; text-align: right;">${formatCurrency(item.total)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="3" style="border: 1px solid #000; padding: 5px; text-align: right;"><strong>TOTAL:</strong></td>
+                            <td style="border: 1px solid #000; padding: 5px; text-align: right;"><strong>${formatCurrency(data.total)}</strong></td>
+                        </tr>
+                    </tfoot>
+                </table>
+                
+                <!-- Payment Info -->
+                <div style="margin-bottom: 15px;">
+                    <p><strong>Forma de Pago:</strong> ${data.paymentMethod || 'Efectivo'}</p>
+                    ${data.bank ? `<p><strong>Banco:</strong> ${data.bank}</p>` : ''}
+                    ${data.notes ? `<p><strong>Observaciones:</strong> ${data.notes}</p>` : ''}
+                </div>
+                
+                <!-- Footer -->
+                <div style="margin-top: 30px; padding-top: 15px; border-top: 1px solid #000;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <div style="text-align: center; width: 45%;">
+                            <div style="border-bottom: 1px solid #000; margin-bottom: 5px; height: 40px;"></div>
+                            <p style="margin: 0; font-size: 11px;">Firma del Estudiante</p>
+                        </div>
+                        <div style="text-align: center; width: 45%;">
+                            <div style="border-bottom: 1px solid #000; margin-bottom: 5px; height: 40px;"></div>
+                            <p style="margin: 0; font-size: 11px;">Firma Autorizada</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
+    // Print regular invoice
+    printInvoice() {
+        printStandardInvoice();
+    },
+
+    // Save as PDF (implement based on your PDF library)
+    saveAsPDF(invoiceNumber) {
+        // Implement PDF generation here
+        console.log('Saving PDF for invoice:', invoiceNumber);
+        window.showNotification('📄 Generando PDF...', 'info');
+        
+        // Use window.print() with save as PDF option
+        window.print();
     }
-}
+};
+
+// Replace the old window.printAsHalfPage function
+window.printAsHalfPage = window.printHalfPageInvoice;
+
+// Update the global InvoiceGenerator
+window.InvoiceGenerator = InvoiceGenerator;
+
+console.log('✅ Invoice printing module fixed and loaded');
+
+
 
 // Invoice Generator for creating professional receipts
 const InvoiceGenerator = {
