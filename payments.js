@@ -383,15 +383,29 @@ class InvoiceStorageManager {
     }
 }
 
-// ===== SIMPLIFIED INVOICE PRINTING SOLUTION =====
+// ===== FIXED INVOICE PRINTING FUNCTIONS - STAY IN PAYMENTS TAB =====
 
 // Single Invoice Print Handler - Standard size
-window.printStandardInvoice = function() {
+window.printStandardInvoice = function(event) {
+    // Prevent any default action
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    
     const invoiceContent = document.getElementById('invoiceContent');
     if (!invoiceContent) return;
     
-    // Create print window
-    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    // Store current hash to restore if needed
+    const currentHash = window.location.hash;
+    
+    // Create print window with specific features to prevent focus issues
+    const printWindow = window.open('', 'PrintWindow' + Date.now(), 'width=800,height=600,toolbar=no,location=no,directories=no,status=no,menubar=no,scrollbars=yes,resizable=yes');
+    
+    if (!printWindow) {
+        alert('Por favor permite las ventanas emergentes para imprimir');
+        return;
+    }
     
     // Standard full-page invoice styles
     const styles = `
@@ -441,15 +455,40 @@ window.printStandardInvoice = function() {
         </html>
     `);
     printWindow.document.close();
+    
+    // Ensure we stay on the same page
+    setTimeout(() => {
+        if (window.location.hash !== currentHash) {
+            window.location.hash = currentHash;
+        }
+        // Keep focus on the main window
+        window.focus();
+    }, 100);
+    
+    return false; // Prevent any navigation
 };
 
 // Half-Page Invoice Print - TWO COPIES on same page
-window.printHalfPageInvoice = function() {
+window.printHalfPageInvoice = function(event) {
+    // Prevent any default action
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    
     const invoiceContent = document.getElementById('invoiceContent');
     if (!invoiceContent) return;
     
-    // Create print window
-    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    // Store current hash to restore if needed
+    const currentHash = window.location.hash;
+    
+    // Create print window with specific features
+    const printWindow = window.open('', 'PrintWindowHalf' + Date.now(), 'width=800,height=600,toolbar=no,location=no,directories=no,status=no,menubar=no,scrollbars=yes,resizable=yes');
+    
+    if (!printWindow) {
+        alert('Por favor permite las ventanas emergentes para imprimir');
+        return;
+    }
     
     // Half-page specific styles for TWO copies
     const styles = `
@@ -551,6 +590,17 @@ window.printHalfPageInvoice = function() {
         </html>
     `);
     printWindow.document.close();
+    
+    // Ensure we stay on the same page
+    setTimeout(() => {
+        if (window.location.hash !== currentHash) {
+            window.location.hash = currentHash;
+        }
+        // Keep focus on the main window
+        window.focus();
+    }, 100);
+    
+    return false; // Prevent any navigation
 };
 
 // Invoice Generator for creating professional receipts
@@ -663,8 +713,8 @@ const InvoiceGenerator = {
         }
     },
 
-    // Show invoice modal with fixed buttons
-  showInvoiceModal(invoiceData) {
+    // Show invoice modal with FIXED buttons to prevent navigation
+    showInvoiceModal(invoiceData) {
         const existingModal = document.getElementById('invoiceModal');
         if (existingModal) existingModal.remove();
 
@@ -685,14 +735,14 @@ const InvoiceGenerator = {
         
         // Check if invoice has storage URL for download button
         const downloadButton = invoiceData.storageUrl ? 
-            `<button onclick="event.preventDefault(); event.stopPropagation(); window.open('${invoiceData.storageUrl}', '_blank'); return false;" 
+            `<button type="button" onclick="event.preventDefault(); event.stopPropagation(); window.open('${invoiceData.storageUrl}', '_blank'); return false;" 
                     style="background: #059669; color: white; padding: 12px 24px; margin: 0 10px; border: none; cursor: pointer; border-radius: 4px; font-size: 14px;">
                 ☁️ Descargar desde la nube
             </button>` : '';
         
         modal.innerHTML = `
             <div style="background: white; padding: 20px; max-width: 650px; max-height: 90vh; overflow-y: auto; position: relative; margin: 20px;">
-                <button onclick="event.preventDefault(); document.getElementById('invoiceModal').remove(); return false;" 
+                <button type="button" onclick="event.preventDefault(); event.stopPropagation(); document.getElementById('invoiceModal').remove(); return false;" 
                         style="position: absolute; right: 10px; top: 10px; background: red; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 4px;">✖</button>
                 
                 <div id="invoiceContent">
@@ -718,7 +768,14 @@ const InvoiceGenerator = {
         `;
         
         document.body.appendChild(modal);
+        
+        // Additional safeguard: After modal is added, ensure we're still on the right tab
+        setTimeout(() => {
+            // Force focus back to main window
+            window.focus();
+        }, 100);
     },
+
     // Get invoice HTML - UPDATED WITH LOGO, FIXED DATE, AND COMPLETE INFO
     getInvoiceHTML(data) {
         const formatDate = (date) => {
@@ -906,12 +963,18 @@ const InvoiceGenerator = {
     },
 
     printInvoice() {
-        printStandardInvoice();
+        printStandardInvoice(event);
     },
 
     saveAsPDF(invoiceNumber) {
+        // Prevent navigation
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
         window.print();
         alert(`Use "Guardar como PDF" en el diálogo de impresión.\nNombre sugerido: Comprobante_${invoiceNumber}.pdf`);
+        return false;
     }
 };
 
@@ -1164,7 +1227,7 @@ window.batchPrintHalfPage = function(invoices) {
         return;
     }
     
-    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    const printWindow = window.open('', 'BatchPrint' + Date.now(), 'width=800,height=600');
     
     const styles = `
         <style>
