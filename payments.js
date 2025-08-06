@@ -522,7 +522,7 @@ const InvoiceGenerator = {
             </button>` : '';
 
         modal.innerHTML = `
-            <div style="background: white; padding: 20px; max-width: 850px; max-height: 90vh; overflow-y: auto; position: relative; margin: 20px;">
+            <div style="background: white; padding: 20px; max-width: 600px; max-height: 90vh; overflow-y: auto; position: relative; margin: 20px;">
                 <button onclick="document.getElementById('invoiceModal').remove()" 
                         style="position: absolute; right: 10px; top: 10px; background: red; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 4px;">✖</button>
                 
@@ -547,7 +547,7 @@ const InvoiceGenerator = {
         document.body.appendChild(modal);
     },
 
-    // Get invoice HTML
+    // Get invoice HTML - UPDATED WITH SMALLER SIZE
     getInvoiceHTML(data) {
         const formatDate = (date) => {
             const d = new Date(date);
@@ -562,11 +562,11 @@ const InvoiceGenerator = {
         const formatCurrency = (num) => `$${num.toLocaleString('es-CO')}`;
 
         return `
-return `
-    <div class="invoice-print" style="width: 500px; padding: 15px; border: 2px solid #000; font-family: Arial, sans-serif; position: relative; background: white; font-size: 12px;">                <!-- Header -->
-                <div style="text-align: center; margin-bottom: 20px;">
+            <div class="invoice-print" style="width: 500px; padding: 15px; border: 2px solid #000; font-family: Arial, sans-serif; position: relative; background: white; font-size: 11px;">
+                <!-- Header -->
+                <div style="text-align: center; margin-bottom: 15px;">
                     <!-- Logo -->
-                    <div style="width: 60px; height: 60px; margin: 0 auto 10px; position: relative;">
+                    <div style="width: 60px; height: 60px; margin: 0 auto 8px; position: relative;">
                         <svg width="60" height="60" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
                             <!-- Red circle -->
                             <circle cx="50" cy="50" r="48" fill="#E53E3E" stroke="none"/>
@@ -579,78 +579,78 @@ return `
                         </svg>
                     </div>
                     
-                    <h1 style="margin: 0; font-size: 32px;">${this.config.businessName}</h1>
-                    <p style="margin: 5px 0;">NIT. ${this.config.nit}</p>
-                    <p style="margin: 5px 0;">${this.config.address} &nbsp; Cel. ${this.config.phones}</p>
+                    <h1 style="margin: 0; font-size: 24px;">${this.config.businessName}</h1>
+                    <p style="margin: 3px 0; font-size: 10px;">NIT. ${this.config.nit}</p>
+                    <p style="margin: 3px 0; font-size: 10px;">${this.config.address} &nbsp; Cel. ${this.config.phones}</p>
                 </div>
 
                 <!-- Invoice Number -->
-                <div style="position: absolute; right: 20px; top: 20px; border: 2px solid #000; padding: 10px 20px;">
-                    <div style="font-size: 12px;">COMPROBANTE DE PAGO</div>
-                    <div style="font-size: 18px; font-weight: bold;">${data.number}</div>
+                <div style="position: absolute; right: 15px; top: 15px; border: 2px solid #000; padding: 8px 15px;">
+                    <div style="font-size: 10px;">COMPROBANTE DE PAGO</div>
+                    <div style="font-size: 14px; font-weight: bold;">${data.number}</div>
                 </div>
 
                 <!-- Date -->
-                <div style="position: absolute; right: 20px; top: 100px; border: 2px solid #000; padding: 10px;">
-                    <div style="font-size: 12px; text-align: center;">FECHA</div>
-                    <div style="display: flex; gap: 10px;">
+                <div style="position: absolute; right: 15px; top: 70px; border: 2px solid #000; padding: 8px;">
+                    <div style="font-size: 10px; text-align: center;">FECHA</div>
+                    <div style="display: flex; gap: 8px;">
                         <div style="text-align: center;">
-                            <div style="border: 1px solid #000; padding: 5px 10px;">${dateInfo.day}</div>
-                            <small>DÍA</small>
+                            <div style="border: 1px solid #000; padding: 4px 8px; font-size: 10px;">${dateInfo.day}</div>
+                            <small style="font-size: 8px;">DÍA</small>
                         </div>
                         <div style="text-align: center;">
-                            <div style="border: 1px solid #000; padding: 5px 10px;">${dateInfo.month}</div>
-                            <small>MES</small>
+                            <div style="border: 1px solid #000; padding: 4px 8px; font-size: 10px;">${dateInfo.month}</div>
+                            <small style="font-size: 8px;">MES</small>
                         </div>
                         <div style="text-align: center;">
-                            <div style="border: 1px solid #000; padding: 5px 10px;">${dateInfo.year}</div>
-                            <small>AÑO</small>
+                            <div style="border: 1px solid #000; padding: 4px 8px; font-size: 10px;">${dateInfo.year}</div>
+                            <small style="font-size: 8px;">AÑO</small>
                         </div>
                     </div>
                 </div>
 
                 <!-- Customer Info -->
-                <div style="margin: 100px 0 20px 0;">
-                    <div style="display: flex; margin-bottom: 10px;">
-                        <label style="font-weight: bold; width: 100px;">Señor:</label>
-                        <span style="flex: 1; border-bottom: 1px solid #000; padding: 0 5px;">${data.student.name}</span>
-                        <label style="font-weight: bold; width: 100px; margin-left: 20px;">${data.student.tipoDoc || 'NIT'}/C.C.:</label>
-                        <span style="flex: 1; border-bottom: 1px solid #000; padding: 0 5px;">${data.student.nit}</span>
+                <div style="margin: 80px 0 15px 0;">
+                    <div style="display: flex; margin-bottom: 8px;">
+                        <label style="font-weight: bold; width: 60px; font-size: 10px;">Señor:</label>
+                        <span style="flex: 1; border-bottom: 1px solid #000; padding: 0 3px; font-size: 10px;">${data.student.name}</span>
+                        <label style="font-weight: bold; width: 50px; margin-left: 10px; font-size: 10px;">${data.student.tipoDoc || 'C.C'}:</label>
+                        <span style="flex: 1; border-bottom: 1px solid #000; padding: 0 3px; font-size: 10px;">${data.student.nit}</span>
                     </div>
-                    <div style="display: flex; margin-bottom: 20px;">
-                        <label style="font-weight: bold; width: 100px;">Dirección:</label>
-                        <span style="flex: 1; border-bottom: 1px solid #000; padding: 0 5px;">${data.student.address || 'N/A'}</span>
-                        <label style="font-weight: bold; width: 100px; margin-left: 20px;">Cel.:</label>
-                        <span style="flex: 1; border-bottom: 1px solid #000; padding: 0 5px;">${data.student.phone}</span>
+                    <div style="display: flex; margin-bottom: 15px;">
+                        <label style="font-weight: bold; width: 60px; font-size: 10px;">Dirección:</label>
+                        <span style="flex: 1; border-bottom: 1px solid #000; padding: 0 3px; font-size: 10px;">${data.student.address || 'N/A'}</span>
+                        <label style="font-weight: bold; width: 50px; margin-left: 10px; font-size: 10px;">Cel.:</label>
+                        <span style="flex: 1; border-bottom: 1px solid #000; padding: 0 3px; font-size: 10px;">${data.student.phone}</span>
                     </div>
                 </div>
 
                 <!-- Items Table -->
-                <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
                     <thead>
                         <tr>
-                            <th style="border: 2px solid #000; padding: 10px; background: #f0f0f0; width: 80px;">CANT.</th>
-                            <th style="border: 2px solid #000; padding: 10px; background: #f0f0f0;">DESCRIPCIÓN</th>
-                            <th style="border: 2px solid #000; padding: 10px; background: #f0f0f0; width: 120px;">VR. UNITARIO</th>
-                            <th style="border: 2px solid #000; padding: 10px; background: #f0f0f0; width: 120px;">VR. TOTAL</th>
+                            <th style="border: 2px solid #000; padding: 6px; background: #f0f0f0; width: 50px; font-size: 10px;">CANT.</th>
+                            <th style="border: 2px solid #000; padding: 6px; background: #f0f0f0; font-size: 10px;">DESCRIPCIÓN</th>
+                            <th style="border: 2px solid #000; padding: 6px; background: #f0f0f0; width: 80px; font-size: 10px;">VR. UNITARIO</th>
+                            <th style="border: 2px solid #000; padding: 6px; background: #f0f0f0; width: 80px; font-size: 10px;">VR. TOTAL</th>
                         </tr>
                     </thead>
                     <tbody>
                         ${data.items.map(item => `
                             <tr>
-                                <td style="border: 1px solid #000; padding: 10px; text-align: center;">${item.quantity}</td>
-                                <td style="border: 1px solid #000; padding: 10px;">${item.description}</td>
-                                <td style="border: 1px solid #000; padding: 10px; text-align: right;">${formatCurrency(item.unitPrice)}</td>
-                                <td style="border: 1px solid #000; padding: 10px; text-align: right;">${formatCurrency(item.total)}</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: center; font-size: 10px;">${item.quantity}</td>
+                                <td style="border: 1px solid #000; padding: 6px; font-size: 10px;">${item.description}</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: right; font-size: 10px;">${formatCurrency(item.unitPrice)}</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: right; font-size: 10px;">${formatCurrency(item.total)}</td>
                             </tr>
                         `).join('')}
                         <!-- Empty rows -->
-                        ${[...Array(Math.max(0, 5 - data.items.length))].map(() => `
+                        ${[...Array(Math.max(0, 3 - data.items.length))].map(() => `
                             <tr>
-                                <td style="border: 1px solid #000; padding: 10px; height: 30px;">&nbsp;</td>
-                                <td style="border: 1px solid #000; padding: 10px;">&nbsp;</td>
-                                <td style="border: 1px solid #000; padding: 10px;">&nbsp;</td>
-                                <td style="border: 1px solid #000; padding: 10px;">&nbsp;</td>
+                                <td style="border: 1px solid #000; padding: 6px; height: 20px; font-size: 10px;">&nbsp;</td>
+                                <td style="border: 1px solid #000; padding: 6px; font-size: 10px;">&nbsp;</td>
+                                <td style="border: 1px solid #000; padding: 6px; font-size: 10px;">&nbsp;</td>
+                                <td style="border: 1px solid #000; padding: 6px; font-size: 10px;">&nbsp;</td>
                             </tr>
                         `).join('')}
                     </tbody>
@@ -658,16 +658,16 @@ return `
 
                 <!-- Totals -->
                 <div style="text-align: right;">
-                    <table style="margin-left: auto; width: 300px;">
+                    <table style="margin-left: auto; width: 200px;">
                         <tr>
-                            <td style="padding: 5px; font-weight: bold;">SUB-TOTAL</td>
-                            <td style="border: 1px solid #000; padding: 5px 10px; text-align: right; width: 150px;">
+                            <td style="padding: 4px; font-weight: bold; font-size: 10px;">SUB-TOTAL</td>
+                            <td style="border: 1px solid #000; padding: 4px 8px; text-align: right; width: 100px; font-size: 10px;">
                                 ${formatCurrency(data.subtotal)}
                             </td>
                         </tr>
                         <tr>
-                            <td style="padding: 5px; font-weight: bold; font-size: 18px;">TOTAL</td>
-                            <td style="border: 2px solid #000; padding: 5px 10px; text-align: right; font-weight: bold; font-size: 18px;">
+                            <td style="padding: 4px; font-weight: bold; font-size: 14px;">TOTAL</td>
+                            <td style="border: 2px solid #000; padding: 4px 8px; text-align: right; font-weight: bold; font-size: 14px;">
                                 ${formatCurrency(data.total)}
                             </td>
                         </tr>
@@ -675,21 +675,21 @@ return `
                 </div>
 
                 <!-- Footer -->
-                <div style="margin-top: 20px; font-size: 12px; text-align: center;">
-                    <p style="margin: 5px 0;">Solicita la factura electrónica enviando este comprobante al correo: ${this.config.email}</p>
-                    <p style="margin: 5px 0;">o al whatsapp ${this.config.whatsapp}</p>
+                <div style="margin-top: 15px; font-size: 9px; text-align: center;">
+                    <p style="margin: 3px 0;">Solicita la factura electrónica enviando este comprobante al correo: ${this.config.email}</p>
+                    <p style="margin: 3px 0;">o al whatsapp ${this.config.whatsapp}</p>
                 </div>
 
                 <!-- Observations -->
-                <div style="margin-top: 20px; border: 1px solid #000; padding: 10px; min-height: 60px;">
-                    <strong>OBSERVACIONES:</strong><br>
-                    ${data.observations || ''}
-                    ${data.paymentMethod ? `<br>Método de pago: ${data.paymentMethod}` : ''}
-                    ${data.bank ? ` - ${data.bank}` : ''}
+                <div style="margin-top: 15px; border: 1px solid #000; padding: 8px; min-height: 40px;">
+                    <strong style="font-size: 10px;">OBSERVACIONES:</strong><br>
+                    <span style="font-size: 10px;">${data.observations || ''}</span>
+                    ${data.paymentMethod ? `<br><span style="font-size: 10px;">Método de pago: ${data.paymentMethod}</span>` : ''}
+                    ${data.bank ? `<span style="font-size: 10px;"> - ${data.bank}</span>` : ''}
                 </div>
 
                 <!-- Timestamp -->
-                <div style="margin-top: 10px; font-size: 10px; color: #666; text-align: right;">
+                <div style="margin-top: 8px; font-size: 8px; color: #666; text-align: right;">
                     Impreso: ${new Date(data.printedAt).toLocaleString('es-CO')}
                 </div>
             </div>
@@ -1108,7 +1108,7 @@ async function processPayment(studentId) {
 
 console.log('✅ Payments module loaded successfully');
 
-// Add print styles for invoices
+// Add print styles for invoices - UPDATED FOR HALF-LETTER SIZE
 if (!document.getElementById('invoicePrintStyles')) {
     const style = document.createElement('style');
     style.id = 'invoicePrintStyles';
@@ -1124,13 +1124,15 @@ if (!document.getElementById('invoicePrintStyles')) {
                 position: absolute;
                 left: 0;
                 top: 0;
+                width: 5.5in !important;
+                max-width: 5.5in !important;
             }
             .no-print {
                 display: none !important;
             }
             @page {
-                size: letter;
-                margin: 0.5in;
+                size: 5.5in 8.5in;
+                margin: 0.25in;
             }
         }
     `;
