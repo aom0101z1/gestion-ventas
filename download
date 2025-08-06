@@ -382,7 +382,23 @@ class InvoiceStorageManager {
         }
     }
 }
-
+// ===== NEW: HALF-PAGE INVOICE GENERATOR (2 PER PAGE) =====
+class HalfPageInvoiceGenerator {
+    constructor() {
+        this.invoicesPerPage = 2;
+        this.config = {
+            businessName: 'CIUDAD BILINGÜE',
+            nit: '9.764.924-1',
+            address: 'Cra 8. #22-52',
+            phones: '324 297 3737 - 315 640 6911',
+            email: 'contacto@ciudadbilingue.com',
+            whatsapp: '324 297 37 37'
+        };
+    }
+    
+    // [Add all the methods from the artifact here]
+    // generateHalfPageHTML, generatePage, generateSingleInvoice, etc.
+}
 // Invoice Generator for creating professional receipts
 const InvoiceGenerator = {
     config: {
@@ -494,58 +510,62 @@ const InvoiceGenerator = {
     },
 
     // Show invoice modal
-    showInvoiceModal(invoiceData) {
-        const existingModal = document.getElementById('invoiceModal');
-        if (existingModal) existingModal.remove();
-
-        const modal = document.createElement('div');
-        modal.id = 'invoiceModal';
-        modal.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 10000;
-            overflow-y: auto;
-        `;
-
-        // Check if invoice has storage URL for download button
-        const downloadButton = invoiceData.storageUrl ? 
-            `<button onclick="window.open('${invoiceData.storageUrl}', '_blank')" 
-                    style="background: #059669; color: white; padding: 10px 20px; margin: 0 10px; border: none; cursor: pointer; border-radius: 4px;">
-                ☁️ Descargar desde la nube
-            </button>` : '';
-
-        modal.innerHTML = `
-            <div style="background: white; padding: 20px; max-width: 600px; max-height: 90vh; overflow-y: auto; position: relative; margin: 20px;">
-                <button onclick="document.getElementById('invoiceModal').remove()" 
-                        style="position: absolute; right: 10px; top: 10px; background: red; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 4px;">✖</button>
-                
-                <div id="invoiceContent">
-                    ${this.getInvoiceHTML(invoiceData)}
-                </div>
-                
-                <div style="margin-top: 20px; text-align: center;" class="no-print">
-                    <button onclick="InvoiceGenerator.printInvoice()" 
-                            style="background: #3b82f6; color: white; padding: 10px 20px; margin: 0 10px; border: none; cursor: pointer; border-radius: 4px;">
-                        🖨️ Imprimir
-                    </button>
-                    <button onclick="InvoiceGenerator.saveAsPDF('${invoiceData.number}')" 
-                            style="background: #10b981; color: white; padding: 10px 20px; margin: 0 10px; border: none; cursor: pointer; border-radius: 4px;">
-                        📄 Guardar PDF
-                    </button>
-                    ${downloadButton}
-                </div>
+showInvoiceModal(invoiceData) {
+    const existingModal = document.getElementById('invoiceModal');
+    if (existingModal) existingModal.remove();
+    
+    const modal = document.createElement('div');
+    modal.id = 'invoiceModal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+        overflow-y: auto;
+    `;
+    
+    // Check if invoice has storage URL for download button
+    const downloadButton = invoiceData.storageUrl ? 
+        `<button onclick="window.open('${invoiceData.storageUrl}', '_blank')" 
+                style="background: #059669; color: white; padding: 10px 20px; margin: 0 10px; border: none; cursor: pointer; border-radius: 4px;">
+            ☁️ Descargar desde la nube
+        </button>` : '';
+    
+    modal.innerHTML = `
+        <div style="background: white; padding: 20px; max-width: 600px; max-height: 90vh; overflow-y: auto; position: relative; margin: 20px;">
+            <button onclick="document.getElementById('invoiceModal').remove()" 
+                    style="position: absolute; right: 10px; top: 10px; background: red; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 4px;">✖</button>
+            
+            <div id="invoiceContent">
+                ${this.getInvoiceHTML(invoiceData)}
             </div>
-        `;
-
-        document.body.appendChild(modal);
-    },
+            
+            <div style="margin-top: 20px; text-align: center;" class="no-print">
+                <button onclick="InvoiceGenerator.printInvoice()" 
+                        style="background: #3b82f6; color: white; padding: 10px 20px; margin: 0 10px; border: none; cursor: pointer; border-radius: 4px;">
+                    🖨️ Imprimir
+                </button>
+                <button onclick="printAsHalfPage('${invoiceData.number}')" 
+                        style="background: #8b5cf6; color: white; padding: 10px 20px; margin: 0 10px; border: none; cursor: pointer; border-radius: 4px;">
+                    📄 Imprimir Media Carta
+                </button>
+                <button onclick="InvoiceGenerator.saveAsPDF('${invoiceData.number}')" 
+                        style="background: #10b981; color: white; padding: 10px 20px; margin: 0 10px; border: none; cursor: pointer; border-radius: 4px;">
+                    📄 Guardar PDF
+                </button>
+                ${downloadButton}
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+},
 
     // Get invoice HTML - UPDATED WITH SMALLER SIZE
     getInvoiceHTML(data) {
@@ -944,10 +964,132 @@ window.downloadStoredInvoice = async function(invoiceNumber) {
         window.showNotification('❌ Error al descargar', 'error');
     }
 };
+window.downloadStoredInvoice = async function(invoiceNumber) {
+    try {
+        await window.InvoiceStorage.downloadInvoice(invoiceNumber);
+        window.showNotification('✅ Descarga iniciada', 'success');
+    } catch (error) {
+        console.error('Error downloading invoice:', error);
+        window.showNotification('❌ Error al descargar', 'error');
+    }
+};
 
+// ===== HALF-PAGE BATCH PRINTING FUNCTIONS =====
+
+// Print multiple invoices (2 per page)
+window.batchPrintHalfPageInvoices = async function(studentIds, month) {
+    try {
+        window.showNotification('📄 Generando comprobantes (2 por página)...', 'info');
+        
+        const invoices = [];
+        
+        for (const studentId of studentIds) {
+            const student = window.StudentManager?.students.get(studentId);
+            if (!student) continue;
+            
+            const invoice = {
+                number: await InvoiceGenerator.generateInvoiceNumber(studentId),
+                date: new Date().toISOString(),
+                studentName: student.nombre,
+                documentType: student.tipoDoc || 'C.C',
+                documentNumber: student.numDoc,
+                acudiente: student.acudiente,
+                items: [{
+                    quantity: 1,
+                    description: `Mensualidad ${month} - Grupo ${student.grupo || ''}`,
+                    unitPrice: student.valor || 0,
+                    total: student.valor || 0
+                }],
+                subtotal: student.valor || 0,
+                total: student.valor || 0,
+                paymentMethod: student.tipoPago || 'Por definir',
+                createdBy: window.FirebaseData?.currentUser?.email || 'Sistema'
+            };
+            
+            invoices.push(invoice);
+        }
+        
+        // Print all invoices (2 per page)
+        await window.HalfPageInvoiceGen.printInvoices(invoices);
+        
+        window.showNotification(`✅ ${invoices.length} comprobantes generados (2 por página)`, 'success');
+        
+    } catch (error) {
+        console.error('Error in batch print:', error);
+        window.showNotification('❌ Error en impresión masiva', 'error');
+    }
+}; // <-- Don't forget this closing bracket!
+
+// Print today's payments in half-page format
+window.printTodayPaymentsHalfPage = async function() {
+    const today = new Date().toISOString().split('T')[0];
+    const todayPayments = Array.from(window.PaymentManager.payments.values())
+        .filter(p => p.date.startsWith(today));
+    
+    if (todayPayments.length === 0) {
+        window.showNotification('No hay pagos de hoy para imprimir', 'info');
+        return;
+    }
+    
+    const invoices = [];
+    for (const payment of todayPayments) {
+        const student = window.StudentManager.students.get(payment.studentId);
+        if (!student) continue;
+        
+        invoices.push(window.HalfPageInvoiceGen.createInvoiceFromPayment(payment, student));
+    }
+    
+    await window.HalfPageInvoiceGen.printInvoices(invoices);
+};
+
+// Print single invoice as half-page
+window.printAsHalfPage = async function(invoiceNumber) {
+    try {
+        // Get invoice data
+        const db = window.firebaseModules.database;
+        const invoiceRef = db.ref(window.FirebaseData.database, `invoices/${invoiceNumber}`);
+        const snapshot = await db.get(invoiceRef);
+        
+        if (!snapshot.exists()) {
+            window.showNotification('❌ Comprobante no encontrado', 'error');
+            return;
+        }
+        
+        const invoiceData = snapshot.val();
+        
+        // Convert to half-page format
+        const halfPageInvoice = {
+            number: invoiceData.number,
+            date: invoiceData.date,
+            studentName: invoiceData.student.name,
+            documentType: invoiceData.student.tipoDoc,
+            documentNumber: invoiceData.student.nit,
+            items: invoiceData.items,
+            subtotal: invoiceData.subtotal,
+            total: invoiceData.total,
+            paymentMethod: invoiceData.paymentMethod,
+            bank: invoiceData.bank,
+            notes: invoiceData.observations,
+            createdBy: invoiceData.createdBy || 'Sistema'
+        };
+        
+        // Print single invoice (will appear on top half of page)
+        await window.HalfPageInvoiceGen.printInvoices([halfPageInvoice]);
+        
+    } catch (error) {
+        console.error('Error printing half-page:', error);
+        window.showNotification('❌ Error al imprimir', 'error');
+    }
+};
+
+// Then continue with your existing code:
+// Global instances
+window.PaymentManager = new PaymentManager();
+// ... etc
 // Global instances
 window.PaymentManager = new PaymentManager();
 window.InvoiceStorage = new InvoiceStorageManager(); // NEW: Initialize storage manager
+window.HalfPageInvoiceGen = new HalfPageInvoiceGenerator(); // NEW: Half-page invoice generator
 
 window.loadPaymentsTab = async function() {
     console.log('💰 Loading payments tab');
