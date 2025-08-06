@@ -713,10 +713,15 @@ const InvoiceGenerator = {
         }
     },
 
-    // Show invoice modal with FIXED buttons to prevent navigation
+    // Show invoice modal with FIXED z-index and timing
     showInvoiceModal(invoiceData) {
+        // First, remove any existing invoice modal
         const existingModal = document.getElementById('invoiceModal');
         if (existingModal) existingModal.remove();
+        
+        // IMPORTANT: Also ensure payment modal is closed
+        const paymentModal = document.getElementById('paymentModal');
+        if (paymentModal) paymentModal.remove();
 
         const modal = document.createElement('div');
         modal.id = 'invoiceModal';
@@ -726,11 +731,12 @@ const InvoiceGenerator = {
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.5);
+            background: rgba(0,0,0,0.7);
             display: flex;
             justify-content: center;
             align-items: center;
-            z-index: 9999;
+            z-index: 99999;
+            animation: fadeIn 0.3s ease-in;
         `;
         
         // Check if invoice has storage URL for download button
@@ -741,9 +747,9 @@ const InvoiceGenerator = {
             </button>` : '';
         
         modal.innerHTML = `
-            <div style="background: white; padding: 20px; max-width: 650px; max-height: 90vh; overflow-y: auto; position: relative; margin: 20px;">
+            <div style="background: white; padding: 20px; max-width: 650px; max-height: 90vh; overflow-y: auto; position: relative; margin: 20px; border-radius: 8px; box-shadow: 0 10px 50px rgba(0,0,0,0.3); animation: slideIn 0.3s ease-out;">
                 <button type="button" onclick="event.preventDefault(); event.stopPropagation(); document.getElementById('invoiceModal').remove(); return false;" 
-                        style="position: absolute; right: 10px; top: 10px; background: red; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 4px;">✖</button>
+                        style="position: absolute; right: 10px; top: 10px; background: red; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 4px; z-index: 100000;">✖</button>
                 
                 <div id="invoiceContent">
                     ${this.getInvoiceHTML(invoiceData)}
@@ -767,12 +773,37 @@ const InvoiceGenerator = {
             </div>
         `;
         
+        // Add animation styles if not already present
+        if (!document.getElementById('invoiceModalAnimations')) {
+            const style = document.createElement('style');
+            style.id = 'invoiceModalAnimations';
+            style.textContent = `
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                @keyframes slideIn {
+                    from { 
+                        opacity: 0;
+                        transform: translateY(-20px);
+                    }
+                    to { 
+                        opacity: 1;
+                        transform: translateY(0);
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        // Append to body
         document.body.appendChild(modal);
         
-        // Additional safeguard: After modal is added, ensure we're still on the right tab
+        // Force focus to the invoice modal
         setTimeout(() => {
-            // Force focus back to main window
-            window.focus();
+            modal.focus();
+            // Ensure it's on top
+            modal.style.zIndex = '99999';
         }, 100);
     },
 
@@ -1442,7 +1473,7 @@ window.exportPaymentReport = function() {
     // Implementation for CSV export would go here
 };
 
-// Enhanced processPayment function with automatic invoice generation
+// Enhanced processPayment function with FIXED timing for invoice modal
 async function processPayment(studentId) {
     try {
         const paymentData = {
@@ -1462,14 +1493,23 @@ async function processPayment(studentId) {
         // Generate invoice automatically (NOW WITH STORAGE)
         const invoiceData = await InvoiceGenerator.generateInvoice(payment, student);
         
+        // Show success notification
         window.showNotification('✅ Pago registrado exitosamente', 'success');
+        
+        // IMPORTANT: Close payment modal FIRST and wait a bit
         closePaymentModal();
         
-        // Show invoice modal immediately
-        InvoiceGenerator.showInvoiceModal(invoiceData);
+        // Wait for modal to fully close before showing invoice
+        setTimeout(() => {
+            // Show invoice modal after payment modal is gone
+            InvoiceGenerator.showInvoiceModal(invoiceData);
+        }, 300); // Give time for the payment modal to disappear
         
-        // Reload payments tab
-        loadPaymentsTab();
+        // Reload payments tab after a delay
+        setTimeout(() => {
+            loadPaymentsTab();
+        }, 500);
+        
     } catch (error) {
         console.error('❌ Error processing payment:', error);
         window.showNotification('❌ Error al registrar pago', 'error');
