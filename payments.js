@@ -664,7 +664,7 @@ const InvoiceGenerator = {
     },
 
     // Show invoice modal with fixed buttons
-    showInvoiceModal(invoiceData) {
+  showInvoiceModal(invoiceData) {
         const existingModal = document.getElementById('invoiceModal');
         if (existingModal) existingModal.remove();
 
@@ -685,14 +685,14 @@ const InvoiceGenerator = {
         
         // Check if invoice has storage URL for download button
         const downloadButton = invoiceData.storageUrl ? 
-            `<button onclick="window.open('${invoiceData.storageUrl}', '_blank')" 
+            `<button onclick="event.preventDefault(); event.stopPropagation(); window.open('${invoiceData.storageUrl}', '_blank'); return false;" 
                     style="background: #059669; color: white; padding: 12px 24px; margin: 0 10px; border: none; cursor: pointer; border-radius: 4px; font-size: 14px;">
                 ☁️ Descargar desde la nube
             </button>` : '';
         
         modal.innerHTML = `
             <div style="background: white; padding: 20px; max-width: 650px; max-height: 90vh; overflow-y: auto; position: relative; margin: 20px;">
-                <button onclick="document.getElementById('invoiceModal').remove()" 
+                <button onclick="event.preventDefault(); document.getElementById('invoiceModal').remove(); return false;" 
                         style="position: absolute; right: 10px; top: 10px; background: red; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 4px;">✖</button>
                 
                 <div id="invoiceContent">
@@ -700,15 +700,15 @@ const InvoiceGenerator = {
                 </div>
                 
                 <div style="margin-top: 20px; text-align: center;">
-                    <button onclick="printStandardInvoice()" 
+                    <button type="button" onclick="event.preventDefault(); event.stopPropagation(); printStandardInvoice(event); return false;" 
                             style="background: #3b82f6; color: white; padding: 12px 24px; margin: 0 10px; border: none; cursor: pointer; border-radius: 4px; font-size: 14px;">
                         🖨️ Imprimir Tamaño Carta
                     </button>
-                    <button onclick="printHalfPageInvoice()" 
+                    <button type="button" onclick="event.preventDefault(); event.stopPropagation(); printHalfPageInvoice(event); return false;" 
                             style="background: #E53E3E; color: white; padding: 12px 24px; margin: 0 10px; border: none; cursor: pointer; border-radius: 4px; font-size: 14px;">
                         📄 Imprimir 2 Copias (Media Carta)
                     </button>
-                    <button onclick="InvoiceGenerator.saveAsPDF('${invoiceData.number}')" 
+                    <button type="button" onclick="event.preventDefault(); event.stopPropagation(); InvoiceGenerator.saveAsPDF('${invoiceData.number}'); return false;" 
                             style="background: #10b981; color: white; padding: 12px 24px; margin: 0 10px; border: none; cursor: pointer; border-radius: 4px; font-size: 14px;">
                         💾 Guardar como PDF
                     </button>
@@ -719,7 +719,6 @@ const InvoiceGenerator = {
         
         document.body.appendChild(modal);
     },
-
     // Get invoice HTML - UPDATED WITH LOGO, FIXED DATE, AND COMPLETE INFO
     getInvoiceHTML(data) {
         const formatDate = (date) => {
