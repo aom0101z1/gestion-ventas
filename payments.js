@@ -1,7 +1,13 @@
-// payments.js - Payment Tracking Module with Color Status and Invoice Generation
+// ==================================================================================
+// PAYMENTS.JS - PAYMENT TRACKING MODULE WITH COLOR STATUS AND INVOICE GENERATION
+// ==================================================================================
+
 console.log('💰 Loading payments module...');
 
-// Payment Manager Class
+// ==================================================================================
+// SECTION 1: PAYMENT MANAGER CLASS - Core payment functionality and Firebase operations
+// ==================================================================================
+
 class PaymentManager {
     constructor() {
         this.payments = new Map();
@@ -177,7 +183,10 @@ class PaymentManager {
     }
 }
 
-// ===== NEW: INVOICE STORAGE MANAGER FOR FIREBASE STORAGE =====
+// ==================================================================================
+// SECTION 2: INVOICE STORAGE MANAGER - Firebase Storage integration for invoice files
+// ==================================================================================
+
 class InvoiceStorageManager {
     constructor() {
         this.storage = null;
@@ -383,7 +392,9 @@ class InvoiceStorageManager {
     }
 }
 
-// ===== FIXED INVOICE PRINTING FUNCTIONS - STAY IN PAYMENTS TAB =====
+// ==================================================================================
+// SECTION 3: PRINT FUNCTIONS - Fixed invoice printing without navigation issues
+// ==================================================================================
 
 // Single Invoice Print Handler - Standard size
 window.printStandardInvoice = function(event) {
@@ -603,7 +614,10 @@ window.printHalfPageInvoice = function(event) {
     return false; // Prevent any navigation
 };
 
-// Invoice Generator for creating professional receipts
+// ==================================================================================
+// SECTION 4: INVOICE GENERATOR - Professional receipt generation with storage integration
+// ==================================================================================
+
 const InvoiceGenerator = {
     config: {
         businessName: 'CIUDAD BILINGÜE',
@@ -1009,7 +1023,10 @@ const InvoiceGenerator = {
     }
 };
 
-// UI Functions
+// ==================================================================================
+// SECTION 5: UI RENDERING FUNCTIONS - Dashboard and table generation
+// ==================================================================================
+
 function renderPaymentDashboard() {
     return `
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
@@ -1032,9 +1049,6 @@ function renderPaymentDashboard() {
         </div>
     `;
 }
-
-// Updated renderPaymentTable function for payments.js
-// This adds row numbers to the payments table
 
 function renderPaymentTable(students) {
     if (!students.length) {
@@ -1185,6 +1199,10 @@ function renderPaymentModal(student) {
         </div>
     `;
 }
+
+// ==================================================================================
+// SECTION 6: WINDOW FUNCTIONS - Global event handlers and modal management
+// ==================================================================================
 
 // Add function to view/regenerate invoices from payment history
 window.viewPaymentInvoice = async function(paymentId) {
@@ -1346,6 +1364,10 @@ window.batchPrintHalfPage = function(invoices) {
     printWindow.document.close();
 };
 
+// ==================================================================================
+// SECTION 7: GLOBAL INSTANCES AND INITIALIZATION - Main entry points and setup
+// ==================================================================================
+
 // Global instances
 window.PaymentManager = new PaymentManager();
 window.InvoiceStorage = new InvoiceStorageManager();
@@ -1473,6 +1495,10 @@ window.exportPaymentReport = function() {
     // Implementation for CSV export would go here
 };
 
+// ==================================================================================
+// SECTION 8: PAYMENT PROCESSING - Core payment workflow with invoice generation
+// ==================================================================================
+
 // Enhanced processPayment function with FIXED timing for invoice modal
 async function processPayment(studentId) {
     try {
@@ -1515,6 +1541,10 @@ async function processPayment(studentId) {
         window.showNotification('❌ Error al registrar pago', 'error');
     }
 }
+
+// ==================================================================================
+// SECTION 9: STYLES AND UTILITIES - CSS styles and backward compatibility
+// ==================================================================================
 
 console.log('✅ Payments module loaded successfully');
 
