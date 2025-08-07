@@ -880,33 +880,47 @@ window.deleteUser = deleteUser;
 window.closeModal = closeModal;
 
 // Load admin tab function
+// Load admin tab function - REPLACE THE EXISTING ONE WITH THIS
 window.loadAdminTab = async function() {
-  console.log('🔐 Loading Admin tab');
+  console.log('🔐 Loading Admin tab (fixed version)');
   
-  const container = document.getElementById('adminContainer');
+  // Try both possible container IDs
+  let container = document.getElementById('adminContainer') || document.getElementById('admin');
+  
   if (!container) {
-    console.error('Admin container not found');
+    console.error('No admin container found');
     return;
   }
   
-  // Make sure container is visible
+  // Remove hidden class (your system uses this)
+  container.classList.remove('hidden');
+  // Also ensure display block
   container.style.display = 'block';
   
-  // Show loading
-  container.innerHTML = '<div style="text-align: center; padding: 3rem;"><div class="loading-spinner"></div> Cargando centro de administración...</div>';
-  
-  try {
-    // Initialize and render
-    const initialized = await window.AdminCenter.init();
+  // Check if already initialized
+  if (window.AdminCenter.initialized) {
+    console.log('Rendering admin...');
+    window.renderAdminCenter();
+  } else {
+    // Show loading message while initializing
+    container.innerHTML = '<div style="text-align: center; padding: 3rem;"><div class="loading-spinner"></div> Cargando centro de administración...</div>';
     
-    if (!initialized) {
+    // Initialize AdminCenter
+    const init = await window.AdminCenter.init();
+    
+    if (init) {
+      // Success - render the admin center
+      window.renderAdminCenter();
+    } else {
+      // No permissions
       container.innerHTML = `
         <div style="text-align: center; padding: 3rem; color: #dc2626;">
           ❌ No tienes permisos para acceder a esta sección
         </div>
       `;
-      return;
     }
+  }
+};
     
     // Render the admin center
     renderAdminCenter();
