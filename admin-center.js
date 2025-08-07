@@ -881,8 +881,9 @@ window.closeModal = closeModal;
 
 // Load admin tab function
 // Load admin tab function - REPLACE THE EXISTING ONE WITH THIS
+// Load admin tab function - REPLACE THE EXISTING ONE WITH THIS
 window.loadAdminTab = async function() {
-  console.log('🔐 Loading Admin tab');
+  console.log('🔐 Loading Admin tab (fixed version)');
   
   // Try both possible container IDs
   let container = document.getElementById('adminContainer') || document.getElementById('admin');
@@ -899,51 +900,28 @@ window.loadAdminTab = async function() {
   
   // Check if already initialized
   if (window.AdminCenter.initialized) {
-    console.log('Admin already initialized, rendering...');
+    console.log('Rendering admin...');
     window.renderAdminCenter();
-    return;
-  }
-  
-  // Show loading message while initializing
-  container.innerHTML = '<div style="text-align: center; padding: 3rem;"><div class="loading-spinner"></div> Cargando centro de administración...</div>';
-  
-  try {
-    // Initialize and render
-    const initialized = await window.AdminCenter.init();
+  } else {
+    // Show loading message while initializing
+    container.innerHTML = '<div style="text-align: center; padding: 3rem;"><div class="loading-spinner"></div> Cargando centro de administración...</div>';
     
-    if (!initialized) {
+    // Initialize AdminCenter
+    const init = await window.AdminCenter.init();
+    
+    if (init) {
+      // Success - render the admin center
+      window.renderAdminCenter();
+    } else {
+      // No permissions
       container.innerHTML = `
         <div style="text-align: center; padding: 3rem; color: #dc2626;">
           ❌ No tienes permisos para acceder a esta sección
         </div>
       `;
-      return;
     }
-    
-    // THIS IS THE KEY FIX - Call renderAdminCenter after successful init
-    console.log('Admin initialized, now rendering...');
-    window.renderAdminCenter();
-    
-  } catch (error) {
-    console.error('Error loading admin tab:', error);
-    container.innerHTML = `
-      <div style="text-align: center; padding: 3rem; color: #dc2626;">
-        ❌ Error al cargar: ${error.message}
-      </div>
-    `;
-  };
-    // Render the admin center
-    renderAdminCenter();
-  } catch (error) {
-    console.error('Error loading admin tab:', error);
-    container.innerHTML = `
-      <div style="text-align: center; padding: 3rem; color: #dc2626;">
-        ❌ Error al cargar el centro de administración: ${error.message}
-      </div>
-    `;
   }
 };
-
 // Add debug function
 window.debugAdminModule = function() {
   console.log('=== Admin Module Debug ===');
