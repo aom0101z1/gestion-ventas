@@ -77,21 +77,32 @@ class AdminCenterManager {
   }
 
   // Load audit log
-  async loadAuditLog() {
+async loadAuditLog() {
     try {
-      const db = window.firebaseModules.database;
-      const ref = db.ref(window.FirebaseData.database, 'auditLog');
-      const snapshot = await db.get(ref);
-      
-      if (snapshot.exists()) {
-        this.auditLog = Object.values(snapshot.val())
-          .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-          .slice(0, 100); // Last 100 entries
-      }
+        const db = window.firebaseModules.database;
+        const ref = db.ref(window.FirebaseData.database, 'auditLog');
+        const snapshot = await db.get(ref);
+        
+        if (snapshot.exists()) {
+            this.auditLog = Object.values(snapshot.val())
+                .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+                .slice(0, 100);
+        } else {
+            // Si no existe auditLog, crear array vacío
+            this.auditLog = [];
+            console.log('📋 No audit log entries yet');
+        }
     } catch (error) {
-      console.error('Error loading audit log:', error);
+        // Si hay error de permisos, continuar sin audit log
+        if (error.message && error.message.includes('Permission denied')) {
+            console.log('⚠️ No permission to read audit log - continuing without it');
+            this.auditLog = [];
+        } else {
+            console.error('Error loading audit log:', error);
+            this.auditLog = [];
+        }
     }
-  }
+}
 
   // Create user
   async createUser(userData) {
