@@ -28,8 +28,18 @@ class AdminCenterManager {
 
   // Initialize
   async init() {
-    if (this.initialized) return;
+    if (this.initialized) {
+      console.log('Admin Center already initialized');
+      return true;
+    }
+    
     console.log('🚀 Initializing Admin Center');
+    
+    // Check if Firebase is loaded
+    if (!window.FirebaseData || !window.firebaseModules) {
+      console.error('Firebase not loaded yet');
+      return false;
+    }
     
     // Check admin permission
     const user = window.FirebaseData?.currentUser;
@@ -39,17 +49,25 @@ class AdminCenterManager {
     }
 
     // Load current user role
-    const profile = await window.FirebaseData.loadUserProfile();
-    if (!profile?.role || (profile.role !== 'admin' && profile.role !== 'director')) {
-      console.error('Insufficient permissions');
+    try {
+      const profile = await window.FirebaseData.loadUserProfile();
+      console.log('User profile loaded:', profile);
+      
+      if (!profile?.role || (profile.role !== 'admin' && profile.role !== 'director')) {
+        console.error('Insufficient permissions. Role:', profile?.role);
+        return false;
+      }
+
+      this.currentAdmin = user;
+      await this.loadUsers();
+      await this.loadAuditLog();
+      this.initialized = true;
+      console.log('✅ Admin Center initialized successfully');
+      return true;
+    } catch (error) {
+      console.error('Error initializing Admin Center:', error);
       return false;
     }
-
-    this.currentAdmin = user;
-    await this.loadUsers();
-    await this.loadAuditLog();
-    this.initialized = true;
-    return true;
   }
 
   // Load all users
@@ -58,6 +76,8 @@ class AdminCenterManager {
       const db = window.firebaseModules.database;
       const ref = db.ref(window.FirebaseData.database, 'users');
       const snapshot = await db.get(ref);
+      
+      this.users.clear(); // Clear existing users
       
       if (snapshot.exists()) {
         snapshot.forEach(child => {
@@ -77,32 +97,30 @@ class AdminCenterManager {
   }
 
   // Load audit log
-async loadAuditLog() {
+  async loadAuditLog() {
     try {
-        const db = window.firebaseModules.database;
-        const ref = db.ref(window.FirebaseData.database, 'auditLog');
-        const snapshot = await db.get(ref);
-        
-        if (snapshot.exists()) {
-            this.auditLog = Object.values(snapshot.val())
-                .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-                .slice(0, 100);
-        } else {
-            // Si no existe auditLog, crear array vacío
-            this.auditLog = [];
-            console.log('📋 No audit log entries yet');
-        }
+      const db = window.firebaseModules.database;
+      const ref = db.ref(window.FirebaseData.database, 'auditLog');
+      const snapshot = await db.get(ref);
+      
+      if (snapshot.exists()) {
+        this.auditLog = Object.values(snapshot.val())
+          .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+          .slice(0, 100);
+      } else {
+        this.auditLog = [];
+        console.log('📋 No audit log entries yet');
+      }
     } catch (error) {
-        // Si hay error de permisos, continuar sin audit log
-        if (error.message && error.message.includes('Permission denied')) {
-            console.log('⚠️ No permission to read audit log - continuing without it');
-            this.auditLog = [];
-        } else {
-            console.error('Error loading audit log:', error);
-            this.auditLog = [];
-        }
+      if (error.message && error.message.includes('Permission denied')) {
+        console.log('⚠️ No permission to read audit log - continuing without it');
+        this.auditLog = [];
+      } else {
+        console.error('Error loading audit log:', error);
+        this.auditLog = [];
+      }
     }
-}
+  }
 
   // Create user
   async createUser(userData) {
@@ -301,7 +319,20 @@ async loadAuditLog() {
 // UI Rendering Functions
 function renderAdminCenter() {
   const container = document.getElementById('adminContainer');
-  if (!container) return;
+  if (!container) {
+    console.error('Admin container not found');
+    return;
+  }
+
+  if (!window.AdminCenter || !window.AdminCenter.initialized) {
+    console.error('Admin Center not initialized');
+    container.innerHTML = `
+      <div style="text-align: center; padding: 3rem; color: #dc2626;">
+        ❌ Error: Centro de administración no inicializado
+      </div>
+    `;
+    return;
+  }
 
   const stats = window.AdminCenter.getUserStats();
   
@@ -409,9 +440,9 @@ function renderUserCards() {
     const statusColor = user.status === 'active' ? '#10b981' : '#ef4444';
     const statusText = user.status === 'active' ? 'Activo' : 'Bloqueado';
     
-    // FIX: Verificar que name y email existan
+    // FIXED: Safe handling of missing name/email
     const userName = user.name || user.email || 'Usuario';
-    const firstLetter = userName[0] ? userName[0].toUpperCase() : 'U';
+    const firstLetter = userName && userName[0] ? userName[0].toUpperCase() : 'U';
     
     return `
       <div id="userCard-${user.id}" style="
@@ -588,6 +619,11 @@ function renderAuditLog() {
 // Modal for creating user
 function showCreateUserModal() {
   const modal = document.getElementById('adminModal');
+  if (!modal) {
+    console.error('Modal container not found');
+    return;
+  }
+  
   modal.innerHTML = `
     <div style="
       position: fixed;
@@ -718,12 +754,22 @@ async function handleCreateUser(event) {
   
   try {
     await window.AdminCenter.createUser({ name, email, password, permissions });
-    window.showNotification('✅ Usuario creado exitosamente', 'success');
+    
+    if (window.showNotification) {
+      window.showNotification('✅ Usuario creado exitosamente', 'success');
+    } else {
+      alert('✅ Usuario creado exitosamente');
+    }
+    
     closeModal();
     await window.AdminCenter.init();
     renderAdminCenter();
   } catch (error) {
-    window.showNotification('❌ Error: ' + error.message, 'error');
+    if (window.showNotification) {
+      window.showNotification('❌ Error: ' + error.message, 'error');
+    } else {
+      alert('❌ Error: ' + error.message);
+    }
   }
 }
 
@@ -737,9 +783,16 @@ async function toggleUserPermissions(userId) {
 async function updatePermission(userId, moduleId, allowed) {
   try {
     await window.AdminCenter.setModulePermission(userId, moduleId, allowed);
-    window.showNotification(`✅ Permiso ${allowed ? 'otorgado' : 'revocado'}`, 'success');
+    
+    if (window.showNotification) {
+      window.showNotification(`✅ Permiso ${allowed ? 'otorgado' : 'revocado'}`, 'success');
+    }
   } catch (error) {
-    window.showNotification('❌ Error actualizando permiso', 'error');
+    if (window.showNotification) {
+      window.showNotification('❌ Error actualizando permiso', 'error');
+    } else {
+      console.error('Error updating permission:', error);
+    }
   }
 }
 
@@ -748,10 +801,18 @@ async function toggleUserStatus(userId) {
   
   try {
     const newStatus = await window.AdminCenter.toggleUserStatus(userId);
-    window.showNotification(`✅ Usuario ${newStatus === 'active' ? 'activado' : 'bloqueado'}`, 'success');
+    
+    if (window.showNotification) {
+      window.showNotification(`✅ Usuario ${newStatus === 'active' ? 'activado' : 'bloqueado'}`, 'success');
+    }
+    
     renderAdminCenter();
   } catch (error) {
-    window.showNotification('❌ Error: ' + error.message, 'error');
+    if (window.showNotification) {
+      window.showNotification('❌ Error: ' + error.message, 'error');
+    } else {
+      alert('❌ Error: ' + error.message);
+    }
   }
 }
 
@@ -760,9 +821,18 @@ async function resetUserPassword(email) {
   
   try {
     await window.AdminCenter.resetPassword(email);
-    window.showNotification('✅ Email de reseteo enviado', 'success');
+    
+    if (window.showNotification) {
+      window.showNotification('✅ Email de reseteo enviado', 'success');
+    } else {
+      alert('✅ Email de reseteo enviado');
+    }
   } catch (error) {
-    window.showNotification('❌ Error: ' + error.message, 'error');
+    if (window.showNotification) {
+      window.showNotification('❌ Error: ' + error.message, 'error');
+    } else {
+      alert('❌ Error: ' + error.message);
+    }
   }
 }
 
@@ -771,19 +841,43 @@ async function deleteUser(userId) {
   
   try {
     await window.AdminCenter.deleteUser(userId);
-    window.showNotification('✅ Usuario eliminado', 'success');
+    
+    if (window.showNotification) {
+      window.showNotification('✅ Usuario eliminado', 'success');
+    } else {
+      alert('✅ Usuario eliminado');
+    }
+    
     renderAdminCenter();
   } catch (error) {
-    window.showNotification('❌ Error: ' + error.message, 'error');
+    if (window.showNotification) {
+      window.showNotification('❌ Error: ' + error.message, 'error');
+    } else {
+      alert('❌ Error: ' + error.message);
+    }
   }
 }
 
 function closeModal() {
-  document.getElementById('adminModal').innerHTML = '';
+  const modal = document.getElementById('adminModal');
+  if (modal) {
+    modal.innerHTML = '';
+  }
 }
 
 // Initialize Admin Center
 window.AdminCenter = new AdminCenterManager();
+
+// Expose functions globally
+window.renderAdminCenter = renderAdminCenter;
+window.showCreateUserModal = showCreateUserModal;
+window.handleCreateUser = handleCreateUser;
+window.toggleUserPermissions = toggleUserPermissions;
+window.updatePermission = updatePermission;
+window.toggleUserStatus = toggleUserStatus;
+window.resetUserPassword = resetUserPassword;
+window.deleteUser = deleteUser;
+window.closeModal = closeModal;
 
 // Load admin tab function
 window.loadAdminTab = async function() {
@@ -795,22 +889,63 @@ window.loadAdminTab = async function() {
     return;
   }
   
+  // Make sure container is visible
+  container.style.display = 'block';
+  
   // Show loading
-  container.innerHTML = '<div style="text-align: center; padding: 3rem;">Cargando centro de administración...</div>';
+  container.innerHTML = '<div style="text-align: center; padding: 3rem;"><div class="loading-spinner"></div> Cargando centro de administración...</div>';
   
-  // Initialize and render
-  const initialized = await window.AdminCenter.init();
-  
-  if (!initialized) {
+  try {
+    // Initialize and render
+    const initialized = await window.AdminCenter.init();
+    
+    if (!initialized) {
+      container.innerHTML = `
+        <div style="text-align: center; padding: 3rem; color: #dc2626;">
+          ❌ No tienes permisos para acceder a esta sección
+        </div>
+      `;
+      return;
+    }
+    
+    // Render the admin center
+    renderAdminCenter();
+  } catch (error) {
+    console.error('Error loading admin tab:', error);
     container.innerHTML = `
       <div style="text-align: center; padding: 3rem; color: #dc2626;">
-        ❌ No tienes permisos para acceder a esta sección
+        ❌ Error al cargar el centro de administración: ${error.message}
       </div>
     `;
-    return;
+  }
+};
+
+// Add debug function
+window.debugAdminModule = function() {
+  console.log('=== Admin Module Debug ===');
+  console.log('AdminCenter loaded:', !!window.AdminCenter);
+  console.log('loadAdminTab loaded:', !!window.loadAdminTab);
+  console.log('renderAdminCenter loaded:', !!window.renderAdminCenter);
+  
+  if (window.AdminCenter) {
+    console.log('AdminCenter initialized:', window.AdminCenter.initialized);
+    console.log('Current admin:', window.AdminCenter.currentAdmin);
+    console.log('Users loaded:', window.AdminCenter.users.size);
+    console.log('Audit log entries:', window.AdminCenter.auditLog.length);
   }
   
-  renderAdminCenter();
+  const container = document.getElementById('adminContainer');
+  console.log('Admin container exists:', !!container);
+  console.log('Container display:', container?.style.display);
+  
+  if (window.FirebaseData) {
+    console.log('Current user:', window.FirebaseData.currentUser?.email);
+    window.FirebaseData.loadUserProfile().then(profile => {
+      console.log('User profile:', profile);
+      console.log('User role:', profile?.role);
+    });
+  }
 };
 
 console.log('✅ Admin Center module loaded successfully');
+console.log('Use window.debugAdminModule() to debug');
