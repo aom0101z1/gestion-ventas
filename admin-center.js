@@ -409,6 +409,10 @@ function renderUserCards() {
     const statusColor = user.status === 'active' ? '#10b981' : '#ef4444';
     const statusText = user.status === 'active' ? 'Activo' : 'Bloqueado';
     
+    // FIX: Verificar que name y email existan
+    const userName = user.name || user.email || 'Usuario';
+    const firstLetter = userName[0] ? userName[0].toUpperCase() : 'U';
+    
     return `
       <div id="userCard-${user.id}" style="
         background: white;
@@ -433,11 +437,11 @@ function renderUserCards() {
             color: white;
             font-weight: bold;
             margin-right: 1rem;
-          ">${(user.name || user.email)[0].toUpperCase()}</div>
+          ">${firstLetter}</div>
           
           <div style="flex: 1;">
-            <div style="font-weight: 600; color: #1f2937;">${user.name || 'Sin nombre'}</div>
-            <div style="font-size: 0.875rem; color: #6b7280;">${user.email}</div>
+            <div style="font-weight: 600; color: #1f2937;">${userName}</div>
+            <div style="font-size: 0.875rem; color: #6b7280;">${user.email || 'Sin email'}</div>
           </div>
           
           <div style="display: flex; gap: 0.5rem;">
