@@ -933,7 +933,6 @@ window.loadAdminTab = async function() {
     `;
   }
 };
-    
     // Render the admin center
     renderAdminCenter();
   } catch (error) {
