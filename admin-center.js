@@ -931,8 +931,7 @@ window.loadAdminTab = async function() {
         ❌ Error al cargar: ${error.message}
       </div>
     `;
-  }
-};
+  };
     // Render the admin center
     renderAdminCenter();
   } catch (error) {
