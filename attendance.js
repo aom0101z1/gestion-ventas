@@ -1,5 +1,5 @@
 // attendance.js - Simplified Attendance System with Payment Integration
-console.log('📋 Loading attendance module v3.0...');
+console.log('📋 Loading attendance module v3.1...');
 
 // ==================================================================================
 // ATTENDANCE MANAGER CLASS
@@ -9,33 +9,41 @@ class AttendanceManager {
         this.attendanceRecords = new Map();
         this.substituteRecords = new Map();
         this.holidayCalendar = new Map();
-        this.paymentRates = new Map(); // Store teacher-group payment rates
+        this.paymentRates = new Map();
         this.initialized = false;
     }
 
-    // Initialize and load data from Firebase
+    // Initialize and load data from Firebase with better error handling
     async init() {
         if (this.initialized) return;
         console.log('🚀 Initializing Attendance Manager...');
         
         try {
-            // Load existing attendance records
-            await this.loadAttendanceRecords();
-            // Load payment rates
-            await this.loadPaymentRates();
-            // Load holidays
-            await this.loadHolidays();
+            // Load with error handling for each operation
+            const loadPromises = [
+                this.loadAttendanceRecords().catch(err => console.warn('⚠️ Could not load attendance records:', err)),
+                this.loadPaymentRates().catch(err => console.warn('⚠️ Could not load payment rates:', err)),
+                this.loadHolidays().catch(err => console.warn('⚠️ Could not load holidays:', err))
+            ];
+            
+            await Promise.allSettled(loadPromises);
             
             this.initialized = true;
             console.log('✅ Attendance Manager initialized');
         } catch (error) {
             console.error('❌ Error initializing Attendance Manager:', error);
+            this.initialized = true; // Mark as initialized anyway to prevent infinite loops
         }
     }
 
-    // Load attendance records from Firebase
+    // Load attendance records from Firebase with error handling
     async loadAttendanceRecords() {
         try {
+            if (!window.firebaseModules?.database || !window.FirebaseData?.database) {
+                console.warn('Firebase not ready for attendance records');
+                return;
+            }
+            
             const db = window.firebaseModules.database;
             const ref = db.ref(window.FirebaseData.database, 'attendance');
             const snapshot = await db.get(ref);
@@ -48,13 +56,22 @@ class AttendanceManager {
                 console.log(`✅ Loaded ${this.attendanceRecords.size} attendance records`);
             }
         } catch (error) {
-            console.error('❌ Error loading attendance records:', error);
+            if (error.code === 'PERMISSION_DENIED') {
+                console.warn('⚠️ No permission to read attendance records');
+            } else {
+                console.error('❌ Error loading attendance records:', error);
+            }
         }
     }
 
-    // Load payment rates from Firebase
+    // Load payment rates from Firebase with error handling
     async loadPaymentRates() {
         try {
+            if (!window.firebaseModules?.database || !window.FirebaseData?.database) {
+                console.warn('Firebase not ready for payment rates');
+                return;
+            }
+            
             const db = window.firebaseModules.database;
             const ref = db.ref(window.FirebaseData.database, 'paymentRates');
             const snapshot = await db.get(ref);
@@ -68,13 +85,22 @@ class AttendanceManager {
                 console.log(`✅ Loaded ${this.paymentRates.size} payment rates`);
             }
         } catch (error) {
-            console.error('❌ Error loading payment rates:', error);
+            if (error.code === 'PERMISSION_DENIED') {
+                console.warn('⚠️ No permission to read payment rates');
+            } else {
+                console.error('❌ Error loading payment rates:', error);
+            }
         }
     }
 
-    // Load holidays from Firebase
+    // Load holidays from Firebase with error handling
     async loadHolidays() {
         try {
+            if (!window.firebaseModules?.database || !window.FirebaseData?.database) {
+                console.warn('Firebase not ready for holidays');
+                return;
+            }
+            
             const db = window.firebaseModules.database;
             const ref = db.ref(window.FirebaseData.database, 'holidays');
             const snapshot = await db.get(ref);
@@ -87,7 +113,11 @@ class AttendanceManager {
                 console.log(`✅ Loaded ${this.holidayCalendar.size} holidays`);
             }
         } catch (error) {
-            console.error('❌ Error loading holidays:', error);
+            if (error.code === 'PERMISSION_DENIED') {
+                console.warn('⚠️ No permission to read holidays');
+            } else {
+                console.error('❌ Error loading holidays:', error);
+            }
         }
     }
 
@@ -144,15 +174,15 @@ class AttendanceManager {
         try {
             const attendanceDate = date || new Date().toISOString().split('T')[0];
             
-            // Ensure GroupsManager is initialized
-            if (!window.GroupsManager?.initialized) {
-                await window.GroupsManager?.init();
+            // Try to get group with error handling
+            let group = null;
+            if (window.GroupsManager?.groups) {
+                group = window.GroupsManager.groups.get(groupId);
             }
             
-            const group = window.GroupsManager?.groups.get(groupId);
-            
             if (!group) {
-                throw new Error('Grupo no encontrado');
+                console.warn('⚠️ Group not found, using defaults');
+                group = { name: 'Unknown Group', schedule: { time: '8:00-10:00' } };
             }
 
             // Get scheduled hours from group (parse schedule time)
@@ -228,6 +258,7 @@ class AttendanceManager {
             await db.set(ref, studentRecord);
             
             // Update local record
+            if (!attendance.students) attendance.students = {};
             attendance.students[studentId] = studentRecord;
             
             console.log('✅ Student attendance marked:', studentId, status);
@@ -241,8 +272,11 @@ class AttendanceManager {
     // Create substitute teacher record
     async createSubstituteRecord(groupId, substituteTeacherId, date, reason = '') {
         try {
-            const group = window.GroupsManager?.groups.get(groupId);
-            const originalTeacherId = group?.teacherId;
+            let group = null;
+            if (window.GroupsManager?.groups) {
+                group = window.GroupsManager.groups.get(groupId);
+            }
+            const originalTeacherId = group?.teacherId || 'unknown';
             
             // Mark original teacher as absent (0 hours)
             await this.markAbsentTeacher(groupId, originalTeacherId, date, reason);
@@ -266,7 +300,10 @@ class AttendanceManager {
     // Mark teacher as absent (0 hours with reason)
     async markAbsentTeacher(groupId, teacherId, date, reason = '') {
         try {
-            const group = window.GroupsManager?.groups.get(groupId);
+            let group = null;
+            if (window.GroupsManager?.groups) {
+                group = window.GroupsManager.groups.get(groupId);
+            }
             
             const record = {
                 id: `ABS-${Date.now()}`,
@@ -448,7 +485,9 @@ class AttendanceManager {
     async getStudentsForGroup(groupName) {
         // Ensure StudentManager is initialized
         if (!window.StudentManager?.initialized) {
-            await window.StudentManager?.init();
+            if (window.StudentManager?.init) {
+                await window.StudentManager.init();
+            }
         }
         
         let students = [];
@@ -466,17 +505,58 @@ class AttendanceManager {
 }
 
 // ==================================================================================
+// MODAL HELPER - Creates modals within the attendance container
+// ==================================================================================
+function createModalInContainer(modalId, modalContent) {
+    // Remove any existing modal with same ID
+    const existingModal = document.getElementById(modalId);
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // Try to find the attendance container first
+    let targetContainer = document.getElementById('attendanceContainer');
+    
+    // If not found, try the content area
+    if (!targetContainer) {
+        targetContainer = document.getElementById('contentArea');
+    }
+    
+    // If still not found, use body as last resort
+    if (!targetContainer) {
+        targetContainer = document.body;
+    }
+    
+    // Create modal wrapper
+    const modalWrapper = document.createElement('div');
+    modalWrapper.innerHTML = modalContent;
+    
+    // Append to target container
+    targetContainer.appendChild(modalWrapper.firstElementChild);
+}
+
+// ==================================================================================
 // UI RENDERING FUNCTIONS
 // ==================================================================================
 
 function renderAttendanceView() {
     const currentUser = window.FirebaseData?.currentUser;
-    const teachers = Array.from(window.TeacherManager?.teachers?.values() || []);
+    let teachers = [];
+    
+    // Safely get teachers
+    try {
+        if (window.TeacherManager?.teachers) {
+            teachers = Array.from(window.TeacherManager.teachers.values());
+        }
+    } catch (error) {
+        console.warn('Could not load teachers:', error);
+    }
+    
     const teacher = teachers.find(t => t.email === currentUser?.email);
     const isAdmin = !teacher;
     
     return `
-        <div style="min-height: 100vh; background: #f3f4f6; padding: 1rem;">
+        <div style="min-height: 100vh; background: #f3f4f6; padding: 1rem; position: relative;">
             <!-- Header -->
             <div style="background: white; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; 
                         box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
@@ -500,6 +580,9 @@ function renderAttendanceView() {
             
             <!-- Today's Summary -->
             <div id="todaySummaryContainer"></div>
+            
+            <!-- Modal Container for this module -->
+            <div id="attendanceModalsContainer"></div>
         </div>
     `;
 }
@@ -541,9 +624,16 @@ function renderTeacherControls(teacher) {
         `;
     }
     
-    // Get teacher's groups
-    const groups = Array.from(window.GroupsManager?.groups?.values() || [])
-        .filter(g => g.teacherId === teacher.id);
+    // Get teacher's groups safely
+    let groups = [];
+    try {
+        if (window.GroupsManager?.groups) {
+            groups = Array.from(window.GroupsManager.groups.values())
+                .filter(g => g.teacherId === teacher.id);
+        }
+    } catch (error) {
+        console.warn('Could not load groups:', error);
+    }
     
     return `
         <div style="background: white; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
@@ -570,7 +660,10 @@ function renderTeacherControls(teacher) {
 }
 
 async function renderStudentAttendanceList(attendanceId, groupId) {
-    const group = window.GroupsManager?.groups.get(groupId);
+    let group = null;
+    if (window.GroupsManager?.groups) {
+        group = window.GroupsManager.groups.get(groupId);
+    }
     
     // Get students for this group
     const students = await window.AttendanceManager.getStudentsForGroup(group?.name);
@@ -629,18 +722,29 @@ async function renderStudentAttendanceList(attendanceId, groupId) {
 }
 
 // ==================================================================================
-// MODAL FUNCTIONS
+// MODAL FUNCTIONS - Now render in attendance container
 // ==================================================================================
 
 window.showPaymentRatesModal = function() {
-    const teachers = Array.from(window.TeacherManager?.teachers?.values() || []);
-    const groups = Array.from(window.GroupsManager?.groups?.values() || []);
+    let teachers = [];
+    let groups = [];
+    
+    try {
+        if (window.TeacherManager?.teachers) {
+            teachers = Array.from(window.TeacherManager.teachers.values());
+        }
+        if (window.GroupsManager?.groups) {
+            groups = Array.from(window.GroupsManager.groups.values());
+        }
+    } catch (error) {
+        console.warn('Error loading data for modal:', error);
+    }
     
     const modal = `
         <div id="paymentRatesModal" style="
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(0,0,0,0.5); display: flex; align-items: center;
-            justify-content: center; z-index: 1000;">
+            justify-content: center; z-index: 9999;">
             <div style="background: white; padding: 2rem; border-radius: 8px; 
                         max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto;">
                 <h3>💰 Configurar Tarifa de Pago</h3>
@@ -686,7 +790,7 @@ window.showPaymentRatesModal = function() {
         </div>
     `;
     
-    document.body.insertAdjacentHTML('beforeend', modal);
+    createModalInContainer('paymentRatesModal', modal);
 };
 
 window.savePaymentRate = async function() {
@@ -718,14 +822,25 @@ window.savePaymentRate = async function() {
 };
 
 window.showAbsenceModal = function() {
-    const teachers = Array.from(window.TeacherManager?.teachers?.values() || []);
-    const groups = Array.from(window.GroupsManager?.groups?.values() || []);
+    let teachers = [];
+    let groups = [];
+    
+    try {
+        if (window.TeacherManager?.teachers) {
+            teachers = Array.from(window.TeacherManager.teachers.values());
+        }
+        if (window.GroupsManager?.groups) {
+            groups = Array.from(window.GroupsManager.groups.values());
+        }
+    } catch (error) {
+        console.warn('Error loading data for modal:', error);
+    }
     
     const modal = `
         <div id="absenceModal" style="
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(0,0,0,0.5); display: flex; align-items: center;
-            justify-content: center; z-index: 1000;">
+            justify-content: center; z-index: 9999;">
             <div style="background: white; padding: 2rem; border-radius: 8px; 
                         max-width: 400px; width: 90%;">
                 <h3>❌ Marcar Ausencia</h3>
@@ -779,18 +894,29 @@ window.showAbsenceModal = function() {
         </div>
     `;
     
-    document.body.insertAdjacentHTML('beforeend', modal);
+    createModalInContainer('absenceModal', modal);
 };
 
 window.showSubstituteModal = function() {
-    const groups = Array.from(window.GroupsManager?.groups?.values() || []);
-    const teachers = Array.from(window.TeacherManager?.teachers?.values() || []);
+    let teachers = [];
+    let groups = [];
+    
+    try {
+        if (window.TeacherManager?.teachers) {
+            teachers = Array.from(window.TeacherManager.teachers.values());
+        }
+        if (window.GroupsManager?.groups) {
+            groups = Array.from(window.GroupsManager.groups.values());
+        }
+    } catch (error) {
+        console.warn('Error loading data for modal:', error);
+    }
     
     const modal = `
         <div id="substituteModal" style="
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(0,0,0,0.5); display: flex; align-items: center;
-            justify-content: center; z-index: 1000;">
+            justify-content: center; z-index: 9999;">
             <div style="background: white; padding: 2rem; border-radius: 8px; 
                         max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto;">
                 <h3>🔄 Asignar Profesor Sustituto</h3>
@@ -799,12 +925,15 @@ window.showSubstituteModal = function() {
                     <label>Grupo</label>
                     <select id="substituteGroup" required style="width: 100%; padding: 0.75rem;">
                         <option value="">Seleccionar grupo...</option>
-                        ${groups.map(g => `
-                            <option value="${g.id}">
-                                ${g.name} - ${g.schedule?.days || ''} 
-                                (Prof. ${window.TeacherManager?.teachers.get(g.teacherId)?.name || 'N/A'})
-                            </option>
-                        `).join('')}
+                        ${groups.map(g => {
+                            const teacherName = window.TeacherManager?.teachers?.get(g.teacherId)?.name || 'N/A';
+                            return `
+                                <option value="${g.id}">
+                                    ${g.name} - ${g.schedule?.days || ''} 
+                                    (Prof. ${teacherName})
+                                </option>
+                            `;
+                        }).join('')}
                     </select>
                 </div>
                 
@@ -856,17 +985,25 @@ window.showSubstituteModal = function() {
         </div>
     `;
     
-    document.body.insertAdjacentHTML('beforeend', modal);
+    createModalInContainer('substituteModal', modal);
 };
 
 window.showHolidayModal = function() {
-    const teachers = Array.from(window.TeacherManager?.teachers?.values() || []);
+    let teachers = [];
+    
+    try {
+        if (window.TeacherManager?.teachers) {
+            teachers = Array.from(window.TeacherManager.teachers.values());
+        }
+    } catch (error) {
+        console.warn('Error loading teachers for modal:', error);
+    }
     
     const modal = `
         <div id="holidayModal" style="
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(0,0,0,0.5); display: flex; align-items: center;
-            justify-content: center; z-index: 1000;">
+            justify-content: center; z-index: 9999;">
             <div style="background: white; padding: 2rem; border-radius: 8px; 
                         max-width: 400px; width: 90%;">
                 <h3>🏖️ Configurar Festivo/Vacaciones</h3>
@@ -923,7 +1060,7 @@ window.showHolidayModal = function() {
         </div>
     `;
     
-    document.body.insertAdjacentHTML('beforeend', modal);
+    createModalInContainer('holidayModal', modal);
 };
 
 // ==================================================================================
@@ -944,34 +1081,59 @@ window.loadAttendanceTab = async function() {
     }
 
     try {
-        // Initialize all required managers
+        // Show loading state
+        container.innerHTML = '<div style="padding: 2rem; text-align: center;">⏳ Cargando módulo de asistencia...</div>';
+        
+        // Initialize all required managers with error handling
         const initPromises = [];
         
         if (window.TeacherManager && !window.TeacherManager.initialized) {
-            initPromises.push(window.TeacherManager.init());
+            initPromises.push(
+                window.TeacherManager.init()
+                    .catch(err => console.warn('⚠️ Could not initialize TeacherManager:', err))
+            );
         }
         
         if (window.GroupsManager && !window.GroupsManager.initialized) {
-            initPromises.push(window.GroupsManager.init());
+            initPromises.push(
+                window.GroupsManager.init()
+                    .catch(err => console.warn('⚠️ Could not initialize GroupsManager:', err))
+            );
         }
         
         if (window.StudentManager && !window.StudentManager.initialized) {
-            initPromises.push(window.StudentManager.init());
+            initPromises.push(
+                window.StudentManager.init()
+                    .catch(err => console.warn('⚠️ Could not initialize StudentManager:', err))
+            );
         }
         
         if (!window.AttendanceManager.initialized) {
-            initPromises.push(window.AttendanceManager.init());
+            initPromises.push(
+                window.AttendanceManager.init()
+                    .catch(err => console.warn('⚠️ Could not initialize AttendanceManager:', err))
+            );
         }
         
-        // Wait for all managers to initialize
-        await Promise.all(initPromises);
+        // Wait for all managers to initialize (with error handling)
+        await Promise.allSettled(initPromises);
         
+        // Render the attendance view
         container.innerHTML = renderAttendanceView();
         await window.loadTodayAttendance();
         
         // If admin, show admin view
         const currentUser = window.FirebaseData?.currentUser;
-        const teachers = Array.from(window.TeacherManager?.teachers?.values() || []);
+        let teachers = [];
+        
+        try {
+            if (window.TeacherManager?.teachers) {
+                teachers = Array.from(window.TeacherManager.teachers.values());
+            }
+        } catch (error) {
+            console.warn('Could not load teachers for admin check:', error);
+        }
+        
         const teacher = teachers.find(t => t.email === currentUser?.email);
         
         if (!teacher) {
@@ -983,7 +1145,14 @@ window.loadAttendanceTab = async function() {
         }
     } catch (error) {
         console.error('❌ Error loading attendance tab:', error);
-        container.innerHTML = '<p style="color: red;">Error al cargar el módulo de asistencia</p>';
+        container.innerHTML = `
+            <div style="padding: 2rem; text-align: center; color: red;">
+                <p>Error al cargar el módulo de asistencia</p>
+                <button onclick="window.loadAttendanceTab()" class="btn btn-primary">
+                    Reintentar
+                </button>
+            </div>
+        `;
     }
 };
 
@@ -1116,11 +1285,16 @@ window.saveHoliday = async function() {
 window.toggleTeacherSelect = function() {
     const type = document.getElementById('holidayType').value;
     const teacherGroup = document.getElementById('teacherSelectGroup');
-    teacherGroup.style.display = type === 'teacher' ? 'block' : 'none';
+    if (teacherGroup) {
+        teacherGroup.style.display = type === 'teacher' ? 'block' : 'none';
+    }
 };
 
 window.closeModal = function(modalId) {
-    document.getElementById(modalId)?.remove();
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.remove();
+    }
 };
 
 window.showAllTeachersAttendance = async function() {
@@ -1143,27 +1317,30 @@ window.showAllTeachersAttendance = async function() {
                         </tr>
                     </thead>
                     <tbody>
-                        ${records.map(r => `
-                            <tr>
-                                <td style="padding: 0.75rem; border: 1px solid #e5e7eb;">
-                                    ${window.TeacherManager?.teachers.get(r.teacherId)?.name || 'N/A'}
-                                </td>
-                                <td style="padding: 0.75rem; border: 1px solid #e5e7eb;">${r.groupName || 'N/A'}</td>
-                                <td style="padding: 0.75rem; border: 1px solid #e5e7eb;">${r.time}</td>
-                                <td style="padding: 0.75rem; border: 1px solid #e5e7eb;">${r.actualHours}</td>
-                                <td style="padding: 0.75rem; border: 1px solid #e5e7eb;">
-                                    <span style="
-                                        padding: 0.25rem 0.5rem; 
-                                        border-radius: 4px;
-                                        background: ${r.status === 'completed' ? '#dcfce7' : '#fef3c7'};
-                                        color: ${r.status === 'completed' ? '#14532d' : '#78350f'};
-                                        font-size: 0.875rem;
-                                    ">
-                                        ${r.status === 'completed' ? 'Completado' : 'Activo'}
-                                    </span>
-                                </td>
-                            </tr>
-                        `).join('')}
+                        ${records.map(r => {
+                            const teacherName = window.TeacherManager?.teachers?.get(r.teacherId)?.name || 'N/A';
+                            return `
+                                <tr>
+                                    <td style="padding: 0.75rem; border: 1px solid #e5e7eb;">
+                                        ${teacherName}
+                                    </td>
+                                    <td style="padding: 0.75rem; border: 1px solid #e5e7eb;">${r.groupName || 'N/A'}</td>
+                                    <td style="padding: 0.75rem; border: 1px solid #e5e7eb;">${r.time}</td>
+                                    <td style="padding: 0.75rem; border: 1px solid #e5e7eb;">${r.actualHours}</td>
+                                    <td style="padding: 0.75rem; border: 1px solid #e5e7eb;">
+                                        <span style="
+                                            padding: 0.25rem 0.5rem; 
+                                            border-radius: 4px;
+                                            background: ${r.status === 'completed' ? '#dcfce7' : '#fef3c7'};
+                                            color: ${r.status === 'completed' ? '#14532d' : '#78350f'};
+                                            font-size: 0.875rem;
+                                        ">
+                                            ${r.status === 'completed' ? 'Completado' : 'Activo'}
+                                        </span>
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('')}
                     </tbody>
                 </table>
             ` : '<p>No hay registros de asistencia para hoy</p>'}
@@ -1190,13 +1367,16 @@ window.renderAdminAttendanceView = async function() {
             
             <h4>Registros de Hoy</h4>
             <div style="display: grid; gap: 0.5rem;">
-                ${records.map(r => `
-                    <div style="padding: 1rem; background: #f9fafb; border-radius: 8px;">
-                        <strong>${r.groupName || 'Grupo'}</strong> - 
-                        ${window.TeacherManager?.teachers.get(r.teacherId)?.name || 'Profesor'}<br>
-                        <small>Hora: ${r.time} | Estado: ${r.status}</small>
-                    </div>
-                `).join('') || '<p>No hay clases registradas hoy</p>'}
+                ${records.map(r => {
+                    const teacherName = window.TeacherManager?.teachers?.get(r.teacherId)?.name || 'Profesor';
+                    return `
+                        <div style="padding: 1rem; background: #f9fafb; border-radius: 8px;">
+                            <strong>${r.groupName || 'Grupo'}</strong> - 
+                            ${teacherName}<br>
+                            <small>Hora: ${r.time} | Estado: ${r.status}</small>
+                        </div>
+                    `;
+                }).join('') || '<p>No hay clases registradas hoy</p>'}
             </div>
         </div>
     `;
@@ -1212,19 +1392,22 @@ window.loadTodayAttendance = async function() {
             <div style="background: white; padding: 1rem; border-radius: 8px;">
                 <h3 style="margin: 0 0 1rem 0;">📊 Resumen de Hoy</h3>
                 <div style="display: grid; gap: 0.5rem;">
-                    ${records.map(r => `
-                        <div style="padding: 0.75rem; background: #f9fafb; border-radius: 6px;">
-                            <div style="display: flex; justify-content: space-between;">
-                                <span><strong>${r.groupName}</strong></span>
-                                <span>${r.actualHours} horas</span>
+                    ${records.map(r => {
+                        const teacherName = window.TeacherManager?.teachers?.get(r.teacherId)?.name || 'N/A';
+                        return `
+                            <div style="padding: 0.75rem; background: #f9fafb; border-radius: 6px;">
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span><strong>${r.groupName}</strong></span>
+                                    <span>${r.actualHours} horas</span>
+                                </div>
+                                <div style="font-size: 0.875rem; color: #6b7280; margin-top: 0.25rem;">
+                                    ${teacherName} - 
+                                    ${r.time}
+                                    ${r.isSubstitute ? ' (Sustituto)' : ''}
+                                </div>
                             </div>
-                            <div style="font-size: 0.875rem; color: #6b7280; margin-top: 0.25rem;">
-                                ${window.TeacherManager?.teachers.get(r.teacherId)?.name || 'N/A'} - 
-                                ${r.time}
-                                ${r.isSubstitute ? ' (Sustituto)' : ''}
-                            </div>
-                        </div>
-                    `).join('')}
+                        `;
+                    }).join('')}
                 </div>
             </div>
         `;
@@ -1234,7 +1417,15 @@ window.loadTodayAttendance = async function() {
 window.showMonthlyReport = async function() {
     const currentMonth = new Date().getMonth() + 1;
     const currentYear = new Date().getFullYear();
-    const teachers = Array.from(window.TeacherManager?.teachers?.values() || []);
+    let teachers = [];
+    
+    try {
+        if (window.TeacherManager?.teachers) {
+            teachers = Array.from(window.TeacherManager.teachers.values());
+        }
+    } catch (error) {
+        console.warn('Could not load teachers for report:', error);
+    }
     
     let reportHTML = '<h3>📊 Reporte Mensual de Pagos</h3>';
     
@@ -1281,4 +1472,4 @@ if (!document.getElementById('attendance-styles')) {
     document.head.appendChild(styleEl);
 }
 
-console.log('✅ Attendance module v3.0 loaded successfully');
+console.log('✅ Attendance module v3.1 loaded successfully');
