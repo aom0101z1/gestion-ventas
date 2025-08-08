@@ -329,16 +329,16 @@ function renderAdminControls() {
         <div style="background: white; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
             <h3 style="margin: 0 0 1rem 0;">Control Administrativo</h3>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
-                <button onclick="showAllTeachersAttendance()" class="btn btn-primary">
+                <button onclick="window.showAllTeachersAttendance()" class="btn btn-primary">
                     👥 Ver Todos los Profesores
                 </button>
-                <button onclick="showSubstituteModal()" class="btn btn-secondary">
+                <button onclick="window.showSubstituteModal()" class="btn btn-secondary">
                     🔄 Asignar Sustituto
                 </button>
-                <button onclick="showHolidayModal()" class="btn btn-secondary">
+                <button onclick="window.showHolidayModal()" class="btn btn-secondary">
                     🏖️ Configurar Festivos
                 </button>
-                <button onclick="showAbsenceModal()" class="btn btn-warning">
+                <button onclick="window.showAbsenceModal()" class="btn btn-warning">
                     ❌ Marcar Ausencia
                 </button>
             </div>
@@ -356,7 +356,7 @@ function renderTeacherControls(teacher) {
             <h3 style="margin: 0 0 1rem 0;">Mis Grupos - ${teacher.name}</h3>
             <div style="display: grid; gap: 0.5rem;">
                 ${groups.map(group => `
-                    <button onclick="startAttendance('${group.id}', '${teacher.id}')" 
+                    <button onclick="window.startAttendance('${group.id}', '${teacher.id}')" 
                             class="btn btn-primary" style="padding: 1rem;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <span>${group.name}</span>
@@ -374,7 +374,19 @@ function renderTeacherControls(teacher) {
 
 function renderStudentAttendanceList(attendanceId, groupId) {
     const group = window.GroupsManager?.groups.get(groupId);
-    const students = window.StudentManager?.getStudents({ grupo: group?.name }) || [];
+    
+    // Check if StudentManager exists and has the right method
+    let students = [];
+    if (window.StudentManager) {
+        if (typeof window.StudentManager.getStudents === 'function') {
+            students = window.StudentManager.getStudents({ grupo: group?.name }) || [];
+        } else if (window.StudentManager.students) {
+            // If getStudents doesn't exist, try to get students directly
+            students = Array.from(window.StudentManager.students.values() || [])
+                .filter(s => s.grupo === group?.name);
+        }
+    }
+    
     const attendance = window.AttendanceManager.attendanceRecords.get(attendanceId);
     
     return `
@@ -395,15 +407,15 @@ function renderStudentAttendanceList(attendanceId, groupId) {
                                 </div>
                             </div>
                             <div style="display: flex; gap: 0.25rem;">
-                                <button onclick="markStudent('${attendanceId}', '${student.id}', 'present')" 
+                                <button onclick="window.markStudent('${attendanceId}', '${student.id}', 'present')" 
                                         class="btn btn-sm ${studentAttendance?.status === 'present' ? 'btn-success' : 'btn-secondary'}">
                                     ✅
                                 </button>
-                                <button onclick="markStudent('${attendanceId}', '${student.id}', 'late')" 
+                                <button onclick="window.markStudent('${attendanceId}', '${student.id}', 'late')" 
                                         class="btn btn-sm ${studentAttendance?.status === 'late' ? 'btn-warning' : 'btn-secondary'}">
                                     ⏰
                                 </button>
-                                <button onclick="markStudent('${attendanceId}', '${student.id}', 'absent')" 
+                                <button onclick="window.markStudent('${attendanceId}', '${student.id}', 'absent')" 
                                         class="btn btn-sm ${studentAttendance?.status === 'absent' ? 'btn-danger' : 'btn-secondary'}">
                                     ❌
                                 </button>
@@ -413,11 +425,219 @@ function renderStudentAttendanceList(attendanceId, groupId) {
                 }).join('')}
             </div>
             
-            <button onclick="completeAttendance('${attendanceId}')" 
+            <button onclick="window.completeAttendance('${attendanceId}')" 
                     class="btn btn-success" 
                     style="width: 100%; margin-top: 1rem; padding: 1rem;">
                 ✅ Completar Asistencia
             </button>
+        </div>
+    `;
+}
+
+// Add missing function for admin attendance view
+window.renderAdminAttendanceView = async function() {
+    const today = new Date().toISOString().split('T')[0];
+    const records = await window.AttendanceManager.getAttendanceRecords(today, today);
+    const pendingCount = records.filter(r => r.status === 'active').length;
+    
+    return `
+        <div style="background: white; padding: 1.5rem; border-radius: 8px;">
+            <h3>Vista Administrativa - Asistencias de Hoy</h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+                <div style="background: #e0f2fe; padding: 1rem; border-radius: 8px;">
+                    <strong>Clases Activas:</strong> ${pendingCount}
+                </div>
+                <div style="background: #dcfce7; padding: 1rem; border-radius: 8px;">
+                    <strong>Total Clases Hoy:</strong> ${records.length}
+                </div>
+            </div>
+            
+            <h4>Registros de Hoy</h4>
+            <div style="display: grid; gap: 0.5rem;">
+                ${records.map(r => `
+                    <div style="padding: 1rem; background: #f9fafb; border-radius: 8px;">
+                        <strong>${r.groupName || 'Grupo'}</strong> - 
+                        ${window.TeacherManager?.teachers.get(r.teacherId)?.name || 'Profesor'}<br>
+                        <small>Hora: ${r.time} | Estado: ${r.status}</small>
+                    </div>
+                `).join('') || '<p>No hay clases registradas hoy</p>'}
+            </div>
+        </div>
+    `;
+}
+
+// Add missing function for showing all teachers attendance
+window.showAllTeachersAttendance = async function() {
+    const container = document.getElementById('activeClassesContainer');
+    const today = new Date().toISOString().split('T')[0];
+    const records = await window.AttendanceManager.getAttendanceRecords(today, today);
+    
+    container.innerHTML = `
+        <div style="background: white; padding: 1.5rem; border-radius: 8px;">
+            <h3>Asistencias de Todos los Profesores - Hoy</h3>
+            ${records.length > 0 ? `
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background: #f9fafb;">
+                            <th style="padding: 0.75rem; border: 1px solid #e5e7eb;">Profesor</th>
+                            <th style="padding: 0.75rem; border: 1px solid #e5e7eb;">Grupo</th>
+                            <th style="padding: 0.75rem; border: 1px solid #e5e7eb;">Hora</th>
+                            <th style="padding: 0.75rem; border: 1px solid #e5e7eb;">Horas</th>
+                            <th style="padding: 0.75rem; border: 1px solid #e5e7eb;">Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${records.map(r => `
+                            <tr>
+                                <td style="padding: 0.75rem; border: 1px solid #e5e7eb;">
+                                    ${window.TeacherManager?.teachers.get(r.teacherId)?.name || 'N/A'}
+                                </td>
+                                <td style="padding: 0.75rem; border: 1px solid #e5e7eb;">${r.groupName || 'N/A'}</td>
+                                <td style="padding: 0.75rem; border: 1px solid #e5e7eb;">${r.time}</td>
+                                <td style="padding: 0.75rem; border: 1px solid #e5e7eb;">${r.actualHours}</td>
+                                <td style="padding: 0.75rem; border: 1px solid #e5e7eb;">
+                                    <span style="
+                                        padding: 0.25rem 0.5rem; 
+                                        border-radius: 4px;
+                                        background: ${r.status === 'completed' ? '#dcfce7' : '#fef3c7'};
+                                        color: ${r.status === 'completed' ? '#14532d' : '#78350f'};
+                                        font-size: 0.875rem;
+                                    ">
+                                        ${r.status === 'completed' ? 'Completado' : 'Activo'}
+                                    </span>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            ` : '<p>No hay registros de asistencia para hoy</p>'}
+        </div>
+    `;
+}
+
+// Add missing absence modal function
+window.showAbsenceModal = function() {
+    const teachers = Array.from(window.TeacherManager?.teachers.values() || []);
+    const groups = Array.from(window.GroupsManager?.groups.values() || []);
+    
+    const modal = `
+        <div id="absenceModal" style="
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5); display: flex; align-items: center;
+            justify-content: center; z-index: 1000;">
+            <div style="background: white; padding: 2rem; border-radius: 8px; 
+                        max-width: 400px; width: 90%;">
+                <h3>❌ Marcar Ausencia</h3>
+                
+                <div class="form-group">
+                    <label>Profesor</label>
+                    <select id="absenceTeacher" style="width: 100%; padding: 0.75rem;">
+                        <option value="">Seleccionar profesor...</option>
+                        ${teachers.map(t => `
+                            <option value="${t.id}">${t.name}</option>
+                        `).join('')}
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Grupo</label>
+                    <select id="absenceGroup" style="width: 100%; padding: 0.75rem;">
+                        <option value="">Seleccionar grupo...</option>
+                        ${groups.map(g => `
+                            <option value="${g.id}">${g.name}</option>
+                        `).join('')}
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Fecha</label>
+                    <input type="date" id="absenceDate" 
+                           value="${new Date().toISOString().split('T')[0]}"
+                           style="width: 100%; padding: 0.75rem;">
+                </div>
+                
+                <div class="form-group">
+                    <label>Razón</label>
+                    <textarea id="absenceReason" 
+                              placeholder="Motivo de la ausencia..."
+                              style="width: 100%; padding: 0.75rem;" 
+                              rows="3"></textarea>
+                </div>
+                
+                <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+                    <button onclick="window.closeModal('absenceModal')" 
+                            class="btn btn-secondary" style="flex: 1;">
+                        Cancelar
+                    </button>
+                    <button onclick="window.saveAbsence()" 
+                            class="btn btn-danger" style="flex: 1;">
+                        Marcar Ausencia
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modal);
+}
+
+// Add save absence function
+window.saveAbsence = async function() {
+    const teacherId = document.getElementById('absenceTeacher').value;
+    const groupId = document.getElementById('absenceGroup').value;
+    const date = document.getElementById('absenceDate').value;
+    const reason = document.getElementById('absenceReason').value;
+    
+    if (!teacherId || !groupId || !date) {
+        window.showNotification('⚠️ Complete todos los campos requeridos', 'warning');
+        return;
+    }
+    
+    try {
+        await window.AttendanceManager.markAbsentTeacher(groupId, teacherId, date, reason);
+        window.showNotification('✅ Ausencia registrada', 'success');
+        window.closeModal('absenceModal');
+        window.loadAttendanceTab();
+    } catch (error) {
+        console.error('Error marking absence:', error);
+        window.showNotification('❌ Error al marcar ausencia', 'error');
+    }
+};
+
+// Add function to show today's sessions
+window.showTodaySessions = async function() {
+    const container = document.getElementById('activeClassesContainer');
+    const today = new Date().toISOString().split('T')[0];
+    const currentUser = window.FirebaseData?.currentUser;
+    const teachers = Array.from(window.TeacherManager?.teachers.values() || []);
+    const teacher = teachers.find(t => t.email === currentUser?.email);
+    
+    const sessions = await window.AttendanceManager.getTodaySessions(teacher?.id);
+    
+    container.innerHTML = `
+        <div style="background: white; padding: 1.5rem; border-radius: 8px;">
+            <h3>📊 Sesiones de Hoy</h3>
+            ${sessions.length > 0 ? `
+                <div style="display: grid; gap: 0.5rem;">
+                    ${sessions.map(s => `
+                        <div style="padding: 1rem; background: ${s.status === 'active' ? '#fef3c7' : '#dcfce7'}; 
+                                    border-radius: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <strong>${window.GroupsManager?.groups.get(s.groupId)?.name || 'Grupo'}</strong><br>
+                                    <small>Inicio: ${s.checkIn} | Estado: ${s.status}</small>
+                                </div>
+                                ${s.status === 'active' ? `
+                                    <button onclick="window.loadAttendanceView('${s.id}')" 
+                                            class="btn btn-sm btn-primary">
+                                        Continuar
+                                    </button>
+                                ` : ''}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            ` : '<p>No hay sesiones registradas hoy</p>'}
         </div>
     `;
 }
@@ -484,11 +704,11 @@ function showSubstituteModal() {
                 </div>
                 
                 <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
-                    <button onclick="closeModal('substituteModal')" 
+                    <button onclick="window.closeModal('substituteModal')" 
                             class="btn btn-secondary" style="flex: 1;">
                         Cancelar
                     </button>
-                    <button onclick="assignSubstitute()" 
+                    <button onclick="window.assignSubstitute()" 
                             class="btn btn-primary" style="flex: 1;">
                         Asignar
                     </button>
@@ -500,7 +720,7 @@ function showSubstituteModal() {
     document.body.insertAdjacentHTML('beforeend', modal);
 }
 
-function showHolidayModal() {
+window.showHolidayModal = function() {
     const teachers = Array.from(window.TeacherManager?.teachers.values() || []);
     
     const modal = `
@@ -514,7 +734,7 @@ function showHolidayModal() {
                 
                 <div class="form-group">
                     <label>Tipo</label>
-                    <select id="holidayType" onchange="toggleTeacherSelect()" 
+                    <select id="holidayType" onchange="window.toggleTeacherSelect()" 
                             style="width: 100%; padding: 0.75rem;">
                         <option value="global">Festivo Global</option>
                         <option value="teacher">Vacaciones de Profesor</option>
@@ -551,11 +771,11 @@ function showHolidayModal() {
                 </div>
                 
                 <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
-                    <button onclick="closeModal('holidayModal')" 
+                    <button onclick="window.closeModal('holidayModal')" 
                             class="btn btn-secondary" style="flex: 1;">
                         Cancelar
                     </button>
-                    <button onclick="saveHoliday()" 
+                    <button onclick="window.saveHoliday()" 
                             class="btn btn-primary" style="flex: 1;">
                         Guardar
                     </button>
@@ -570,21 +790,56 @@ function showHolidayModal() {
 // Global Functions
 window.AttendanceManager = new AttendanceManager();
 
-window.loadAttendanceTab = function() {
-    const container = document.getElementById('attendanceContainer');
-    if (!container) return;
+window.loadAttendanceTab = async function() {
+    console.log('📋 Loading attendance tab');
     
-    container.innerHTML = renderAttendanceView();
-    loadTodayAttendance();
+    const container = document.getElementById('attendanceContainer');
+    if (!container) {
+        console.error('❌ Attendance container not found');
+        return;
+    }
+
+    try {
+        // Ensure managers are loaded
+        if (!window.TeacherManager || !window.GroupsManager) {
+            container.innerHTML = '<p>Cargando datos...</p>';
+            setTimeout(() => window.loadAttendanceTab(), 1000);
+            return;
+        }
+
+        container.innerHTML = renderAttendanceView();
+        await window.loadTodayAttendance();
+        
+        // If admin, show admin view
+        const currentUser = window.FirebaseData?.currentUser;
+        const teachers = Array.from(window.TeacherManager?.teachers.values() || []);
+        const teacher = teachers.find(t => t.email === currentUser?.email);
+        
+        if (!teacher) {
+            // Admin view - show today's summary
+            const summaryContainer = document.getElementById('todaySummaryContainer');
+            if (summaryContainer) {
+                summaryContainer.innerHTML = await window.renderAdminAttendanceView();
+            }
+        }
+    } catch (error) {
+        console.error('❌ Error loading attendance tab:', error);
+        container.innerHTML = '<p style="color: red;">Error al cargar el módulo de asistencia</p>';
+    }
 };
 
 window.startAttendance = async function(groupId, teacherId) {
     try {
+        console.log('Starting attendance for group:', groupId, 'teacher:', teacherId);
+        
+        // Create attendance record
         const record = await window.AttendanceManager.markClassAttendance(groupId, teacherId);
         
         // Show student list for marking attendance
         const container = document.getElementById('activeClassesContainer');
-        container.innerHTML = renderStudentAttendanceList(record.id, groupId);
+        if (container) {
+            container.innerHTML = renderStudentAttendanceList(record.id, groupId);
+        }
         
         window.showNotification('✅ Asistencia iniciada', 'success');
     } catch (error) {
@@ -619,7 +874,7 @@ window.completeAttendance = function(attendanceId) {
     if (record) {
         record.status = 'completed';
         window.showNotification('✅ Asistencia completada', 'success');
-        loadAttendanceTab();
+        window.loadAttendanceTab();
     }
 };
 
@@ -639,8 +894,8 @@ window.assignSubstitute = async function() {
         const fullReason = `${reason}: ${notes}`.trim();
         await window.AttendanceManager.createSubstituteRecord(groupId, teacherId, date, fullReason);
         window.showNotification('✅ Sustituto asignado', 'success');
-        closeModal('substituteModal');
-        loadAttendanceTab();
+        window.closeModal('substituteModal');
+        window.loadAttendanceTab();
     } catch (error) {
         console.error('Error assigning substitute:', error);
         window.showNotification('❌ Error al asignar sustituto', 'error');
@@ -670,7 +925,7 @@ window.saveHoliday = async function() {
         }
         
         window.showNotification('✅ Festivo/Vacaciones configurado', 'success');
-        closeModal('holidayModal');
+        window.closeModal('holidayModal');
     } catch (error) {
         console.error('Error setting holiday:', error);
         window.showNotification('❌ Error al configurar festivo', 'error');
@@ -687,12 +942,12 @@ window.closeModal = function(modalId) {
     document.getElementById(modalId)?.remove();
 };
 
-async function loadTodayAttendance() {
+window.loadTodayAttendance = async function() {
     const today = new Date().toISOString().split('T')[0];
     const records = await window.AttendanceManager.getAttendanceRecords(today, today);
     
     const container = document.getElementById('todaySummaryContainer');
-    if (records.length > 0) {
+    if (container && records.length > 0) {
         container.innerHTML = `
             <div style="background: white; padding: 1rem; border-radius: 8px;">
                 <h3 style="margin: 0 0 1rem 0;">📊 Resumen de Hoy</h3>
