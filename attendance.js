@@ -1,8 +1,9 @@
 // attendance.js - Simplified Attendance System with Payment Integration
-console.log('📋 Loading attendance module v3.2 - Fixed modal issues...');
+// Version 3.3 - With Section Numbers for Easy Maintenance
+console.log('📋 Loading attendance module v3.3 - Section numbered for maintenance...');
 
 // ==================================================================================
-// ATTENDANCE MANAGER CLASS
+// SECTION 1: ATTENDANCE MANAGER CLASS
 // ==================================================================================
 class AttendanceManager {
     constructor() {
@@ -13,17 +14,20 @@ class AttendanceManager {
         this.initialized = false;
     }
 
-    // Initialize and load data from Firebase with better error handling
+    // ==================================================================================
+    // SECTION 2: INITIALIZATION METHODS
+    // ==================================================================================
+    
+    // SECTION 2.1: Main initialization
     async init() {
         if (this.initialized) return;
         console.log('🚀 Initializing Attendance Manager...');
         
         try {
-            // Load with error handling for each operation
             const loadPromises = [
-                this.loadAttendanceRecords().catch(err => console.warn('⚠️ Could not load attendance records:', err)),
-                this.loadPaymentRates().catch(err => console.warn('⚠️ Could not load payment rates:', err)),
-                this.loadHolidays().catch(err => console.warn('⚠️ Could not load holidays:', err))
+                this.loadAttendanceRecords().catch(err => console.warn('⚠️ Could not load attendance records:', err.message || err)),
+                this.loadPaymentRates().catch(err => console.warn('⚠️ Could not load payment rates:', err.message || err)),
+                this.loadHolidays().catch(err => console.warn('⚠️ Could not load holidays:', err.message || err))
             ];
             
             await Promise.allSettled(loadPromises);
@@ -32,11 +36,11 @@ class AttendanceManager {
             console.log('✅ Attendance Manager initialized');
         } catch (error) {
             console.error('❌ Error initializing Attendance Manager:', error);
-            this.initialized = true; // Mark as initialized anyway to prevent infinite loops
+            this.initialized = true;
         }
     }
 
-    // Load attendance records from Firebase with error handling
+    // SECTION 2.2: Load attendance records from Firebase
     async loadAttendanceRecords() {
         try {
             if (!window.firebaseModules?.database || !window.FirebaseData?.database) {
@@ -64,7 +68,7 @@ class AttendanceManager {
         }
     }
 
-    // Load payment rates from Firebase with error handling
+    // SECTION 2.3: Load payment rates
     async loadPaymentRates() {
         try {
             if (!window.firebaseModules?.database || !window.FirebaseData?.database) {
@@ -93,7 +97,7 @@ class AttendanceManager {
         }
     }
 
-    // Load holidays from Firebase with error handling
+    // SECTION 2.4: Load holidays
     async loadHolidays() {
         try {
             if (!window.firebaseModules?.database || !window.FirebaseData?.database) {
@@ -121,23 +125,185 @@ class AttendanceManager {
         }
     }
 
-    // Get or create payment rate for teacher-group combination
+    // ==================================================================================
+    // SECTION 3: ATTENDANCE MANAGEMENT METHODS
+    // ==================================================================================
+
+    // SECTION 3.1: Mark class attendance
+    async markClassAttendance(groupId, teacherId, date = null, isSubstitute = false) {
+        try {
+            const attendanceDate = date || new Date().toISOString().split('T')[0];
+            
+            let group = null;
+            if (window.GroupsManager?.groups) {
+                try {
+                    group = window.GroupsManager.groups.get(groupId);
+                } catch (err) {
+                    console.warn('Could not get group:', err.message);
+                }
+            }
+            
+            if (!group) {
+                console.warn('⚠️ Group not found, using defaults');
+                group = { name: 'Unknown Group', schedule: { time: '8:00-10:00' } };
+            }
+
+            let scheduledHours = 2;
+            if (group.schedule?.time) {
+                const times = group.schedule.time.split('-');
+                if (times.length === 2) {
+                    const start = times[0].split(':');
+                    const end = times[1].split(':');
+                    const startHour = parseInt(start[0]) + (parseInt(start[1] || 0) / 60);
+                    const endHour = parseInt(end[0]) + (parseInt(end[1] || 0) / 60);
+                    scheduledHours = endHour - startHour;
+                    if (scheduledHours < 0) scheduledHours += 24;
+                }
+            }
+            if (group.schedule?.days?.includes('Sábado')) {
+                scheduledHours = 4;
+            }
+            
+            const record = {
+                id: `ATT-${Date.now()}`,
+                groupId,
+                groupName: group.name,
+                teacherId,
+                originalTeacherId: isSubstitute ? group.teacherId : null,
+                date: attendanceDate,
+                time: new Date().toLocaleTimeString('es-CO', { hour12: false }),
+                scheduledHours,
+                actualHours: scheduledHours,
+                students: {},
+                status: 'active',
+                isSubstitute,
+                paymentGenerated: false
+            };
+
+            const db = window.firebaseModules.database;
+            const ref = db.ref(window.FirebaseData.database, `attendance/${record.id}`);
+            await db.set(ref, record);
+            
+            this.attendanceRecords.set(record.id, record);
+            
+            await this.generatePaymentRecord(record);
+            
+            console.log('✅ Attendance record created:', record.id);
+            return record;
+        } catch (error) {
+            console.error('❌ Error creating attendance:', error);
+            throw error;
+        }
+    }
+
+    // SECTION 3.2: Mark student attendance
+    async markStudentAttendance(attendanceId, studentId, status = 'present') {
+        try {
+            const attendance = this.attendanceRecords.get(attendanceId);
+            if (!attendance) {
+                throw new Error('Registro de asistencia no encontrado');
+            }
+
+            const studentRecord = {
+                studentId,
+                status,
+                timestamp: new Date().toISOString()
+            };
+
+            const db = window.firebaseModules.database;
+            const ref = db.ref(window.FirebaseData.database, 
+                              `attendance/${attendanceId}/students/${studentId}`);
+            await db.set(ref, studentRecord);
+            
+            if (!attendance.students) attendance.students = {};
+            attendance.students[studentId] = studentRecord;
+            
+            console.log('✅ Student attendance marked:', studentId, status);
+            return true;
+        } catch (error) {
+            console.error('❌ Error marking student attendance:', error);
+            throw error;
+        }
+    }
+
+    // SECTION 3.3: Create substitute record
+    async createSubstituteRecord(groupId, substituteTeacherId, date, reason = '') {
+        try {
+            let group = null;
+            if (window.GroupsManager?.groups) {
+                group = window.GroupsManager.groups.get(groupId);
+            }
+            const originalTeacherId = group?.teacherId || 'unknown';
+            
+            await this.markAbsentTeacher(groupId, originalTeacherId, date, reason);
+            
+            const substituteRecord = await this.markClassAttendance(
+                groupId, 
+                substituteTeacherId, 
+                date, 
+                true
+            );
+            
+            console.log('✅ Substitute record created');
+            return substituteRecord;
+        } catch (error) {
+            console.error('❌ Error creating substitute record:', error);
+            throw error;
+        }
+    }
+
+    // SECTION 3.4: Mark teacher absent
+    async markAbsentTeacher(groupId, teacherId, date, reason = '') {
+        try {
+            let group = null;
+            if (window.GroupsManager?.groups) {
+                group = window.GroupsManager.groups.get(groupId);
+            }
+            
+            const record = {
+                id: `ABS-${Date.now()}`,
+                groupId,
+                groupName: group?.name || 'Unknown',
+                teacherId,
+                date,
+                scheduledHours: 0,
+                actualHours: 0,
+                reason,
+                status: 'absent',
+                paymentGenerated: true
+            };
+
+            const db = window.firebaseModules.database;
+            const ref = db.ref(window.FirebaseData.database, `absences/${record.id}`);
+            await db.set(ref, record);
+            
+            console.log('✅ Absence recorded:', record.id);
+            return record;
+        } catch (error) {
+            console.error('❌ Error recording absence:', error);
+            throw error;
+        }
+    }
+
+    // ==================================================================================
+    // SECTION 4: PAYMENT METHODS
+    // ==================================================================================
+
+    // SECTION 4.1: Get or create payment rate
     async getTeacherGroupRate(teacherId, groupId) {
         const key = `${teacherId}-${groupId}`;
         let rate = this.paymentRates.get(key);
         
         if (!rate) {
-            // If no specific rate, get teacher's default rate
             const teacher = window.TeacherManager?.teachers?.get(teacherId);
             if (teacher) {
                 rate = {
                     teacherId,
                     groupId,
-                    amount: teacher.hourlyRate || 17500, // Default rate
+                    amount: teacher.hourlyRate || 17500,
                     currency: 'COP',
                     type: 'hourly'
                 };
-                // Save the rate for future use
                 await this.savePaymentRate(rate);
             }
         }
@@ -145,7 +311,7 @@ class AttendanceManager {
         return rate;
     }
 
-    // Save payment rate
+    // SECTION 4.2: Save payment rate
     async savePaymentRate(rate) {
         try {
             const key = `${rate.teacherId}-${rate.groupId}`;
@@ -169,179 +335,12 @@ class AttendanceManager {
         }
     }
 
-    // Mark class attendance (simplified - no check-out needed)
-    async markClassAttendance(groupId, teacherId, date = null, isSubstitute = false) {
-        try {
-            const attendanceDate = date || new Date().toISOString().split('T')[0];
-            
-            // Try to get group with error handling
-            let group = null;
-            if (window.GroupsManager?.groups) {
-                try {
-                    group = window.GroupsManager.groups.get(groupId);
-                } catch (err) {
-                    console.warn('Could not get group:', err.message);
-                }
-            }
-            
-            if (!group) {
-                console.warn('⚠️ Group not found, using defaults');
-                group = { name: 'Unknown Group', schedule: { time: '8:00-10:00' } };
-            }
-
-            // Get scheduled hours from group (parse schedule time)
-            let scheduledHours = 2; // Default
-            if (group.schedule?.time) {
-                const times = group.schedule.time.split('-');
-                if (times.length === 2) {
-                    const start = times[0].split(':');
-                    const end = times[1].split(':');
-                    const startHour = parseInt(start[0]) + (parseInt(start[1] || 0) / 60);
-                    const endHour = parseInt(end[0]) + (parseInt(end[1] || 0) / 60);
-                    scheduledHours = endHour - startHour;
-                    if (scheduledHours < 0) scheduledHours += 24; // Handle overnight classes
-                }
-            }
-            // Special case for Saturday classes (4 hours)
-            if (group.schedule?.days?.includes('Sábado')) {
-                scheduledHours = 4;
-            }
-            
-            const record = {
-                id: `ATT-${Date.now()}`,
-                groupId,
-                groupName: group.name,
-                teacherId,
-                originalTeacherId: isSubstitute ? group.teacherId : null,
-                date: attendanceDate,
-                time: new Date().toLocaleTimeString('es-CO', { hour12: false }),
-                scheduledHours,
-                actualHours: scheduledHours, // Automatically use scheduled hours
-                students: {},
-                status: 'active',
-                isSubstitute,
-                paymentGenerated: false
-            };
-
-            // Save to Firebase
-            const db = window.firebaseModules.database;
-            const ref = db.ref(window.FirebaseData.database, `attendance/${record.id}`);
-            await db.set(ref, record);
-            
-            this.attendanceRecords.set(record.id, record);
-            
-            // Auto-generate payment record
-            await this.generatePaymentRecord(record);
-            
-            console.log('✅ Attendance record created:', record.id);
-            return record;
-        } catch (error) {
-            console.error('❌ Error creating attendance:', error);
-            throw error;
-        }
-    }
-
-    // Mark individual student attendance
-    async markStudentAttendance(attendanceId, studentId, status = 'present') {
-        try {
-            const attendance = this.attendanceRecords.get(attendanceId);
-            if (!attendance) {
-                throw new Error('Registro de asistencia no encontrado');
-            }
-
-            const studentRecord = {
-                studentId,
-                status, // 'present', 'absent', 'late'
-                timestamp: new Date().toISOString()
-            };
-
-            // Update Firebase
-            const db = window.firebaseModules.database;
-            const ref = db.ref(window.FirebaseData.database, 
-                              `attendance/${attendanceId}/students/${studentId}`);
-            await db.set(ref, studentRecord);
-            
-            // Update local record
-            if (!attendance.students) attendance.students = {};
-            attendance.students[studentId] = studentRecord;
-            
-            console.log('✅ Student attendance marked:', studentId, status);
-            return true;
-        } catch (error) {
-            console.error('❌ Error marking student attendance:', error);
-            throw error;
-        }
-    }
-
-    // Create substitute teacher record
-    async createSubstituteRecord(groupId, substituteTeacherId, date, reason = '') {
-        try {
-            let group = null;
-            if (window.GroupsManager?.groups) {
-                group = window.GroupsManager.groups.get(groupId);
-            }
-            const originalTeacherId = group?.teacherId || 'unknown';
-            
-            // Mark original teacher as absent (0 hours)
-            await this.markAbsentTeacher(groupId, originalTeacherId, date, reason);
-            
-            // Create attendance for substitute
-            const substituteRecord = await this.markClassAttendance(
-                groupId, 
-                substituteTeacherId, 
-                date, 
-                true // isSubstitute = true
-            );
-            
-            console.log('✅ Substitute record created');
-            return substituteRecord;
-        } catch (error) {
-            console.error('❌ Error creating substitute record:', error);
-            throw error;
-        }
-    }
-
-    // Mark teacher as absent (0 hours with reason)
-    async markAbsentTeacher(groupId, teacherId, date, reason = '') {
-        try {
-            let group = null;
-            if (window.GroupsManager?.groups) {
-                group = window.GroupsManager.groups.get(groupId);
-            }
-            
-            const record = {
-                id: `ABS-${Date.now()}`,
-                groupId,
-                groupName: group?.name || 'Unknown',
-                teacherId,
-                date,
-                scheduledHours: 0,
-                actualHours: 0,
-                reason, // sick, personal, no students, etc.
-                status: 'absent',
-                paymentGenerated: true // No payment for absent
-            };
-
-            // Save to Firebase
-            const db = window.firebaseModules.database;
-            const ref = db.ref(window.FirebaseData.database, `absences/${record.id}`);
-            await db.set(ref, record);
-            
-            console.log('✅ Absence recorded:', record.id);
-            return record;
-        } catch (error) {
-            console.error('❌ Error recording absence:', error);
-            throw error;
-        }
-    }
-
-    // Generate payment record automatically
+    // SECTION 4.3: Generate payment record
     async generatePaymentRecord(attendanceRecord) {
         try {
             if (attendanceRecord.paymentGenerated) return;
-            if (attendanceRecord.actualHours === 0) return; // No payment for 0 hours
+            if (attendanceRecord.actualHours === 0) return;
             
-            // Get payment rate from internal method
             const rate = await this.getTeacherGroupRate(
                 attendanceRecord.teacherId, 
                 attendanceRecord.groupId
@@ -365,16 +364,14 @@ class AttendanceManager {
                 total: attendanceRecord.actualHours * rate.amount,
                 status: 'pending',
                 isSubstitute: attendanceRecord.isSubstitute,
-                month: new Date(attendanceRecord.date).toISOString().slice(0, 7), // YYYY-MM
-                type: 'class' // To differentiate from monthly salary
+                month: new Date(attendanceRecord.date).toISOString().slice(0, 7),
+                type: 'class'
             };
 
-            // Save to Firebase
             const db = window.firebaseModules.database;
             const ref = db.ref(window.FirebaseData.database, `teacherPayments/${paymentRecord.id}`);
             await db.set(ref, paymentRecord);
             
-            // Update attendance record
             attendanceRecord.paymentGenerated = true;
             const attRef = db.ref(window.FirebaseData.database, 
                                  `attendance/${attendanceRecord.id}/paymentGenerated`);
@@ -387,19 +384,22 @@ class AttendanceManager {
         }
     }
 
-    // Set holiday (global or per teacher)
+    // ==================================================================================
+    // SECTION 5: HOLIDAY & REPORT METHODS
+    // ==================================================================================
+
+    // SECTION 5.1: Set holiday
     async setHoliday(date, type = 'global', teacherId = null, description = '') {
         try {
             const holiday = {
                 id: `HOL-${Date.now()}`,
                 date,
-                type, // 'global' or 'teacher'
+                type,
                 teacherId,
                 description,
                 createdAt: new Date().toISOString()
             };
 
-            // Save to Firebase
             const db = window.firebaseModules.database;
             const ref = db.ref(window.FirebaseData.database, `holidays/${holiday.id}`);
             await db.set(ref, holiday);
@@ -414,7 +414,7 @@ class AttendanceManager {
         }
     }
 
-    // Check if date is holiday
+    // SECTION 5.2: Check if holiday
     async isHoliday(date, teacherId = null) {
         const holiday = this.holidayCalendar.get(date);
         if (!holiday) return false;
@@ -425,7 +425,7 @@ class AttendanceManager {
         return false;
     }
 
-    // Get attendance records for a date range
+    // SECTION 5.3: Get attendance records
     async getAttendanceRecords(startDate, endDate, teacherId = null) {
         try {
             const db = window.firebaseModules.database;
@@ -448,7 +448,7 @@ class AttendanceManager {
         }
     }
 
-    // Get month summary for teacher
+    // SECTION 5.4: Get month summary
     async getMonthSummary(teacherId, year, month) {
         const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
         const endDate = `${year}-${String(month).padStart(2, '0')}-31`;
@@ -485,9 +485,8 @@ class AttendanceManager {
         return summary;
     }
 
-    // Get students for a group
+    // SECTION 5.5: Get students for group
     async getStudentsForGroup(groupName) {
-        // Ensure StudentManager is initialized
         if (!window.StudentManager?.initialized) {
             if (window.StudentManager?.init) {
                 await window.StudentManager.init();
@@ -496,7 +495,6 @@ class AttendanceManager {
         
         let students = [];
         
-        // Try different methods to get students
         if (window.StudentManager?.getStudents) {
             students = window.StudentManager.getStudents({ grupo: groupName });
         } else if (window.StudentManager?.students) {
@@ -506,48 +504,71 @@ class AttendanceManager {
         
         return students;
     }
+
+    // SECTION 5.6: Get all groups with students (NEW)
+    async getAllGroupsWithStudents() {
+        const groupsWithStudents = [];
+        
+        try {
+            // Get all groups
+            let groups = [];
+            if (window.GroupsManager?.groups) {
+                groups = Array.from(window.GroupsManager.groups.values());
+            }
+            
+            // For each group, get its students
+            for (const group of groups) {
+                const students = await this.getStudentsForGroup(group.name);
+                groupsWithStudents.push({
+                    ...group,
+                    students: students
+                });
+            }
+            
+            return groupsWithStudents;
+        } catch (error) {
+            console.error('Error getting groups with students:', error);
+            return [];
+        }
+    }
 }
 
 // ==================================================================================
-// MODAL HELPER - Creates modals within the attendance container
+// SECTION 6: MODAL HELPER FUNCTIONS
 // ==================================================================================
+
+// SECTION 6.1: Create modal in container
 function createModalInContainer(modalId, modalContent) {
-    // Remove any existing modal with same ID
     const existingModal = document.getElementById(modalId);
     if (existingModal) {
         existingModal.remove();
     }
     
-    // Try to find the attendance container first
     let targetContainer = document.getElementById('attendanceContainer');
     
-    // If not found, try the content area
     if (!targetContainer) {
         targetContainer = document.getElementById('contentArea');
     }
     
-    // If still not found, use body as last resort
     if (!targetContainer) {
         targetContainer = document.body;
     }
     
-    // Create modal wrapper
     const modalWrapper = document.createElement('div');
     modalWrapper.innerHTML = modalContent;
     
-    // Append to target container
     targetContainer.appendChild(modalWrapper.firstElementChild);
 }
 
 // ==================================================================================
-// UI RENDERING FUNCTIONS
+// SECTION 7: UI RENDERING FUNCTIONS - MAIN VIEWS
 // ==================================================================================
 
+// SECTION 7.1: Main attendance view
 function renderAttendanceView() {
     const currentUser = window.FirebaseData?.currentUser;
     let teachers = [];
     
-    // Safely get teachers
     try {
         if (window.TeacherManager?.teachers) {
             teachers = Array.from(window.TeacherManager.teachers.values());
@@ -583,6 +604,9 @@ function renderAttendanceView() {
             <!-- Active Classes Container -->
             <div id="activeClassesContainer"></div>
             
+            <!-- Groups List Container (NEW) -->
+            <div id="groupsListContainer"></div>
+            
             <!-- Today's Summary -->
             <div id="todaySummaryContainer"></div>
             
@@ -592,6 +616,7 @@ function renderAttendanceView() {
     `;
 }
 
+// SECTION 7.2: Admin controls
 function renderAdminControls() {
     return `
         <div style="background: white; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
@@ -600,14 +625,17 @@ function renderAdminControls() {
                 <button onclick="window.showAllTeachersAttendance()" class="btn btn-primary">
                     👥 Ver Todos los Profesores
                 </button>
+                <button onclick="window.showGroupsWithStudents()" class="btn btn-primary">
+                    📚 Ver Grupos y Estudiantes
+                </button>
                 <button onclick="window.showSubstituteModal()" class="btn btn-secondary">
                     🔄 Asignar Sustituto
                 </button>
-                <button onclick="window.showHolidayModal()" class="btn btn-secondary">
-                    🏖️ Configurar Festivos
-                </button>
                 <button onclick="window.showAbsenceModal()" class="btn btn-warning">
                     ❌ Marcar Ausencia
+                </button>
+                <button onclick="window.showHolidayModal()" class="btn btn-secondary">
+                    🏖️ Configurar Festivos
                 </button>
                 <button onclick="window.showPaymentRatesModal()" class="btn btn-info">
                     💰 Configurar Tarifas
@@ -620,6 +648,7 @@ function renderAdminControls() {
     `;
 }
 
+// SECTION 7.3: Teacher controls
 function renderTeacherControls(teacher) {
     if (!teacher) {
         return `
@@ -629,7 +658,6 @@ function renderTeacherControls(teacher) {
         `;
     }
     
-    // Get teacher's groups safely
     let groups = [];
     try {
         if (window.GroupsManager?.groups) {
@@ -665,15 +693,14 @@ function renderTeacherControls(teacher) {
     `;
 }
 
+// SECTION 7.4: Student attendance list
 async function renderStudentAttendanceList(attendanceId, groupId) {
     let group = null;
     if (window.GroupsManager?.groups) {
         group = window.GroupsManager.groups.get(groupId);
     }
     
-    // Get students for this group
     const students = await window.AttendanceManager.getStudentsForGroup(group?.name);
-    
     const attendance = window.AttendanceManager.attendanceRecords.get(attendanceId);
     
     return `
@@ -728,9 +755,10 @@ async function renderStudentAttendanceList(attendanceId, groupId) {
 }
 
 // ==================================================================================
-// MODAL FUNCTIONS - Now render in attendance container
+// SECTION 8: MODAL FUNCTIONS
 // ==================================================================================
 
+// SECTION 8.1: Payment rates modal
 window.showPaymentRatesModal = function() {
     let teachers = [];
     let groups = [];
@@ -806,39 +834,7 @@ window.showPaymentRatesModal = function() {
     createModalInContainer('paymentRatesModal', modal);
 };
 
-window.savePaymentRate = async function() {
-    const teacherId = document.getElementById('rateTeacher').value;
-    const groupId = document.getElementById('rateGroup').value;
-    const amount = parseFloat(document.getElementById('rateAmount').value);
-    
-    if (!teacherId || !groupId || !amount) {
-        window.showNotification('⚠️ Complete todos los campos', 'warning');
-        return;
-    }
-    
-    try {
-        const rate = {
-            teacherId,
-            groupId,
-            amount,
-            currency: 'COP',
-            type: 'hourly'
-        };
-        
-        await window.AttendanceManager.savePaymentRate(rate);
-        window.showNotification('✅ Tarifa guardada correctamente', 'success');
-        
-        // Close modal properly
-        const modal = document.getElementById('paymentRatesModal');
-        if (modal) {
-            modal.remove();
-        }
-    } catch (error) {
-        console.error('Error saving rate:', error);
-        window.showNotification('❌ Error al guardar tarifa', 'error');
-    }
-};
-
+// SECTION 8.2: Absence modal
 window.showAbsenceModal = function() {
     let teachers = [];
     let groups = [];
@@ -922,6 +918,7 @@ window.showAbsenceModal = function() {
     createModalInContainer('absenceModal', modal);
 };
 
+// SECTION 8.3: Substitute modal
 window.showSubstituteModal = function() {
     let teachers = [];
     let groups = [];
@@ -1020,6 +1017,7 @@ window.showSubstituteModal = function() {
     createModalInContainer('substituteModal', modal);
 };
 
+// SECTION 8.4: Holiday modal
 window.showHolidayModal = function() {
     let teachers = [];
     
@@ -1097,13 +1095,13 @@ window.showHolidayModal = function() {
 };
 
 // ==================================================================================
-// GLOBAL WINDOW FUNCTIONS
+// SECTION 9: WINDOW FUNCTIONS - ACTIONS
 // ==================================================================================
 
-// Initialize the manager
+// SECTION 9.1: Initialize manager
 window.AttendanceManager = new AttendanceManager();
 
-// Main loading function
+// SECTION 9.2: Main loading function
 window.loadAttendanceTab = async function() {
     console.log('📋 Loading attendance tab');
     
@@ -1114,10 +1112,8 @@ window.loadAttendanceTab = async function() {
     }
 
     try {
-        // Show loading state
         container.innerHTML = '<div style="padding: 2rem; text-align: center;">⏳ Cargando módulo de asistencia...</div>';
         
-        // Initialize all required managers with error handling
         const initPromises = [];
         
         if (window.TeacherManager && !window.TeacherManager.initialized) {
@@ -1160,14 +1156,11 @@ window.loadAttendanceTab = async function() {
             );
         }
         
-        // Wait for all managers to initialize (with error handling)
         await Promise.allSettled(initPromises);
         
-        // Render the attendance view
         container.innerHTML = renderAttendanceView();
         await window.loadTodayAttendance();
         
-        // If admin, show admin view
         const currentUser = window.FirebaseData?.currentUser;
         let teachers = [];
         
@@ -1183,7 +1176,6 @@ window.loadAttendanceTab = async function() {
         const teacher = teachers.find(t => t.email === currentUser?.email);
         
         if (!teacher) {
-            // Admin view - show today's summary
             const summaryContainer = document.getElementById('todaySummaryContainer');
             if (summaryContainer) {
                 summaryContainer.innerHTML = await window.renderAdminAttendanceView();
@@ -1202,14 +1194,13 @@ window.loadAttendanceTab = async function() {
     }
 };
 
+// SECTION 9.3: Start attendance
 window.startAttendance = async function(groupId, teacherId) {
     try {
         console.log('Starting attendance for group:', groupId, 'teacher:', teacherId);
         
-        // Create attendance record
         const record = await window.AttendanceManager.markClassAttendance(groupId, teacherId);
         
-        // Show student list for marking attendance
         const container = document.getElementById('activeClassesContainer');
         if (container) {
             container.innerHTML = await renderStudentAttendanceList(record.id, groupId);
@@ -1222,10 +1213,10 @@ window.startAttendance = async function(groupId, teacherId) {
     }
 };
 
+// SECTION 9.4: Mark student
 window.markStudent = async function(attendanceId, studentId, status) {
     await window.AttendanceManager.markStudentAttendance(attendanceId, studentId, status);
     
-    // Update button styles
     const buttons = document.querySelectorAll(`[onclick*="${studentId}"]`);
     buttons.forEach(btn => {
         btn.classList.remove('btn-success', 'btn-warning', 'btn-danger');
@@ -1243,6 +1234,7 @@ window.markStudent = async function(attendanceId, studentId, status) {
     }
 };
 
+// SECTION 9.5: Complete attendance
 window.completeAttendance = function(attendanceId) {
     const record = window.AttendanceManager.attendanceRecords.get(attendanceId);
     if (record) {
@@ -1252,6 +1244,40 @@ window.completeAttendance = function(attendanceId) {
     }
 };
 
+// SECTION 9.6: Save payment rate
+window.savePaymentRate = async function() {
+    const teacherId = document.getElementById('rateTeacher').value;
+    const groupId = document.getElementById('rateGroup').value;
+    const amount = parseFloat(document.getElementById('rateAmount').value);
+    
+    if (!teacherId || !groupId || !amount) {
+        window.showNotification('⚠️ Complete todos los campos', 'warning');
+        return;
+    }
+    
+    try {
+        const rate = {
+            teacherId,
+            groupId,
+            amount,
+            currency: 'COP',
+            type: 'hourly'
+        };
+        
+        await window.AttendanceManager.savePaymentRate(rate);
+        window.showNotification('✅ Tarifa guardada correctamente', 'success');
+        
+        const modal = document.getElementById('paymentRatesModal');
+        if (modal) {
+            modal.remove();
+        }
+    } catch (error) {
+        console.error('Error saving rate:', error);
+        window.showNotification('❌ Error al guardar tarifa', 'error');
+    }
+};
+
+// SECTION 9.7: Save absence
 window.saveAbsence = async function() {
     const teacherId = document.getElementById('absenceTeacher').value;
     const groupId = document.getElementById('absenceGroup').value;
@@ -1267,7 +1293,6 @@ window.saveAbsence = async function() {
         await window.AttendanceManager.markAbsentTeacher(groupId, teacherId, date, reason);
         window.showNotification('✅ Ausencia registrada', 'success');
         
-        // Close modal properly
         const modal = document.getElementById('absenceModal');
         if (modal) {
             modal.remove();
@@ -1280,6 +1305,7 @@ window.saveAbsence = async function() {
     }
 };
 
+// SECTION 9.8: Assign substitute
 window.assignSubstitute = async function() {
     const groupId = document.getElementById('substituteGroup').value;
     const teacherId = document.getElementById('substituteTeacher').value;
@@ -1297,7 +1323,6 @@ window.assignSubstitute = async function() {
         await window.AttendanceManager.createSubstituteRecord(groupId, teacherId, date, fullReason);
         window.showNotification('✅ Sustituto asignado', 'success');
         
-        // Close modal properly
         const modal = document.getElementById('substituteModal');
         if (modal) {
             modal.remove();
@@ -1310,6 +1335,7 @@ window.assignSubstitute = async function() {
     }
 };
 
+// SECTION 9.9: Save holiday
 window.saveHoliday = async function() {
     const type = document.getElementById('holidayType').value;
     const teacherId = type === 'teacher' ? document.getElementById('holidayTeacher').value : null;
@@ -1323,7 +1349,6 @@ window.saveHoliday = async function() {
     }
     
     try {
-        // Create holiday for each date in range
         const start = new Date(startDate);
         const end = new Date(endDate);
         
@@ -1334,7 +1359,6 @@ window.saveHoliday = async function() {
         
         window.showNotification('✅ Festivo/Vacaciones configurado', 'success');
         
-        // Close modal properly
         const modal = document.getElementById('holidayModal');
         if (modal) {
             modal.remove();
@@ -1345,6 +1369,7 @@ window.saveHoliday = async function() {
     }
 };
 
+// SECTION 9.10: Toggle teacher select
 window.toggleTeacherSelect = function() {
     const type = document.getElementById('holidayType').value;
     const teacherGroup = document.getElementById('teacherSelectGroup');
@@ -1353,15 +1378,14 @@ window.toggleTeacherSelect = function() {
     }
 };
 
+// SECTION 9.11: Close modal
 window.closeModal = function(modalId) {
-    // Try to find modal by ID
     const modal = document.getElementById(modalId);
     if (modal) {
         modal.remove();
         return;
     }
     
-    // If no ID provided or modal not found, try to close any open modal
     const modals = document.querySelectorAll('[id$="Modal"]');
     modals.forEach(modal => {
         if (modal && modal.style.position === 'fixed') {
@@ -1370,10 +1394,24 @@ window.closeModal = function(modalId) {
     });
 };
 
+// ==================================================================================
+// SECTION 10: REPORT FUNCTIONS
+// ==================================================================================
+
+// SECTION 10.1: Show all teachers attendance (FIXED)
 window.showAllTeachersAttendance = async function() {
     const container = document.getElementById('activeClassesContainer');
     const today = new Date().toISOString().split('T')[0];
+    
+    // First ensure GroupsManager is loaded
+    if (!window.GroupsManager?.initialized) {
+        await window.GroupsManager?.init();
+    }
+    
     const records = await window.AttendanceManager.getAttendanceRecords(today, today);
+    
+    // Get groups data for display
+    const groupsData = window.GroupsManager?.groups || new Map();
     
     container.innerHTML = `
         <div style="background: white; padding: 1.5rem; border-radius: 8px;">
@@ -1384,20 +1422,27 @@ window.showAllTeachersAttendance = async function() {
                         <tr style="background: #f9fafb;">
                             <th style="padding: 0.75rem; border: 1px solid #e5e7eb;">Profesor</th>
                             <th style="padding: 0.75rem; border: 1px solid #e5e7eb;">Grupo</th>
+                            <th style="padding: 0.75rem; border: 1px solid #e5e7eb;">Estudiantes</th>
                             <th style="padding: 0.75rem; border: 1px solid #e5e7eb;">Hora</th>
                             <th style="padding: 0.75rem; border: 1px solid #e5e7eb;">Horas</th>
                             <th style="padding: 0.75rem; border: 1px solid #e5e7eb;">Estado</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${records.map(r => {
+                        ${await Promise.all(records.map(async r => {
                             const teacherName = window.TeacherManager?.teachers?.get(r.teacherId)?.name || 'N/A';
+                            const group = groupsData.get(r.groupId);
+                            const students = await window.AttendanceManager.getStudentsForGroup(group?.name || r.groupName);
+                            
                             return `
                                 <tr>
                                     <td style="padding: 0.75rem; border: 1px solid #e5e7eb;">
                                         ${teacherName}
                                     </td>
                                     <td style="padding: 0.75rem; border: 1px solid #e5e7eb;">${r.groupName || 'N/A'}</td>
+                                    <td style="padding: 0.75rem; border: 1px solid #e5e7eb; text-align: center;">
+                                        ${students.length}
+                                    </td>
                                     <td style="padding: 0.75rem; border: 1px solid #e5e7eb;">${r.time}</td>
                                     <td style="padding: 0.75rem; border: 1px solid #e5e7eb;">${r.actualHours}</td>
                                     <td style="padding: 0.75rem; border: 1px solid #e5e7eb;">
@@ -1413,7 +1458,7 @@ window.showAllTeachersAttendance = async function() {
                                     </td>
                                 </tr>
                             `;
-                        }).join('')}
+                        })).then(rows => rows.join(''))}
                     </tbody>
                 </table>
             ` : '<p>No hay registros de asistencia para hoy</p>'}
@@ -1421,6 +1466,56 @@ window.showAllTeachersAttendance = async function() {
     `;
 };
 
+// SECTION 10.2: Show groups with students (NEW)
+window.showGroupsWithStudents = async function() {
+    const container = document.getElementById('groupsListContainer');
+    
+    // Get all groups with their students
+    const groupsWithStudents = await window.AttendanceManager.getAllGroupsWithStudents();
+    
+    container.innerHTML = `
+        <div style="background: white; padding: 1.5rem; border-radius: 8px; margin-top: 1rem;">
+            <h3>📚 Todos los Grupos y sus Estudiantes</h3>
+            ${groupsWithStudents.length === 0 ? 
+                '<p>No hay grupos disponibles</p>' :
+                groupsWithStudents.map(group => `
+                    <div style="margin-bottom: 1.5rem; padding: 1rem; background: #f9fafb; border-radius: 8px;">
+                        <h4 style="margin: 0 0 0.5rem 0; color: #1f2937;">
+                            ${group.name} 
+                            <span style="font-size: 0.875rem; color: #6b7280;">
+                                (${group.students.length} estudiantes)
+                            </span>
+                        </h4>
+                        <div style="font-size: 0.875rem; color: #6b7280; margin-bottom: 1rem;">
+                            Profesor: ${window.TeacherManager?.teachers?.get(group.teacherId)?.name || 'Sin asignar'} | 
+                            Horario: ${group.schedule?.days || 'N/A'} ${group.schedule?.time || ''}
+                        </div>
+                        ${group.students.length === 0 ? 
+                            '<p style="color: #ef4444;">No hay estudiantes en este grupo</p>' :
+                            `<div style="display: grid; gap: 0.5rem;">
+                                ${group.students.map(student => `
+                                    <div style="padding: 0.5rem; background: white; border-radius: 4px; 
+                                                display: flex; justify-content: space-between; align-items: center;">
+                                        <span>${student.nombre}</span>
+                                        <span style="font-size: 0.75rem; color: #6b7280;">
+                                            ${student.telefono || 'Sin teléfono'}
+                                        </span>
+                                    </div>
+                                `).join('')}
+                            </div>`
+                        }
+                        <button onclick="window.startAttendance('${group.id}', '${group.teacherId}')" 
+                                class="btn btn-primary" style="margin-top: 1rem;">
+                            📋 Tomar Asistencia
+                        </button>
+                    </div>
+                `).join('')
+            }
+        </div>
+    `;
+};
+
+// SECTION 10.3: Admin attendance view
 window.renderAdminAttendanceView = async function() {
     const today = new Date().toISOString().split('T')[0];
     const records = await window.AttendanceManager.getAttendanceRecords(today, today);
@@ -1455,6 +1550,7 @@ window.renderAdminAttendanceView = async function() {
     `;
 };
 
+// SECTION 10.4: Load today attendance
 window.loadTodayAttendance = async function() {
     const today = new Date().toISOString().split('T')[0];
     const records = await window.AttendanceManager.getAttendanceRecords(today, today);
@@ -1487,6 +1583,7 @@ window.loadTodayAttendance = async function() {
     }
 };
 
+// SECTION 10.5: Monthly report
 window.showMonthlyReport = async function() {
     const currentMonth = new Date().getMonth() + 1;
     const currentYear = new Date().getFullYear();
@@ -1528,7 +1625,9 @@ window.showMonthlyReport = async function() {
     }
 };
 
-// Add button styles
+// ==================================================================================
+// SECTION 11: STYLES
+// ==================================================================================
 const attendanceStyles = `
     .btn-success { background: #10b981 !important; }
     .btn-warning { background: #f59e0b !important; }
@@ -1546,4 +1645,4 @@ if (!document.getElementById('attendance-styles')) {
     document.head.appendChild(styleEl);
 }
 
-console.log('✅ Attendance module v3.2 loaded successfully - Modal issues fixed');
+console.log('✅ Attendance module v3.3 loaded successfully - With section numbers for maintenance');
