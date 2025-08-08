@@ -1,5 +1,5 @@
 // attendance.js - Simplified Attendance System with Payment Integration
-console.log('📋 Loading attendance module v3.1...');
+console.log('📋 Loading attendance module v3.2 - Fixed modal issues...');
 
 // ==================================================================================
 // ATTENDANCE MANAGER CLASS
@@ -177,7 +177,11 @@ class AttendanceManager {
             // Try to get group with error handling
             let group = null;
             if (window.GroupsManager?.groups) {
-                group = window.GroupsManager.groups.get(groupId);
+                try {
+                    group = window.GroupsManager.groups.get(groupId);
+                } catch (err) {
+                    console.warn('Could not get group:', err.message);
+                }
             }
             
             if (!group) {
@@ -549,7 +553,8 @@ function renderAttendanceView() {
             teachers = Array.from(window.TeacherManager.teachers.values());
         }
     } catch (error) {
-        console.warn('Could not load teachers:', error);
+        console.warn('Could not load teachers:', error.message);
+        teachers = [];
     }
     
     const teacher = teachers.find(t => t.email === currentUser?.email);
@@ -632,7 +637,8 @@ function renderTeacherControls(teacher) {
                 .filter(g => g.teacherId === teacher.id);
         }
     } catch (error) {
-        console.warn('Could not load groups:', error);
+        console.warn('Could not load groups for teacher:', error.message);
+        groups = [];
     }
     
     return `
@@ -733,11 +739,18 @@ window.showPaymentRatesModal = function() {
         if (window.TeacherManager?.teachers) {
             teachers = Array.from(window.TeacherManager.teachers.values());
         }
+    } catch (error) {
+        console.warn('Error loading teachers for modal:', error.message);
+        teachers = [];
+    }
+    
+    try {
         if (window.GroupsManager?.groups) {
             groups = Array.from(window.GroupsManager.groups.values());
         }
     } catch (error) {
-        console.warn('Error loading data for modal:', error);
+        console.warn('Error loading groups for modal:', error.message);
+        groups = [];
     }
     
     const modal = `
@@ -777,7 +790,7 @@ window.showPaymentRatesModal = function() {
                 </div>
                 
                 <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
-                    <button onclick="window.closeModal('paymentRatesModal')" 
+                    <button onclick="(function(){ const m = document.getElementById('paymentRatesModal'); if(m) m.remove(); })()" 
                             class="btn btn-secondary" style="flex: 1;">
                         Cancelar
                     </button>
@@ -814,7 +827,12 @@ window.savePaymentRate = async function() {
         
         await window.AttendanceManager.savePaymentRate(rate);
         window.showNotification('✅ Tarifa guardada correctamente', 'success');
-        window.closeModal('paymentRatesModal');
+        
+        // Close modal properly
+        const modal = document.getElementById('paymentRatesModal');
+        if (modal) {
+            modal.remove();
+        }
     } catch (error) {
         console.error('Error saving rate:', error);
         window.showNotification('❌ Error al guardar tarifa', 'error');
@@ -829,11 +847,18 @@ window.showAbsenceModal = function() {
         if (window.TeacherManager?.teachers) {
             teachers = Array.from(window.TeacherManager.teachers.values());
         }
+    } catch (error) {
+        console.warn('Error loading teachers for modal:', error.message);
+        teachers = [];
+    }
+    
+    try {
         if (window.GroupsManager?.groups) {
             groups = Array.from(window.GroupsManager.groups.values());
         }
     } catch (error) {
-        console.warn('Error loading data for modal:', error);
+        console.warn('Error loading groups for modal:', error.message);
+        groups = [];
     }
     
     const modal = `
@@ -881,7 +906,7 @@ window.showAbsenceModal = function() {
                 </div>
                 
                 <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
-                    <button onclick="window.closeModal('absenceModal')" 
+                    <button onclick="(function(){ const m = document.getElementById('absenceModal'); if(m) m.remove(); })()" 
                             class="btn btn-secondary" style="flex: 1;">
                         Cancelar
                     </button>
@@ -905,11 +930,18 @@ window.showSubstituteModal = function() {
         if (window.TeacherManager?.teachers) {
             teachers = Array.from(window.TeacherManager.teachers.values());
         }
+    } catch (error) {
+        console.warn('Error loading teachers for modal:', error.message);
+        teachers = [];
+    }
+    
+    try {
         if (window.GroupsManager?.groups) {
             groups = Array.from(window.GroupsManager.groups.values());
         }
     } catch (error) {
-        console.warn('Error loading data for modal:', error);
+        console.warn('Error loading groups for modal:', error.message);
+        groups = [];
     }
     
     const modal = `
@@ -972,7 +1004,7 @@ window.showSubstituteModal = function() {
                 </div>
                 
                 <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
-                    <button onclick="window.closeModal('substituteModal')" 
+                    <button onclick="(function(){ const m = document.getElementById('substituteModal'); if(m) m.remove(); })()" 
                             class="btn btn-secondary" style="flex: 1;">
                         Cancelar
                     </button>
@@ -996,7 +1028,8 @@ window.showHolidayModal = function() {
             teachers = Array.from(window.TeacherManager.teachers.values());
         }
     } catch (error) {
-        console.warn('Error loading teachers for modal:', error);
+        console.warn('Error loading teachers for modal:', error.message);
+        teachers = [];
     }
     
     const modal = `
@@ -1047,7 +1080,7 @@ window.showHolidayModal = function() {
                 </div>
                 
                 <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
-                    <button onclick="window.closeModal('holidayModal')" 
+                    <button onclick="(function(){ const m = document.getElementById('holidayModal'); if(m) m.remove(); })()" 
                             class="btn btn-secondary" style="flex: 1;">
                         Cancelar
                     </button>
@@ -1090,28 +1123,40 @@ window.loadAttendanceTab = async function() {
         if (window.TeacherManager && !window.TeacherManager.initialized) {
             initPromises.push(
                 window.TeacherManager.init()
-                    .catch(err => console.warn('⚠️ Could not initialize TeacherManager:', err))
+                    .catch(err => {
+                        console.warn('⚠️ Could not initialize TeacherManager:', err.message || err);
+                        return null;
+                    })
             );
         }
         
         if (window.GroupsManager && !window.GroupsManager.initialized) {
             initPromises.push(
                 window.GroupsManager.init()
-                    .catch(err => console.warn('⚠️ Could not initialize GroupsManager:', err))
+                    .catch(err => {
+                        console.warn('⚠️ Could not initialize GroupsManager:', err.message || err);
+                        return null;
+                    })
             );
         }
         
         if (window.StudentManager && !window.StudentManager.initialized) {
             initPromises.push(
                 window.StudentManager.init()
-                    .catch(err => console.warn('⚠️ Could not initialize StudentManager:', err))
+                    .catch(err => {
+                        console.warn('⚠️ Could not initialize StudentManager:', err.message || err);
+                        return null;
+                    })
             );
         }
         
         if (!window.AttendanceManager.initialized) {
             initPromises.push(
                 window.AttendanceManager.init()
-                    .catch(err => console.warn('⚠️ Could not initialize AttendanceManager:', err))
+                    .catch(err => {
+                        console.warn('⚠️ Could not initialize AttendanceManager:', err.message || err);
+                        return null;
+                    })
             );
         }
         
@@ -1131,7 +1176,8 @@ window.loadAttendanceTab = async function() {
                 teachers = Array.from(window.TeacherManager.teachers.values());
             }
         } catch (error) {
-            console.warn('Could not load teachers for admin check:', error);
+            console.warn('Could not load teachers for admin check:', error.message);
+            teachers = [];
         }
         
         const teacher = teachers.find(t => t.email === currentUser?.email);
@@ -1220,7 +1266,13 @@ window.saveAbsence = async function() {
     try {
         await window.AttendanceManager.markAbsentTeacher(groupId, teacherId, date, reason);
         window.showNotification('✅ Ausencia registrada', 'success');
-        window.closeModal('absenceModal');
+        
+        // Close modal properly
+        const modal = document.getElementById('absenceModal');
+        if (modal) {
+            modal.remove();
+        }
+        
         window.loadAttendanceTab();
     } catch (error) {
         console.error('Error marking absence:', error);
@@ -1244,7 +1296,13 @@ window.assignSubstitute = async function() {
         const fullReason = `${reason}: ${notes}`.trim();
         await window.AttendanceManager.createSubstituteRecord(groupId, teacherId, date, fullReason);
         window.showNotification('✅ Sustituto asignado', 'success');
-        window.closeModal('substituteModal');
+        
+        // Close modal properly
+        const modal = document.getElementById('substituteModal');
+        if (modal) {
+            modal.remove();
+        }
+        
         window.loadAttendanceTab();
     } catch (error) {
         console.error('Error assigning substitute:', error);
@@ -1275,7 +1333,12 @@ window.saveHoliday = async function() {
         }
         
         window.showNotification('✅ Festivo/Vacaciones configurado', 'success');
-        window.closeModal('holidayModal');
+        
+        // Close modal properly
+        const modal = document.getElementById('holidayModal');
+        if (modal) {
+            modal.remove();
+        }
     } catch (error) {
         console.error('Error setting holiday:', error);
         window.showNotification('❌ Error al configurar festivo', 'error');
@@ -1291,10 +1354,20 @@ window.toggleTeacherSelect = function() {
 };
 
 window.closeModal = function(modalId) {
+    // Try to find modal by ID
     const modal = document.getElementById(modalId);
     if (modal) {
         modal.remove();
+        return;
     }
+    
+    // If no ID provided or modal not found, try to close any open modal
+    const modals = document.querySelectorAll('[id$="Modal"]');
+    modals.forEach(modal => {
+        if (modal && modal.style.position === 'fixed') {
+            modal.remove();
+        }
+    });
 };
 
 window.showAllTeachersAttendance = async function() {
@@ -1424,7 +1497,8 @@ window.showMonthlyReport = async function() {
             teachers = Array.from(window.TeacherManager.teachers.values());
         }
     } catch (error) {
-        console.warn('Could not load teachers for report:', error);
+        console.warn('Could not load teachers for report:', error.message);
+        teachers = [];
     }
     
     let reportHTML = '<h3>📊 Reporte Mensual de Pagos</h3>';
@@ -1472,4 +1546,4 @@ if (!document.getElementById('attendance-styles')) {
     document.head.appendChild(styleEl);
 }
 
-console.log('✅ Attendance module v3.1 loaded successfully');
+console.log('✅ Attendance module v3.2 loaded successfully - Modal issues fixed');
