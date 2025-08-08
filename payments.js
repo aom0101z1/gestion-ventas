@@ -139,6 +139,123 @@ class PaymentManager {
         );
     }
 
+    // NEW: Get complete payment history for a student (12 months)
+    async getStudentPaymentHistory(studentId, year = null) {
+        const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 
+                       'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+        const targetYear = year || new Date().getFullYear();
+        const history = {};
+        
+        // Get all payments for this student
+        const payments = this.getStudentPayments(studentId);
+        
+        // Get student data for default amount
+        const student = window.StudentManager.students.get(studentId);
+        const defaultAmount = student?.valor || 0;
+        
+        // Build history object for each month
+        for (const month of months) {
+            const payment = payments.find(p => 
+                p.month?.toLowerCase() === month && 
+                p.year === targetYear
+            );
+            
+            if (payment) {
+                history[month] = {
+                    status: 'paid',
+                    amount: payment.amount,
+                    date: new Date(payment.date).toLocaleDateString('es-CO'),
+                    method: payment.method,
+                    bank: payment.bank,
+                    invoiceNumber: payment.invoiceNumber,
+                    paymentId: payment.id
+                };
+            } else {
+                // Check if payment is due/overdue for this month
+                const monthIndex = months.indexOf(month);
+                const today = new Date();
+                const currentYear = today.getFullYear();
+                const currentMonth = today.getMonth();
+                
+                if (targetYear < currentYear || (targetYear === currentYear && monthIndex < currentMonth)) {
+                    // Past month - check if it should have been paid
+                    if (student?.diaPago) {
+                        history[month] = {
+                            status: 'overdue',
+                            amount: defaultAmount,
+                            date: null
+                        };
+                    } else {
+                        history[month] = {
+                            status: 'no-payment',
+                            amount: 0,
+                            date: null
+                        };
+                    }
+                } else if (targetYear === currentYear && monthIndex === currentMonth) {
+                    // Current month
+                    if (student?.diaPago) {
+                        const payDay = parseInt(student.diaPago);
+                        const dueDate = new Date(targetYear, monthIndex, payDay);
+                        const isPending = dueDate >= today;
+                        
+                        history[month] = {
+                            status: isPending ? 'pending' : 'overdue',
+                            amount: defaultAmount,
+                            date: null
+                        };
+                    } else {
+                        history[month] = {
+                            status: 'no-payment',
+                            amount: 0,
+                            date: null
+                        };
+                    }
+                } else {
+                    // Future month
+                    history[month] = {
+                        status: 'no-payment',
+                        amount: 0,
+                        date: null
+                    };
+                }
+            }
+        }
+        
+        return history;
+    }
+
+    // NEW: Calculate payment statistics
+    calculatePaymentStats(history) {
+        let totalPaid = 0;
+        let totalPending = 0;
+        let monthsPaid = 0;
+        let monthsPending = 0;
+        let monthsOverdue = 0;
+        
+        Object.values(history).forEach(payment => {
+            if (payment.status === 'paid') {
+                totalPaid += payment.amount;
+                monthsPaid++;
+            } else if (payment.status === 'pending') {
+                totalPending += payment.amount;
+                monthsPending++;
+            } else if (payment.status === 'overdue') {
+                totalPending += payment.amount;
+                monthsOverdue++;
+            }
+        });
+        
+        return { 
+            totalPaid, 
+            totalPending, 
+            monthsPaid, 
+            monthsPending,
+            monthsOverdue,
+            totalMonths: monthsPaid + monthsPending + monthsOverdue
+        };
+    }
+
     // Get payment summary
     async getPaymentSummary() {
         const students = Array.from(window.StudentManager.students.values());
@@ -1078,6 +1195,7 @@ function renderPaymentDashboard() {
     `;
 }
 
+// UPDATED: Render payment table with expandable history rows
 function renderPaymentTable(students) {
     if (!students.length) {
         return '<div style="text-align: center; padding: 2rem; color: #666;">No hay estudiantes</div>';
@@ -1087,6 +1205,7 @@ function renderPaymentTable(students) {
         <table style="width: 100%; background: white; border-radius: 8px; overflow: hidden;">
             <thead style="background: #f3f4f6;">
                 <tr>
+                    <th style="padding: 0.75rem; text-align: center; width: 40px;"></th>
                     <th style="padding: 0.75rem; text-align: center; width: 50px;">#</th>
                     <th style="padding: 0.75rem; text-align: left;">Estado</th>
                     <th style="padding: 0.75rem; text-align: left;">Estudiante</th>
@@ -1099,15 +1218,27 @@ function renderPaymentTable(students) {
             <tbody>
                 ${students.map((s, index) => {
                     const status = window.PaymentManager.getPaymentStatus(s);
-                    const statusColors = {
-                        paid: '#10b981',
-                        upcoming: '#fbbf24',
-                        overdue: '#ef4444',
-                        none: '#6b7280'
-                    };
                     
-                    return `
+                    // Main row with expand button
+                    let mainRow = `
                         <tr style="border-top: 1px solid #e5e7eb;">
+                            <td style="padding: 0.75rem; text-align: center;">
+                                <button onclick="togglePaymentHistory('${s.id}')" 
+                                        id="expand-${s.id}"
+                                        style="
+                                            background: none; 
+                                            border: none; 
+                                            cursor: pointer; 
+                                            padding: 4px;
+                                            transition: transform 0.3s;
+                                            display: inline-flex;
+                                            align-items: center;
+                                        ">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="#6b7280">
+                                        <path d="M9 5l7 7-7 7"/>
+                                    </svg>
+                                </button>
+                            </td>
                             <td style="padding: 0.75rem; text-align: center; font-weight: bold; color: #6b7280;">
                                 ${index + 1}
                             </td>
@@ -1116,16 +1247,15 @@ function renderPaymentTable(students) {
                                     display: inline-flex;
                                     align-items: center;
                                     gap: 0.5rem;
-                                    color: ${statusColors[status.type]};
+                                    color: ${status.color};
+                                    font-weight: 500;
                                 ">
-                                    ${status.type === 'paid' ? '✅' : 
-                                      status.type === 'overdue' ? '🔴' : 
-                                      status.type === 'upcoming' ? '🟡' : '❓'}
-                                    ${status.label}
+                                    ${status.icon}
+                                    ${status.status}
                                 </span>
                             </td>
                             <td style="padding: 0.75rem;">
-                                <div>${s.nombre || '-'}</div>
+                                <div style="font-weight: 500;">${s.nombre || '-'}</div>
                                 <small style="color: #6b7280;">${s.telefono || '-'}</small>
                             </td>
                             <td style="padding: 0.75rem;">${s.grupo || 'Sin grupo'}</td>
@@ -1149,9 +1279,133 @@ function renderPaymentTable(students) {
                             </td>
                         </tr>
                     `;
+                    
+                    // Hidden history row (will be populated on expand)
+                    let historyRow = `
+                        <tr id="history-${s.id}" class="payment-history-row" style="display: none;">
+                            <td colspan="8" style="padding: 20px; background: #f9fafb; text-align: center;">
+                                <div style="color: #6b7280;">Cargando historial...</div>
+                            </td>
+                        </tr>
+                    `;
+                    
+                    return mainRow + historyRow;
                 }).join('')}
             </tbody>
         </table>
+    `;
+}
+
+// NEW: Render payment history row with monthly grid
+function renderPaymentHistoryContent(studentId, history, stats) {
+    const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 
+                   'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    
+    const statusColors = {
+        'paid': '#10b981',
+        'pending': '#f59e0b',
+        'overdue': '#ef4444',
+        'no-payment': '#d1d5db'
+    };
+    
+    return `
+        <div style="padding: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h4 style="margin: 0; color: #1f2937; font-size: 16px;">📅 Historial de Pagos ${new Date().getFullYear()}</h4>
+                <select onchange="changeHistoryYear('${studentId}', this.value)" 
+                        style="padding: 6px 12px; border: 1px solid #d1d5db; border-radius: 6px; background: white;">
+                    <option value="${new Date().getFullYear()}">${new Date().getFullYear()}</option>
+                    <option value="${new Date().getFullYear() - 1}">${new Date().getFullYear() - 1}</option>
+                </select>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px;">
+                ${months.map(month => {
+                    const payment = history[month];
+                    const color = statusColors[payment.status];
+                    
+                    return `
+                        <div style="
+                            background: white; 
+                            border: 2px solid ${color}; 
+                            border-radius: 8px; 
+                            padding: 12px;
+                            position: relative;
+                            cursor: ${payment.status === 'paid' && payment.invoiceNumber ? 'pointer' : 'default'};
+                            transition: all 0.2s;
+                        " 
+                        ${payment.status === 'paid' && payment.invoiceNumber ? 
+                            `onclick="viewPaymentInvoice('${payment.paymentId}')"
+                             onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 6px rgba(0,0,0,0.1)';"
+                             onmouseout="this.style.transform=''; this.style.boxShadow='';"` : ''}>
+                            
+                            <div style="
+                                width: 8px; height: 8px; 
+                                background: ${color}; 
+                                border-radius: 50%;
+                                position: absolute; top: 8px; right: 8px;
+                            "></div>
+                            
+                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px; font-size: 13px;">
+                                ${month.charAt(0).toUpperCase() + month.slice(1)}
+                            </div>
+                            
+                            <div style="font-weight: 600; font-size: 15px; color: ${color};">
+                                ${payment.amount > 0 ? '$' + payment.amount.toLocaleString('es-CO') : '-'}
+                            </div>
+                            
+                            <div style="font-size: 11px; color: #6b7280; margin-top: 4px;">
+                                ${payment.date || (payment.status === 'pending' ? 'Pendiente' : payment.status === 'overdue' ? 'Vencido' : '')}
+                            </div>
+                            
+                            ${payment.status === 'paid' && payment.method ? 
+                                `<div style="font-size: 10px; color: #9ca3af; margin-top: 2px;">
+                                    ${payment.method} ${payment.bank ? '- ' + payment.bank : ''}
+                                </div>` : ''}
+                            
+                            ${payment.status === 'paid' && payment.invoiceNumber ? 
+                                `<div style="font-size: 10px; color: #3b82f6; margin-top: 4px;">
+                                    🧾 Ver comprobante
+                                </div>` : ''}
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+            
+            <!-- Summary Stats -->
+            <div style="
+                display: flex; 
+                gap: 20px; 
+                margin-top: 20px; 
+                padding-top: 20px; 
+                border-top: 1px solid #e5e7eb;
+            ">
+                <div style="flex: 1; text-align: center;">
+                    <div style="font-size: 12px; color: #6b7280; margin-bottom: 4px;">Total Pagado</div>
+                    <div style="font-size: 18px; font-weight: 600; color: #10b981;">
+                        $${stats.totalPaid.toLocaleString('es-CO')}
+                    </div>
+                </div>
+                <div style="flex: 1; text-align: center;">
+                    <div style="font-size: 12px; color: #6b7280; margin-bottom: 4px;">Total Pendiente</div>
+                    <div style="font-size: 18px; font-weight: 600; color: #f59e0b;">
+                        $${stats.totalPending.toLocaleString('es-CO')}
+                    </div>
+                </div>
+                <div style="flex: 1; text-align: center;">
+                    <div style="font-size: 12px; color: #6b7280; margin-bottom: 4px;">Meses Pagados</div>
+                    <div style="font-size: 18px; font-weight: 600; color: #1f2937;">
+                        ${stats.monthsPaid}/12
+                    </div>
+                </div>
+                <div style="flex: 1; text-align: center;">
+                    <div style="font-size: 12px; color: #6b7280; margin-bottom: 4px;">Meses Vencidos</div>
+                    <div style="font-size: 18px; font-weight: 600; color: #ef4444;">
+                        ${stats.monthsOverdue}
+                    </div>
+                </div>
+            </div>
+        </div>
     `;
 }
 
@@ -1231,6 +1485,70 @@ function renderPaymentModal(student) {
 // ==================================================================================
 // SECTION 6: WINDOW FUNCTIONS - Global event handlers and modal management
 // ==================================================================================
+
+// NEW: Toggle payment history visibility
+window.togglePaymentHistory = async function(studentId) {
+    const btn = document.querySelector(`#expand-${studentId}`);
+    const historyRow = document.querySelector(`#history-${studentId}`);
+    
+    if (!historyRow) return;
+    
+    // Toggle visibility
+    const isVisible = historyRow.style.display !== 'none';
+    
+    if (isVisible) {
+        // Hide
+        historyRow.style.display = 'none';
+        btn.style.transform = 'rotate(0deg)';
+    } else {
+        // Show and load data if needed
+        historyRow.style.display = 'table-row';
+        btn.style.transform = 'rotate(90deg)';
+        
+        // Check if we need to load the history
+        if (historyRow.innerHTML.includes('Cargando')) {
+            try {
+                const history = await window.PaymentManager.getStudentPaymentHistory(studentId);
+                const stats = window.PaymentManager.calculatePaymentStats(history);
+                
+                // Update the row with actual history
+                historyRow.innerHTML = `
+                    <td colspan="8" style="padding: 0; background: #f9fafb;">
+                        ${renderPaymentHistoryContent(studentId, history, stats)}
+                    </td>
+                `;
+            } catch (error) {
+                console.error('Error loading payment history:', error);
+                historyRow.innerHTML = '<td colspan="8" style="padding: 20px; text-align: center; color: #ef4444;">Error al cargar historial</td>';
+            }
+        }
+    }
+};
+
+// NEW: Change history year
+window.changeHistoryYear = async function(studentId, year) {
+    const historyRow = document.querySelector(`#history-${studentId}`);
+    if (!historyRow) return;
+    
+    try {
+        // Show loading
+        historyRow.innerHTML = '<td colspan="8" style="padding: 20px; text-align: center; color: #6b7280;">Cargando historial...</td>';
+        
+        // Load history for selected year
+        const history = await window.PaymentManager.getStudentPaymentHistory(studentId, parseInt(year));
+        const stats = window.PaymentManager.calculatePaymentStats(history);
+        
+        // Update display
+        historyRow.innerHTML = `
+            <td colspan="8" style="padding: 0; background: #f9fafb;">
+                ${renderPaymentHistoryContent(studentId, history, stats)}
+            </td>
+        `;
+    } catch (error) {
+        console.error('Error changing year:', error);
+        window.showNotification('❌ Error al cargar historial', 'error');
+    }
+};
 
 // Add function to view/regenerate invoices from payment history
 window.viewPaymentInvoice = async function(paymentId) {
@@ -1602,6 +1920,24 @@ if (!document.getElementById('invoicePrintStyles')) {
                 size: 5.5in 8.5in;
                 margin: 0.25in;
             }
+        }
+        
+        /* Payment history styles */
+        .payment-history-row {
+            transition: all 0.3s ease-in-out;
+        }
+        
+        .payment-history-row td {
+            padding: 0 !important;
+        }
+        
+        #expand-btn:hover svg {
+            fill: #3b82f6;
+        }
+        
+        .month-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
     `;
     document.head.appendChild(style);
