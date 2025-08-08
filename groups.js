@@ -1,969 +1,552 @@
-// groups.js - Groups Management Module
-console.log('👥 Loading groups module...');
-
-// Add debugging to check if the file loads completely
-console.log('Groups module file start');
+// groups.js - Groups Management with Schedule Information
+console.log('👥 Loading groups module with schedule...');
 
 // Groups Manager Class
 class GroupsManager {
     constructor() {
         this.groups = new Map();
-        this.schedules = new Map();
-        this.initialized = false;
+        this.locations = new Map();
+        this.initializeLocations();
     }
 
-    // Initialize
-    async init() {
-        if (this.initialized) return;
-        console.log('🚀 Initializing groups manager');
-        await this.loadGroups();
-        this.initialized = true;
+    // Initialize default locations
+    initializeLocations() {
+        const defaultLocations = [
+            { id: 'LOC-001', name: 'CB Office', address: 'Calle Principal 123' },
+            { id: 'LOC-002', name: 'Coats Cadena', address: 'Av. Industrial 456' },
+            { id: 'LOC-003', name: 'Online', address: 'Virtual' },
+            { id: 'LOC-004', name: 'Cliente Externo', address: 'Por definir' }
+        ];
+        
+        defaultLocations.forEach(loc => {
+            this.locations.set(loc.id, loc);
+        });
+    }
+
+    // Create new group with schedule
+    async createGroup(groupData) {
+        try {
+            const group = {
+                id: `GRP-${Date.now()}`,
+                name: groupData.name,
+                level: groupData.level || 'Intermedio',
+                teacherId: groupData.teacherId,
+                students: groupData.students || [],
+                schedule: {
+                    days: groupData.days || [], // ['Lunes', 'Miércoles', 'Viernes']
+                    startTime: groupData.startTime || '08:00',
+                    endTime: groupData.endTime || '10:00',
+                    duration: groupData.duration || 2, // hours
+                    locationId: groupData.locationId || 'LOC-001',
+                    locationName: this.locations.get(groupData.locationId)?.name || 'CB Office'
+                },
+                maxStudents: groupData.maxStudents || 15,
+                status: 'active',
+                createdAt: new Date().toISOString()
+            };
+
+            // Save to Firebase
+            const db = window.firebaseModules.database;
+            const ref = db.ref(window.FirebaseData.database, `groups/${group.id}`);
+            await db.set(ref, group);
+            
+            this.groups.set(group.id, group);
+            console.log('✅ Group created:', group.id);
+            return group;
+        } catch (error) {
+            console.error('❌ Error creating group:', error);
+            throw error;
+        }
+    }
+
+    // Update group schedule
+    async updateGroupSchedule(groupId, scheduleData) {
+        try {
+            const group = this.groups.get(groupId);
+            if (!group) throw new Error('Grupo no encontrado');
+
+            // Calculate duration from start and end time
+            if (scheduleData.startTime && scheduleData.endTime) {
+                const start = new Date(`2024-01-01 ${scheduleData.startTime}`);
+                const end = new Date(`2024-01-01 ${scheduleData.endTime}`);
+                scheduleData.duration = (end - start) / (1000 * 60 * 60); // Convert to hours
+            }
+
+            group.schedule = { ...group.schedule, ...scheduleData };
+
+            // Update Firebase
+            const db = window.firebaseModules.database;
+            const ref = db.ref(window.FirebaseData.database, `groups/${groupId}/schedule`);
+            await db.set(ref, group.schedule);
+            
+            console.log('✅ Schedule updated for group:', groupId);
+            return group;
+        } catch (error) {
+            console.error('❌ Error updating schedule:', error);
+            throw error;
+        }
+    }
+
+    // Add student to group
+    async addStudentToGroup(groupId, studentId) {
+        try {
+            const group = this.groups.get(groupId);
+            if (!group) throw new Error('Grupo no encontrado');
+            
+            if (group.students.includes(studentId)) {
+                throw new Error('Estudiante ya está en el grupo');
+            }
+            
+            if (group.students.length >= group.maxStudents) {
+                throw new Error('Grupo lleno');
+            }
+
+            group.students.push(studentId);
+
+            // Update Firebase
+            const db = window.firebaseModules.database;
+            const ref = db.ref(window.FirebaseData.database, `groups/${groupId}/students`);
+            await db.set(ref, group.students);
+            
+            console.log('✅ Student added to group');
+            return group;
+        } catch (error) {
+            console.error('❌ Error adding student:', error);
+            throw error;
+        }
+    }
+
+    // Remove student from group
+    async removeStudentFromGroup(groupId, studentId) {
+        try {
+            const group = this.groups.get(groupId);
+            if (!group) throw new Error('Grupo no encontrado');
+            
+            group.students = group.students.filter(id => id !== studentId);
+
+            // Update Firebase
+            const db = window.firebaseModules.database;
+            const ref = db.ref(window.FirebaseData.database, `groups/${groupId}/students`);
+            await db.set(ref, group.students);
+            
+            console.log('✅ Student removed from group');
+            return group;
+        } catch (error) {
+            console.error('❌ Error removing student:', error);
+            throw error;
+        }
+    }
+
+    // Get groups by teacher
+    getGroupsByTeacher(teacherId) {
+        return Array.from(this.groups.values())
+            .filter(g => g.teacherId === teacherId);
+    }
+
+    // Get groups by day
+    getGroupsByDay(day) {
+        return Array.from(this.groups.values())
+            .filter(g => g.schedule.days.includes(day));
+    }
+
+    // Get today's groups
+    getTodayGroups() {
+        const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+        const today = days[new Date().getDay()];
+        return this.getGroupsByDay(today);
     }
 
     // Load groups from Firebase
     async loadGroups() {
         try {
-            console.log('📂 Starting to load groups from Firebase...');
-            
-            // Add a small delay to ensure Firebase is fully initialized
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            // First, let's find Firebase auth
-            let auth = null;
-            let authFound = false;
-            
-            // Try different ways to get Firebase auth
-            if (window.firebase && window.firebase.auth) {
-                auth = window.firebase.auth();
-                console.log('✅ Found auth via window.firebase.auth()');
-                authFound = true;
-            } else if (window.firebase && typeof window.firebase.auth === 'function') {
-                auth = window.firebase.auth();
-                console.log('✅ Found auth via window.firebase.auth() function');
-                authFound = true;
-            }
-            
-            if (!authFound) {
-                console.log('⚠️ Firebase auth not found in expected location');
-                console.log('Available Firebase modules:', Object.keys(window.firebase || {}));
-            }
-            
-            // If we found auth, wait for authentication
-            if (auth) {
-                console.log('⏳ Checking authentication status...');
-                
-                // Check current user
-                let currentUser = auth.currentUser;
-                console.log('Current user immediately:', currentUser ? currentUser.email : 'null');
-                
-                // If no current user, wait for auth state
-                if (!currentUser) {
-                    console.log('⏳ Waiting for auth state change...');
-                    currentUser = await new Promise((resolve) => {
-                        const unsubscribe = auth.onAuthStateChanged((user) => {
-                            console.log('Auth state changed:', user ? user.email : 'null');
-                            unsubscribe();
-                            resolve(user);
-                        });
-                        
-                        // Timeout after 5 seconds
-                        setTimeout(() => {
-                            console.log('⏱️ Auth wait timeout');
-                            unsubscribe();
-                            resolve(null);
-                        }, 5000);
-                    });
-                }
-                
-                if (currentUser) {
-                    console.log('✅ Authenticated as:', currentUser.email);
-                    console.log('User UID:', currentUser.uid);
-                } else {
-                    console.error('❌ No authenticated user found');
-                    // Don't throw, just continue - maybe rules allow anonymous access
-                }
-            } else {
-                console.warn('⚠️ Proceeding without auth check (may fail)');
-            }
-            
-            // Now try to load groups
-            console.log('📥 Attempting to load groups from database...');
-            
             const db = window.firebaseModules.database;
             const ref = db.ref(window.FirebaseData.database, 'groups');
-            
-            console.log('Database reference created:', ref.toString());
-            
             const snapshot = await db.get(ref);
             
             if (snapshot.exists()) {
-                const data = snapshot.val();
-                console.log('✅ Groups data received:', Object.keys(data || {}).length, 'groups');
-                
-                Object.entries(data).forEach(([id, group]) => {
+                const groups = snapshot.val();
+                this.groups.clear();
+                Object.entries(groups).forEach(([id, group]) => {
                     this.groups.set(id, group);
                 });
-            } else {
-                console.log('⚠️ No groups data exists in database');
+                console.log(`✅ Loaded ${this.groups.size} groups`);
             }
-            
-            // Load schedules
-            console.log('📥 Loading schedules...');
-            const schedRef = db.ref(window.FirebaseData.database, 'schedules');
-            const schedSnapshot = await db.get(schedRef);
-            
-            if (schedSnapshot.exists()) {
-                const schedData = schedSnapshot.val();
-                Object.entries(schedData).forEach(([id, schedule]) => {
-                    this.schedules.set(id, schedule);
-                });
-                console.log('✅ Schedules loaded');
-            }
-            
-            console.log(`✅ Successfully loaded ${this.groups.size} groups`);
-            
         } catch (error) {
             console.error('❌ Error loading groups:', error);
-            console.error('Error details:', {
-                message: error.message,
-                code: error.code,
-                stack: error.stack
-            });
-            
-            // Check if it's a permission error
-            if (error.message && error.message.includes('Permission denied')) {
-                console.error('🔒 This is a permission error. Check:');
-                console.error('1. User is authenticated');
-                console.error('2. User has correct role in Firebase');
-                console.error('3. Firebase rules allow access');
-            }
-            
-            // Don't throw, just log
         }
     }
 
-    // Create/Update group
-    async saveGroup(groupData) {
-        try {
-            const id = groupData.id || `GRP-${Date.now()}`;
-            const group = {
-                ...groupData,
-                id,
-                updatedAt: new Date().toISOString(),
-                createdAt: groupData.createdAt || new Date().toISOString()
-            };
-
-            const db = window.firebaseModules.database;
-            const ref = db.ref(window.FirebaseData.database, `groups/${id}`);
-            await db.set(ref, group);
-            
-            this.groups.set(id, group);
-            console.log('✅ Group saved:', id);
-            return group;
-        } catch (error) {
-            console.error('❌ Error saving group:', error);
-            throw error;
-        }
-    }
-
-    // Get groups with student count
-    async getGroupsWithStats() {
-        const groups = Array.from(this.groups.values());
-        // Check if StudentManager exists before using it
-        const students = (window.StudentManager && window.StudentManager.getStudents) ? 
-            window.StudentManager.getStudents() : [];
+    // Add new location
+    async addLocation(name, address) {
+        const location = {
+            id: `LOC-${Date.now()}`,
+            name,
+            address
+        };
         
-        return groups.map(group => {
-            const groupStudents = students.filter(s => s.grupo === group.name);
-            return {
-                ...group,
-                studentCount: groupStudents.length,
-                students: groupStudents,
-                status: this.getGroupStatus(groupStudents.length)
-            };
-        });
-    }
-
-    // Get group status based on size
-    getGroupStatus(count) {
-        if (count < 4) return { color: '#ef4444', text: 'Muy pequeño' };
-        if (count > 8) return { color: '#f59e0b', text: 'Muy grande' };
-        return { color: '#10b981', text: 'Óptimo' };
-    }
-
-    // Assign teacher to group
-    async assignTeacher(groupId, teacherId) {
+        this.locations.set(location.id, location);
+        
+        // Save to Firebase
         const db = window.firebaseModules.database;
-        const ref = db.ref(window.FirebaseData.database, `groups/${groupId}/teacherId`);
-        await db.set(ref, teacherId);
+        const ref = db.ref(window.FirebaseData.database, `locations/${location.id}`);
+        await db.set(ref, location);
         
-        const group = this.groups.get(groupId);
-        if (group) {
-            group.teacherId = teacherId;
-            this.groups.set(groupId, group);
-        }
-    }
-
-    // Get available schedules
-    getAvailableSchedules() {
-        return [
-            // Regular schedules
-            { id: 'mwf-morning', days: 'L-Mi-V', time: '8:00-10:00', type: 'regular' },
-            { id: 'mwf-afternoon', days: 'L-Mi-V', time: '4:00-6:00', type: 'regular' },
-            { id: 'mwf-evening', days: 'L-Mi-V', time: '6:30-8:30', type: 'regular' },
-            { id: 'tt-morning', days: 'Ma-J', time: '8:00-10:00', type: 'regular' },
-            { id: 'tt-afternoon', days: 'Ma-J', time: '4:00-6:00', type: 'regular' },
-            { id: 'tt-evening', days: 'Ma-J', time: '6:30-8:30', type: 'regular' },
-            // Saturday
-            { id: 'sat-morning', days: 'Sábado', time: '8:00-12:00', type: 'saturday' },
-            { id: 'sat-afternoon', days: 'Sábado', time: '1:00-5:00', type: 'saturday' },
-            // Special locations
-            { id: 'hogar-tue', days: 'Martes', time: '1:30-5:30', type: 'hogar', location: 'Hogar Nazareth' },
-            { id: 'hogar-wed', days: 'Miércoles', time: '1:30-5:30', type: 'hogar', location: 'Hogar Nazareth' },
-            { id: 'hogar-thu', days: 'Jueves', time: '1:30-5:30', type: 'hogar', location: 'Hogar Nazareth' },
-            { id: 'coats-tt', days: 'Ma-Mi', time: 'Flexible', type: 'company', location: 'Coats Cadena' },
-            { id: 'coats-tf', days: 'J-V', time: 'Flexible', type: 'company', location: 'Coats Cadena' }
-        ];
+        return location;
     }
 }
 
 // UI Functions
-function renderGroupsView() {
-    console.log('Rendering groups view');
+function renderGroupsTab() {
+    const groups = Array.from(window.GroupsManager?.groups.values() || []);
+    const teachers = Array.from(window.TeacherManager?.teachers.values() || []);
+    
     return `
         <div style="padding: 1rem;">
+            <!-- Header -->
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-                <h2>📚 Gestión de Grupos</h2>
-                <button onclick="showGroupForm()" class="btn btn-primary">
+                <h2 style="margin: 0;">👥 Gestión de Grupos</h2>
+                <button onclick="showCreateGroupModal()" class="btn btn-primary">
                     ➕ Nuevo Grupo
                 </button>
             </div>
             
-            <div id="groupFormContainer"></div>
-            
-            <div style="display: grid; gap: 1rem;" id="groupsGrid">
-                <div style="text-align: center; padding: 2rem; color: #666;">
-                    Cargando grupos...
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-function renderGroupCard(group) {
-    const status = group.status;
-    const teacher = window.TeacherManager?.teachers?.get(group.teacherId);
-    
-    return `
-        <div style="background: white; border-radius: 8px; padding: 1.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
-                <div>
-                    <h3 style="margin: 0 0 0.5rem 0;">${group.name}</h3>
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <span style="background: ${status.color}; color: white; padding: 0.25rem 0.75rem; 
-                                     border-radius: 4px; font-size: 0.875rem;">
-                            ${group.studentCount}/8 - ${status.text}
-                        </span>
-                    </div>
-                </div>
-                <button onclick="toggleGroupDetails('${group.id}')" class="btn btn-sm"
-                        style="background: #3b82f6; color: white;">
-                    ${group.expanded ? '➖' : '➕'}
-                </button>
-            </div>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 1rem;">
-                <div>
-                    <strong>📅 Horario:</strong> ${group.schedule || 'Sin asignar'}
-                </div>
-                <div>
-                    <strong>📍 Lugar:</strong> ${group.location || 'CB Principal'}
-                </div>
-                <div>
-                    <strong>👩‍🏫 Profesor:</strong> ${teacher?.name || 'Sin asignar'}
-                </div>
-                <div>
-                    <strong>📖 Libro:</strong> ${group.book || 'Por definir'}
+            <!-- Today's Groups Summary -->
+            <div style="background: #e0f2fe; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
+                <h3 style="margin: 0 0 0.5rem 0;">📅 Grupos de Hoy</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.5rem;">
+                    ${window.GroupsManager?.getTodayGroups().map(g => `
+                        <div style="background: white; padding: 0.5rem; border-radius: 4px;">
+                            <strong>${g.name}</strong><br>
+                            <small>${g.schedule.startTime} - ${g.schedule.endTime}</small>
+                        </div>
+                    `).join('') || '<p>No hay grupos programados para hoy</p>'}
                 </div>
             </div>
             
-            <div id="groupDetails-${group.id}" style="display: ${group.expanded ? 'block' : 'none'};">
-                <hr style="margin: 1rem 0;">
-                
-                <div style="margin-bottom: 1rem;">
-                    <h4 style="margin-bottom: 0.5rem;">Estudiantes (${group.studentCount})</h4>
-                    <div style="max-height: 200px; overflow-y: auto;">
-                        ${group.students.length ? `
-                            <table style="width: 100%; font-size: 0.875rem;">
-                                ${group.students.map(s => `
-                                    <tr>
-                                        <td style="padding: 0.25rem 0;">${s.nombre}</td>
-                                        <td style="padding: 0.25rem 0; text-align: right;">
-                                            <button onclick="removeFromGroup('${s.id}', '${group.id}')" 
-                                                    class="btn btn-sm" style="background: #ef4444; color: white;">
-                                                ❌
-                                            </button>
-                                        </td>
-                                    </tr>
-                                `).join('')}
-                            </table>
-                        ` : '<div style="color: #6b7280;">No hay estudiantes asignados</div>'}
-                    </div>
-                </div>
-                
-                <div style="display: flex; gap: 0.5rem;">
-                    <button onclick="showGroupForm('${group.id}')" class="btn btn-sm"
-                            style="background: #3b82f6; color: white;">
-                        ✏️ Editar
-                    </button>
-                    <button onclick="assignStudentsModal('${group.id}')" class="btn btn-sm"
-                            style="background: #10b981; color: white;">
-                        👥 Asignar Estudiantes
-                    </button>
-                    <button onclick="deleteGroup('${group.id}')" class="btn btn-sm"
-                            style="background: #ef4444; color: white;">
-                        🗑️ Eliminar
-                    </button>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-function renderGroupForm(group = null) {
-    const schedules = window.GroupsManager.getAvailableSchedules();
-    
-    // Get teachers list
-    let teacherOptions = '<option value="">Sin asignar</option>';
-    
-    // Check if TeacherManager exists and has teachers
-    if (window.TeacherManager && window.TeacherManager.teachers && window.TeacherManager.teachers.size > 0) {
-        const teachers = Array.from(window.TeacherManager.teachers.values());
-        teacherOptions += teachers.map(t => `
-            <option value="${t.id}" ${group?.teacherId === t.id ? 'selected' : ''}>
-                ${t.name}
-            </option>
-        `).join('');
-    }
-    
-    return `
-        <div style="background: #f3f4f6; padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem;">
-            <h3>${group ? '✏️ Editar' : '➕ Nuevo'} Grupo</h3>
-            
-            <form id="groupForm" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
-                <div class="form-group">
-                    <label>Nombre del Grupo*</label>
-                    <input type="text" id="groupName" value="${group?.name || ''}" required 
-                           placeholder="Ej: A1-Morning-01">
-                </div>
-                
-                <div class="form-group">
-                    <label>Horario*</label>
-                    <select id="groupSchedule" required onchange="updateLocationField()">
-                        <option value="">Seleccionar...</option>
-                        ${schedules.map(s => `
-                            <option value="${s.id}" data-location="${s.location || ''}"
-                                    ${group?.scheduleId === s.id ? 'selected' : ''}>
-                                ${s.days} ${s.time} ${s.location ? `- ${s.location}` : ''}
-                            </option>
+            <!-- Groups Table -->
+            <div style="background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background: #f9fafb;">
+                            <th style="padding: 0.75rem; text-align: left; border-bottom: 1px solid #e5e7eb;">Nombre</th>
+                            <th style="padding: 0.75rem; text-align: left; border-bottom: 1px solid #e5e7eb;">Profesor</th>
+                            <th style="padding: 0.75rem; text-align: left; border-bottom: 1px solid #e5e7eb;">Horario</th>
+                            <th style="padding: 0.75rem; text-align: left; border-bottom: 1px solid #e5e7eb;">Ubicación</th>
+                            <th style="padding: 0.75rem; text-align: left; border-bottom: 1px solid #e5e7eb;">Estudiantes</th>
+                            <th style="padding: 0.75rem; text-align: left; border-bottom: 1px solid #e5e7eb;">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${groups.map(group => `
+                            <tr>
+                                <td style="padding: 0.75rem; border-bottom: 1px solid #e5e7eb;">
+                                    <strong>${group.name}</strong><br>
+                                    <small style="color: #6b7280;">${group.level}</small>
+                                </td>
+                                <td style="padding: 0.75rem; border-bottom: 1px solid #e5e7eb;">
+                                    ${teachers.find(t => t.id === group.teacherId)?.name || 'Sin asignar'}
+                                </td>
+                                <td style="padding: 0.75rem; border-bottom: 1px solid #e5e7eb;">
+                                    <small>
+                                        ${group.schedule?.days?.join(', ') || 'Sin definir'}<br>
+                                        ${group.schedule?.startTime || ''} - ${group.schedule?.endTime || ''}<br>
+                                        (${group.schedule?.duration || 0} horas)
+                                    </small>
+                                </td>
+                                <td style="padding: 0.75rem; border-bottom: 1px solid #e5e7eb;">
+                                    ${group.schedule?.locationName || 'N/A'}
+                                </td>
+                                <td style="padding: 0.75rem; border-bottom: 1px solid #e5e7eb;">
+                                    ${group.students?.length || 0} / ${group.maxStudents}
+                                </td>
+                                <td style="padding: 0.75rem; border-bottom: 1px solid #e5e7eb;">
+                                    <button onclick="editGroup('${group.id}')" class="btn btn-sm btn-secondary">✏️</button>
+                                    <button onclick="manageStudents('${group.id}')" class="btn btn-sm btn-primary">👥</button>
+                                    <button onclick="setPaymentRate('${group.id}')" class="btn btn-sm btn-success">💰</button>
+                                </td>
+                            </tr>
                         `).join('')}
-                    </select>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+}
+
+function showCreateGroupModal() {
+    const teachers = Array.from(window.TeacherManager?.teachers.values() || []);
+    const locations = Array.from(window.GroupsManager?.locations.values() || []);
+    
+    const modal = `
+        <div id="createGroupModal" style="
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5); display: flex; align-items: center;
+            justify-content: center; z-index: 1000;">
+            <div style="background: white; padding: 2rem; border-radius: 8px; 
+                        max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto;">
+                <h3>➕ Crear Nuevo Grupo</h3>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label>Nombre del Grupo</label>
+                        <input type="text" id="groupName" placeholder="Ej: Inglés Avanzado A1" 
+                               style="width: 100%; padding: 0.5rem;">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Nivel</label>
+                        <select id="groupLevel" style="width: 100%; padding: 0.5rem;">
+                            <option value="Básico">Básico</option>
+                            <option value="Intermedio">Intermedio</option>
+                            <option value="Avanzado">Avanzado</option>
+                            <option value="Conversacional">Conversacional</option>
+                            <option value="Business">Business</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Profesor</label>
+                        <select id="groupTeacher" style="width: 100%; padding: 0.5rem;">
+                            <option value="">Seleccionar profesor...</option>
+                            ${teachers.map(t => `
+                                <option value="${t.id}">${t.name}</option>
+                            `).join('')}
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Máximo de Estudiantes</label>
+                        <input type="number" id="groupMaxStudents" value="15" 
+                               style="width: 100%; padding: 0.5rem;">
+                    </div>
+                </div>
+                
+                <h4 style="margin-top: 1.5rem;">📅 Horario</h4>
+                
+                <div class="form-group">
+                    <label>Días de Clase</label>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;">
+                        ${['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'].map(day => `
+                            <label style="display: flex; align-items: center;">
+                                <input type="checkbox" name="groupDays" value="${day}" style="margin-right: 0.5rem;">
+                                ${day}
+                            </label>
+                        `).join('')}
+                    </div>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label>Hora Inicio</label>
+                        <input type="time" id="groupStartTime" value="08:00" 
+                               style="width: 100%; padding: 0.5rem;">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Hora Fin</label>
+                        <input type="time" id="groupEndTime" value="10:00" 
+                               style="width: 100%; padding: 0.5rem;">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Duración (horas)</label>
+                        <select id="groupDuration" style="width: 100%; padding: 0.5rem;">
+                            <option value="1">1 hora</option>
+                            <option value="2" selected>2 horas</option>
+                            <option value="3">3 horas</option>
+                            <option value="4">4 horas</option>
+                        </select>
+                    </div>
                 </div>
                 
                 <div class="form-group">
                     <label>Ubicación</label>
-                    <input type="text" id="groupLocation" value="${group?.location || 'CB Principal'}" 
-                           placeholder="CB Principal">
-                </div>
-                
-                <div class="form-group">
-                    <label>Profesor</label>
-                    <select id="groupTeacher">
-                        ${teacherOptions}
+                    <select id="groupLocation" style="width: 100%; padding: 0.5rem;">
+                        ${locations.map(loc => `
+                            <option value="${loc.id}">${loc.name} - ${loc.address}</option>
+                        `).join('')}
                     </select>
                 </div>
                 
-                <div class="form-group">
-                    <label>Libro/Material</label>
-                    <input type="text" id="groupBook" value="${group?.book || ''}" 
-                           placeholder="Ej: English File A1">
-                </div>
-                
-                <div class="form-group">
-                    <label>Sala/Aula</label>
-                    <input type="text" id="groupRoom" value="${group?.room || ''}" 
-                           placeholder="Ej: Sala 101">
-                </div>
-                
-                <div style="grid-column: 1/-1; display: flex; gap: 1rem; justify-content: flex-end;">
-                    <button type="button" onclick="cancelGroupForm()" class="btn btn-secondary">
+                <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+                    <button onclick="closeModal('createGroupModal')" 
+                            class="btn btn-secondary" style="flex: 1;">
                         Cancelar
                     </button>
-                    <button type="submit" class="btn btn-primary">
-                        ${group ? 'Actualizar' : 'Crear'} Grupo
-                    </button>
-                </div>
-            </form>
-        </div>
-    `;
-}
-
-// Global functions
-window.GroupsManager = new GroupsManager();
-window.groupsData = new Map(); // For compatibility
-
-// Main function to load groups tab - add debugging
-window.loadGroupsTab = async function() {
-    console.log('📚 loadGroupsTab called');
-    
-    // Debug: Check if function is accessible
-    console.log('loadGroupsTab is on window:', window.loadGroupsTab === loadGroupsTab);
-    
-    const container = document.getElementById('groupsContainer');
-    console.log('Groups container found:', !!container);
-    
-    if (!container) {
-        console.error('❌ Groups container not found!');
-        // Try to find any container
-        console.log('Available containers:', document.querySelectorAll('[id*="Container"]'));
-        return;
-    }
-
-    try {
-        console.log('Setting initial content...');
-        container.innerHTML = renderGroupsView();
-        
-        console.log('Initializing GroupsManager...');
-        await window.GroupsManager.init();
-        
-        // Also check if teachers need to be loaded
-        if (window.TeacherManager && !window.TeacherManager.initialized) {
-            console.log('📚 Also loading teachers...');
-            try {
-                await window.TeacherManager.init();
-            } catch (err) {
-                console.warn('⚠️ Could not load teachers:', err);
-            }
-        }
-        
-        console.log('Refreshing groups grid...');
-        await refreshGroupsGrid();
-        console.log('✅ Groups tab loaded successfully');
-        
-    } catch (error) {
-        console.error('❌ Error loading groups tab:', error);
-        container.innerHTML = `
-            <div style="padding: 2rem; text-align: center; color: #ef4444;">
-                <p>❌ Error al cargar grupos: ${error.message}</p>
-                <button onclick="loadGroupsTab()" class="btn btn-primary" style="margin-top: 1rem;">
-                    Reintentar
-                </button>
-            </div>
-        `;
-    }
-};
-
-// Make sure it's accessible globally
-window.showGroupsTab = window.loadGroupsTab;
-window.loadGroups = window.loadGroupsTab;
-
-window.refreshGroupsGrid = async function() {
-    console.log('Refreshing groups grid...');
-    const groups = await window.GroupsManager.getGroupsWithStats();
-    const grid = document.getElementById('groupsGrid');
-    
-    if (!grid) {
-        console.error('Groups grid not found!');
-        return;
-    }
-    
-    if (!groups.length) {
-        grid.innerHTML = '<div style="text-align: center; padding: 2rem; color: #666;">No hay grupos creados</div>';
-        return;
-    }
-    
-    // Sort groups by status (problematic first)
-    groups.sort((a, b) => {
-        if (a.studentCount < 4 && b.studentCount >= 4) return -1;
-        if (a.studentCount >= 4 && b.studentCount < 4) return 1;
-        if (a.studentCount > 8 && b.studentCount <= 8) return -1;
-        if (a.studentCount <= 8 && b.studentCount > 8) return 1;
-        return a.name.localeCompare(b.name);
-    });
-    
-    grid.innerHTML = groups.map(group => renderGroupCard(group)).join('');
-    
-    // Update global groupsData for student module
-    window.groupsData.clear();
-    groups.forEach(g => window.groupsData.set(g.name, g));
-    
-    console.log('✅ Groups grid refreshed with', groups.length, 'groups');
-};
-
-window.showGroupForm = function(groupId = null) {
-    const group = groupId ? window.GroupsManager.groups.get(groupId) : null;
-    document.getElementById('groupFormContainer').innerHTML = renderGroupForm(group);
-    
-    document.getElementById('groupForm').onsubmit = async (e) => {
-        e.preventDefault();
-        await saveGroupForm(groupId);
-    };
-};
-
-window.cancelGroupForm = function() {
-    document.getElementById('groupFormContainer').innerHTML = '';
-};
-
-window.toggleGroupDetails = function(groupId) {
-    const details = document.getElementById(`groupDetails-${groupId}`);
-    if (details) {
-        const isHidden = details.style.display === 'none';
-        details.style.display = isHidden ? 'block' : 'none';
-        
-        // Update expanded state
-        const group = window.GroupsManager.groups.get(groupId);
-        if (group) {
-            group.expanded = isHidden;
-        }
-    }
-};
-
-window.updateLocationField = function() {
-    const select = document.getElementById('groupSchedule');
-    const location = select.options[select.selectedIndex]?.dataset.location;
-    if (location) {
-        document.getElementById('groupLocation').value = location;
-    }
-};
-
-window.assignStudentsModal = async function(groupId) {
-    console.log('📚 Opening assign students modal for group:', groupId);
-    
-    // Get the group details
-    const group = window.GroupsManager.groups.get(groupId);
-    if (!group) {
-        alert('Grupo no encontrado');
-        return;
-    }
-    
-    // Initialize StudentManager if needed
-    if (!window.StudentManager || !window.StudentManager.initialized) {
-        console.log('Initializing StudentManager...');
-        if (window.StudentManager) {
-            await window.StudentManager.init();
-        } else {
-            console.error('StudentManager not found!');
-            alert('Error: Módulo de estudiantes no cargado');
-            return;
-        }
-    }
-    
-    // Get all students
-    const allStudents = window.StudentManager.getStudents();
-    
-    // Create modal
-    const modal = document.createElement('div');
-    modal.id = 'assignStudentsModal';
-    modal.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0,0,0,0.5);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 1000;
-    `;
-    
-    modal.innerHTML = `
-        <div style="
-            background: white;
-            padding: 2rem;
-            border-radius: 12px;
-            max-width: 800px;
-            width: 90%;
-            max-height: 80vh;
-            display: flex;
-            flex-direction: column;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        ">
-            <h2 style="margin: 0 0 1rem 0;">📚 Asignar Estudiantes a ${group.name}</h2>
-            
-            <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
-                <button onclick="selectAllStudents(true)" class="btn btn-sm" 
-                        style="background: #10b981; color: white;">
-                    ✅ Seleccionar Todos
-                </button>
-                <button onclick="selectAllStudents(false)" class="btn btn-sm"
-                        style="background: #6b7280; color: white;">
-                    ❌ Deseleccionar Todos
-                </button>
-                <input type="text" id="studentFilterInput" placeholder="Buscar estudiante..." 
-                       style="flex: 1; padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 4px;"
-                       onkeyup="filterStudentsList()">
-            </div>
-            
-            <div style="flex: 1; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 8px; padding: 1rem;">
-                <table style="width: 100%;">
-                    <thead>
-                        <tr style="border-bottom: 2px solid #e5e7eb;">
-                            <th style="padding: 0.5rem; text-align: center; width: 50px;">
-                                <input type="checkbox" id="selectAllCheckbox" onchange="selectAllStudents(this.checked)">
-                            </th>
-                            <th style="padding: 0.5rem; text-align: left;">Nombre</th>
-                            <th style="padding: 0.5rem; text-align: left;">Documento</th>
-                            <th style="padding: 0.5rem; text-align: left;">Teléfono</th>
-                            <th style="padding: 0.5rem; text-align: left;">Grupo Actual</th>
-                        </tr>
-                    </thead>
-                    <tbody id="studentListBody">
-                        ${allStudents.map(student => {
-                            const isInThisGroup = student.grupo === group.name;
-                            const hasOtherGroup = student.grupo && student.grupo !== group.name;
-                            
-                            return `
-                                <tr class="student-row" data-student-name="${(student.nombre || '').toLowerCase()}">
-                                    <td style="padding: 0.5rem; text-align: center;">
-                                        <input type="checkbox" 
-                                               class="student-checkbox" 
-                                               data-student-id="${student.id}"
-                                               ${isInThisGroup ? 'checked disabled' : ''}>
-                                    </td>
-                                    <td style="padding: 0.5rem;">
-                                        ${student.nombre || '-'}
-                                        ${isInThisGroup ? '<span style="color: #10b981; font-weight: bold;"> ✓</span>' : ''}
-                                    </td>
-                                    <td style="padding: 0.5rem;">${student.tipoDoc || ''} ${student.numDoc || '-'}</td>
-                                    <td style="padding: 0.5rem;">${student.telefono || '-'}</td>
-                                    <td style="padding: 0.5rem;">
-                                        ${isInThisGroup ? 
-                                            `<span style="color: #10b981; font-weight: bold;">${group.name}</span>` : 
-                                            hasOtherGroup ? 
-                                            `<span style="color: #f59e0b;">${student.grupo}</span>` : 
-                                            '<span style="color: #6b7280;">Sin grupo</span>'}
-                                    </td>
-                                </tr>
-                            `;
-                        }).join('')}
-                    </tbody>
-                </table>
-            </div>
-            
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem;">
-                <div id="selectionCount" style="color: #6b7280;">
-                    0 estudiantes seleccionados
-                </div>
-                <div style="display: flex; gap: 1rem;">
-                    <button onclick="closeAssignStudentsModal()" class="btn btn-secondary">
-                        Cancelar
-                    </button>
-                    <button onclick="assignSelectedStudents('${groupId}')" class="btn btn-primary">
-                        ✅ Asignar Estudiantes
+                    <button onclick="saveGroup()" 
+                            class="btn btn-primary" style="flex: 1;">
+                        Crear Grupo
                     </button>
                 </div>
             </div>
         </div>
     `;
     
-    // Append to groups container instead of body
-    const groupsContainer = document.getElementById('groupsContainer');
-    if (groupsContainer) {
-        groupsContainer.appendChild(modal);
-    } else {
-        document.body.appendChild(modal);
-    }
-    
-    updateSelectionCount();
-};
-
-window.closeAssignStudentsModal = function() {
-    const modal = document.getElementById('assignStudentsModal');
-    if (modal) {
-        modal.remove();
-    }
-};
-
-window.selectAllStudents = function(checked) {
-    const checkboxes = document.querySelectorAll('.student-checkbox:not(:disabled)');
-    checkboxes.forEach(cb => cb.checked = checked);
-    
-    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
-    if (selectAllCheckbox) {
-        selectAllCheckbox.checked = checked;
-    }
-    
-    updateSelectionCount();
-};
-
-window.filterStudentsList = function() {
-    const filter = document.getElementById('studentFilterInput').value.toLowerCase();
-    const rows = document.querySelectorAll('.student-row');
-    
-    rows.forEach(row => {
-        const name = row.dataset.studentName;
-        row.style.display = name.includes(filter) ? '' : 'none';
-    });
-};
-
-window.updateSelectionCount = function() {
-    const checkboxes = document.querySelectorAll('.student-checkbox:checked:not(:disabled)');
-    const countElement = document.getElementById('selectionCount');
-    if (countElement) {
-        countElement.textContent = `${checkboxes.length} estudiantes seleccionados`;
-    }
-    
-    // Add event listeners to checkboxes if not already added
-    document.querySelectorAll('.student-checkbox').forEach(cb => {
-        if (!cb.hasListener) {
-            cb.addEventListener('change', updateSelectionCount);
-            cb.hasListener = true;
-        }
-    });
-};
-
-window.assignSelectedStudents = async function(groupId) {
-    const checkboxes = document.querySelectorAll('.student-checkbox:checked:not(:disabled)');
-    
-    if (checkboxes.length === 0) {
-        alert('Por favor selecciona al menos un estudiante');
-        return;
-    }
-    
-    const group = window.GroupsManager.groups.get(groupId);
-    if (!group) {
-        alert('Grupo no encontrado');
-        return;
-    }
-    
-    try {
-        // Show loading
-        const modal = document.getElementById('assignStudentsModal');
-        modal.innerHTML = `
-            <div style="
-                background: white;
-                padding: 3rem;
-                border-radius: 12px;
-                text-align: center;
-            ">
-                <div class="loading-spinner" style="margin: 0 auto 1rem;"></div>
-                <p>Asignando estudiantes al grupo ${group.name}...</p>
-            </div>
-        `;
-        
-        // Update each selected student
-        let assigned = 0;
-        for (const checkbox of checkboxes) {
-            const studentId = checkbox.dataset.studentId;
-            await window.StudentManager.updateStudent(studentId, { grupo: group.name });
-            assigned++;
-        }
-        
-        // Update group student count
-        if (!group.students) group.students = [];
-        
-        // Get updated list of students in this group
-        const studentsInGroup = window.StudentManager.getStudents().filter(s => s.grupo === group.name);
-        group.students = studentsInGroup.map(s => s.id);
-        
-        // Save group changes
-        window.GroupsManager.groups.set(groupId, group);
-        
-        // Save to Firebase
-        const db = window.firebaseModules.database;
-        const ref = db.ref(window.FirebaseData.database, `groups/${groupId}`);
-        await db.update(ref, { students: group.students });
-        
-        // Show success
-        modal.innerHTML = `
-            <div style="
-                background: white;
-                padding: 3rem;
-                border-radius: 12px;
-                text-align: center;
-            ">
-                <div style="font-size: 3rem; color: #10b981; margin-bottom: 1rem;">✅</div>
-                <p style="font-size: 1.2rem; margin-bottom: 2rem;">
-                    ${assigned} estudiantes asignados exitosamente al grupo ${group.name}
-                </p>
-                <button onclick="closeAssignStudentsModal(); refreshGroupsGrid();" class="btn btn-primary">
-                    Aceptar
-                </button>
-            </div>
-        `;
-        
-    } catch (error) {
-        console.error('Error assigning students:', error);
-        alert('Error al asignar estudiantes: ' + error.message);
-        closeAssignStudentsModal();
-    }
-};
-
-// Add CSS for loading spinner
-if (!document.getElementById('assign-students-styles')) {
-    const style = document.createElement('style');
-    style.id = 'assign-students-styles';
-    style.textContent = `
-        .loading-spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid #e5e7eb;
-            border-top: 4px solid #3b82f6;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        .student-row:hover {
-            background-color: #f9fafb;
-        }
-        
-        .student-checkbox {
-            width: 18px;
-            height: 18px;
-            cursor: pointer;
-        }
-        
-        .student-checkbox:disabled {
-            cursor: not-allowed;
-            opacity: 0.5;
-        }
-    `;
-    document.head.appendChild(style);
+    document.body.insertAdjacentHTML('beforeend', modal);
 }
 
-window.removeFromGroup = async function(studentId, groupId) {
-    if (!confirm('¿Quitar estudiante del grupo?')) return;
+function manageStudentsModal(groupId) {
+    const group = window.GroupsManager?.groups.get(groupId);
+    const allStudents = Array.from(window.StudentManager?.students.values() || []);
+    const groupStudents = group?.students || [];
     
-    await window.StudentManager.updateStudent(studentId, { grupo: '' });
-    await refreshGroupsGrid();
-    window.showNotification('✅ Estudiante removido del grupo', 'success');
-};
-
-window.deleteGroup = async function(groupId) {
-    if (!confirm('¿Eliminar este grupo? Los estudiantes quedarán sin grupo asignado.')) return;
-    
-    try {
-        const db = window.firebaseModules.database;
-        const ref = db.ref(window.FirebaseData.database, `groups/${groupId}`);
-        await db.remove(ref);
-        
-        window.GroupsManager.groups.delete(groupId);
-        await refreshGroupsGrid();
-        window.showNotification('✅ Grupo eliminado', 'success');
-    } catch (error) {
-        console.error('❌ Error deleting group:', error);
-        window.showNotification('❌ Error al eliminar grupo', 'error');
-    }
-};
-
-async function saveGroupForm(groupId) {
-    try {
-        const scheduleSelect = document.getElementById('groupSchedule');
-        const selectedSchedule = window.GroupsManager.getAvailableSchedules()
-            .find(s => s.id === scheduleSelect.value);
-        
-        const groupData = {
-            id: groupId,
-            name: document.getElementById('groupName').value,
-            scheduleId: scheduleSelect.value,
-            schedule: selectedSchedule ? `${selectedSchedule.days} ${selectedSchedule.time}` : '',
-            location: document.getElementById('groupLocation').value,
-            teacherId: document.getElementById('groupTeacher').value,
-            book: document.getElementById('groupBook').value,
-            room: document.getElementById('groupRoom').value
-        };
-
-        await window.GroupsManager.saveGroup(groupData);
-        
-        window.showNotification('✅ Grupo guardado', 'success');
-        cancelGroupForm();
-        await refreshGroupsGrid();
-    } catch (error) {
-        console.error('❌ Error saving group:', error);
-        window.showNotification('❌ Error al guardar grupo', 'error');
-    }
-}
-
-// Check user permissions helper
-window.checkUserPermissions = async function() {
-    console.log('=== Checking User Permissions ===');
-    
-    try {
-        // Find Firebase auth
-        let auth = null;
-        if (window.firebase && window.firebase.auth) {
-            auth = window.firebase.auth();
-        }
-        
-        if (!auth) {
-            console.error('❌ Firebase auth not found');
-            return;
-        }
-        
-        const currentUser = auth.currentUser;
-        if (!currentUser) {
-            console.error('❌ No user logged in');
-            return;
-        }
-        
-        console.log('✅ Current user:', currentUser.email);
-        console.log('User UID:', currentUser.uid);
-        
-        // Try to read user's role from database
-        const db = window.firebaseModules.database;
-        const userRef = db.ref(window.FirebaseData.database, `users/${currentUser.uid}`);
-        
-        console.log('📥 Checking user data in database...');
-        
-        try {
-            const userSnapshot = await db.get(userRef);
-            
-            if (userSnapshot.exists()) {
-                const userData = userSnapshot.val();
-                console.log('✅ User data:', userData);
+    const modal = `
+        <div id="manageStudentsModal" style="
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5); display: flex; align-items: center;
+            justify-content: center; z-index: 1000;">
+            <div style="background: white; padding: 2rem; border-radius: 8px; 
+                        max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto;">
+                <h3>👥 Gestionar Estudiantes - ${group?.name}</h3>
                 
-                if (userData.profile && userData.profile.role) {
-                    console.log('👤 User role:', userData.profile.role);
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <!-- Available Students -->
+                    <div>
+                        <h4>Estudiantes Disponibles</h4>
+                        <div style="max-height: 300px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 4px; padding: 0.5rem;">
+                            ${allStudents.filter(s => !groupStudents.includes(s.id)).map(student => `
+                                <div style="padding: 0.5rem; border-bottom: 1px solid #f3f4f6;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <span>${student.nombre}</span>
+                                        <button onclick="addToGroup('${groupId}', '${student.id}')" 
+                                                class="btn btn-sm btn-primary">➕</button>
+                                    </div>
+                                </div>
+                            `).join('') || '<p style="text-align: center; color: #6b7280;">No hay estudiantes disponibles</p>'}
+                        </div>
+                    </div>
                     
-                    if (userData.profile.role === 'director') {
-                        console.log('✅ User has director role - should have full access');
-                    } else {
-                        console.log('⚠️ User role is not director - may have limited access');
-                    }
-                } else {
-                    console.log('⚠️ No role found in user profile');
-                }
-            } else {
-                console.error('❌ No user data found in database');
-            }
-        } catch (error) {
-            console.error('❌ Error reading user data:', error);
-        }
-        
-        // Test group access
-        console.log('\n📥 Testing group access...');
-        try {
-            const groupRef = db.ref(window.FirebaseData.database, 'groups');
-            const testSnapshot = await db.get(groupRef);
-            console.log('✅ Can read groups!');
-        } catch (error) {
-            console.error('❌ Cannot read groups:', error.message);
-        }
-        
-    } catch (error) {
-        console.error('❌ Error checking permissions:', error);
+                    <!-- Group Students -->
+                    <div>
+                        <h4>Estudiantes en el Grupo (${groupStudents.length}/${group?.maxStudents})</h4>
+                        <div style="max-height: 300px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 4px; padding: 0.5rem;">
+                            ${groupStudents.map(studentId => {
+                                const student = window.StudentManager?.students.get(studentId);
+                                return student ? `
+                                    <div style="padding: 0.5rem; border-bottom: 1px solid #f3f4f6;">
+                                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                                            <span>${student.nombre}</span>
+                                            <button onclick="removeFromGroup('${groupId}', '${studentId}')" 
+                                                    class="btn btn-sm btn-danger">❌</button>
+                                        </div>
+                                    </div>
+                                ` : '';
+                            }).join('') || '<p style="text-align: center; color: #6b7280;">No hay estudiantes en este grupo</p>'}
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 1.5rem;">
+                    <button onclick="closeModal('manageStudentsModal')" 
+                            class="btn btn-secondary" style="width: 100%;">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modal);
+}
+
+// Global Functions
+window.GroupsManager = new GroupsManager();
+
+window.loadGroupsTab = async function() {
+    await window.GroupsManager.loadGroups();
+    const container = document.getElementById('groupsContainer');
+    if (container) {
+        container.innerHTML = renderGroupsTab();
     }
 };
 
-console.log('✅ Groups module loaded successfully');
-console.log('Available functions:', {
-    loadGroupsTab: typeof window.loadGroupsTab,
-    showGroupsTab: typeof window.showGroupsTab,
-    GroupsManager: typeof window.GroupsManager
-});
+window.saveGroup = async function() {
+    const days = Array.from(document.querySelectorAll('input[name="groupDays"]:checked'))
+        .map(cb => cb.value);
+    
+    if (days.length === 0) {
+        window.showNotification('⚠️ Seleccione al menos un día', 'warning');
+        return;
+    }
+    
+    const groupData = {
+        name: document.getElementById('groupName').value,
+        level: document.getElementById('groupLevel').value,
+        teacherId: document.getElementById('groupTeacher').value,
+        maxStudents: parseInt(document.getElementById('groupMaxStudents').value),
+        days,
+        startTime: document.getElementById('groupStartTime').value,
+        endTime: document.getElementById('groupEndTime').value,
+        duration: parseFloat(document.getElementById('groupDuration').value),
+        locationId: document.getElementById('groupLocation').value
+    };
+    
+    if (!groupData.name || !groupData.teacherId) {
+        window.showNotification('⚠️ Complete todos los campos requeridos', 'warning');
+        return;
+    }
+    
+    try {
+        await window.GroupsManager.createGroup(groupData);
+        window.showNotification('✅ Grupo creado exitosamente', 'success');
+        closeModal('createGroupModal');
+        loadGroupsTab();
+    } catch (error) {
+        window.showNotification('❌ Error al crear grupo', 'error');
+    }
+};
+
+window.editGroup = function(groupId) {
+    // Similar to create but with pre-filled data
+    const group = window.GroupsManager.groups.get(groupId);
+    if (group) {
+        // Show edit modal with group data
+        console.log('Edit group:', group);
+    }
+};
+
+window.manageStudents = function(groupId) {
+    manageStudentsModal(groupId);
+};
+
+window.setPaymentRate = function(groupId) {
+    // This will be handled by the payments module
+    if (window.PaymentManager) {
+        window.PaymentManager.showRateModal(groupId);
+    } else {
+        window.showNotification('⚠️ Módulo de pagos no cargado', 'warning');
+    }
+};
+
+window.addToGroup = async function(groupId, studentId) {
+    try {
+        await window.GroupsManager.addStudentToGroup(groupId, studentId);
+        window.showNotification('✅ Estudiante agregado', 'success');
+        closeModal('manageStudentsModal');
+        manageStudents(groupId);
+    } catch (error) {
+        window.showNotification(`❌ ${error.message}`, 'error');
+    }
+};
+
+window.removeFromGroup = async function(groupId, studentId) {
+    try {
+        await window.GroupsManager.removeStudentFromGroup(groupId, studentId);
+        window.showNotification('✅ Estudiante removido', 'success');
+        closeModal('manageStudentsModal');
+        manageStudents(groupId);
+    } catch (error) {
+        window.showNotification('❌ Error al remover estudiante', 'error');
+    }
+};
+
+window.closeModal = function(modalId) {
+    document.getElementById(modalId)?.remove();
+};
+
+// Initialize on load
+if (window.FirebaseData?.database) {
+    window.GroupsManager.loadGroups();
+}
+
+console.log('✅ Groups module with schedule loaded successfully');
