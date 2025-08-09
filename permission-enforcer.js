@@ -2,9 +2,46 @@
 // Works with admin-center.js to control module visibility
 console.log('🔒 Loading Permission Enforcer...');
 
+// ============ IMMEDIATE SECURITY CSS ============
+// Inject CSS to hide modules immediately as backup
+(function() {
+    const style = document.createElement('style');
+    style.id = 'permission-enforcer-hide';
+    style.innerHTML = `
+        /* Hide school modules until authenticated */
+        #schoolButtonBar, #schoolFloatBtn, #schoolModuleView {
+            display: none !important;
+            visibility: hidden !important;
+        }
+        /* Hide any element containing school module text */
+        div:not(.login-form):not(.login-container) {
+            button:not([onclick*="Firebase"]) {
+                display: none !important;
+            }
+        }
+        /* Hide navigation tabs */
+        #contactsTab, #leadsTab, #pipelineTab, #reportsTab,
+        #tasksTab, #monitoringTab, #socialMediaTab, #configTab, #adminTab {
+            display: none !important;
+        }
+    `;
+    document.head.appendChild(style);
+    console.log('🛡️ Security CSS injected');
+})();
+
 // ============ IMMEDIATE HIDE - ADD THIS BLOCK ============
 // Hide everything immediately until we verify authentication
 (function() {
+    // Block school-buttons.js from running until authenticated
+    window.addSchoolButtons = function() {
+        if (!window.FirebaseData?.currentUser) {
+            console.log('🚫 Blocked addSchoolButtons - not authenticated');
+            return;
+        }
+        // Will be replaced by the real function once authenticated
+    };
+    
+    // Hide all tabs immediately
     const elementsToHide = [
         'schoolButtonBar', 'schoolFloatBtn',
         'contactsTab', 'leadsTab', 'pipelineTab', 'reportsTab', 
@@ -16,7 +53,102 @@ console.log('🔒 Loading Permission Enforcer...');
         if (el) el.style.display = 'none';
     });
     
-    console.log('🔒 Modules hidden until authentication check');
+    // Monitor DOM for school modules being added and hide them immediately
+    const observer = new MutationObserver(function(mutations) {
+        // Only hide if we're not authenticated yet
+        if (!window.FirebaseData?.currentUser) {
+            mutations.forEach(function(mutation) {
+                mutation.addedNodes.forEach(function(node) {
+                    if (node.nodeType === 1) { // Element node
+                        // Check if this is a school module by ID, class, or content
+                        const shouldHide = 
+                            node.id === 'schoolButtonBar' || 
+                            node.id === 'schoolFloatBtn' ||
+                            node.id === 'schoolModuleView' ||
+                            (node.className && typeof node.className === 'string' && 
+                             (node.className.includes('school') || node.className.includes('module'))) ||
+                            (node.textContent && 
+                             (node.textContent.includes('Módulos Escolares') ||
+                              node.textContent.includes('Estudiantes') ||
+                              node.textContent.includes('Pagos') ||
+                              node.textContent.includes('Grupos') ||
+                              node.textContent.includes('Profesores') ||
+                              node.textContent.includes('Asistencia')));
+                        
+                        if (shouldHide) {
+                            node.style.display = 'none';
+                            node.style.visibility = 'hidden';
+                            console.log('🚫 Blocked module from appearing:', node.id || node.className || 'school element');
+                        }
+                        
+                        // Also check children for school-related elements
+                        if (node.querySelectorAll) {
+                            const schoolElements = node.querySelectorAll('#schoolButtonBar, #schoolFloatBtn, .school-module, [class*="school"]');
+                            schoolElements.forEach(el => {
+                                el.style.display = 'none';
+                                el.style.visibility = 'hidden';
+                            });
+                            
+                            // Check for buttons with school module text
+                            const buttons = node.querySelectorAll('button');
+                            buttons.forEach(btn => {
+                                const text = btn.textContent || '';
+                                if (text.includes('Estudiantes') || text.includes('Pagos') || 
+                                    text.includes('Grupos') || text.includes('Profesores') || 
+                                    text.includes('Asistencia')) {
+                                    btn.style.display = 'none';
+                                    btn.style.visibility = 'hidden';
+                                    // Also hide parent container if it only contains school buttons
+                                    if (btn.parentElement) {
+                                        btn.parentElement.style.display = 'none';
+                                    }
+                                }
+                            });
+                        }
+                    }
+                });
+            });
+        }
+    });
+    
+    // Start observing immediately
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+    
+    // Store observer reference to stop it later when authenticated
+    window._moduleHideObserver = observer;
+    
+    // Also periodically check for any visible school modules (belt and suspenders)
+    const hideInterval = setInterval(function() {
+        if (!window.FirebaseData?.currentUser) {
+            // Find and hide any school-related elements
+            document.querySelectorAll('#schoolButtonBar, #schoolFloatBtn, [class*="school"]').forEach(el => {
+                el.style.display = 'none';
+            });
+            // Find buttons with school text
+            document.querySelectorAll('button').forEach(btn => {
+                const text = btn.textContent || '';
+                if (text.includes('Estudiantes') || text.includes('Pagos') || 
+                    text.includes('Grupos') || text.includes('Profesores') || 
+                    text.includes('Asistencia')) {
+                    btn.style.display = 'none';
+                    if (btn.parentElement && btn.parentElement.id !== 'root') {
+                        btn.parentElement.style.display = 'none';
+                    }
+                }
+            });
+        } else {
+            // Stop checking once authenticated
+            clearInterval(hideInterval);
+        }
+    }, 100); // Check every 100ms
+    
+    // Store interval reference
+    window._moduleHideInterval = hideInterval;
+    
+    console.log('🔒 Modules hidden and aggressive monitoring active');
 })();
 // ============ END OF NEW BLOCK ============
 
@@ -59,6 +191,27 @@ class PermissionEnforcer {
             
             // Wait for Firebase and user authentication
             await this.waitForFirebase();
+            
+            // Stop the initial hide observer now that we're authenticated
+            if (window._moduleHideObserver) {
+                window._moduleHideObserver.disconnect();
+                window._moduleHideObserver = null;
+                console.log('🔓 Stopped initial security monitoring');
+            }
+            
+            // Stop the hide interval
+            if (window._moduleHideInterval) {
+                clearInterval(window._moduleHideInterval);
+                window._moduleHideInterval = null;
+                console.log('🔓 Stopped security interval');
+            }
+            
+            // Remove the hide CSS now that we're authenticated
+            const hideStyle = document.getElementById('permission-enforcer-hide');
+            if (hideStyle) {
+                hideStyle.remove();
+                console.log('🔓 Removed security CSS');
+            }
             
             // Load user permissions
             await this.loadUserPermissions();
