@@ -9,17 +9,13 @@ console.log('🔒 Loading Permission Enforcer...');
     style.id = 'permission-enforcer-hide';
     style.innerHTML = `
         /* Hide school modules until authenticated */
-        #schoolButtonBar, #schoolFloatBtn, #schoolModuleView {
+        #schoolButtonBar {
             display: none !important;
-            visibility: hidden !important;
         }
-        /* Hide any element containing school module text */
-        div:not(.login-form):not(.login-container) {
-            button:not([onclick*="Firebase"]) {
-                display: none !important;
-            }
+        #schoolFloatBtn {
+            display: none !important;
         }
-        /* Hide navigation tabs */
+        /* Hide navigation tabs until authenticated */
         #contactsTab, #leadsTab, #pipelineTab, #reportsTab,
         #tasksTab, #monitoringTab, #socialMediaTab, #configTab, #adminTab {
             display: none !important;
@@ -32,13 +28,21 @@ console.log('🔒 Loading Permission Enforcer...');
 // ============ IMMEDIATE HIDE - ADD THIS BLOCK ============
 // Hide everything immediately until we verify authentication
 (function() {
+    // Save original addSchoolButtons if it exists
+    if (typeof window.addSchoolButtons === 'function') {
+        window.originalAddSchoolButtons = window.addSchoolButtons;
+    }
+    
     // Block school-buttons.js from running until authenticated
     window.addSchoolButtons = function() {
         if (!window.FirebaseData?.currentUser) {
             console.log('🚫 Blocked addSchoolButtons - not authenticated');
             return;
         }
-        // Will be replaced by the real function once authenticated
+        // Call original if authenticated
+        if (window.originalAddSchoolButtons) {
+            window.originalAddSchoolButtons();
+        }
     };
     
     // Hide all tabs immediately
@@ -59,51 +63,13 @@ console.log('🔒 Loading Permission Enforcer...');
         if (!window.FirebaseData?.currentUser) {
             mutations.forEach(function(mutation) {
                 mutation.addedNodes.forEach(function(node) {
-                    if (node.nodeType === 1) { // Element node
-                        // Check if this is a school module by ID, class, or content
-                        const shouldHide = 
-                            node.id === 'schoolButtonBar' || 
+                    if (node.nodeType === 1 && node.id) { // Element node with ID
+                        // Check if this is a school module by ID
+                        if (node.id === 'schoolButtonBar' || 
                             node.id === 'schoolFloatBtn' ||
-                            node.id === 'schoolModuleView' ||
-                            (node.className && typeof node.className === 'string' && 
-                             (node.className.includes('school') || node.className.includes('module'))) ||
-                            (node.textContent && 
-                             (node.textContent.includes('Módulos Escolares') ||
-                              node.textContent.includes('Estudiantes') ||
-                              node.textContent.includes('Pagos') ||
-                              node.textContent.includes('Grupos') ||
-                              node.textContent.includes('Profesores') ||
-                              node.textContent.includes('Asistencia')));
-                        
-                        if (shouldHide) {
+                            node.id === 'schoolModuleView') {
                             node.style.display = 'none';
-                            node.style.visibility = 'hidden';
-                            console.log('🚫 Blocked module from appearing:', node.id || node.className || 'school element');
-                        }
-                        
-                        // Also check children for school-related elements
-                        if (node.querySelectorAll) {
-                            const schoolElements = node.querySelectorAll('#schoolButtonBar, #schoolFloatBtn, .school-module, [class*="school"]');
-                            schoolElements.forEach(el => {
-                                el.style.display = 'none';
-                                el.style.visibility = 'hidden';
-                            });
-                            
-                            // Check for buttons with school module text
-                            const buttons = node.querySelectorAll('button');
-                            buttons.forEach(btn => {
-                                const text = btn.textContent || '';
-                                if (text.includes('Estudiantes') || text.includes('Pagos') || 
-                                    text.includes('Grupos') || text.includes('Profesores') || 
-                                    text.includes('Asistencia')) {
-                                    btn.style.display = 'none';
-                                    btn.style.visibility = 'hidden';
-                                    // Also hide parent container if it only contains school buttons
-                                    if (btn.parentElement) {
-                                        btn.parentElement.style.display = 'none';
-                                    }
-                                }
-                            });
+                            console.log('🚫 Blocked module from appearing:', node.id);
                         }
                     }
                 });
@@ -123,27 +89,22 @@ console.log('🔒 Loading Permission Enforcer...');
     // Also periodically check for any visible school modules (belt and suspenders)
     const hideInterval = setInterval(function() {
         if (!window.FirebaseData?.currentUser) {
-            // Find and hide any school-related elements
-            document.querySelectorAll('#schoolButtonBar, #schoolFloatBtn, [class*="school"]').forEach(el => {
-                el.style.display = 'none';
-            });
-            // Find buttons with school text
-            document.querySelectorAll('button').forEach(btn => {
-                const text = btn.textContent || '';
-                if (text.includes('Estudiantes') || text.includes('Pagos') || 
-                    text.includes('Grupos') || text.includes('Profesores') || 
-                    text.includes('Asistencia')) {
-                    btn.style.display = 'none';
-                    if (btn.parentElement && btn.parentElement.id !== 'root') {
-                        btn.parentElement.style.display = 'none';
-                    }
-                }
-            });
+            // Find and hide school button bar only
+            const schoolBar = document.getElementById('schoolButtonBar');
+            if (schoolBar && schoolBar.style.display !== 'none') {
+                schoolBar.style.display = 'none';
+                console.log('🚫 Re-hiding school button bar');
+            }
+            
+            const floatBtn = document.getElementById('schoolFloatBtn');
+            if (floatBtn && floatBtn.style.display !== 'none') {
+                floatBtn.style.display = 'none';
+            }
         } else {
             // Stop checking once authenticated
             clearInterval(hideInterval);
         }
-    }, 100); // Check every 100ms
+    }, 250); // Check every 250ms
     
     // Store interval reference
     window._moduleHideInterval = hideInterval;
@@ -187,10 +148,12 @@ class PermissionEnforcer {
     // Initialize the permission system
     async init() {
         try {
-            console.log('🔐 Initializing permission enforcement...');
+            console.log('🔐 Starting secure initialization...');
             
             // Wait for Firebase and user authentication
             await this.waitForFirebase();
+            
+            console.log('✅ User authenticated:', window.FirebaseData.currentUser.email);
             
             // Stop the initial hide observer now that we're authenticated
             if (window._moduleHideObserver) {
@@ -222,8 +185,30 @@ class PermissionEnforcer {
             // Set up observer for school buttons
             this.observeSchoolButtons();
             
+            // For admin/director, ensure school buttons are created
+            if (this.userRole === 'admin' || this.userRole === 'director') {
+                console.log('🔓 Admin/Director detected - ensuring all modules visible');
+                
+                // Wait a bit then force visibility
+                setTimeout(() => {
+                    // Try to create school buttons if they don't exist
+                    if (!document.getElementById('schoolButtonBar')) {
+                        if (window.originalAddSchoolButtons) {
+                            console.log('🏫 Creating school buttons for admin');
+                            window.originalAddSchoolButtons();
+                        } else if (typeof window.addSchoolButtons === 'function') {
+                            console.log('🏫 Creating school buttons for admin (alt)');
+                            window.addSchoolButtons();
+                        }
+                    }
+                    
+                    // Force visibility of all elements
+                    this.forceShowAll();
+                }, 500);
+            }
+            
             this.isReady = true;
-            console.log('✅ Permission enforcement active');
+            console.log('✅ Permission enforcement active - Role:', this.userRole);
             
         } catch (error) {
             console.error('❌ Permission Enforcer initialization error:', error);
@@ -280,11 +265,33 @@ class PermissionEnforcer {
             
             this.userRole = profile.role;
             console.log('👤 User role:', this.userRole);
+            console.log('📧 User email:', window.FirebaseData.currentUser.email);
             
-            // Directors and admins see everything - ADDED 'admin' role
-            if (this.userRole === 'director' || this.userRole === 'admin') {
-                console.log('👑 Director/Admin role - all permissions granted');
+            // Check if user is admin by email as fallback
+            const isAdminEmail = window.FirebaseData.currentUser.email.includes('admin');
+            
+            // Directors and admins see everything
+            if (this.userRole === 'director' || this.userRole === 'admin' || isAdminEmail) {
+                console.log('👑 Admin/Director role detected - granting all permissions');
                 this.userPermissions = this.getAllModulesPermission();
+                
+                // If detected as admin by email but role isn't set, update role
+                if (isAdminEmail && !this.userRole) {
+                    this.userRole = 'admin';
+                }
+                
+                // Force remove all hiding styles immediately for admin/director
+                const hideStyle = document.getElementById('permission-enforcer-hide');
+                if (hideStyle) {
+                    hideStyle.remove();
+                    console.log('🔓 Removed hide CSS for admin');
+                }
+                
+                // Force show all modules immediately
+                setTimeout(() => {
+                    this.forceShowAll();
+                }, 100);
+                
                 return;
             }
             
@@ -328,8 +335,11 @@ class PermissionEnforcer {
     
     // Check if user has permission for a module
     hasPermission(module) {
-        // Directors and admins always have permission - ADDED 'admin' check
-        if (this.userRole === 'director' || this.userRole === 'admin') {
+        // Check if user is admin by email
+        const isAdminEmail = window.FirebaseData?.currentUser?.email?.includes('admin');
+        
+        // Directors, admins, and admin emails always have permission
+        if (this.userRole === 'director' || this.userRole === 'admin' || isAdminEmail) {
             return true;
         }
         
@@ -341,14 +351,26 @@ class PermissionEnforcer {
     enforcePermissions() {
         console.log('🎯 Enforcing permissions on UI...');
         
-        // Hide all navigation tabs first, then show allowed ones
+        // First, make sure to remove any lingering hide styles
+        const hideStyle = document.getElementById('permission-enforcer-hide');
+        if (hideStyle) {
+            hideStyle.remove();
+            console.log('🔓 Removed lingering security CSS');
+        }
+        
+        // Process navigation tabs
         Object.entries(this.moduleMapping).forEach(([module, config]) => {
             if (config.type === 'tab') {
                 const element = document.getElementById(config.elementId);
                 if (element) {
                     if (this.hasPermission(module)) {
                         console.log(`✅ Showing ${module} tab`);
+                        // Force show by removing all hide styles
                         element.style.display = '';
+                        element.style.visibility = 'visible';
+                        element.style.opacity = '1';
+                        element.style.pointerEvents = 'auto';
+                        element.removeAttribute('data-security-hidden');
                     } else {
                         console.log(`🚫 Hiding ${module} tab`);
                         element.style.display = 'none';
@@ -363,6 +385,12 @@ class PermissionEnforcer {
         
         // Control school button bar visibility
         this.controlSchoolButtonBar(hasAnySchoolPermission);
+        
+        // Force re-run school buttons script if it exists and user has permissions
+        if (hasAnySchoolPermission && typeof window.originalAddSchoolButtons === 'function') {
+            console.log('🏫 Re-running school buttons script');
+            window.originalAddSchoolButtons();
+        }
     }
     
     // Control school button bar visibility
@@ -380,6 +408,17 @@ class PermissionEnforcer {
             }
         } else {
             console.log('✅ School modules accessible');
+            // Force show the button bar
+            if (buttonBar) {
+                buttonBar.style.display = 'flex';
+                buttonBar.style.visibility = 'visible';
+                buttonBar.style.opacity = '1';
+                buttonBar.style.pointerEvents = 'auto';
+            }
+            if (floatBtn) {
+                floatBtn.style.display = 'block';
+                floatBtn.style.visibility = 'visible';
+            }
             // Hide individual buttons user doesn't have permission for
             this.enforceSchoolButtonPermissions();
         }
@@ -423,6 +462,22 @@ class PermissionEnforcer {
     observeSchoolButtons() {
         console.log('👁️ Setting up school button observer...');
         
+        // First, try to run school buttons if they haven't been created yet
+        if (typeof window.originalAddSchoolButtons === 'function' || typeof window.addSchoolButtons === 'function') {
+            const schoolModules = ['students', 'payments', 'groups', 'teachers', 'attendance'];
+            const hasAnySchoolPermission = schoolModules.some(module => this.hasPermission(module));
+            
+            if (hasAnySchoolPermission) {
+                console.log('🏫 User has school permissions, ensuring buttons are created');
+                // Try to run the original function
+                if (window.originalAddSchoolButtons) {
+                    window.originalAddSchoolButtons();
+                } else if (window.addSchoolButtons) {
+                    window.addSchoolButtons();
+                }
+            }
+        }
+        
         // Check periodically for school button bar
         const checkInterval = setInterval(() => {
             const buttonBar = document.getElementById('schoolButtonBar');
@@ -434,12 +489,20 @@ class PermissionEnforcer {
                 const schoolModules = ['students', 'payments', 'groups', 'teachers', 'attendance'];
                 const hasAnySchoolPermission = schoolModules.some(module => this.hasPermission(module));
                 
+                // Force visibility if user has permissions
+                if (hasAnySchoolPermission) {
+                    buttonBar.style.display = 'flex';
+                    buttonBar.style.visibility = 'visible';
+                    buttonBar.style.opacity = '1';
+                    buttonBar.style.pointerEvents = 'auto';
+                }
+                
                 this.controlSchoolButtonBar(hasAnySchoolPermission);
             }
-        }, 1000);
+        }, 500); // Check every 500ms
         
-        // Stop checking after 30 seconds
-        setTimeout(() => clearInterval(checkInterval), 30000);
+        // Stop checking after 10 seconds (reduced from 30)
+        setTimeout(() => clearInterval(checkInterval), 10000);
     }
     
     // Refresh permissions (call this after admin changes permissions)
@@ -461,6 +524,55 @@ class PermissionEnforcer {
             console.log(`${module}: ${this.hasPermission(module) ? '✅' : '🚫'}`);
         });
     }
+    
+    // Force show all modules (for debugging)
+    forceShowAll() {
+        console.log('🔓 Force showing all modules...');
+        
+        // Remove CSS hide
+        const hideStyle = document.getElementById('permission-enforcer-hide');
+        if (hideStyle) hideStyle.remove();
+        
+        // Show all tabs by removing inline styles
+        const allTabs = ['contactsTab', 'leadsTab', 'pipelineTab', 'reportsTab', 
+                        'tasksTab', 'monitoringTab', 'socialMediaTab', 'configTab', 'adminTab'];
+        
+        allTabs.forEach(tabId => {
+            const element = document.getElementById(tabId);
+            if (element) {
+                // Remove all inline styles
+                element.removeAttribute('style');
+                // Then explicitly show
+                element.style.display = '';
+                console.log(`✅ Forced show: ${tabId}`);
+            }
+        });
+        
+        // Show school button bar
+        const buttonBar = document.getElementById('schoolButtonBar');
+        if (buttonBar) {
+            buttonBar.removeAttribute('style');
+            buttonBar.style.display = 'flex';
+            console.log('✅ Forced show: schoolButtonBar');
+        }
+        
+        const floatBtn = document.getElementById('schoolFloatBtn');
+        if (floatBtn) {
+            floatBtn.removeAttribute('style');
+            floatBtn.style.display = 'block';
+            console.log('✅ Forced show: schoolFloatBtn');
+        }
+        
+        // Remove any display:none from any element
+        document.querySelectorAll('[style*="display: none"]').forEach(el => {
+            if (el.id && (el.id.includes('Tab') || el.id.includes('school') || el.id.includes('School'))) {
+                el.style.display = '';
+                console.log(`✅ Removed hide from: ${el.id}`);
+            }
+        });
+        
+        console.log('✅ All modules forced visible');
+    }
 }
 
 // Create global instance
@@ -474,6 +586,16 @@ if (document.readyState === 'loading') {
 } else {
     // DOM already loaded
     window.PermissionEnforcer.init(); // REMOVED setTimeout
+}
+
+// Also check authentication state changes
+if (window.FirebaseData?.auth) {
+    window.FirebaseData.auth.onAuthStateChanged((user) => {
+        if (user && window.PermissionEnforcer && !window.PermissionEnforcer.isReady) {
+            console.log('🔄 Auth state changed - initializing permissions');
+            window.PermissionEnforcer.init();
+        }
+    });
 }
 
 // Provide global functions for admin-center integration
@@ -492,5 +614,15 @@ window.debugPermissions = function() {
     }
 };
 
+// Force show all modules (for admin debugging)
+window.forceShowModules = function() {
+    if (window.PermissionEnforcer) {
+        window.PermissionEnforcer.forceShowAll();
+    } else {
+        console.log('❌ Permission Enforcer not loaded');
+    }
+};
+
 console.log('✅ Permission Enforcer loaded');
 console.log('Use debugPermissions() to check current permissions');
+console.log('Use forceShowModules() to force show all modules (admin only)');
