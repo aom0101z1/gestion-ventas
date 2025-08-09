@@ -9,23 +9,21 @@ console.log('🔒 Loading Permission Enforcer...');
     style.id = 'permission-enforcer-hide';
     style.innerHTML = `
         /* Hide school modules until authenticated - DON'T change positioning */
-        #schoolButtonBar:not(.authorized) {
+        #schoolButtonBar {
             display: none !important;
         }
-        #schoolFloatBtn:not(.authorized) {
+        #schoolFloatBtn {
             display: none !important;
         }
         /* Hide navigation tabs until authenticated */
-        #contactsTab:not(.authorized), 
-        #leadsTab:not(.authorized), 
-        #pipelineTab:not(.authorized), 
-        #reportsTab:not(.authorized),
-        #tasksTab:not(.authorized), 
-        #monitoringTab:not(.authorized), 
-        #socialMediaTab:not(.authorized), 
-        #configTab:not(.authorized), 
-        #adminTab:not(.authorized) {
+        #contactsTab, #leadsTab, #pipelineTab, #reportsTab,
+        #tasksTab, #monitoringTab, #socialMediaTab, #configTab, #adminTab {
             display: none !important;
+        }
+        /* When authorized, ensure modules use their original positioning */
+        #schoolButtonBar.authorized {
+            display: flex !important;
+            flex-direction: column !important;
         }
     `;
     document.head.appendChild(style);
@@ -193,11 +191,11 @@ class PermissionEnforcer {
             // Set up observer for school buttons
             this.observeSchoolButtons();
             
-            // For admin/director, ensure school buttons are created
+            // For admin/director, ensure school buttons are created with original positioning
             if (this.userRole === 'admin' || this.userRole === 'director') {
                 console.log('🔓 Admin/Director detected - ensuring all modules visible');
                 
-                // Wait a bit then force visibility
+                // Wait a bit then ensure visibility and VERTICAL layout
                 setTimeout(() => {
                     // Try to create school buttons if they don't exist
                     if (!document.getElementById('schoolButtonBar')) {
@@ -210,8 +208,14 @@ class PermissionEnforcer {
                         }
                     }
                     
-                    // Force visibility of all elements
-                    this.forceShowAll();
+                    // Ensure visibility and correct vertical layout
+                    const buttonBar = document.getElementById('schoolButtonBar');
+                    if (buttonBar) {
+                        buttonBar.style.display = 'flex';
+                        buttonBar.style.flexDirection = 'column'; // FORCE vertical
+                        buttonBar.classList.add('authorized');
+                        console.log('📐 Forced vertical layout for school buttons');
+                    }
                 }, 500);
             }
             
@@ -289,18 +293,6 @@ class PermissionEnforcer {
                     this.userRole = 'admin';
                 }
                 
-                // Force remove all hiding styles immediately for admin/director
-                const hideStyle = document.getElementById('permission-enforcer-hide');
-                if (hideStyle) {
-                    hideStyle.remove();
-                    console.log('🔓 Removed hide CSS for admin');
-                }
-                
-                // Force show all modules immediately
-                setTimeout(() => {
-                    this.forceShowAll();
-                }, 100);
-                
                 return;
             }
             
@@ -374,8 +366,10 @@ class PermissionEnforcer {
                 if (element) {
                     if (this.hasPermission(module)) {
                         console.log(`✅ Showing ${module} tab`);
-                        // Only change display, don't force other styles
-                        element.style.display = '';
+                        // Only change display if it's hidden
+                        if (element.style.display === 'none') {
+                            element.style.display = '';
+                        }
                         element.classList.add('authorized');
                     } else {
                         console.log(`🚫 Hiding ${module} tab`);
@@ -394,9 +388,20 @@ class PermissionEnforcer {
         this.controlSchoolButtonBar(hasAnySchoolPermission);
         
         // Force re-run school buttons script if it exists and user has permissions
-        if (hasAnySchoolPermission && typeof window.originalAddSchoolButtons === 'function') {
-            console.log('🏫 Re-running school buttons script');
-            window.originalAddSchoolButtons();
+        if (hasAnySchoolPermission) {
+            // Ensure vertical layout is preserved
+            setTimeout(() => {
+                const buttonBar = document.getElementById('schoolButtonBar');
+                if (buttonBar && !buttonBar.style.flexDirection) {
+                    console.log('📐 Ensuring vertical layout');
+                    buttonBar.style.flexDirection = 'column';
+                }
+            }, 100);
+            
+            if (typeof window.originalAddSchoolButtons === 'function') {
+                console.log('🏫 Re-running school buttons script');
+                window.originalAddSchoolButtons();
+            }
         }
     }
     
@@ -417,13 +422,18 @@ class PermissionEnforcer {
             }
         } else {
             console.log('✅ School modules accessible');
-            // Show the button bar without changing its position
+            // Show the button bar with ORIGINAL flex display and vertical layout
             if (buttonBar) {
-                buttonBar.style.display = ''; // Let it use its original display value
+                // Restore to flex display (needed for flex-direction to work)
+                buttonBar.style.display = 'flex';
+                // Ensure vertical layout is preserved
+                if (!buttonBar.style.flexDirection || buttonBar.style.flexDirection !== 'column') {
+                    buttonBar.style.flexDirection = 'column';
+                }
                 buttonBar.classList.add('authorized');
             }
             if (floatBtn) {
-                floatBtn.style.display = ''; // Let it use its original display value
+                floatBtn.style.display = 'block'; // Float button uses block
                 floatBtn.classList.add('authorized');
             }
             // Hide individual buttons user doesn't have permission for
@@ -496,9 +506,10 @@ class PermissionEnforcer {
                 const schoolModules = ['students', 'payments', 'groups', 'teachers', 'attendance'];
                 const hasAnySchoolPermission = schoolModules.some(module => this.hasPermission(module));
                 
-                // Only control visibility, not positioning
+                // Show with proper flex display and vertical layout
                 if (hasAnySchoolPermission) {
-                    buttonBar.style.display = ''; // Use original display value
+                    buttonBar.style.display = 'flex';
+                    buttonBar.style.flexDirection = 'column'; // ENSURE vertical
                     buttonBar.classList.add('authorized');
                 }
                 
@@ -506,7 +517,7 @@ class PermissionEnforcer {
             }
         }, 500); // Check every 500ms
         
-        // Stop checking after 10 seconds (reduced from 30)
+        // Stop checking after 10 seconds
         setTimeout(() => clearInterval(checkInterval), 10000);
     }
     
@@ -578,30 +589,54 @@ class PermissionEnforcer {
         
         allTabs.forEach(tabId => {
             const element = document.getElementById(tabId);
-            if (element) {
-                element.style.display = ''; // Reset display only
+            if (element && element.style.display === 'none') {
+                element.style.display = ''; // Reset display only if hidden
                 element.classList.add('authorized');
                 console.log(`✅ Forced show: ${tabId}`);
             }
         });
         
-        // Show school button bar without changing position
+        // Show school button bar with VERTICAL layout preserved
         const buttonBar = document.getElementById('schoolButtonBar');
         if (buttonBar) {
-            // Only change display, keep original positioning
-            buttonBar.style.display = '';
+            buttonBar.style.display = 'flex';
+            buttonBar.style.flexDirection = 'column'; // ENSURE vertical
             buttonBar.classList.add('authorized');
-            console.log('✅ Forced show: schoolButtonBar');
+            console.log('✅ Forced show: schoolButtonBar (vertical)');
         }
         
         const floatBtn = document.getElementById('schoolFloatBtn');
-        if (floatBtn) {
-            floatBtn.style.display = '';
+        if (floatBtn && floatBtn.style.display === 'none') {
+            floatBtn.style.display = 'block';
             floatBtn.classList.add('authorized');
             console.log('✅ Forced show: schoolFloatBtn');
         }
         
         console.log('✅ All modules forced visible');
+    }
+    
+    // Restore original school button positioning (VERTICAL layout)
+    restoreSchoolButtonPosition() {
+        console.log('🔧 Restoring school button bar to vertical layout...');
+        const buttonBar = document.getElementById('schoolButtonBar');
+        if (buttonBar) {
+            // Restore the EXACT original styles from school-buttons.js
+            buttonBar.style.cssText = `
+                position: fixed;
+                top: 80px;
+                right: 20px;
+                background: white;
+                border: 2px solid #3b82f6;
+                border-radius: 8px;
+                padding: 10px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                z-index: 9999;
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            `;
+            console.log('✅ School button bar restored to vertical layout');
+        }
     }
 }
 
@@ -632,8 +667,14 @@ setTimeout(() => {
                     if (window.PermissionEnforcer.userRole === 'admin' || 
                         window.PermissionEnforcer.userRole === 'director' ||
                         user.email.includes('admin')) {
-                        console.log('🔓 Ensuring admin modules are visible');
-                        window.PermissionEnforcer.forceShowAll();
+                        console.log('🔓 Ensuring admin modules are visible with vertical layout');
+                        // Ensure proper display and vertical layout
+                        const buttonBar = document.getElementById('schoolButtonBar');
+                        if (buttonBar) {
+                            buttonBar.style.display = 'flex';
+                            buttonBar.style.flexDirection = 'column'; // FORCE vertical
+                            buttonBar.classList.add('authorized');
+                        }
                     }
                 }
             } else {
@@ -672,9 +713,20 @@ window.forceShowModules = function() {
     }
 };
 
+// Restore school button position
+window.fixSchoolButtonPosition = function() {
+    if (window.PermissionEnforcer) {
+        window.PermissionEnforcer.restoreSchoolButtonPosition();
+    } else {
+        console.log('❌ Permission Enforcer not loaded');
+    }
+};
+
 console.log('✅ Permission Enforcer loaded');
 console.log('📝 Commands:');
 console.log('  debugPermissions() - Check current permissions');
 console.log('  forceShowModules() - Force show all modules');
-console.log('  window.PermissionEnforcer.userRole - Check current role');
-console.log('  window.PermissionEnforcer.isReady - Check if initialized');
+console.log('  fixSchoolButtonPosition() - Restore floating position & vertical layout');
+console.log('');
+console.log('🔧 Quick fix if modules are horizontal:');
+console.log("  document.getElementById('schoolButtonBar').style.flexDirection = 'column'");
