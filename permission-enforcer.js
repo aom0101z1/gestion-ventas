@@ -8,16 +8,23 @@ console.log('🔒 Loading Permission Enforcer...');
     const style = document.createElement('style');
     style.id = 'permission-enforcer-hide';
     style.innerHTML = `
-        /* Hide school modules until authenticated */
-        #schoolButtonBar {
+        /* Hide school modules until authenticated - DON'T change positioning */
+        #schoolButtonBar:not(.authorized) {
             display: none !important;
         }
-        #schoolFloatBtn {
+        #schoolFloatBtn:not(.authorized) {
             display: none !important;
         }
         /* Hide navigation tabs until authenticated */
-        #contactsTab, #leadsTab, #pipelineTab, #reportsTab,
-        #tasksTab, #monitoringTab, #socialMediaTab, #configTab, #adminTab {
+        #contactsTab:not(.authorized), 
+        #leadsTab:not(.authorized), 
+        #pipelineTab:not(.authorized), 
+        #reportsTab:not(.authorized),
+        #tasksTab:not(.authorized), 
+        #monitoringTab:not(.authorized), 
+        #socialMediaTab:not(.authorized), 
+        #configTab:not(.authorized), 
+        #adminTab:not(.authorized) {
             display: none !important;
         }
     `;
@@ -119,6 +126,7 @@ class PermissionEnforcer {
         this.userPermissions = {};
         this.userRole = null;
         this.isReady = false;
+        this.isAuthenticated = false; // Track authentication status
         this.defaultModules = []; // CHANGED: Empty array - no defaults until logged in
         
         // Module to UI element mapping
@@ -241,6 +249,7 @@ class PermissionEnforcer {
         while (attempts < maxAttempts) {
             if (window.FirebaseData && window.FirebaseData.currentUser) {
                 console.log('✅ Firebase ready');
+                this.isAuthenticated = true; // Set authenticated flag
                 return true;
             }
             
@@ -365,15 +374,13 @@ class PermissionEnforcer {
                 if (element) {
                     if (this.hasPermission(module)) {
                         console.log(`✅ Showing ${module} tab`);
-                        // Force show by removing all hide styles
+                        // Only change display, don't force other styles
                         element.style.display = '';
-                        element.style.visibility = 'visible';
-                        element.style.opacity = '1';
-                        element.style.pointerEvents = 'auto';
-                        element.removeAttribute('data-security-hidden');
+                        element.classList.add('authorized');
                     } else {
                         console.log(`🚫 Hiding ${module} tab`);
                         element.style.display = 'none';
+                        element.classList.remove('authorized');
                     }
                 }
             }
@@ -402,22 +409,22 @@ class PermissionEnforcer {
             console.log('🚫 Hiding school button bar - no permissions');
             if (buttonBar) {
                 buttonBar.style.display = 'none';
+                buttonBar.classList.remove('authorized');
             }
             if (floatBtn) {
                 floatBtn.style.display = 'none';
+                floatBtn.classList.remove('authorized');
             }
         } else {
             console.log('✅ School modules accessible');
-            // Force show the button bar
+            // Show the button bar without changing its position
             if (buttonBar) {
-                buttonBar.style.display = 'flex';
-                buttonBar.style.visibility = 'visible';
-                buttonBar.style.opacity = '1';
-                buttonBar.style.pointerEvents = 'auto';
+                buttonBar.style.display = ''; // Let it use its original display value
+                buttonBar.classList.add('authorized');
             }
             if (floatBtn) {
-                floatBtn.style.display = 'block';
-                floatBtn.style.visibility = 'visible';
+                floatBtn.style.display = ''; // Let it use its original display value
+                floatBtn.classList.add('authorized');
             }
             // Hide individual buttons user doesn't have permission for
             this.enforceSchoolButtonPermissions();
@@ -489,12 +496,10 @@ class PermissionEnforcer {
                 const schoolModules = ['students', 'payments', 'groups', 'teachers', 'attendance'];
                 const hasAnySchoolPermission = schoolModules.some(module => this.hasPermission(module));
                 
-                // Force visibility if user has permissions
+                // Only control visibility, not positioning
                 if (hasAnySchoolPermission) {
-                    buttonBar.style.display = 'flex';
-                    buttonBar.style.visibility = 'visible';
-                    buttonBar.style.opacity = '1';
-                    buttonBar.style.pointerEvents = 'auto';
+                    buttonBar.style.display = ''; // Use original display value
+                    buttonBar.classList.add('authorized');
                 }
                 
                 this.controlSchoolButtonBar(hasAnySchoolPermission);
@@ -512,17 +517,51 @@ class PermissionEnforcer {
         this.enforcePermissions();
     }
     
+    // Reset on logout
+    reset() {
+        console.log('🔒 Resetting permissions - user logged out');
+        this.isAuthenticated = false;
+        this.isReady = false;
+        this.userRole = null;
+        this.userPermissions = {};
+        this.hideAllModules();
+        
+        // Re-inject hide CSS
+        if (!document.getElementById('permission-enforcer-hide')) {
+            const style = document.createElement('style');
+            style.id = 'permission-enforcer-hide';
+            style.innerHTML = `
+                #schoolButtonBar, #schoolFloatBtn { display: none !important; }
+                #contactsTab, #leadsTab, #pipelineTab, #reportsTab,
+                #tasksTab, #monitoringTab, #socialMediaTab, #configTab, #adminTab {
+                    display: none !important;
+                }
+            `;
+            document.head.appendChild(style);
+        }
+    }
+    
     // Debug function
     debug() {
         console.log('=== Permission Enforcer Debug ===');
+        console.log('Authenticated:', this.isAuthenticated);
         console.log('Role:', this.userRole);
+        console.log('Email:', window.FirebaseData?.currentUser?.email);
+        console.log('Is Admin:', this.userRole === 'admin' || this.userRole === 'director' || window.FirebaseData?.currentUser?.email?.includes('admin'));
         console.log('Permissions:', this.userPermissions);
         console.log('Is Ready:', this.isReady);
         
         // Check each module
+        console.log('=== Module Permissions ===');
         Object.keys(this.moduleMapping).forEach(module => {
             console.log(`${module}: ${this.hasPermission(module) ? '✅' : '🚫'}`);
         });
+        
+        // Check DOM visibility
+        console.log('=== DOM Element Visibility ===');
+        console.log('schoolButtonBar:', document.getElementById('schoolButtonBar')?.style.display || 'not found');
+        console.log('contactsTab:', document.getElementById('contactsTab')?.style.display || 'not found');
+        console.log('Hide CSS present:', document.getElementById('permission-enforcer-hide') ? 'Yes' : 'No');
     }
     
     // Force show all modules (for debugging)
@@ -533,43 +572,34 @@ class PermissionEnforcer {
         const hideStyle = document.getElementById('permission-enforcer-hide');
         if (hideStyle) hideStyle.remove();
         
-        // Show all tabs by removing inline styles
+        // Show all tabs by only changing display property
         const allTabs = ['contactsTab', 'leadsTab', 'pipelineTab', 'reportsTab', 
                         'tasksTab', 'monitoringTab', 'socialMediaTab', 'configTab', 'adminTab'];
         
         allTabs.forEach(tabId => {
             const element = document.getElementById(tabId);
             if (element) {
-                // Remove all inline styles
-                element.removeAttribute('style');
-                // Then explicitly show
-                element.style.display = '';
+                element.style.display = ''; // Reset display only
+                element.classList.add('authorized');
                 console.log(`✅ Forced show: ${tabId}`);
             }
         });
         
-        // Show school button bar
+        // Show school button bar without changing position
         const buttonBar = document.getElementById('schoolButtonBar');
         if (buttonBar) {
-            buttonBar.removeAttribute('style');
-            buttonBar.style.display = 'flex';
+            // Only change display, keep original positioning
+            buttonBar.style.display = '';
+            buttonBar.classList.add('authorized');
             console.log('✅ Forced show: schoolButtonBar');
         }
         
         const floatBtn = document.getElementById('schoolFloatBtn');
         if (floatBtn) {
-            floatBtn.removeAttribute('style');
-            floatBtn.style.display = 'block';
+            floatBtn.style.display = '';
+            floatBtn.classList.add('authorized');
             console.log('✅ Forced show: schoolFloatBtn');
         }
-        
-        // Remove any display:none from any element
-        document.querySelectorAll('[style*="display: none"]').forEach(el => {
-            if (el.id && (el.id.includes('Tab') || el.id.includes('school') || el.id.includes('School'))) {
-                el.style.display = '';
-                console.log(`✅ Removed hide from: ${el.id}`);
-            }
-        });
         
         console.log('✅ All modules forced visible');
     }
@@ -589,14 +619,33 @@ if (document.readyState === 'loading') {
 }
 
 // Also check authentication state changes
-if (window.FirebaseData?.auth) {
-    window.FirebaseData.auth.onAuthStateChanged((user) => {
-        if (user && window.PermissionEnforcer && !window.PermissionEnforcer.isReady) {
-            console.log('🔄 Auth state changed - initializing permissions');
-            window.PermissionEnforcer.init();
-        }
-    });
-}
+setTimeout(() => {
+    if (window.FirebaseData?.auth) {
+        window.FirebaseData.auth.onAuthStateChanged((user) => {
+            if (user) {
+                console.log('🔑 Auth state: User logged in -', user.email);
+                if (window.PermissionEnforcer && !window.PermissionEnforcer.isReady) {
+                    console.log('🔄 Initializing permissions for authenticated user');
+                    window.PermissionEnforcer.init();
+                } else if (window.PermissionEnforcer?.isReady && window.PermissionEnforcer.userRole) {
+                    // Double-check modules are visible for admin
+                    if (window.PermissionEnforcer.userRole === 'admin' || 
+                        window.PermissionEnforcer.userRole === 'director' ||
+                        user.email.includes('admin')) {
+                        console.log('🔓 Ensuring admin modules are visible');
+                        window.PermissionEnforcer.forceShowAll();
+                    }
+                }
+            } else {
+                // User logged out
+                console.log('🔒 Auth state: User logged out');
+                if (window.PermissionEnforcer) {
+                    window.PermissionEnforcer.reset();
+                }
+            }
+        });
+    }
+}, 1000); // Wait 1 second for Firebase to be ready
 
 // Provide global functions for admin-center integration
 window.refreshUserPermissions = function() {
@@ -624,5 +673,8 @@ window.forceShowModules = function() {
 };
 
 console.log('✅ Permission Enforcer loaded');
-console.log('Use debugPermissions() to check current permissions');
-console.log('Use forceShowModules() to force show all modules (admin only)');
+console.log('📝 Commands:');
+console.log('  debugPermissions() - Check current permissions');
+console.log('  forceShowModules() - Force show all modules');
+console.log('  window.PermissionEnforcer.userRole - Check current role');
+console.log('  window.PermissionEnforcer.isReady - Check if initialized');
