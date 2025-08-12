@@ -324,7 +324,6 @@ function renderStudentForm(student = null) {
                         <option value="C.E" ${student?.tipoDoc === 'C.E' ? 'selected' : ''}>C.E</option>
                         <option value="PAS" ${student?.tipoDoc === 'PAS' ? 'selected' : ''}>Pasaporte</option>
                         <option value="PPT" ${student?.tipoDoc === 'PPT' ? 'selected' : ''}>PPT</option>
-                        
                     </select>
                 </div>
                 
@@ -354,7 +353,19 @@ function renderStudentForm(student = null) {
                 </div>
                 
                 <div class="form-group">
-                    <label>Doc. Acudiente</label>
+                    <label>Tipo Doc. Acudiente</label>
+                    <select id="stuTipoDocAcudiente">
+                        <option value="" ${!student?.tipoDocAcudiente ? 'selected' : ''}>Seleccionar</option>
+                        <option value="C.C" ${student?.tipoDocAcudiente === 'C.C' ? 'selected' : ''}>C.C</option>
+                        <option value="T.I" ${student?.tipoDocAcudiente === 'T.I' ? 'selected' : ''}>T.I</option>
+                        <option value="C.E" ${student?.tipoDocAcudiente === 'C.E' ? 'selected' : ''}>C.E</option>
+                        <option value="PAS" ${student?.tipoDocAcudiente === 'PAS' ? 'selected' : ''}>Pasaporte</option>
+                        <option value="PPT" ${student?.tipoDocAcudiente === 'PPT' ? 'selected' : ''}>PPT</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Número Doc. Acudiente</label>
                     <input type="text" id="stuDocAcudiente" value="${student?.docAcudiente || ''}">
                 </div>
                 
@@ -376,8 +387,8 @@ function renderStudentForm(student = null) {
                 <div class="form-group">
                     <label>Tipo Pago</label>
                     <select id="stuTipoPago">
-                        <option value="MENSUAL">Mensual</option>
-                        <option value="SEMESTRAL">Semestral</option>
+                        <option value="MENSUAL" ${student?.tipoPago === 'MENSUAL' ? 'selected' : ''}>Mensual</option>
+                        <option value="SEMESTRAL" ${student?.tipoPago === 'SEMESTRAL' ? 'selected' : ''}>Semestral</option>
                     </select>
                 </div>
                 
