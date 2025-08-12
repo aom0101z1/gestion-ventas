@@ -323,6 +323,8 @@ function renderStudentForm(student = null) {
                         <option value="T.I" ${student?.tipoDoc === 'T.I' ? 'selected' : ''}>T.I</option>
                         <option value="C.E" ${student?.tipoDoc === 'C.E' ? 'selected' : ''}>C.E</option>
                         <option value="PAS" ${student?.tipoDoc === 'PAS' ? 'selected' : ''}>Pasaporte</option>
+                        <option value="PPT" ${student?.tipoDoc === 'PAS' ? 'selected' : ''}>PPT</option>
+                        <option value="C.E" ${student?.tipoDoc === 'PAS' ? 'selected' : ''}>Cédula de Ext.</option>
                     </select>
                 </div>
                 
