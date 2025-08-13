@@ -23,93 +23,110 @@ class PaymentManager {
     }
 
     // Load payments from Firebase
-    async loadPayments() {
-        try {
-            const db = window.firebaseModules.database;
-            const ref = db.ref(window.FirebaseData.database, 'payments');
-            const snapshot = await db.get(ref);
-            
-            if (snapshot.exists()) {
-                const data = snapshot.val();
-                Object.entries(data).forEach(([id, payment]) => {
-                    this.payments.set(id, payment);
-                });
-            }
-            console.log(`✅ Loaded ${this.payments.size} payment records`);
-        } catch (error) {
-            console.error('❌ Error loading payments:', error);
+async loadPayments() {
+    try {
+        this.payments.clear(); // Clear existing payments first
+        const db = window.firebaseModules.database;
+        const ref = db.ref(window.FirebaseData.database, 'payments');
+        const snapshot = await db.get(ref);
+        
+        if (snapshot.exists()) {
+            const data = snapshot.val();
+            Object.entries(data).forEach(([id, payment]) => {
+                // Ensure month is lowercase for consistency
+                if (payment.month) {
+                    payment.month = payment.month.toLowerCase();
+                }
+                this.payments.set(id, payment);
+            });
         }
+        console.log(`✅ Loaded ${this.payments.size} payment records`);
+    } catch (error) {
+        console.error('❌ Error loading payments:', error);
     }
+}
 
     // Get payment status with color
-    getPaymentStatus(student) {
-        if (!student.diaPago) return { color: '#6b7280', status: 'Sin fecha', icon: '❓' };
-        
-        const today = new Date();
-        const currentMonth = today.getMonth();
-        const currentDay = today.getDate();
-        const payDay = parseInt(student.diaPago) || 1;
-        
-        // Check if payment was made this month
-        const monthName = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 
-                          'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'][currentMonth];
-        const payment = this.getStudentPayment(student.id, monthName);
-        
-        if (payment?.paid) {
-            return { color: '#10b981', status: 'Pagado', icon: '✅' };
-        }
-        
-        // Calculate days until payment
-        let payDate = new Date(today.getFullYear(), currentMonth, payDay);
-        if (payDate < today) {
-            // Payment is overdue
-            const daysLate = Math.ceil((today - payDate) / (1000 * 60 * 60 * 24));
-            return { color: '#ef4444', status: `Vencido ${daysLate}d`, icon: '🔴' };
-        }
-        
-        const daysUntil = Math.ceil((payDate - today) / (1000 * 60 * 60 * 24));
-        
-        if (daysUntil === 0) {
-            return { color: '#f59e0b', status: 'Vence hoy', icon: '🟠' };
-        } else if (daysUntil <= 5) {
-            return { color: '#fbbf24', status: `Vence en ${daysUntil}d`, icon: '🟡' };
-        } else {
-            return { color: '#10b981', status: `Vence en ${daysUntil}d`, icon: '🟢' };
-        }
+// Get payment status with color
+getPaymentStatus(student) {
+    if (!student.diaPago) return { color: '#6b7280', status: 'Sin fecha', icon: '❓' };
+    
+    const today = new Date();
+    const currentMonth = today.getMonth();
+    const currentDay = today.getDate();
+    const payDay = parseInt(student.diaPago) || 1;
+    
+    // Check if payment was made this month
+    const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 
+                      'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    const monthName = monthNames[currentMonth];
+    const currentYear = today.getFullYear();
+    
+    // Look for payment in the payments Map
+    const payment = Array.from(this.payments.values()).find(p => 
+        p.studentId === student.id && 
+        p.month?.toLowerCase() === monthName.toLowerCase() && 
+        p.year === currentYear
+    );
+    
+    // If payment exists for this month, mark as paid
+    if (payment) {
+        return { color: '#10b981', status: 'Pagado', icon: '✅' };
     }
-
-    // Record payment
-    async recordPayment(studentId, paymentData) {
-        try {
-            const payment = {
-                id: `PAY-${Date.now()}`,
-                studentId,
-                amount: paymentData.amount,
-                method: paymentData.method, // 'Transferencia' or 'Efectivo'
-                bank: paymentData.bank, // 'Nequi', 'Bancolombia', etc
-                month: paymentData.month,
-                year: paymentData.year || new Date().getFullYear(),
-                date: new Date().toISOString(),
-                registeredBy: window.FirebaseData.currentUser?.uid,
-                notes: paymentData.notes || ''
-            };
-
-            const db = window.firebaseModules.database;
-            const ref = db.ref(window.FirebaseData.database, `payments/${payment.id}`);
-            await db.set(ref, payment);
-            
-            this.payments.set(payment.id, payment);
-            
-            // Update student payment status
-            await this.updateStudentPaymentStatus(studentId, payment.month, true);
-            
-            console.log('✅ Payment recorded:', payment.id);
-            return payment;
-        } catch (error) {
-            console.error('❌ Error recording payment:', error);
-            throw error;
-        }
+    
+    // Calculate days until payment
+    let payDate = new Date(today.getFullYear(), currentMonth, payDay);
+    if (payDate < today) {
+        // Payment is overdue
+        const daysLate = Math.ceil((today - payDate) / (1000 * 60 * 60 * 24));
+        return { color: '#ef4444', status: `Vencido ${daysLate}d`, icon: '🔴' };
     }
+    
+    const daysUntil = Math.ceil((payDate - today) / (1000 * 60 * 60 * 24));
+    
+    if (daysUntil === 0) {
+        return { color: '#f59e0b', status: 'Vence hoy', icon: '🟠' };
+    } else if (daysUntil <= 5) {
+        return { color: '#fbbf24', status: `Vence en ${daysUntil}d`, icon: '🟡' };
+    } else {
+        return { color: '#10b981', status: `Vence en ${daysUntil}d`, icon: '🟢' };
+    }
+}
+ // Record payment
+async recordPayment(studentId, paymentData) {
+    try {
+        const payment = {
+            id: `PAY-${Date.now()}`,
+            studentId,
+            amount: paymentData.amount,
+            method: paymentData.method,
+            bank: paymentData.bank,
+            month: paymentData.month.toLowerCase(), // Ensure lowercase
+            year: paymentData.year || new Date().getFullYear(),
+            date: new Date().toISOString(),
+            registeredBy: window.FirebaseData.currentUser?.uid,
+            notes: paymentData.notes || ''
+        };
+
+        const db = window.firebaseModules.database;
+        const ref = db.ref(window.FirebaseData.database, `payments/${payment.id}`);
+        await db.set(ref, payment);
+        
+        this.payments.set(payment.id, payment);
+        
+        console.log('✅ Payment recorded:', payment.id);
+        
+        // Force UI refresh after payment
+        setTimeout(() => {
+            window.loadPaymentsTab();
+        }, 100);
+        
+        return payment;
+    } catch (error) {
+        console.error('❌ Error recording payment:', error);
+        throw error;
+    }
+}
 
     // Update student payment status
     async updateStudentPaymentStatus(studentId, month, paid) {
