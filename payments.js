@@ -5,6 +5,54 @@
 console.log('💰 Loading payments module...');
 
 // ==================================================================================
+// PAYMENT CONFIGURATION - Semester dates and payment options
+// ==================================================================================
+
+const PaymentConfig = {
+    // Academic semester definitions
+    semesters: {
+        2025: {
+            semester1: {
+                name: "Semestre 1 2025",
+                startDate: "2025-02-01",
+                endDate: "2025-06-30",
+                months: ['febrero', 'marzo', 'abril', 'mayo', 'junio']
+            },
+            semester2: {
+                name: "Semestre 2 2025",
+                startDate: "2025-07-01", 
+                endDate: "2025-12-07",
+                months: ['julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+            }
+        },
+        2026: {
+            semester1: {
+                name: "Semestre 1 2026",
+                startDate: "2026-02-01",
+                endDate: "2026-06-30",
+                months: ['febrero', 'marzo', 'abril', 'mayo', 'junio']
+            },
+            semester2: {
+                name: "Semestre 2 2026",
+                startDate: "2026-07-01",
+                endDate: "2026-12-07",
+                months: ['julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+            }
+        }
+    },
+    
+    // Payment type options
+    paymentTypes: {
+        monthly: { name: "Mensual", months: 1 },
+        trimester: { name: "Trimestre", months: 3 },
+        semester: { name: "Semestre (6 meses)", months: 6 },
+        academicSemester: { name: "Semestre Académico", months: 'custom' },
+        annual: { name: "Anual (12 meses)", months: 12 },
+        twoSemesters: { name: "2 Semestres Académicos", months: 'custom' }
+    }
+};
+
+// ==================================================================================
 // SECTION 1: PAYMENT MANAGER CLASS - Core payment functionality and Firebase operations
 // ==================================================================================
 
@@ -92,6 +140,70 @@ getPaymentStatus(student) {
         return { color: '#10b981', status: `Vence en ${daysUntil}d`, icon: '🟢' };
     }
 }
+
+// NEW: Record multi-month payment (for semesters, annual, etc)
+async recordMultiMonthPayment(studentId, paymentData) {
+    try {
+        const payments = [];
+        const masterPaymentId = `PAY-MULTI-${Date.now()}`;
+        
+        // Calculate amount per month
+        const monthCount = paymentData.selectedMonths.length;
+        const amountPerMonth = Math.round(paymentData.totalAmount / monthCount);
+        
+        // Create individual payment records for each selected month
+        for (const monthData of paymentData.selectedMonths) {
+            const payment = {
+                id: `PAY-${Date.now()}-${monthData.month}`,
+                masterPaymentId: masterPaymentId, // Link to the master payment
+                studentId,
+                amount: amountPerMonth,
+                method: paymentData.method,
+                bank: paymentData.bank,
+                month: monthData.month.toLowerCase(),
+                year: monthData.year,
+                date: new Date().toISOString(),
+                registeredBy: window.FirebaseData.currentUser?.uid,
+                notes: paymentData.notes || '',
+                paymentType: paymentData.paymentType, // 'semester', 'annual', etc
+                paymentPeriod: paymentData.paymentPeriod, // 'Semestre 1 2025', etc
+                installment: paymentData.installment || '1/1', // '1/3' for first of 3 payments
+                totalInstallments: paymentData.totalInstallments || 1
+            };
+
+            const db = window.firebaseModules.database;
+            const ref = db.ref(window.FirebaseData.database, `payments/${payment.id}`);
+            await db.set(ref, payment);
+            
+            this.payments.set(payment.id, payment);
+            payments.push(payment);
+            
+            // Small delay to ensure unique timestamps
+            await new Promise(resolve => setTimeout(resolve, 10));
+        }
+        
+        console.log(`✅ Multi-month payment recorded: ${payments.length} months`);
+        
+        // Force UI refresh
+        setTimeout(() => {
+            window.loadPaymentsTab();
+        }, 100);
+        
+        return {
+            masterPaymentId,
+            payments,
+            totalAmount: paymentData.totalAmount,
+            paymentType: paymentData.paymentType,
+            paymentPeriod: paymentData.paymentPeriod
+        };
+    } catch (error) {
+        console.error('❌ Error recording multi-month payment:', error);
+        throw error;
+    }
+}
+
+
+    
  // Record payment
 async recordPayment(studentId, paymentData) {
     try {
@@ -867,6 +979,72 @@ const InvoiceGenerator = {
         return invoiceData;
     },
 
+    // NEW: Generate multi-month invoice for semester/annual payments
+    async generateMultiMonthInvoice(paymentResult, student) {
+        const invoiceNumber = await this.generateInvoiceNumber(student.id);
+        
+        // Build description based on payment type
+        let description = '';
+        if (paymentResult.paymentPeriod.includes('Semestre')) {
+            description = paymentResult.paymentPeriod;
+        } else {
+            const monthCount = paymentResult.payments.length;
+            description = `Pago ${monthCount} meses - ${paymentResult.paymentPeriod}`;
+        }
+        
+        const invoiceData = {
+            number: invoiceNumber,
+            masterPaymentId: paymentResult.masterPaymentId,
+            date: new Date(),
+            student: {
+                name: student.nombre || '',
+                nit: student.numDoc || '',
+                tipoDoc: student.tipoDoc || 'C.C',
+                address: student.direccion || '',
+                phone: student.telefono || ''
+            },
+            items: [{
+                quantity: 1,
+                description: `${description} - ${student.grupo || 'Curso de Inglés'}`,
+                unitPrice: paymentResult.totalAmount,
+                total: paymentResult.totalAmount
+            }],
+            subtotal: paymentResult.totalAmount,
+            total: paymentResult.totalAmount,
+            paymentMethod: paymentResult.payments[0].method,
+            bank: paymentResult.payments[0].bank,
+            observations: paymentResult.payments[0].notes || '',
+            printedAt: new Date().toISOString(),
+            studentId: student.id,
+            paymentType: paymentResult.paymentType,
+            coveredMonths: paymentResult.payments.map(p => `${p.month} ${p.year}`)
+        };
+
+        // Save invoice
+        await this.saveInvoice(invoiceData, student.id);
+        
+        // Update all related payments with invoice number
+        const db = window.firebaseModules.database;
+        for (const payment of paymentResult.payments) {
+            const paymentRef = db.ref(window.FirebaseData.database, `payments/${payment.id}/invoiceNumber`);
+            await db.set(paymentRef, invoiceNumber);
+        }
+        
+        // Try to save to storage
+        try {
+            const htmlContent = this.getInvoiceHTML(invoiceData);
+            const storageResult = await window.InvoiceStorage.saveInvoiceToStorage(invoiceData, htmlContent);
+            if (storageResult) {
+                invoiceData.storageUrl = storageResult.downloadUrl;
+                invoiceData.storagePath = storageResult.path;
+            }
+        } catch (error) {
+            console.error('⚠️ Storage save failed:', error);
+        }
+        
+        return invoiceData;
+    },
+
     // Save invoice to Firebase
     async saveInvoice(invoiceData, studentId) {
         try {
@@ -1184,7 +1362,6 @@ const InvoiceGenerator = {
         return false;
     }
 };
-
 // ==================================================================================
 // SECTION 5: UI RENDERING FUNCTIONS - Dashboard and table generation
 // ==================================================================================
@@ -1428,38 +1605,128 @@ function renderPaymentHistoryContent(studentId, history, stats) {
 
 function renderPaymentModal(student) {
     const currentMonth = new Date().toLocaleDateString('es-ES', { month: 'long' });
+    const currentYear = new Date().getFullYear();
+    const nextYear = currentYear + 1;
+    
+    // Generate month options for 24 months (current year + next year)
+    const allMonths = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 
+                       'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
     
     return `
         <div id="paymentModal" style="
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(0,0,0,0.5); display: flex; align-items: center;
             justify-content: center; z-index: 1000;">
-            <div style="background: white; padding: 2rem; border-radius: 8px; max-width: 500px; width: 90%;">
+            <div style="background: white; padding: 2rem; border-radius: 8px; max-width: 700px; width: 90%; max-height: 90vh; overflow-y: auto;">
                 <h3>💵 Registrar Pago - ${student.nombre}</h3>
                 
                 <form id="paymentForm" style="margin-top: 1rem;">
+                    <!-- Payment Type Selection -->
                     <div class="form-group">
-                        <label>Mes</label>
-                        <select id="payMonth" required>
-                            <option value="${currentMonth}">${currentMonth}</option>
-                            <option value="enero">Enero</option>
-                            <option value="febrero">Febrero</option>
-                            <option value="marzo">Marzo</option>
-                            <option value="abril">Abril</option>
-                            <option value="mayo">Mayo</option>
-                            <option value="junio">Junio</option>
-                            <option value="julio">Julio</option>
-                            <option value="agosto">Agosto</option>
-                            <option value="septiembre">Septiembre</option>
-                            <option value="octubre">Octubre</option>
-                            <option value="noviembre">Noviembre</option>
-                            <option value="diciembre">Diciembre</option>
+                        <label>Tipo de Pago</label>
+                        <select id="paymentType" required onchange="handlePaymentTypeChange()">
+                            <option value="monthly">Mensual</option>
+                            <option value="trimester">Trimestre (3 meses)</option>
+                            <option value="semester">Semestre (6 meses)</option>
+                            <option value="academicSemester">Semestre Académico (Fechas fijas)</option>
+                            <option value="annual">Anual (12 meses)</option>
+                            <option value="twoSemesters">2 Semestres Académicos</option>
                         </select>
                     </div>
                     
+                    <!-- Academic Semester Selection (hidden by default) -->
+                    <div class="form-group" id="academicSemesterGroup" style="display: none;">
+                        <label>Seleccionar Semestre Académico</label>
+                        <select id="academicSemesterSelect" onchange="selectAcademicSemester()">
+                            <option value="">Seleccionar...</option>
+                            <option value="2025-1">Semestre 1 2025 (Feb-Jun)</option>
+                            <option value="2025-2">Semestre 2 2025 (Jul-Dic)</option>
+                            <option value="2026-1">Semestre 1 2026 (Feb-Jun)</option>
+                            <option value="2026-2">Semestre 2 2026 (Jul-Dic)</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Month Selection Grid -->
+                    <div class="form-group" id="monthSelectionGroup">
+                        <label>Seleccionar Meses <span id="monthCounter">(0 seleccionados)</span></label>
+                        <div style="border: 1px solid #ddd; padding: 10px; border-radius: 5px; max-height: 300px; overflow-y: auto;">
+                            <!-- Current Year -->
+                            <div style="margin-bottom: 15px;">
+                                <strong>${currentYear}</strong>
+                                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px;">
+                                    ${allMonths.map((month, idx) => {
+                                        const monthDate = new Date(currentYear, idx, 1);
+                                        const isPast = monthDate < new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+                                        return `
+                                            <label style="display: flex; align-items: center; padding: 5px; background: ${isPast ? '#f3f4f6' : 'white'}; border: 1px solid #e5e7eb; border-radius: 4px; cursor: pointer;">
+                                                <input type="checkbox" 
+                                                       class="month-checkbox" 
+                                                       data-month="${month}" 
+                                                       data-year="${currentYear}"
+                                                       data-month-index="${idx}"
+                                                       onchange="updateMonthSelection()"
+                                                       style="margin-right: 5px;">
+                                                <span style="font-size: 13px; ${isPast ? 'color: #6b7280;' : ''}">${month.charAt(0).toUpperCase() + month.slice(1)}</span>
+                                            </label>
+                                        `;
+                                    }).join('')}
+                                </div>
+                            </div>
+                            
+                            <!-- Next Year -->
+                            <div>
+                                <strong>${nextYear}</strong>
+                                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px;">
+                                    ${allMonths.map((month, idx) => `
+                                        <label style="display: flex; align-items: center; padding: 5px; background: white; border: 1px solid #e5e7eb; border-radius: 4px; cursor: pointer;">
+                                            <input type="checkbox" 
+                                                   class="month-checkbox" 
+                                                   data-month="${month}" 
+                                                   data-year="${nextYear}"
+                                                   data-month-index="${idx}"
+                                                   onchange="updateMonthSelection()"
+                                                   style="margin-right: 5px;">
+                                            <span style="font-size: 13px;">${month.charAt(0).toUpperCase() + month.slice(1)}</span>
+                                        </label>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Payment Installments -->
+                    <div class="form-group" id="installmentGroup" style="display: none;">
+                        <label>Opciones de Pago</label>
+                        <select id="installmentOption" onchange="updateInstallmentAmounts()">
+                            <option value="1">Pago único (100%)</option>
+                            <option value="2">2 cuotas (50% cada una)</option>
+                            <option value="3">3 cuotas (33.3% cada una)</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Amount Section -->
                     <div class="form-group">
-                        <label>Monto ($)</label>
-                        <input type="number" id="payAmount" value="${student.valor || ''}" required min="0">
+                        <label>Monto Total ($)</label>
+                        <input type="number" id="payAmount" value="${student.valor || ''}" required min="0" onchange="updateInstallmentAmounts()">
+                        <small id="amountHelp" style="color: #6b7280; display: block; margin-top: 5px;">
+                            Valor mensual: $${(student.valor || 0).toLocaleString()}
+                        </small>
+                    </div>
+                    
+                    <!-- Installment Details (hidden by default) -->
+                    <div id="installmentDetails" style="display: none; background: #f9fafb; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
+                        <strong>Detalles de Cuotas:</strong>
+                        <div id="installmentBreakdown"></div>
+                    </div>
+                    
+                    <!-- Current Installment Selection (for multi-installment payments) -->
+                    <div class="form-group" id="currentInstallmentGroup" style="display: none;">
+                        <label>Esta es la cuota número:</label>
+                        <select id="currentInstallment">
+                            <option value="1">Primera cuota</option>
+                            <option value="2">Segunda cuota</option>
+                            <option value="3">Tercera cuota</option>
+                        </select>
                     </div>
                     
                     <div class="form-group">
@@ -1728,6 +1995,123 @@ window.batchPrintHalfPage = function(invoices) {
 };
 
 // ==================================================================================
+// NEW MULTI-MONTH PAYMENT FUNCTIONS
+// ==================================================================================
+
+// Handle payment type change
+window.handlePaymentTypeChange = function() {
+    const paymentType = document.getElementById('paymentType').value;
+    const monthSelectionGroup = document.getElementById('monthSelectionGroup');
+    const academicSemesterGroup = document.getElementById('academicSemesterGroup');
+    const installmentGroup = document.getElementById('installmentGroup');
+    
+    // Reset all checkboxes
+    document.querySelectorAll('.month-checkbox').forEach(cb => {
+        cb.checked = false;
+        cb.disabled = false;
+    });
+    
+    if (paymentType === 'academicSemester' || paymentType === 'twoSemesters') {
+        monthSelectionGroup.style.display = 'none';
+        academicSemesterGroup.style.display = 'block';
+        installmentGroup.style.display = 'block';
+    } else {
+        academicSemesterGroup.style.display = 'none';
+        monthSelectionGroup.style.display = 'block';
+        installmentGroup.style.display = paymentType !== 'monthly' ? 'block' : 'none';
+        
+        // Auto-select months for standard types
+        if (paymentType === 'monthly') {
+            // Select current month
+            const currentMonth = new Date().toLocaleDateString('es-ES', { month: 'long' });
+            const currentYear = new Date().getFullYear();
+            const checkbox = document.querySelector(`.month-checkbox[data-month="${currentMonth}"][data-year="${currentYear}"]`);
+            if (checkbox) checkbox.checked = true;
+        }
+    }
+    
+    updateMonthSelection();
+};
+
+// Update month selection counter
+window.updateMonthSelection = function() {
+    const checkedBoxes = document.querySelectorAll('.month-checkbox:checked');
+    const counter = document.getElementById('monthCounter');
+    const paymentType = document.getElementById('paymentType').value;
+    const amountInput = document.getElementById('payAmount');
+    const student = window.StudentManager.students.get(window.currentStudentId);
+    
+    counter.textContent = `(${checkedBoxes.length} seleccionados)`;
+    
+    // Update suggested amount based on selection
+    if (student && student.valor && checkedBoxes.length > 0) {
+        const suggestedAmount = student.valor * checkedBoxes.length;
+        amountInput.value = suggestedAmount;
+        document.getElementById('amountHelp').innerHTML = `
+            Valor mensual: $${student.valor.toLocaleString()}<br>
+            Total sugerido (${checkedBoxes.length} meses): $${suggestedAmount.toLocaleString()}
+        `;
+    }
+    
+    updateInstallmentAmounts();
+};
+
+// Select academic semester months
+window.selectAcademicSemester = function() {
+    const selection = document.getElementById('academicSemesterSelect').value;
+    if (!selection) return;
+    
+    const [year, semesterNum] = selection.split('-');
+    const semesterKey = `semester${semesterNum}`;
+    const semesterData = PaymentConfig.semesters[year]?.[semesterKey];
+    
+    if (semesterData) {
+        // Clear all checkboxes first
+        document.querySelectorAll('.month-checkbox').forEach(cb => cb.checked = false);
+        
+        // Select semester months
+        semesterData.months.forEach(month => {
+            const checkbox = document.querySelector(`.month-checkbox[data-month="${month}"][data-year="${year}"]`);
+            if (checkbox) checkbox.checked = true;
+        });
+        
+        updateMonthSelection();
+    }
+};
+
+// Update installment amounts display
+window.updateInstallmentAmounts = function() {
+    const totalAmount = parseInt(document.getElementById('payAmount').value) || 0;
+    const installments = parseInt(document.getElementById('installmentOption')?.value) || 1;
+    const installmentDetails = document.getElementById('installmentDetails');
+    const installmentBreakdown = document.getElementById('installmentBreakdown');
+    const currentInstallmentGroup = document.getElementById('currentInstallmentGroup');
+    
+    if (installments > 1 && totalAmount > 0) {
+        const amountPerInstallment = Math.round(totalAmount / installments);
+        let breakdown = '';
+        
+        for (let i = 1; i <= installments; i++) {
+            breakdown += `<div style="margin: 5px 0;">Cuota ${i}: $${amountPerInstallment.toLocaleString()}</div>`;
+        }
+        
+        installmentBreakdown.innerHTML = breakdown;
+        installmentDetails.style.display = 'block';
+        currentInstallmentGroup.style.display = 'block';
+        
+        // Update current installment options
+        const currentInstallmentSelect = document.getElementById('currentInstallment');
+        currentInstallmentSelect.innerHTML = '';
+        for (let i = 1; i <= installments; i++) {
+            currentInstallmentSelect.innerHTML += `<option value="${i}">Cuota ${i} de ${installments}</option>`;
+        }
+    } else {
+        installmentDetails.style.display = 'none';
+        currentInstallmentGroup.style.display = 'none';
+    }
+};
+
+// ==================================================================================
 // SECTION 7: GLOBAL INSTANCES AND INITIALIZATION - Main entry points and setup
 // ==================================================================================
 
@@ -1790,6 +2174,8 @@ window.loadPaymentsTab = async function() {
 window.showPaymentModal = function(studentId) {
     const student = window.StudentManager.students.get(studentId);
     if (!student) return;
+    
+    window.currentStudentId = studentId; // Store for use in other functions
     
     // Remove any existing modal first
     const existingModal = document.getElementById('paymentModal');
@@ -1863,38 +2249,87 @@ window.exportPaymentReport = function() {
 // ==================================================================================
 
 // Enhanced processPayment function with FIXED timing for invoice modal
+// Enhanced processPayment function for multi-month payments
 async function processPayment(studentId) {
     try {
+        window.currentStudentId = studentId; // Store for reference
+        const paymentType = document.getElementById('paymentType').value;
+        const selectedMonths = Array.from(document.querySelectorAll('.month-checkbox:checked'))
+            .map(cb => ({
+                month: cb.dataset.month,
+                year: parseInt(cb.dataset.year),
+                monthIndex: parseInt(cb.dataset.monthIndex)
+            }));
+        
+        const totalAmount = parseInt(document.getElementById('payAmount').value);
+        const installmentOption = parseInt(document.getElementById('installmentOption')?.value) || 1;
+        const currentInstallment = parseInt(document.getElementById('currentInstallment')?.value) || 1;
+        
+        // Get semester info if academic semester
+        let paymentPeriod = '';
+        if (paymentType === 'academicSemester' || paymentType === 'twoSemesters') {
+            const selection = document.getElementById('academicSemesterSelect').value;
+            if (selection) {
+                const [year, semesterNum] = selection.split('-');
+                paymentPeriod = `Semestre ${semesterNum} ${year}`;
+            }
+        } else if (selectedMonths.length > 1) {
+            // For regular multi-month payments
+            const firstMonth = selectedMonths[0];
+            const lastMonth = selectedMonths[selectedMonths.length - 1];
+            paymentPeriod = `${firstMonth.month} ${firstMonth.year} - ${lastMonth.month} ${lastMonth.year}`;
+        }
+        
         const paymentData = {
-            amount: parseInt(document.getElementById('payAmount').value),
+            selectedMonths: selectedMonths,
+            totalAmount: totalAmount,
             method: document.getElementById('payMethod').value,
             bank: document.getElementById('payBank')?.value || '',
-            month: document.getElementById('payMonth').value,
-            notes: document.getElementById('payNotes').value
+            notes: document.getElementById('payNotes').value,
+            paymentType: paymentType,
+            paymentPeriod: paymentPeriod,
+            installment: installmentOption > 1 ? `${currentInstallment}/${installmentOption}` : '1/1',
+            totalInstallments: installmentOption
         };
         
-        // Record payment (existing functionality)
-        const payment = await window.PaymentManager.recordPayment(studentId, paymentData);
-        
-        // Get student data
+        // Record payment(s)
+        let result;
         const student = window.StudentManager.students.get(studentId);
         
-        // Generate invoice automatically (NOW WITH STORAGE)
-        const invoiceData = await InvoiceGenerator.generateInvoice(payment, student);
+        if (selectedMonths.length === 1 && paymentType === 'monthly') {
+            // Single month payment (existing logic)
+            const singlePaymentData = {
+                amount: totalAmount,
+                method: paymentData.method,
+                bank: paymentData.bank,
+                month: selectedMonths[0].month,
+                year: selectedMonths[0].year,
+                notes: paymentData.notes
+            };
+            const payment = await window.PaymentManager.recordPayment(studentId, singlePaymentData);
+            const invoiceData = await InvoiceGenerator.generateInvoice(payment, student);
+            result = { invoiceData };
+        } else {
+            // Multi-month payment
+            result = await window.PaymentManager.recordMultiMonthPayment(studentId, paymentData);
+            
+            // Generate consolidated invoice for multi-month payment
+            const invoiceData = await InvoiceGenerator.generateMultiMonthInvoice(result, student);
+            result.invoiceData = invoiceData;
+        }
         
         // Show success notification
         window.showNotification('✅ Pago registrado exitosamente', 'success');
         
-        // IMPORTANT: Close payment modal FIRST and wait a bit
+        // Close payment modal
         closePaymentModal();
         
-        // Wait for modal to fully close before showing invoice
+        // Show invoice modal
         setTimeout(() => {
-            // Show invoice modal after payment modal is gone
-            InvoiceGenerator.showInvoiceModal(invoiceData);
-        }, 300); // Give time for the payment modal to disappear
+            InvoiceGenerator.showInvoiceModal(result.invoiceData);
+        }, 300);
         
-        // Reload payments tab after a delay
+        // Reload payments tab
         setTimeout(() => {
             loadPaymentsTab();
         }, 500);
@@ -1904,7 +2339,6 @@ async function processPayment(studentId) {
         window.showNotification('❌ Error al registrar pago', 'error');
     }
 }
-
 // ==================================================================================
 // SECTION 9: STYLES AND UTILITIES - CSS styles and backward compatibility
 // ==================================================================================
