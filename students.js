@@ -307,110 +307,119 @@ function renderPaymentNotesModal(student) {
 function renderStudentForm(student = null) {
     const isEdit = !!student;
     return `
-        <div style="background: white; padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem;">
-            <h3>${isEdit ? '✏️ Editar' : '➕ Nuevo'} Estudiante</h3>
-            <form id="studentForm" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                
-                <div class="form-group">
-                    <label>Nombre Completo*</label>
-                    <input type="text" id="stuNombre" value="${student?.nombre || ''}" required>
-                </div>
-                
-                <div class="form-group">
-                    <label>Tipo Documento</label>
-                    <select id="stuTipoDoc">
-                        <option value="C.C" ${student?.tipoDoc === 'C.C' ? 'selected' : ''}>C.C</option>
-                        <option value="T.I" ${student?.tipoDoc === 'T.I' ? 'selected' : ''}>T.I</option>
-                        <option value="C.E" ${student?.tipoDoc === 'C.E' ? 'selected' : ''}>C.E</option>
-                        <option value="PAS" ${student?.tipoDoc === 'PAS' ? 'selected' : ''}>Pasaporte</option>
-                        <option value="PPT" ${student?.tipoDoc === 'PPT' ? 'selected' : ''}>PPT</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label>Número Documento*</label>
-                    <input type="text" id="stuNumDoc" value="${student?.numDoc || ''}" required>
-                </div>
-                
-                <div class="form-group">
-                    <label>Edad</label>
-                    <input type="number" id="stuEdad" value="${student?.edad || ''}" min="5" max="100">
-                </div>
-                
-                <div class="form-group">
-                    <label>Teléfono*</label>
-                    <input type="tel" id="stuTelefono" value="${student?.telefono || ''}" required>
-                </div>
-                
-                <div class="form-group">
-                    <label>Correo</label>
-                    <input type="email" id="stuCorreo" value="${student?.correo || ''}">
-                </div>
-                
-                <div class="form-group">
-                    <label>Acudiente</label>
-                    <input type="text" id="stuAcudiente" value="${student?.acudiente || ''}">
-                </div>
-                
-                <div class="form-group">
-                    <label>Tipo Doc. Acudiente</label>
-                    <select id="stuTipoDocAcudiente">
-                        <option value="" ${!student?.tipoDocAcudiente ? 'selected' : ''}>Seleccionar</option>
-                        <option value="C.C" ${student?.tipoDocAcudiente === 'C.C' ? 'selected' : ''}>C.C</option>
-                        <option value="T.I" ${student?.tipoDocAcudiente === 'T.I' ? 'selected' : ''}>T.I</option>
-                        <option value="C.E" ${student?.tipoDocAcudiente === 'C.E' ? 'selected' : ''}>C.E</option>
-                        <option value="PAS" ${student?.tipoDocAcudiente === 'PAS' ? 'selected' : ''}>Pasaporte</option>
-                        <option value="PPT" ${student?.tipoDocAcudiente === 'PPT' ? 'selected' : ''}>PPT</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label>Número Doc. Acudiente</label>
-                    <input type="text" id="stuDocAcudiente" value="${student?.docAcudiente || ''}">
-                </div>
-                
-                <div class="form-group">
-                    <label>Fecha Inicio*</label>
-                    <input type="date" id="stuFechaInicio" value="${student?.fechaInicio || ''}" required>
-                </div>
-                
-                <div class="form-group">
-                    <label>Grupo</label>
-                    <select id="stuGrupo">
-                        <option value="">Sin asignar</option>
-                        ${window.groupsData ? Array.from(window.groupsData.keys()).map(g => 
-                            `<option value="${g}" ${student?.grupo === g ? 'selected' : ''}>${g}</option>`
-                        ).join('') : ''}
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label>Tipo Pago</label>
-                    <select id="stuTipoPago">
-                        <option value="MENSUAL" ${student?.tipoPago === 'MENSUAL' ? 'selected' : ''}>Mensual</option>
-                        <option value="SEMESTRAL" ${student?.tipoPago === 'SEMESTRAL' ? 'selected' : ''}>Semestral</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label>Valor ($)</label>
-                    <input type="number" id="stuValor" value="${student?.valor || ''}" min="0">
-                </div>
-                
-                <div class="form-group">
-                    <label>Día de Pago</label>
-                    <input type="number" id="stuDiaPago" value="${student?.diaPago || '1'}" min="1" max="31">
-                </div>
-                
-                <div style="grid-column: 1/-1; display: flex; gap: 1rem; justify-content: flex-end;">
-                    <button type="button" onclick="cancelStudentForm()" class="btn btn-secondary">
-                        Cancelar
-                    </button>
-                    <button type="submit" class="btn btn-primary">
-                        ${isEdit ? 'Actualizar' : 'Guardar'} Estudiante
+        <div id="studentFormModal" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; 
+             background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;">
+            <div style="background: white; padding: 2rem; border-radius: 8px; max-width: 900px; width: 90%; 
+                        max-height: 90vh; overflow-y: auto;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                    <h3>${isEdit ? '✏️ Editar' : '➕ Nuevo'} Estudiante</h3>
+                    <button onclick="closeStudentFormModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">
+                        ✖
                     </button>
                 </div>
-            </form>
+                <form id="studentForm" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    
+                    <div class="form-group">
+                        <label>Nombre Completo*</label>
+                        <input type="text" id="stuNombre" value="${student?.nombre || ''}" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Tipo Documento</label>
+                        <select id="stuTipoDoc">
+                            <option value="C.C" ${student?.tipoDoc === 'C.C' ? 'selected' : ''}>C.C</option>
+                            <option value="T.I" ${student?.tipoDoc === 'T.I' ? 'selected' : ''}>T.I</option>
+                            <option value="C.E" ${student?.tipoDoc === 'C.E' ? 'selected' : ''}>C.E</option>
+                            <option value="PAS" ${student?.tipoDoc === 'PAS' ? 'selected' : ''}>Pasaporte</option>
+                            <option value="PPT" ${student?.tipoDoc === 'PPT' ? 'selected' : ''}>PPT</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Número Documento*</label>
+                        <input type="text" id="stuNumDoc" value="${student?.numDoc || ''}" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Edad</label>
+                        <input type="number" id="stuEdad" value="${student?.edad || ''}" min="5" max="100">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Teléfono*</label>
+                        <input type="tel" id="stuTelefono" value="${student?.telefono || ''}" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Correo</label>
+                        <input type="email" id="stuCorreo" value="${student?.correo || ''}">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Acudiente</label>
+                        <input type="text" id="stuAcudiente" value="${student?.acudiente || ''}">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Tipo Doc. Acudiente</label>
+                        <select id="stuTipoDocAcudiente">
+                            <option value="" ${!student?.tipoDocAcudiente ? 'selected' : ''}>Seleccionar</option>
+                            <option value="C.C" ${student?.tipoDocAcudiente === 'C.C' ? 'selected' : ''}>C.C</option>
+                            <option value="T.I" ${student?.tipoDocAcudiente === 'T.I' ? 'selected' : ''}>T.I</option>
+                            <option value="C.E" ${student?.tipoDocAcudiente === 'C.E' ? 'selected' : ''}>C.E</option>
+                            <option value="PAS" ${student?.tipoDocAcudiente === 'PAS' ? 'selected' : ''}>Pasaporte</option>
+                            <option value="PPT" ${student?.tipoDocAcudiente === 'PPT' ? 'selected' : ''}>PPT</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Número Doc. Acudiente</label>
+                        <input type="text" id="stuDocAcudiente" value="${student?.docAcudiente || ''}">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Fecha Inicio*</label>
+                        <input type="date" id="stuFechaInicio" value="${student?.fechaInicio || ''}" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Grupo</label>
+                        <select id="stuGrupo">
+                            <option value="">Sin asignar</option>
+                            ${window.groupsData ? Array.from(window.groupsData.keys()).map(g => 
+                                `<option value="${g}" ${student?.grupo === g ? 'selected' : ''}>${g}</option>`
+                            ).join('') : ''}
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Tipo Pago</label>
+                        <select id="stuTipoPago">
+                            <option value="MENSUAL" ${student?.tipoPago === 'MENSUAL' ? 'selected' : ''}>Mensual</option>
+                            <option value="SEMESTRAL" ${student?.tipoPago === 'SEMESTRAL' ? 'selected' : ''}>Semestral</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Valor ($)</label>
+                        <input type="number" id="stuValor" value="${student?.valor || ''}" min="0">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Día de Pago</label>
+                        <input type="number" id="stuDiaPago" value="${student?.diaPago || '1'}" min="1" max="31">
+                    </div>
+                    
+                    <div style="grid-column: 1/-1; display: flex; gap: 1rem; justify-content: flex-end;">
+                        <button type="button" onclick="closeStudentFormModal()" class="btn btn-secondary">
+                            Cancelar
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            ${isEdit ? 'Actualizar' : 'Guardar'} Estudiante
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     `;
 }
@@ -539,7 +548,7 @@ window.loadStudentsTab = async function() {
                 </div>
             </div>
             
-            <div id="studentFormContainer"></div>
+            
             <div id="studentTableContainer">
                 ${renderStudentTable(window.StudentManager.getStudents({ status: currentFilter }))}
             </div>
@@ -574,12 +583,25 @@ window.loadStudentsTab = async function() {
 
 window.showStudentForm = function(studentId = null) {
     const student = studentId ? window.StudentManager.students.get(studentId) : null;
-    document.getElementById('studentFormContainer').innerHTML = renderStudentForm(student);
+    
+    // Remove any existing modal first
+    const existingModal = document.getElementById('studentFormModal');
+    if (existingModal) existingModal.remove();
+    
+    // Append modal to container
+    const container = document.getElementById('studentsContainer');
+    container.insertAdjacentHTML('beforeend', renderStudentForm(student));
     
     document.getElementById('studentForm').onsubmit = async (e) => {
         e.preventDefault();
         await saveStudentForm(studentId);
     };
+};
+
+// NEW: Close student form modal
+window.closeStudentFormModal = function() {
+    const modal = document.getElementById('studentFormModal');
+    if (modal) modal.remove();
 };
 
 window.editStudent = function(id) {
@@ -593,8 +615,9 @@ window.deleteStudent = async function(id) {
     }
 };
 
+// UPDATED: Now calls closeStudentFormModal
 window.cancelStudentForm = function() {
-    document.getElementById('studentFormContainer').innerHTML = '';
+    closeStudentFormModal();
 };
 
 // UPDATED: Toggle student status - Now appends to studentsContainer
@@ -682,7 +705,6 @@ window.closePaymentNotesModal = function() {
     const modal = document.getElementById('paymentNotesModal');
     if (modal) modal.remove();
 };
-
 // ============================================
 // SECTION 8: FORM SAVE FUNCTION
 // ============================================
@@ -713,7 +735,7 @@ async function saveStudentForm(studentId) {
         }
 
         window.showNotification('✅ Estudiante guardado', 'success');
-        cancelStudentForm();
+        closeStudentFormModal();
         loadStudentsTab();
     } catch (error) {
         console.error('❌ Error saving student:', error);
