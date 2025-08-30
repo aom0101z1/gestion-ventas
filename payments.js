@@ -902,25 +902,58 @@ const InvoiceGenerator = {
         whatsapp: '324 297 37 37'
     },
 
-    // Generate invoice number: CB-2025-STD123-001
+    // Generate invoice number: CB-YYYYMMDD-StudentRow#-Receipt#
     async generateInvoiceNumber(studentId) {
-        const year = new Date().getFullYear();
-        const studentPart = studentId.substring(0, 6).toUpperCase().replace('STU-', '');
+        const now = new Date();
+        const dateStr = now.getFullYear().toString() + 
+                       String(now.getMonth() + 1).padStart(2, '0') + 
+                       String(now.getDate()).padStart(2, '0');
         
         try {
-            const db = window.firebaseModules.database;
-            const counterRef = db.ref(window.FirebaseData.database, `invoiceCounters/${year}/${studentId}`);
-            const snapshot = await db.get(counterRef);
+            // Get student row number from students list
+            const studentRowNumber = await this.getStudentRowNumber(studentId);
             
+            // Use atomic counter increment
+            const db = window.firebaseModules.database;
+            const counterRef = db.ref(window.FirebaseData.database, `invoiceCounters/global`);
+            
+            // Get current counter value and increment atomically
             let counter = 1;
+            const snapshot = await db.get(counterRef);
             if (snapshot.exists()) {
                 counter = snapshot.val() + 1;
             }
             
+            // Save new counter value
             await db.set(counterRef, counter);
-            return `CB-${year}-${studentPart}-${String(counter).padStart(3, '0')}`;
+            return `CB-${dateStr}-${String(studentRowNumber).padStart(3, '0')}-${String(counter).padStart(3, '0')}`;
         } catch (error) {
-            return `CB-${year}-${studentPart}-${Date.now().toString().slice(-4)}`;
+            console.warn('Failed to generate sequential invoice number, using timestamp fallback:', error);
+            return `CB-${dateStr}-000-${Date.now().toString().slice(-4)}`;
+        }
+    },
+
+    // Helper function to get student row number from the students list
+    async getStudentRowNumber(studentId) {
+        try {
+            const db = window.firebaseModules.database;
+            const studentsRef = db.ref(window.FirebaseData.database, 'students');
+            const snapshot = await db.get(studentsRef);
+            
+            if (snapshot.exists()) {
+                const studentsData = snapshot.val();
+                const studentsList = Object.keys(studentsData)
+                    .map(key => ({ id: key, ...studentsData[key] }))
+                    .filter(s => s.status === 'active')
+                    .sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+                
+                const studentIndex = studentsList.findIndex(s => s.id === studentId);
+                return studentIndex >= 0 ? studentIndex + 1 : 999;
+            }
+            return 999;
+        } catch (error) {
+            console.warn('Error getting student row number:', error);
+            return 999;
         }
     },
 
