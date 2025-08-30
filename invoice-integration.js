@@ -37,30 +37,10 @@ const InvoiceSystem = {
     }, 1000);
   },
 
-  // Generate invoice number: CB-2025-STD123-001
+  // Generate invoice number: CB-YYYYMMDD-StudentRow#-Receipt# 
   async generateInvoiceNumber(studentId) {
-    const year = new Date().getFullYear();
-    const studentPart = studentId.substring(0, 6).toUpperCase();
-    
-    // Get last invoice number from Firebase
-    try {
-      const db = window.firebaseModules.database;
-      const invoiceRef = db.ref(window.FirebaseData.database, `invoiceCounters/${year}/${studentId}`);
-      const snapshot = await db.get(invoiceRef);
-      
-      let counter = 1;
-      if (snapshot.exists()) {
-        counter = snapshot.val() + 1;
-      }
-      
-      // Update counter
-      await db.set(invoiceRef, counter);
-      
-      return `CB-${year}-${studentPart}-${String(counter).padStart(3, '0')}`;
-    } catch (error) {
-      // Fallback to timestamp-based number
-      return `CB-${year}-${studentPart}-${Date.now().toString().slice(-4)}`;
-    }
+    // Use the same logic as InvoiceGenerator for consistency
+    return await window.InvoiceGenerator.generateInvoiceNumber(studentId);
   },
 
   // Get student data from Firebase
