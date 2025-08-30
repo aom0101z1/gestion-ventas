@@ -209,6 +209,37 @@
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
 
+        /* ===== REPORT TABS ===== */
+        .report-tab {
+            padding: 0.75rem 1.5rem;
+            margin-right: 0.5rem;
+            border: none;
+            background: transparent;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            color: #6b7280;
+        }
+
+        .report-tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .report-tab:hover:not(.active) {
+            color: #4f46e5;
+            background: #f8fafc;
+        }
+
+        .report-content {
+            margin-top: 2rem;
+        }
+
+        .report-content.hidden {
+            display: none;
+        }
+
         /* ===== TABLE ===== */
         .table {
             width: 100%;
@@ -624,38 +655,136 @@
 
             <!-- ========== SECTION 10: TAB CONTENT - REPORTS ========== -->
             <div id="reports" class="tab-content hidden">
-                <h2 id="reportsTitle">📊 Reportes</h2>
+                <h2 id="reportsTitle">📊 Dashboard de Reportes</h2>
                 
-                <div id="personalReports">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem;">
-                        <div id="weeklyPerformance">
-                            <div class="loading-spinner"></div> Cargando rendimiento...
-                        </div>
-                        <div id="personalTargets">
-                            <div class="loading-spinner"></div> Cargando objetivos...
-                        </div>
+                <!-- Period Selector -->
+                <div style="display: flex; gap: 1rem; margin-bottom: 2rem; align-items: center;">
+                    <label><strong>Período:</strong></label>
+                    <select id="reportsPeriod" onchange="updateReportsPeriod()" style="padding: 0.5rem; border-radius: 4px; border: 1px solid #ccc;">
+                        <option value="daily">Diario</option>
+                        <option value="weekly">Semanal</option>
+                        <option value="monthly" selected>Mensual</option>
+                        <option value="semester">Semestral</option>
+                        <option value="yearly">Anual</option>
+                        <option value="custom">Personalizado</option>
+                    </select>
+                    
+                    <div id="customDateRange" style="display: none;">
+                        <input type="date" id="startDate" style="padding: 0.5rem; border-radius: 4px; border: 1px solid #ccc;">
+                        <span>a</span>
+                        <input type="date" id="endDate" style="padding: 0.5rem; border-radius: 4px; border: 1px solid #ccc;">
+                    </div>
+                    
+                    <button onclick="refreshReports()" class="btn btn-primary">🔄 Actualizar</button>
+                    <button onclick="exportReports()" class="btn btn-success">📥 Exportar</button>
+                </div>
+
+                <!-- Key Metrics Cards -->
+                <div id="keyMetrics" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+                    <div class="metric-card" style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 2rem; color: #28a745;">💰</div>
+                        <div id="totalIncome" style="font-size: 1.5rem; font-weight: bold; color: #333;">$0</div>
+                        <div style="color: #666;">Ingresos Totales</div>
+                    </div>
+                    
+                    <div class="metric-card" style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 2rem; color: #007bff;">👥</div>
+                        <div id="activeStudents" style="font-size: 1.5rem; font-weight: bold; color: #333;">0</div>
+                        <div style="color: #666;">Estudiantes Activos</div>
+                    </div>
+                    
+                    <div class="metric-card" style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 2rem; color: #17a2b8;">📈</div>
+                        <div id="newEnrollments" style="font-size: 1.5rem; font-weight: bold; color: #333;">0</div>
+                        <div style="color: #666;">Nuevas Matrículas</div>
+                    </div>
+                    
+                    <div class="metric-card" style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 2rem; color: #ffc107;">⏰</div>
+                        <div id="pendingPayments" style="font-size: 1.5rem; font-weight: bold; color: #333;">$0</div>
+                        <div style="color: #666;">Pagos Pendientes</div>
                     </div>
                 </div>
-                
-                <div id="directorReports" class="hidden">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2rem; margin-top: 2rem;">
-                        <div id="teamPerformance">
-                            <h4>👥 Rendimiento del Equipo</h4>
-                            <div class="loading-spinner"></div> Cargando...
+
+                <!-- Report Tabs -->
+                <div style="border-bottom: 1px solid #ccc; margin-bottom: 2rem;">
+                    <button class="report-tab active" onclick="switchReportTab('financial')" id="financialReportTab">💰 Financiero</button>
+                    <button class="report-tab" onclick="switchReportTab('students')" id="studentsReportTab">👥 Estudiantes</button>
+                    <button class="report-tab" onclick="switchReportTab('sales')" id="salesReportTab">🎯 Ventas</button>
+                </div>
+
+                <!-- Financial Reports -->
+                <div id="financialReports" class="report-content">
+                    <h3>💰 Reporte Financiero</h3>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem;">
+                        <div>
+                            <h4>Ingresos Diarios</h4>
+                            <canvas id="dailyIncomeChart" width="400" height="200"></canvas>
                         </div>
-                        <div id="salesRanking">
-                            <h4>🏆 Ranking de Ventas</h4>
-                            <div class="loading-spinner"></div> Cargando...
-                        </div>
-                        <div id="executiveSummary">
-                            <h4>📈 Resumen Ejecutivo</h4>
-                            <div class="loading-spinner"></div> Cargando...
+                        <div>
+                            <h4>Métodos de Pago</h4>
+                            <canvas id="paymentMethodsChart" width="400" height="200"></canvas>
                         </div>
                     </div>
+                    
+                    <div id="financialSummary" style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px;">
+                        <h4>Resumen Financiero</h4>
+                        <div id="financialDetails">Cargando datos financieros...</div>
+                    </div>
                 </div>
-                
-                <div style="margin-top: 2rem; text-align: center;">
-                    <button onclick="exportTodayContacts()" class="btn btn-success">📥 Exportar Contactos de Hoy</button>
+
+                <!-- Student Reports -->
+                <div id="studentReports" class="report-content hidden">
+                    <h3>👥 Reporte de Estudiantes</h3>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem;">
+                        <div>
+                            <h4>Tendencia de Matrículas</h4>
+                            <canvas id="enrollmentTrendChart" width="400" height="200"></canvas>
+                        </div>
+                        <div>
+                            <h4>Cursos Populares</h4>
+                            <canvas id="coursePopularityChart" width="400" height="200"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div id="studentSummary" style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px;">
+                        <h4>Resumen de Estudiantes</h4>
+                        <div id="studentDetails">Cargando datos de estudiantes...</div>
+                    </div>
+                </div>
+
+                <!-- Sales Reports -->
+                <div id="salesReports" class="report-content hidden">
+                    <h3>🎯 Reporte de Ventas</h3>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem;">
+                        <div>
+                            <h4>Leads Diarios</h4>
+                            <canvas id="dailyLeadsChart" width="400" height="200"></canvas>
+                        </div>
+                        <div>
+                            <h4>Fuentes de Leads</h4>
+                            <canvas id="leadSourcesChart" width="400" height="200"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div id="salesSummary" style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px;">
+                        <h4>Resumen de Ventas</h4>
+                        <div id="salesDetails">Cargando datos de ventas...</div>
+                    </div>
+                </div>
+
+                <!-- Export Options -->
+                <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid #eee; text-align: center;">
+                    <h4>Exportar Datos</h4>
+                    <div style="display: flex; gap: 1rem; justify-content: center; margin-top: 1rem;">
+                        <button onclick="exportFinancialData()" class="btn btn-success">📊 Datos Financieros</button>
+                        <button onclick="exportStudentData()" class="btn btn-success">👥 Datos Estudiantes</button>
+                        <button onclick="exportSalesData()" class="btn btn-success">🎯 Datos Ventas</button>
+                        <button onclick="exportTodayContacts()" class="btn btn-success">📞 Contactos de Hoy</button>
+                    </div>
                 </div>
             </div>
 
@@ -1389,6 +1518,373 @@ onAuthStateChanged(auth, async (user) => {
                         
             } catch (error) {
                 console.error('❌ Error switching tab:', error);
+            }
+        }
+
+        // ========== SECTION 16.9.1: REPORTS FUNCTIONS ==========
+        
+        let currentReportsPeriod = 'monthly';
+        let reportsCharts = {};
+
+        async function loadReportsData() {
+            console.log('📊 Loading reports data...');
+            try {
+                await window.ReportsManager.init();
+                await refreshReports();
+            } catch (error) {
+                console.error('❌ Error loading reports:', error);
+                showNotification('Error cargando reportes: ' + error.message, 'error');
+            }
+        }
+
+        function updateReportsPeriod() {
+            const period = document.getElementById('reportsPeriod').value;
+            currentReportsPeriod = period;
+            
+            const customRange = document.getElementById('customDateRange');
+            if (period === 'custom') {
+                customRange.style.display = 'flex';
+            } else {
+                customRange.style.display = 'none';
+            }
+            
+            refreshReports();
+        }
+
+        async function refreshReports() {
+            try {
+                console.log('🔄 Refreshing reports for period:', currentReportsPeriod);
+                
+                let customStart = null, customEnd = null;
+                if (currentReportsPeriod === 'custom') {
+                    const startInput = document.getElementById('startDate');
+                    const endInput = document.getElementById('endDate');
+                    if (startInput.value) customStart = new Date(startInput.value);
+                    if (endInput.value) customEnd = new Date(endInput.value);
+                }
+
+                // Generate all reports
+                const [financialReport, studentReport, salesReport] = await Promise.all([
+                    window.generateFinancialReport(currentReportsPeriod, customStart, customEnd),
+                    window.generateStudentReport(currentReportsPeriod, customStart, customEnd),
+                    window.generateSalesReport(currentReportsPeriod, customStart, customEnd)
+                ]);
+
+                // Update key metrics
+                updateKeyMetrics(financialReport, studentReport, salesReport);
+
+                // Update charts based on current tab
+                const activeReportTab = document.querySelector('.report-tab.active');
+                if (activeReportTab) {
+                    const tabId = activeReportTab.id.replace('ReportTab', '');
+                    updateReportCharts(tabId, { financial: financialReport, students: studentReport, sales: salesReport });
+                }
+
+                console.log('✅ Reports refreshed successfully');
+            } catch (error) {
+                console.error('❌ Error refreshing reports:', error);
+                showNotification('Error actualizando reportes: ' + error.message, 'error');
+            }
+        }
+
+        function updateKeyMetrics(financialReport, studentReport, salesReport) {
+            // Update metric cards
+            document.getElementById('totalIncome').textContent = 
+                window.ReportsManager.formatCurrency(financialReport.totalIncome);
+            document.getElementById('activeStudents').textContent = studentReport.activeStudents;
+            document.getElementById('newEnrollments').textContent = studentReport.newStudents;
+            document.getElementById('pendingPayments').textContent = 
+                window.ReportsManager.formatCurrency(financialReport.pendingPayments);
+        }
+
+        function switchReportTab(tabName) {
+            console.log('📊 Switching to report tab:', tabName);
+            
+            // Update tab appearance
+            document.querySelectorAll('.report-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.getElementById(tabName + 'ReportTab').classList.add('active');
+            
+            // Show/hide content
+            document.querySelectorAll('.report-content').forEach(content => {
+                content.classList.add('hidden');
+            });
+            document.getElementById(tabName + 'Reports').classList.remove('hidden');
+            
+            // Load specific report data
+            loadReportTab(tabName);
+        }
+
+        async function loadReportTab(tabName) {
+            try {
+                let customStart = null, customEnd = null;
+                if (currentReportsPeriod === 'custom') {
+                    const startInput = document.getElementById('startDate');
+                    const endInput = document.getElementById('endDate');
+                    if (startInput.value) customStart = new Date(startInput.value);
+                    if (endInput.value) customEnd = new Date(endInput.value);
+                }
+
+                switch (tabName) {
+                    case 'financial':
+                        const financialReport = await window.generateFinancialReport(currentReportsPeriod, customStart, customEnd);
+                        updateFinancialReports(financialReport);
+                        break;
+                    case 'students':
+                        const studentReport = await window.generateStudentReport(currentReportsPeriod, customStart, customEnd);
+                        updateStudentReports(studentReport);
+                        break;
+                    case 'sales':
+                        const salesReport = await window.generateSalesReport(currentReportsPeriod, customStart, customEnd);
+                        updateSalesReports(salesReport);
+                        break;
+                }
+            } catch (error) {
+                console.error('❌ Error loading report tab:', error);
+            }
+        }
+
+        function updateFinancialReports(report) {
+            // Update financial details
+            const detailsEl = document.getElementById('financialDetails');
+            detailsEl.innerHTML = `
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                    <div>
+                        <h5>💰 Resumen de Ingresos</h5>
+                        <p><strong>Total:</strong> ${window.ReportsManager.formatCurrency(report.totalIncome)}</p>
+                        <p><strong>Promedio por pago:</strong> ${window.ReportsManager.formatCurrency(report.avgPaymentAmount)}</p>
+                        <p><strong>Facturas pagadas:</strong> ${report.paidInvoices}</p>
+                    </div>
+                    <div>
+                        <h5>⏰ Pagos Pendientes</h5>
+                        <p><strong>Total:</strong> ${window.ReportsManager.formatCurrency(report.pendingPayments)}</p>
+                        <p><strong>Total facturas:</strong> ${report.totalInvoices}</p>
+                        <p><strong>Período:</strong> ${window.ReportsManager.formatDateRange(report.dateRange.start, report.dateRange.end)}</p>
+                    </div>
+                </div>
+            `;
+
+            // Create charts
+            createFinancialCharts(report);
+        }
+
+        function updateStudentReports(report) {
+            // Update student details
+            const detailsEl = document.getElementById('studentDetails');
+            detailsEl.innerHTML = `
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                    <div>
+                        <h5>👥 Estadísticas Generales</h5>
+                        <p><strong>Total estudiantes:</strong> ${report.totalStudents}</p>
+                        <p><strong>Estudiantes activos:</strong> ${report.activeStudents}</p>
+                        <p><strong>Tasa de retención:</strong> ${window.ReportsManager.formatPercent(report.retentionRate)}</p>
+                    </div>
+                    <div>
+                        <h5>📈 Crecimiento</h5>
+                        <p><strong>Nuevas matrículas:</strong> ${report.newStudents}</p>
+                        <p><strong>Estudiantes inactivos:</strong> ${report.inactiveStudents}</p>
+                        <p><strong>Período:</strong> ${window.ReportsManager.formatDateRange(report.dateRange.start, report.dateRange.end)}</p>
+                    </div>
+                </div>
+            `;
+
+            // Create charts
+            createStudentCharts(report);
+        }
+
+        function updateSalesReports(report) {
+            // Update sales details
+            const detailsEl = document.getElementById('salesDetails');
+            detailsEl.innerHTML = `
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                    <div>
+                        <h5>🎯 Rendimiento de Ventas</h5>
+                        <p><strong>Total leads:</strong> ${report.totalLeads}</p>
+                        <p><strong>Conversiones:</strong> ${report.conversions}</p>
+                        <p><strong>Tasa de conversión:</strong> ${window.ReportsManager.formatPercent(report.conversionRate)}</p>
+                    </div>
+                    <div>
+                        <h5>⏱️ Métricas de Proceso</h5>
+                        <p><strong>Tiempo resp. promedio:</strong> ${report.avgResponseTime}h</p>
+                        <p><strong>Período:</strong> ${window.ReportsManager.formatDateRange(report.dateRange.start, report.dateRange.end)}</p>
+                    </div>
+                </div>
+            `;
+
+            // Create charts
+            createSalesCharts(report);
+        }
+
+        function createFinancialCharts(report) {
+            // Destroy existing charts
+            if (reportsCharts.dailyIncome) reportsCharts.dailyIncome.destroy();
+            if (reportsCharts.paymentMethods) reportsCharts.paymentMethods.destroy();
+
+            // Daily Income Chart
+            const dailyLabels = Object.keys(report.dailyIncome);
+            const dailyData = dailyLabels.map(date => 
+                report.dailyIncome[date].reduce((sum, p) => sum + p.amount, 0)
+            );
+
+            reportsCharts.dailyIncome = window.ReportsManager.createLineChart(
+                'dailyIncomeChart',
+                dailyLabels,
+                [{
+                    label: 'Ingresos Diarios',
+                    data: dailyData,
+                    borderColor: '#667eea',
+                    backgroundColor: 'rgba(102, 126, 234, 0.1)'
+                }],
+                'Ingresos por Día'
+            );
+
+            // Payment Methods Chart
+            const methodLabels = Object.keys(report.paymentMethods);
+            const methodData = Object.values(report.paymentMethods);
+
+            reportsCharts.paymentMethods = window.ReportsManager.createPieChart(
+                'paymentMethodsChart',
+                methodLabels,
+                methodData,
+                'Distribución por Método de Pago'
+            );
+        }
+
+        function createStudentCharts(report) {
+            // Destroy existing charts
+            if (reportsCharts.enrollmentTrend) reportsCharts.enrollmentTrend.destroy();
+            if (reportsCharts.coursePopularity) reportsCharts.coursePopularity.destroy();
+
+            // Enrollment Trend Chart
+            const trendLabels = Object.keys(report.enrollmentTrend);
+            const trendData = trendLabels.map(month => report.enrollmentTrend[month].length);
+
+            reportsCharts.enrollmentTrend = window.ReportsManager.createLineChart(
+                'enrollmentTrendChart',
+                trendLabels,
+                [{
+                    label: 'Matrículas',
+                    data: trendData,
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)'
+                }],
+                'Tendencia de Matrículas'
+            );
+
+            // Course Popularity Chart
+            const courseLabels = Object.keys(report.courseEnrollment);
+            const courseData = Object.values(report.courseEnrollment);
+
+            reportsCharts.coursePopularity = window.ReportsManager.createBarChart(
+                'coursePopularityChart',
+                courseLabels,
+                [{
+                    label: 'Estudiantes',
+                    data: courseData,
+                    backgroundColor: '#3b82f6'
+                }],
+                'Popularidad de Cursos'
+            );
+        }
+
+        function createSalesCharts(report) {
+            // Destroy existing charts
+            if (reportsCharts.dailyLeads) reportsCharts.dailyLeads.destroy();
+            if (reportsCharts.leadSources) reportsCharts.leadSources.destroy();
+
+            // Daily Leads Chart
+            const leadsLabels = Object.keys(report.dailyLeads);
+            const leadsData = leadsLabels.map(date => report.dailyLeads[date].length);
+
+            reportsCharts.dailyLeads = window.ReportsManager.createLineChart(
+                'dailyLeadsChart',
+                leadsLabels,
+                [{
+                    label: 'Leads',
+                    data: leadsData,
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'rgba(245, 158, 11, 0.1)'
+                }],
+                'Leads por Día'
+            );
+
+            // Lead Sources Chart
+            const sourceLabels = Object.keys(report.leadSources);
+            const sourceData = Object.values(report.leadSources);
+
+            reportsCharts.leadSources = window.ReportsManager.createPieChart(
+                'leadSourcesChart',
+                sourceLabels,
+                sourceData,
+                'Fuentes de Leads'
+            );
+        }
+
+        // Export functions
+        async function exportReports() {
+            try {
+                const period = currentReportsPeriod;
+                let customStart = null, customEnd = null;
+                if (period === 'custom') {
+                    const startInput = document.getElementById('startDate');
+                    const endInput = document.getElementById('endDate');
+                    if (startInput.value) customStart = new Date(startInput.value);
+                    if (endInput.value) customEnd = new Date(endInput.value);
+                }
+
+                const reports = await Promise.all([
+                    window.generateFinancialReport(period, customStart, customEnd),
+                    window.generateStudentReport(period, customStart, customEnd),
+                    window.generateSalesReport(period, customStart, customEnd)
+                ]);
+
+                const combinedData = {
+                    financial: reports[0],
+                    students: reports[1],
+                    sales: reports[2],
+                    generated: new Date(),
+                    period: period
+                };
+
+                window.ReportsManager.exportToCSV([combinedData], `reporte_completo_${period}_${new Date().toISOString().split('T')[0]}.csv`);
+                showNotification('✅ Reporte exportado exitosamente', 'success');
+            } catch (error) {
+                console.error('❌ Error exporting reports:', error);
+                showNotification('Error exportando reporte: ' + error.message, 'error');
+            }
+        }
+
+        async function exportFinancialData() {
+            try {
+                const report = await window.generateFinancialReport(currentReportsPeriod);
+                window.ReportsManager.exportToCSV([report], `reporte_financiero_${currentReportsPeriod}_${new Date().toISOString().split('T')[0]}.csv`);
+                showNotification('✅ Datos financieros exportados', 'success');
+            } catch (error) {
+                console.error('❌ Error exporting financial data:', error);
+                showNotification('Error exportando datos financieros: ' + error.message, 'error');
+            }
+        }
+
+        async function exportStudentData() {
+            try {
+                const report = await window.generateStudentReport(currentReportsPeriod);
+                window.ReportsManager.exportToCSV([report], `reporte_estudiantes_${currentReportsPeriod}_${new Date().toISOString().split('T')[0]}.csv`);
+                showNotification('✅ Datos de estudiantes exportados', 'success');
+            } catch (error) {
+                console.error('❌ Error exporting student data:', error);
+                showNotification('Error exportando datos de estudiantes: ' + error.message, 'error');
+            }
+        }
+
+        async function exportSalesData() {
+            try {
+                const report = await window.generateSalesReport(currentReportsPeriod);
+                window.ReportsManager.exportToCSV([report], `reporte_ventas_${currentReportsPeriod}_${new Date().toISOString().split('T')[0]}.csv`);
+                showNotification('✅ Datos de ventas exportados', 'success');
+            } catch (error) {
+                console.error('❌ Error exporting sales data:', error);
+                showNotification('Error exportando datos de ventas: ' + error.message, 'error');
             }
         }
 
@@ -2406,6 +2902,7 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
     <script src="school-buttons.js"></script>
     <script src="import-students.js"></script>
     <script src="invoice-integration.js"></script>
+    <script src="reports.js"></script>
     <script src="admin-center.js"></script>
     <script src="permission-enforcer.js"></script>
 
