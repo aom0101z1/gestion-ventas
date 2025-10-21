@@ -2903,6 +2903,7 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
     <script src="import-students.js"></script>
     <script src="invoice-integration.js"></script>
     <script src="reports.js"></script>
+    <script src="finance.js"></script>
     <script src="admin-center.js"></script>
     <script src="permission-enforcer.js"></script>
 
@@ -2913,6 +2914,7 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
             console.log('✅ Modules Check:');
             console.log('Students:', !!window.StudentManager);
             console.log('Payments:', !!window.PaymentManager);
+            console.log('Finance:', !!window.FinanceManager);
             console.log('Groups:', !!window.GroupsManager);
             console.log('Teachers:', !!window.TeacherManager);
             console.log('Admin Center:', !!window.AdminCenter);

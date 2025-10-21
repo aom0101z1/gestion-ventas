@@ -37,12 +37,19 @@ function addSchoolButtons() {
     const modules = [
         { name: 'Estudiantes', icon: '👥', color: '#3b82f6', func: 'Students' },
         { name: 'Pagos', icon: '💰', color: '#10b981', func: 'Payments' },
+        { name: 'Finanzas', icon: '💵', color: '#6366f1', func: 'Finance', directorOnly: true },
         { name: 'Grupos', icon: '📚', color: '#8b5cf6', func: 'Groups' },
         { name: 'Profesores', icon: '👩‍🏫', color: '#f59e0b', func: 'Teachers' },
         { name: 'Asistencia', icon: '📋', color: '#ef4444', func: 'Attendance' }
     ];
     
     modules.forEach(module => {
+        // Skip director-only modules if user is not director
+        if (module.directorOnly) {
+            // Check if user is director (will show for all for now, can add role check later)
+            // TODO: Add role check: if (currentUserRole !== 'director') return;
+        }
+
         const btn = document.createElement('button');
         btn.innerHTML = `${module.icon} ${module.name}`;
         btn.style.cssText = `
@@ -56,15 +63,15 @@ function addSchoolButtons() {
             font-weight: 500;
             transition: all 0.2s;
         `;
-        
+
         btn.onmouseover = () => btn.style.opacity = '0.8';
         btn.onmouseout = () => btn.style.opacity = '1';
-        
+
         btn.onclick = () => {
             console.log(`Opening ${module.name}...`);
             openModule(module.func);
         };
-        
+
         buttonBar.appendChild(btn);
     });
     
