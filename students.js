@@ -539,12 +539,12 @@ window.loadStudentsTab = async function() {
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <h2>👥 Gestión de Estudiantes</h2>
                 <div style="display: flex; gap: 1rem; align-items: center;">
-                    <select id="statusFilter" style="padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 4px;">
+                    <select id="studentStatusFilter" style="padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 4px;">
                         <option value="all" ${currentFilter === 'all' ? 'selected' : ''}>Todos</option>
                         <option value="active" ${currentFilter === 'active' ? 'selected' : ''}>Activos</option>
                         <option value="inactive" ${currentFilter === 'inactive' ? 'selected' : ''}>Inactivos</option>
                     </select>
-                    <input type="text" id="studentSearch" placeholder="Buscar..." 
+                    <input type="text" id="studentSearch" placeholder="Buscar..."
                            style="padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 4px;">
                     <button onclick="showStudentForm()" class="btn btn-primary">
                         ➕ Nuevo Estudiante
@@ -561,21 +561,21 @@ window.loadStudentsTab = async function() {
 
     // Add search listener
     document.getElementById('studentSearch')?.addEventListener('input', (e) => {
-        const statusFilter = document.getElementById('statusFilter').value;
-        const filtered = window.StudentManager.getStudents({ 
+        const statusFilter = document.getElementById('studentStatusFilter').value;
+        const filtered = window.StudentManager.getStudents({
             search: e.target.value,
-            status: statusFilter 
+            status: statusFilter
         });
         document.getElementById('studentTableContainer').innerHTML = renderStudentTable(filtered);
     });
-    
+
     // Add status filter listener
-    document.getElementById('statusFilter')?.addEventListener('change', (e) => {
+    document.getElementById('studentStatusFilter')?.addEventListener('change', (e) => {
         localStorage.setItem('studentStatusFilter', e.target.value);
         const searchValue = document.getElementById('studentSearch').value;
-        const filtered = window.StudentManager.getStudents({ 
+        const filtered = window.StudentManager.getStudents({
             status: e.target.value,
-            search: searchValue 
+            search: searchValue
         });
         document.getElementById('studentTableContainer').innerHTML = renderStudentTable(filtered);
     });
