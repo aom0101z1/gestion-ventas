@@ -97,6 +97,11 @@ async loadPayments() {
     // Get payment status with color
 // Get payment status with color
 getPaymentStatus(student) {
+    // Check if student is inactive first
+    if (student.status === 'inactive') {
+        return { color: '#6b7280', status: 'Inactivo', icon: '⏸️' };
+    }
+
     if (!student.diaPago) return { color: '#6b7280', status: 'Sin fecha', icon: '❓' };
     
     const today = new Date();
