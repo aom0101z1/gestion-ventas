@@ -97,11 +97,6 @@ async loadPayments() {
     // Get payment status with color
 // Get payment status with color
 getPaymentStatus(student) {
-    // Check if student is inactive first
-    if (student.status === 'inactive') {
-        return { color: '#6b7280', status: 'Inactivo', icon: '⏸️' };
-    }
-
     if (!student.diaPago) return { color: '#6b7280', status: 'Sin fecha', icon: '❓' };
     
     const today = new Date();
@@ -1439,7 +1434,8 @@ function renderPaymentTable(students) {
                 <tr>
                     <th style="padding: 0.75rem; text-align: center; width: 40px;"></th>
                     <th style="padding: 0.75rem; text-align: center; width: 50px;">#</th>
-                    <th style="padding: 0.75rem; text-align: left;">Estado</th>
+                    <th style="padding: 0.75rem; text-align: left;">Estado Pago</th>
+                    <th style="padding: 0.75rem; text-align: center;">Estado</th>
                     <th style="padding: 0.75rem; text-align: left;">Estudiante</th>
                     <th style="padding: 0.75rem; text-align: left;">Grupo</th>
                     <th style="padding: 0.75rem; text-align: right;">Valor</th>
@@ -1450,17 +1446,19 @@ function renderPaymentTable(students) {
             <tbody>
                 ${students.map((s, index) => {
                     const status = window.PaymentManager.getPaymentStatus(s);
-                    
+                    const isInactive = s.status === 'inactive';
+                    const rowStyle = isInactive ? 'background: #fee2e2;' : '';
+
                     // Main row with expand button
                     let mainRow = `
-                        <tr style="border-top: 1px solid #e5e7eb;">
+                        <tr style="border-top: 1px solid #e5e7eb; ${rowStyle}">
                             <td style="padding: 0.75rem; text-align: center;">
-                                <button onclick="togglePaymentHistory('${s.id}')" 
+                                <button onclick="togglePaymentHistory('${s.id}')"
                                         id="expand-${s.id}"
                                         style="
-                                            background: none; 
-                                            border: none; 
-                                            cursor: pointer; 
+                                            background: none;
+                                            border: none;
+                                            cursor: pointer;
                                             padding: 4px;
                                             transition: transform 0.3s;
                                             display: inline-flex;
@@ -1486,6 +1484,12 @@ function renderPaymentTable(students) {
                                     ${status.status}
                                 </span>
                             </td>
+                            <td style="padding: 0.75rem; text-align: center;">
+                                <button class="btn btn-sm"
+                                        style="background: ${isInactive ? '#ef4444' : '#10b981'}; color: white; cursor: default;">
+                                    ${isInactive ? '❌ Inactivo' : '✓ Activo'}
+                                </button>
+                            </td>
                             <td style="padding: 0.75rem;">
                                 <div style="font-weight: 500;">${s.nombre || '-'}</div>
                                 <small style="color: #6b7280;">${s.telefono || '-'}</small>
@@ -1498,12 +1502,12 @@ function renderPaymentTable(students) {
                                 ${s.diaPago || '-'}
                             </td>
                             <td style="padding: 0.75rem; text-align: center;">
-                                <button onclick="showPaymentModal('${s.id}')" 
-                                        class="btn btn-sm" 
+                                <button onclick="showPaymentModal('${s.id}')"
+                                        class="btn btn-sm"
                                         style="background: #10b981; color: white; margin-right: 0.5rem;">
                                     ➕ Registrar
                                 </button>
-                                <button onclick="sendPaymentReminder('${s.id}')" 
+                                <button onclick="sendPaymentReminder('${s.id}')"
                                         class="btn btn-sm"
                                         style="background: #3b82f6; color: white;">
                                     📱 Recordar
@@ -1511,11 +1515,11 @@ function renderPaymentTable(students) {
                             </td>
                         </tr>
                     `;
-                    
+
                     // Hidden history row (will be populated on expand)
                     let historyRow = `
                         <tr id="history-${s.id}" class="payment-history-row" style="display: none;">
-                            <td colspan="8" style="padding: 20px; background: #f9fafb; text-align: center;">
+                            <td colspan="9" style="padding: 20px; background: #f9fafb; text-align: center;">
                                 <div style="color: #6b7280;">Cargando historial...</div>
                             </td>
                         </tr>
