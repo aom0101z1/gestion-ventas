@@ -89,10 +89,14 @@ class StudentManager {
     // Get filtered students - ENHANCED with status filter
     getStudents(filters = {}) {
         let students = Array.from(this.students.values());
-        
+
         // Filter by status
         if (filters.status && filters.status !== 'all') {
-            students = students.filter(s => s.status === filters.status);
+            students = students.filter(s => {
+                // Default to 'active' if status is undefined or missing
+                const studentStatus = s.status || 'active';
+                return studentStatus === filters.status;
+            });
         }
         
         if (filters.grupo) {
