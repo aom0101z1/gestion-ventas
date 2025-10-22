@@ -25,6 +25,26 @@ const ExpenseCategories = {
 };
 
 // ==================================================================================
+// CURRENCY FORMATTING HELPER
+// ==================================================================================
+
+/**
+ * Format number as Colombian Peso currency
+ * Example: 100000 => "$100.000"
+ * @param {number} amount - The amount to format
+ * @returns {string} Formatted currency string
+ */
+function formatCurrency(amount) {
+    if (amount === null || amount === undefined || isNaN(amount)) {
+        return '$0';
+    }
+
+    const num = Math.round(amount); // Round to avoid decimal issues
+    const formatted = num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return `$${formatted}`;
+}
+
+// ==================================================================================
 // SECTION 2: FINANCE MANAGER CLASS
 // ==================================================================================
 
@@ -426,24 +446,24 @@ function renderFinanceDashboard() {
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
                     <div>
                         <div style="font-size: 0.9rem; opacity: 0.9;">Efectivo Recibido</div>
-                        <div style="font-size: 2rem; font-weight: bold;">$${dailyRevenue.cash.toLocaleString()}</div>
+                        <div style="font-size: 2rem; font-weight: bold;">${formatCurrency(dailyRevenue.cash)}</div>
                         <div style="font-size: 0.8rem; opacity: 0.8;">${dailyRevenue.cashCount} pagos</div>
                     </div>
                     <div>
                         <div style="font-size: 0.9rem; opacity: 0.9;">Transferencias</div>
-                        <div style="font-size: 2rem; font-weight: bold;">$${dailyRevenue.transfers.toLocaleString()}</div>
+                        <div style="font-size: 2rem; font-weight: bold;">${formatCurrency(dailyRevenue.transfers)}</div>
                         <div style="font-size: 0.8rem; opacity: 0.8;">${dailyRevenue.transferCount} pagos</div>
                     </div>
                     <div>
                         <div style="font-size: 0.9rem; opacity: 0.9;">Total Recaudado</div>
-                        <div style="font-size: 2rem; font-weight: bold;">$${dailyRevenue.total.toLocaleString()}</div>
+                        <div style="font-size: 2rem; font-weight: bold;">${formatCurrency(dailyRevenue.total)}</div>
                         <div style="font-size: 0.8rem; opacity: 0.8;">${dailyRevenue.cashCount + dailyRevenue.transferCount} pagos</div>
                     </div>
                     ${reconciliation ? `
                         <div>
                             <div style="font-size: 0.9rem; opacity: 0.9;">Estado Cierre</div>
                             <div style="font-size: 2rem; font-weight: bold;">${reconciliation.isClosed ? '🔒 Cerrado' : '🔓 Abierto'}</div>
-                            <div style="font-size: 0.8rem; opacity: 0.8;">${discrepancy !== 0 ? `Diferencia: $${Math.abs(discrepancy).toLocaleString()}` : 'Sin diferencia'}</div>
+                            <div style="font-size: 0.8rem; opacity: 0.8;">${discrepancy !== 0 ? `Diferencia: ${formatCurrency(Math.abs(discrepancy))}` : 'Sin diferencia'}</div>
                         </div>
                     ` : ''}
                 </div>
@@ -459,7 +479,7 @@ function renderFinanceDashboard() {
                         </div>
                         <div>
                             <div style="font-size: 0.9rem; color: #6b7280;">MRR Esperado</div>
-                            <div style="font-size: 1.5rem; font-weight: bold; color: #1f2937;">$${expectedRevenue.totalExpected.toLocaleString()}</div>
+                            <div style="font-size: 1.5rem; font-weight: bold; color: #1f2937;">${formatCurrency(expectedRevenue.totalExpected)}</div>
                         </div>
                     </div>
                     <div style="font-size: 0.85rem; color: #6b7280;">${expectedRevenue.activeStudents} estudiantes activos</div>
@@ -473,7 +493,7 @@ function renderFinanceDashboard() {
                         </div>
                         <div>
                             <div style="font-size: 0.9rem; color: #6b7280;">Recaudado Este Mes</div>
-                            <div style="font-size: 1.5rem; font-weight: bold; color: #1f2937;">$${monthlyMetrics.revenue.toLocaleString()}</div>
+                            <div style="font-size: 1.5rem; font-weight: bold; color: #1f2937;">${formatCurrency(monthlyMetrics.revenue)}</div>
                         </div>
                     </div>
                     <div style="font-size: 0.85rem; color: #6b7280;">${collectionRate.rate.toFixed(1)}% tasa de cobro</div>
@@ -487,7 +507,7 @@ function renderFinanceDashboard() {
                         </div>
                         <div>
                             <div style="font-size: 0.9rem; color: #6b7280;">Gastos Este Mes</div>
-                            <div style="font-size: 1.5rem; font-weight: bold; color: #1f2937;">$${monthlyMetrics.expenses.toLocaleString()}</div>
+                            <div style="font-size: 1.5rem; font-weight: bold; color: #1f2937;">${formatCurrency(monthlyMetrics.expenses)}</div>
                         </div>
                     </div>
                     <div style="font-size: 0.85rem; color: #6b7280;">${monthlyMetrics.expenseBreakdown ? Object.keys(monthlyMetrics.expenseBreakdown).length : 0} categorías</div>
@@ -502,7 +522,7 @@ function renderFinanceDashboard() {
                         <div>
                             <div style="font-size: 0.9rem; color: #6b7280;">Utilidad (EBITDA)</div>
                             <div style="font-size: 1.5rem; font-weight: bold; color: ${monthlyMetrics.ebitda >= 0 ? '#10b981' : '#ef4444'};">
-                                $${monthlyMetrics.ebitda.toLocaleString()}
+                                ${formatCurrency(monthlyMetrics.ebitda)}
                             </div>
                         </div>
                     </div>
@@ -609,7 +629,7 @@ function renderDailyReconciliationView() {
                             💰 Efectivo Recibido Hoy (Sistema)
                         </label>
                         <div style="font-size: 1.5rem; font-weight: bold; color: #10b981;">
-                            $${dailyRevenue.cash.toLocaleString()}
+                            ${formatCurrency(dailyRevenue.cash)}
                         </div>
                         <small style="color: #6b7280;">${dailyRevenue.cashCount} pagos en efectivo registrados</small>
                     </div>
@@ -620,7 +640,7 @@ function renderDailyReconciliationView() {
                             🏦 Transferencias Recibidas Hoy (Sistema)
                         </label>
                         <div style="font-size: 1.5rem; font-weight: bold; color: #3b82f6;">
-                            $${dailyRevenue.transfers.toLocaleString()}
+                            ${formatCurrency(dailyRevenue.transfers)}
                         </div>
                         <small style="color: #6b7280;">${dailyRevenue.transferCount} transferencias registradas</small>
                     </div>
@@ -631,7 +651,7 @@ function renderDailyReconciliationView() {
                             💸 Gastos Registrados Hoy
                         </label>
                         <div style="font-size: 1.5rem; font-weight: bold; color: #ef4444;">
-                            -$${totalExpenses.toLocaleString()}
+                            -${formatCurrency(totalExpenses)}
                         </div>
                         <small style="color: #6b7280;">${todayExpenses.length} gastos registrados</small>
                         <button type="button" onclick="showAddExpenseModal()" class="btn btn-sm" style="background: #ef4444; color: white; margin-top: 0.5rem;">
@@ -664,7 +684,7 @@ function renderDailyReconciliationView() {
                                 <div>
                                     <div style="font-size: 0.9rem; opacity: 0.9;">Cierre Esperado</div>
                                     <div style="font-size: 1.8rem; font-weight: bold;">
-                                        $${expectedClosing.toLocaleString()}
+                                        ${formatCurrency(expectedClosing)}
                                     </div>
                                     <div style="font-size: 0.8rem; opacity: 0.8;">
                                         Apertura + Efectivo - Gastos
@@ -673,7 +693,7 @@ function renderDailyReconciliationView() {
                                 <div>
                                     <div style="font-size: 0.9rem; opacity: 0.9;">Diferencia</div>
                                     <div id="discrepancyAmount" style="font-size: 1.8rem; font-weight: bold; color: ${discrepancy === 0 ? '#10b981' : discrepancy > 0 ? '#fbbf24' : '#ef4444'};">
-                                        ${discrepancy === 0 ? '✓ $0' : (discrepancy > 0 ? '+$' : '-$') + Math.abs(discrepancy).toLocaleString()}
+                                        ${discrepancy === 0 ? '✓ $0' : (discrepancy > 0 ? '+' : '-') + formatCurrency(Math.abs(discrepancy))}
                                     </div>
                                     <div id="discrepancyStatus" style="font-size: 0.8rem; opacity: 0.8;">
                                         ${discrepancy === 0 ? 'Cuadra perfecto' : discrepancy > 0 ? 'Sobrante' : 'Faltante'}
@@ -748,7 +768,7 @@ function renderDailyReconciliationView() {
                                                 ${payment.method} ${payment.bank ? '- ' + payment.bank : ''}
                                             </span>
                                         </td>
-                                        <td style="padding: 0.75rem; text-align: right; font-weight: 600;">$${payment.amount.toLocaleString()}</td>
+                                        <td style="padding: 0.75rem; text-align: right; font-weight: 600;">${formatCurrency(payment.amount)}</td>
                                         <td style="padding: 0.75rem; font-size: 0.85rem; color: #6b7280;">${payment.registeredByName || 'Sistema'}</td>
                                     </tr>
                                 `;
@@ -757,7 +777,7 @@ function renderDailyReconciliationView() {
                         <tfoot style="background: #f3f4f6; font-weight: bold;">
                             <tr>
                                 <td colspan="3" style="padding: 0.75rem; text-align: right;">TOTAL:</td>
-                                <td style="padding: 0.75rem; text-align: right;">$${dailyRevenue.total.toLocaleString()}</td>
+                                <td style="padding: 0.75rem; text-align: right;">${formatCurrency(dailyRevenue.total)}</td>
                                 <td></td>
                             </tr>
                         </tfoot>
@@ -811,7 +831,7 @@ window.calculateDiscrepancy = function() {
     const statusEl = document.getElementById('discrepancyStatus');
 
     if (amountEl && statusEl) {
-        amountEl.textContent = discrepancy === 0 ? '✓ $0' : (discrepancy > 0 ? '+$' : '-$') + Math.abs(discrepancy).toLocaleString();
+        amountEl.textContent = discrepancy === 0 ? '✓ $0' : (discrepancy > 0 ? '+' : '-') + formatCurrency(Math.abs(discrepancy));
         amountEl.style.color = discrepancy === 0 ? '#10b981' : discrepancy > 0 ? '#fbbf24' : '#ef4444';
         statusEl.textContent = discrepancy === 0 ? 'Cuadra perfecto' : discrepancy > 0 ? 'Sobrante' : 'Faltante';
     }
@@ -906,13 +926,13 @@ window.loadExpensesView = function() {
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem;">
                     <div>
                         <div style="font-size: 0.9rem; color: #6b7280;">Total Gastado</div>
-                        <div style="font-size: 2rem; font-weight: bold; color: #ef4444;">$${monthTotal.toLocaleString()}</div>
+                        <div style="font-size: 2rem; font-weight: bold; color: #ef4444;">${formatCurrency(monthTotal)}</div>
                         <div style="font-size: 0.85rem; color: #6b7280;">${monthExpenses.length} gastos registrados</div>
                     </div>
                     ${Object.entries(byCategory).slice(0, 3).map(([category, data]) => `
                         <div>
                             <div style="font-size: 0.9rem; color: #6b7280;">${category}</div>
-                            <div style="font-size: 1.5rem; font-weight: bold;">$${data.total.toLocaleString()}</div>
+                            <div style="font-size: 1.5rem; font-weight: bold;">${formatCurrency(data.total)}</div>
                             <div style="font-size: 0.85rem; color: #6b7280;">${data.count} gastos</div>
                         </div>
                     `).join('')}
@@ -954,7 +974,7 @@ window.loadExpensesView = function() {
                                     </td>
                                     <td style="padding: 0.75rem;">${expense.description || '-'}</td>
                                     <td style="padding: 0.75rem; text-align: right; font-weight: 600; color: #ef4444;">
-                                        -$${expense.amount.toLocaleString()}
+                                        -${formatCurrency(expense.amount)}
                                     </td>
                                     <td style="padding: 0.75rem; font-size: 0.85rem; color: #6b7280;">
                                         ${expense.registeredByName || 'Sistema'}
@@ -971,7 +991,7 @@ window.loadExpensesView = function() {
                             <tr>
                                 <td colspan="3" style="padding: 0.75rem; text-align: right;">TOTAL:</td>
                                 <td style="padding: 0.75rem; text-align: right; color: #ef4444;">
-                                    -$${expenses.reduce((sum, e) => sum + e.amount, 0).toLocaleString()}
+                                    -${formatCurrency(expenses.reduce((sum, e) => sum + e.amount, 0))}
                                 </td>
                                 <td colspan="2"></td>
                             </tr>
@@ -1137,18 +1157,18 @@ window.loadReportsView = function() {
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem;">
                     <div style="text-align: center; padding: 1rem; background: #f0fdf4; border-radius: 8px;">
                         <div style="font-size: 0.9rem; color: #166534;">Ingresos</div>
-                        <div style="font-size: 2rem; font-weight: bold; color: #16a34a;">$${monthlyMetrics.revenue.toLocaleString()}</div>
+                        <div style="font-size: 2rem; font-weight: bold; color: #16a34a;">${formatCurrency(monthlyMetrics.revenue)}</div>
                     </div>
 
                     <div style="text-align: center; padding: 1rem; background: #fef2f2; border-radius: 8px;">
                         <div style="font-size: 0.9rem; color: #991b1b;">Gastos</div>
-                        <div style="font-size: 2rem; font-weight: bold; color: #dc2626;">$${monthlyMetrics.expenses.toLocaleString()}</div>
+                        <div style="font-size: 2rem; font-weight: bold; color: #dc2626;">${formatCurrency(monthlyMetrics.expenses)}</div>
                     </div>
 
                     <div style="text-align: center; padding: 1rem; background: #f0f9ff; border-radius: 8px;">
                         <div style="font-size: 0.9rem; color: #1e40af;">EBITDA</div>
                         <div style="font-size: 2rem; font-weight: bold; color: ${monthlyMetrics.ebitda >= 0 ? '#2563eb' : '#dc2626'};">
-                            $${monthlyMetrics.ebitda.toLocaleString()}
+                            ${formatCurrency(monthlyMetrics.ebitda)}
                         </div>
                     </div>
 
@@ -1178,7 +1198,7 @@ window.loadReportsView = function() {
                         <div style="margin-bottom: 1rem;">
                             <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
                                 <span>Ingresos Esperados</span>
-                                <span style="font-weight: bold;">$${expectedRevenue.totalExpected.toLocaleString()}</span>
+                                <span style="font-weight: bold;">${formatCurrency(expectedRevenue.totalExpected)}</span>
                             </div>
                             <div style="background: #e5e7eb; height: 30px; border-radius: 4px; overflow: hidden;">
                                 <div style="background: #10b981; height: 100%; width: 100%;"></div>
@@ -1189,7 +1209,7 @@ window.loadReportsView = function() {
                             <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
                                 <span>Ingresos Reales</span>
                                 <span style="font-weight: bold; color: ${monthlyMetrics.revenue >= expectedRevenue.totalExpected ? '#10b981' : '#f59e0b'};">
-                                    $${monthlyMetrics.revenue.toLocaleString()}
+                                    ${formatCurrency(monthlyMetrics.revenue)}
                                 </span>
                             </div>
                             <div style="background: #e5e7eb; height: 30px; border-radius: 4px; overflow: hidden;">
@@ -1200,7 +1220,7 @@ window.loadReportsView = function() {
                         <div>
                             <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
                                 <span>Gastos Totales</span>
-                                <span style="font-weight: bold; color: #ef4444;">$${monthlyMetrics.expenses.toLocaleString()}</span>
+                                <span style="font-weight: bold; color: #ef4444;">${formatCurrency(monthlyMetrics.expenses)}</span>
                             </div>
                             <div style="background: #e5e7eb; height: 30px; border-radius: 4px; overflow: hidden;">
                                 <div style="background: #ef4444; height: 100%; width: ${Math.min((monthlyMetrics.expenses / expectedRevenue.totalExpected) * 100, 100)}%;"></div>
@@ -1211,7 +1231,7 @@ window.loadReportsView = function() {
                     <div style="text-align: center; padding: 2rem; background: ${monthlyMetrics.ebitda >= 0 ? '#f0fdf4' : '#fef2f2'}; border-radius: 12px;">
                         <div style="font-size: 0.9rem; color: #6b7280; margin-bottom: 0.5rem;">Utilidad Neta</div>
                         <div style="font-size: 3rem; font-weight: bold; color: ${monthlyMetrics.ebitda >= 0 ? '#10b981' : '#ef4444'};">
-                            $${Math.abs(monthlyMetrics.ebitda).toLocaleString()}
+                            ${formatCurrency(Math.abs(monthlyMetrics.ebitda))}
                         </div>
                         <div style="font-size: 1rem; color: #6b7280;">${monthlyMetrics.ebitda >= 0 ? 'Ganancia' : 'Pérdida'}</div>
                     </div>
@@ -1253,7 +1273,7 @@ window.loadReportsView = function() {
                                     <div>
                                         <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
                                             <span style="font-size: 0.9rem;">${category}</span>
-                                            <span style="font-weight: bold;">$${amount.toLocaleString()} (${percent.toFixed(1)}%)</span>
+                                            <span style="font-weight: bold;">${formatCurrency(amount)} (${percent.toFixed(1)}%)</span>
                                         </div>
                                         <div style="background: #e5e7eb; height: 20px; border-radius: 4px; overflow: hidden;">
                                             <div style="background: #ef4444; height: 100%; width: ${percent}%; transition: width 0.3s;"></div>
@@ -1287,21 +1307,21 @@ ${new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
 
 MÉTRICAS PRINCIPALES:
 ---------------------
-Ingresos del Mes:       $${monthlyMetrics.revenue.toLocaleString()}
-Gastos del Mes:         $${monthlyMetrics.expenses.toLocaleString()}
-EBITDA:                 $${monthlyMetrics.ebitda.toLocaleString()}
+Ingresos del Mes:       ${formatCurrency(monthlyMetrics.revenue)}
+Gastos del Mes:         ${formatCurrency(monthlyMetrics.expenses)}
+EBITDA:                 ${formatCurrency(monthlyMetrics.ebitda)}
 Margen de Utilidad:     ${monthlyMetrics.profitMargin.toFixed(1)}%
 
 ESTUDIANTES:
 -----------
 Estudiantes Activos:    ${expectedRevenue.activeStudents}
-Ingresos Esperados:     $${expectedRevenue.totalExpected.toLocaleString()}
+Ingresos Esperados:     ${formatCurrency(expectedRevenue.totalExpected)}
 Tasa de Cobro:          ${collectionRate.rate.toFixed(1)}%
 
 DESGLOSE DE GASTOS:
 ------------------
 ${monthlyMetrics.expenseBreakdown ? Object.entries(monthlyMetrics.expenseBreakdown)
-    .map(([category, amount]) => `${category}: $${amount.toLocaleString()}`)
+    .map(([category, amount]) => `${category}: ${formatCurrency(amount)}`)
     .join('\n') : 'Sin gastos registrados'}
 
 ===========================================
