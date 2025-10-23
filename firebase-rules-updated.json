@@ -74,7 +74,7 @@
       ".read": "auth != null",
       ".write": "auth != null",
       "$date": {
-        ".validate": "newData.hasChildren(['startingBalance', 'endingBalance', 'date', 'registeredBy'])"
+        ".validate": "newData.hasChildren(['openingBalance', 'closingCount', 'date', 'registeredBy'])"
       }
     }
   }
