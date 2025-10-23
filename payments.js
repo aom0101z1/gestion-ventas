@@ -1586,47 +1586,62 @@ function renderPaymentHistoryContent(studentId, history, stats) {
                     
                     return `
                         <div style="
-                            background: white; 
-                            border: 2px solid ${color}; 
-                            border-radius: 8px; 
+                            background: white;
+                            border: 2px solid ${color};
+                            border-radius: 8px;
                             padding: 12px;
                             position: relative;
-                            cursor: ${payment.status === 'paid' && payment.invoiceNumber ? 'pointer' : 'default'};
                             transition: all 0.2s;
-                        " 
-                        ${payment.status === 'paid' && payment.invoiceNumber ? 
-                            `onclick="viewPaymentInvoice('${payment.paymentId}')"
-                             onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 6px rgba(0,0,0,0.1)';"
-                             onmouseout="this.style.transform=''; this.style.boxShadow='';"` : ''}>
-                            
+                        ">
+
                             <div style="
-                                width: 8px; height: 8px; 
-                                background: ${color}; 
+                                width: 8px; height: 8px;
+                                background: ${color};
                                 border-radius: 50%;
                                 position: absolute; top: 8px; right: 8px;
                             "></div>
-                            
+
                             <div style="font-weight: 600; color: #374151; margin-bottom: 8px; font-size: 13px;">
                                 ${month.charAt(0).toUpperCase() + month.slice(1)}
                             </div>
-                            
+
                             <div style="font-weight: 600; font-size: 15px; color: ${color};">
                                 ${payment.amount > 0 ? '$' + payment.amount.toLocaleString('es-CO') : '-'}
                             </div>
-                            
+
                             <div style="font-size: 11px; color: #6b7280; margin-top: 4px;">
                                 ${payment.date || (payment.status === 'pending' ? 'Pendiente' : payment.status === 'overdue' ? 'Vencido' : '')}
                             </div>
-                            
-                            ${payment.status === 'paid' && payment.method ? 
+
+                            ${payment.status === 'paid' && payment.method ?
                                 `<div style="font-size: 10px; color: #9ca3af; margin-top: 2px;">
                                     ${payment.method} ${payment.bank ? '- ' + payment.bank : ''}
                                 </div>` : ''}
-                            
-                            ${payment.status === 'paid' && payment.invoiceNumber ? 
-                                `<div style="font-size: 10px; color: #3b82f6; margin-top: 4px;">
-                                    🧾 Ver comprobante
-                                </div>` : ''}
+
+                            ${payment.status === 'paid' && payment.invoiceNumber ?
+                                `<button
+                                    onclick="viewPaymentInvoice('${payment.paymentId}')"
+                                    class="btn btn-sm"
+                                    style="
+                                        background: #3b82f6;
+                                        color: white;
+                                        border: none;
+                                        padding: 4px 8px;
+                                        border-radius: 4px;
+                                        font-size: 10px;
+                                        margin-top: 6px;
+                                        width: 100%;
+                                        cursor: pointer;
+                                        display: flex;
+                                        align-items: center;
+                                        justify-content: center;
+                                        gap: 4px;
+                                        transition: background 0.2s;
+                                    "
+                                    onmouseover="this.style.background='#2563eb'"
+                                    onmouseout="this.style.background='#3b82f6'">
+                                    🧾 Ver Factura
+                                </button>` : ''}
                         </div>
                     `;
                 }).join('')}
@@ -1903,34 +1918,54 @@ window.changeHistoryYear = async function(studentId, year) {
 // Add function to view/regenerate invoices from payment history
 window.viewPaymentInvoice = async function(paymentId) {
     try {
+        console.log('📄 Viewing invoice for payment:', paymentId);
+        window.showNotification('📄 Cargando factura...', 'info');
+
         const payment = window.PaymentManager.payments.get(paymentId);
-        if (!payment) return;
-        
+        if (!payment) {
+            console.error('Payment not found:', paymentId);
+            window.showNotification('❌ Pago no encontrado', 'error');
+            return;
+        }
+
         const student = window.StudentManager.students.get(payment.studentId);
-        if (!student) return;
-        
+        if (!student) {
+            console.error('Student not found:', payment.studentId);
+            window.showNotification('❌ Estudiante no encontrado', 'error');
+            return;
+        }
+
         // Check if invoice exists
         if (payment.invoiceNumber) {
+            console.log('📄 Loading existing invoice:', payment.invoiceNumber);
             // Load existing invoice
             const db = window.firebaseModules.database;
             const invoiceRef = db.ref(window.FirebaseData.database, `invoices/${payment.invoiceNumber}`);
             const snapshot = await db.get(invoiceRef);
-            
+
             if (snapshot.exists()) {
+                console.log('✅ Invoice found in database');
                 InvoiceGenerator.showInvoiceModal(snapshot.val());
+                window.showNotification('✅ Factura cargada', 'success');
             } else {
-                // Regenerate if not found
+                // Regenerate if not found in database (shouldn't normally happen)
+                console.warn('⚠️ Invoice not in database, regenerating with same number');
                 const invoiceData = await InvoiceGenerator.generateInvoice(payment, student);
+                // Keep the original invoice number
+                invoiceData.number = payment.invoiceNumber;
                 InvoiceGenerator.showInvoiceModal(invoiceData);
+                window.showNotification('✅ Factura regenerada', 'success');
             }
         } else {
-            // Generate new invoice
+            // Generate new invoice (for old payments without invoice numbers)
+            console.log('⚠️ Payment has no invoice number, generating new one');
             const invoiceData = await InvoiceGenerator.generateInvoice(payment, student);
             InvoiceGenerator.showInvoiceModal(invoiceData);
+            window.showNotification('✅ Factura generada', 'success');
         }
     } catch (error) {
-        console.error('Error loading invoice:', error);
-        window.showNotification('❌ Error al cargar comprobante', 'error');
+        console.error('❌ Error loading invoice:', error);
+        window.showNotification('❌ Error al cargar factura: ' + error.message, 'error');
     }
 };
 
