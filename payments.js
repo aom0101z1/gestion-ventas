@@ -65,6 +65,18 @@ class PaymentManager {
     // Initialize
     async init() {
         if (this.initialized) return;
+
+        // Validate Firebase dependencies
+        if (!window.firebaseModules?.database) {
+            console.error('❌ Firebase database module not available');
+            throw new Error('Firebase database module required for PaymentManager');
+        }
+
+        if (!window.FirebaseData?.database) {
+            console.error('❌ Firebase database instance not available');
+            throw new Error('Firebase database instance required for PaymentManager');
+        }
+
         console.log('🚀 Initializing payment manager');
         await this.loadPayments();
         this.initialized = true;
@@ -73,11 +85,22 @@ class PaymentManager {
     // Load payments from Firebase
 async loadPayments() {
     try {
+        // Validate dependencies before accessing
+        if (!window.firebaseModules?.database) {
+            console.warn('⚠️ Firebase database module not loaded - cannot load payments');
+            return;
+        }
+
+        if (!window.FirebaseData?.database) {
+            console.warn('⚠️ Firebase database instance not available - cannot load payments');
+            return;
+        }
+
         this.payments.clear(); // Clear existing payments first
         const db = window.firebaseModules.database;
         const ref = db.ref(window.FirebaseData.database, 'payments');
         const snapshot = await db.get(ref);
-        
+
         if (snapshot.exists()) {
             const data = snapshot.val();
             Object.entries(data).forEach(([id, payment]) => {
@@ -91,6 +114,7 @@ async loadPayments() {
         console.log(`✅ Loaded ${this.payments.size} payment records`);
     } catch (error) {
         console.error('❌ Error loading payments:', error);
+        throw error; // Re-throw to be handled by caller
     }
 }
 
@@ -2163,53 +2187,91 @@ window.InvoiceStorage = new InvoiceStorageManager();
 
 window.loadPaymentsTab = async function() {
     console.log('💰 Loading payments tab');
-    
+
     const container = document.getElementById('paymentsContainer');
     if (!container) {
         console.error('❌ Payments container not found');
         return;
     }
 
-    await window.PaymentManager.init();
-    await window.InvoiceStorage.init();
-    
-    const students = window.StudentManager.getStudents();
-    const summary = await window.PaymentManager.getPaymentSummary();
-    
-    container.innerHTML = `
-        <div style="padding: 1rem;">
-            <h2 style="margin-bottom: 1rem;">💰 Control de Pagos</h2>
-            
-            ${renderPaymentDashboard()}
-            
-            <div style="background: white; padding: 1rem; border-radius: 8px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                    <h3>Estado de Pagos</h3>
-                    <div style="display: flex; gap: 1rem;">
-                        <select id="paymentFilter" onchange="filterPayments()">
-                            <option value="">Todos</option>
-                            <option value="paid">✅ Pagados</option>
-                            <option value="upcoming">🟡 Próximos</option>
-                            <option value="overdue">🔴 Vencidos</option>
-                        </select>
-                        <button onclick="exportPaymentReport()" class="btn btn-secondary">
-                            📊 Exportar
-                        </button>
+    // Validate required dependencies
+    if (!window.PaymentManager) {
+        console.error('❌ PaymentManager not available');
+        container.innerHTML = '<div style="padding: 2rem; text-align: center; color: #ef4444;">❌ Error: Sistema de pagos no disponible</div>';
+        return;
+    }
+
+    if (!window.StudentManager) {
+        console.error('❌ StudentManager not available');
+        container.innerHTML = '<div style="padding: 2rem; text-align: center; color: #ef4444;">❌ Error: Sistema de estudiantes no disponible</div>';
+        return;
+    }
+
+    if (!window.InvoiceStorage) {
+        console.error('❌ InvoiceStorage not available');
+        container.innerHTML = '<div style="padding: 2rem; text-align: center; color: #ef4444;">❌ Error: Sistema de comprobantes no disponible</div>';
+        return;
+    }
+
+    try {
+        // Initialize systems
+        await window.PaymentManager.init();
+        await window.InvoiceStorage.init();
+
+        const students = window.StudentManager.getStudents();
+        const summary = await window.PaymentManager.getPaymentSummary();
+
+        if (!students || students.length === 0) {
+            container.innerHTML = '<div style="padding: 2rem; text-align: center; color: #6b7280;">No hay estudiantes registrados</div>';
+            return;
+        }
+
+        container.innerHTML = `
+            <div style="padding: 1rem;">
+                <h2 style="margin-bottom: 1rem;">💰 Control de Pagos</h2>
+
+                ${renderPaymentDashboard()}
+
+                <div style="background: white; padding: 1rem; border-radius: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3>Estado de Pagos</h3>
+                        <div style="display: flex; gap: 1rem;">
+                            <select id="paymentFilter" onchange="filterPayments()">
+                                <option value="">Todos</option>
+                                <option value="paid">✅ Pagados</option>
+                                <option value="upcoming">🟡 Próximos</option>
+                                <option value="overdue">🔴 Vencidos</option>
+                            </select>
+                            <button onclick="exportPaymentReport()" class="btn btn-secondary">
+                                📊 Exportar
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="paymentTableContainer">
+                        ${renderPaymentTable(students)}
                     </div>
                 </div>
-                
-                <div id="paymentTableContainer">
-                    ${renderPaymentTable(students)}
-                </div>
             </div>
-        </div>
-    `;
+        `;
 
-    // Update dashboard
-    document.getElementById('paidCount').textContent = summary.paid;
-    document.getElementById('upcomingCount').textContent = summary.upcoming;
-    document.getElementById('overdueCount').textContent = summary.overdue;
-    document.getElementById('collectedAmount').textContent = `$${summary.collectedAmount.toLocaleString()}`;
+        // Update dashboard
+        document.getElementById('paidCount').textContent = summary.paid;
+        document.getElementById('upcomingCount').textContent = summary.upcoming;
+        document.getElementById('overdueCount').textContent = summary.overdue;
+        document.getElementById('collectedAmount').textContent = `$${summary.collectedAmount.toLocaleString()}`;
+    } catch (error) {
+        console.error('❌ Error loading payments tab:', error);
+        container.innerHTML = `
+            <div style="padding: 2rem; text-align: center; color: #ef4444;">
+                <p>❌ Error al cargar el módulo de pagos</p>
+                <p style="font-size: 0.875rem; margin-top: 0.5rem;">${error.message}</p>
+            </div>
+        `;
+        if (window.showNotification) {
+            window.showNotification('❌ Error al cargar módulo de pagos', 'error');
+        }
+    }
 };
 
 // FIX FOR MODAL POSITION
@@ -2281,9 +2343,80 @@ window.filterPayments = function() {
     document.getElementById('paymentTableContainer').innerHTML = renderPaymentTable(students);
 };
 
-window.exportPaymentReport = function() {
-    window.showNotification('📊 Generando reporte...', 'info');
-    // Implementation for CSV export would go here
+window.exportPaymentReport = async function() {
+    try {
+        window.showNotification('📊 Generando reporte...', 'info');
+
+        // Get current filter
+        const filter = document.getElementById('paymentFilter')?.value;
+        let students = window.StudentManager.getStudents();
+
+        // Apply filter
+        if (filter) {
+            students = students.filter(s => {
+                const status = window.PaymentManager.getPaymentStatus(s);
+                if (filter === 'paid') return status.status === 'Pagado';
+                if (filter === 'upcoming') return status.color === '#fbbf24' || status.color === '#f59e0b';
+                if (filter === 'overdue') return status.color === '#ef4444';
+                return true;
+            });
+        }
+
+        // Build CSV data
+        const currentYear = new Date().getFullYear();
+        const currentMonth = new Date().toLocaleDateString('es', { month: 'long' }).toLowerCase();
+        const rows = [
+            ['Nombre', 'Teléfono', 'Estado', 'Mes Actual', 'Método', 'Banco', 'Monto', 'Fecha Pago', 'No. Comprobante', 'Notas']
+        ];
+
+        for (const student of students) {
+            const status = window.PaymentManager.getPaymentStatus(student);
+            const payment = await window.PaymentManager.getStudentPayment(student.id, currentMonth, currentYear);
+
+            rows.push([
+                student.name || '',
+                student.phone || '',
+                status.status || '',
+                currentMonth.charAt(0).toUpperCase() + currentMonth.slice(1),
+                payment?.method || 'N/A',
+                payment?.bank || 'N/A',
+                payment?.amount ? `Q${payment.amount.toFixed(2)}` : 'Q0.00',
+                payment?.date ? new Date(payment.date).toLocaleDateString('es-GT') : 'N/A',
+                payment?.invoiceNumber || 'N/A',
+                payment?.notes || ''
+            ]);
+        }
+
+        // Convert to CSV string
+        const csvContent = rows.map(row =>
+            row.map(cell => {
+                // Escape quotes and wrap in quotes if contains comma or quotes
+                const cellStr = String(cell).replace(/"/g, '""');
+                return cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')
+                    ? `"${cellStr}"`
+                    : cellStr;
+            }).join(',')
+        ).join('\n');
+
+        // Create and download file
+        const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        const timestamp = new Date().toISOString().split('T')[0];
+        const filterSuffix = filter ? `_${filter}` : '';
+
+        link.setAttribute('href', url);
+        link.setAttribute('download', `reporte_pagos_${timestamp}${filterSuffix}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        window.showNotification(`✅ Reporte exportado (${students.length} estudiantes)`, 'success');
+    } catch (error) {
+        console.error('Error exporting report:', error);
+        window.showNotification('❌ Error al exportar reporte', 'error');
+    }
 };
 
 // ==================================================================================
@@ -2295,15 +2428,74 @@ window.exportPaymentReport = function() {
 async function processPayment(studentId) {
     try {
         window.currentStudentId = studentId; // Store for reference
-        const paymentType = document.getElementById('paymentType').value;
+
+        // Validate required dependencies
+        if (!window.StudentManager) {
+            window.showNotification('❌ Error: StudentManager no está disponible', 'error');
+            return;
+        }
+
+        if (!window.PaymentManager) {
+            window.showNotification('❌ Error: PaymentManager no está disponible', 'error');
+            return;
+        }
+
+        // Get payment type
+        const paymentType = document.getElementById('paymentType')?.value;
+        if (!paymentType) {
+            window.showNotification('❌ Por favor seleccione un tipo de pago', 'error');
+            return;
+        }
+
+        // Validate selected months
         const selectedMonths = Array.from(document.querySelectorAll('.month-checkbox:checked'))
             .map(cb => ({
                 month: cb.dataset.month,
                 year: parseInt(cb.dataset.year),
                 monthIndex: parseInt(cb.dataset.monthIndex)
             }));
-        
-        const totalAmount = parseInt(document.getElementById('payAmount').value);
+
+        if (selectedMonths.length === 0) {
+            window.showNotification('❌ Por favor seleccione al menos un mes', 'error');
+            return;
+        }
+
+        // Validate payment amount
+        const amountInput = document.getElementById('payAmount');
+        if (!amountInput) {
+            window.showNotification('❌ Error: Campo de monto no encontrado', 'error');
+            return;
+        }
+
+        const amountValue = amountInput.value?.trim();
+        if (!amountValue) {
+            window.showNotification('❌ Por favor ingrese un monto', 'error');
+            return;
+        }
+
+        const totalAmount = parseFloat(amountValue);
+        if (isNaN(totalAmount)) {
+            window.showNotification('❌ El monto debe ser un número válido', 'error');
+            return;
+        }
+
+        if (totalAmount <= 0) {
+            window.showNotification('❌ El monto debe ser mayor a cero', 'error');
+            return;
+        }
+
+        if (totalAmount > 999999) {
+            window.showNotification('❌ El monto es demasiado alto', 'error');
+            return;
+        }
+
+        // Validate payment method
+        const paymentMethod = document.getElementById('payMethod')?.value;
+        if (!paymentMethod) {
+            window.showNotification('❌ Por favor seleccione un método de pago', 'error');
+            return;
+        }
+
         const installmentOption = parseInt(document.getElementById('installmentOption')?.value) || 1;
         const currentInstallment = parseInt(document.getElementById('currentInstallment')?.value) || 1;
         
@@ -2325,9 +2517,9 @@ async function processPayment(studentId) {
         const paymentData = {
             selectedMonths: selectedMonths,
             totalAmount: totalAmount,
-            method: document.getElementById('payMethod').value,
+            method: paymentMethod,
             bank: document.getElementById('payBank')?.value || '',
-            notes: document.getElementById('payNotes').value,
+            notes: document.getElementById('payNotes')?.value || '',
             paymentType: paymentType,
             paymentPeriod: paymentPeriod,
             installment: installmentOption > 1 ? `${currentInstallment}/${installmentOption}` : '1/1',

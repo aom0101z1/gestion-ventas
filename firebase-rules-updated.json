@@ -1,0 +1,81 @@
+{
+  "rules": {
+    "users": {
+      ".read": "auth != null",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'director')",
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "$uid === auth.uid || root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'director'"
+      }
+    },
+    "contacts": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$contactId": {
+        ".validate": "newData.hasChildren(['name', 'phone', 'date', 'salespersonId'])"
+      }
+    },
+    "system": {
+      ".read": "auth != null",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin')"
+    },
+    "tasks": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "students": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "payments": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "groups": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "teachers": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "sessions": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "attendance": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "invoices": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "auditLog": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "invoiceCounters": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "permissions": {
+      ".read": "auth != null",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin')"
+    },
+    "expenses": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$expenseId": {
+        ".validate": "newData.hasChildren(['amount', 'category', 'date', 'registeredBy'])"
+      }
+    },
+    "dailyReconciliations": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$date": {
+        ".validate": "newData.hasChildren(['startingBalance', 'endingBalance', 'date', 'registeredBy'])"
+      }
+    }
+  }
+}
