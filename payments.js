@@ -2344,12 +2344,15 @@ window.filterPayments = function() {
 };
 
 window.exportPaymentReport = async function() {
+    console.log('🔄 CSV Export v2.0 - Starting export...');
     try {
         window.showNotification('📊 Generando reporte...', 'info');
 
         // Get current filter
         const filter = document.getElementById('paymentFilter')?.value;
         let students = window.StudentManager.getStudents();
+
+        console.log(`👥 Total students: ${students?.length || 0}`);
 
         // Apply filter
         if (filter) {
