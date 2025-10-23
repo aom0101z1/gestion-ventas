@@ -2369,13 +2369,15 @@ window.exportPaymentReport = async function() {
             ['Nombre', 'Teléfono', 'Estado', 'Mes Actual', 'Método', 'Banco', 'Monto', 'Fecha Pago', 'No. Comprobante', 'Notas']
         ];
 
+        console.log(`📊 Exporting ${students.length} students to CSV...`);
+
         for (const student of students) {
             const status = window.PaymentManager.getPaymentStatus(student);
             const payment = await window.PaymentManager.getStudentPayment(student.id, currentMonth, currentYear);
 
             rows.push([
-                student.name || '',
-                student.phone || '',
+                student.nombre || student.name || '',
+                student.telefono || student.phone || '',
                 status.status || '',
                 currentMonth.charAt(0).toUpperCase() + currentMonth.slice(1),
                 payment?.method || 'N/A',
@@ -2386,6 +2388,8 @@ window.exportPaymentReport = async function() {
                 payment?.notes || ''
             ]);
         }
+
+        console.log(`✅ CSV data prepared: ${rows.length} rows (including header)`);
 
         // Convert to CSV string
         const csvContent = rows.map(row =>
@@ -2404,17 +2408,26 @@ window.exportPaymentReport = async function() {
         const url = URL.createObjectURL(blob);
         const timestamp = new Date().toISOString().split('T')[0];
         const filterSuffix = filter ? `_${filter}` : '';
+        const filename = `reporte_pagos_${timestamp}${filterSuffix}.csv`;
+
+        console.log(`💾 Creating download link: ${filename}`);
+        console.log(`📦 Blob size: ${blob.size} bytes`);
 
         link.setAttribute('href', url);
-        link.setAttribute('download', `reporte_pagos_${timestamp}${filterSuffix}.csv`);
+        link.setAttribute('download', filename);
         link.style.visibility = 'hidden';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
 
+        // Clean up the URL object
+        setTimeout(() => URL.revokeObjectURL(url), 100);
+
+        console.log(`✅ Download triggered for ${filename}`);
         window.showNotification(`✅ Reporte exportado (${students.length} estudiantes)`, 'success');
     } catch (error) {
-        console.error('Error exporting report:', error);
+        console.error('❌ Error exporting report:', error);
+        console.error('Error details:', error.message, error.stack);
         window.showNotification('❌ Error al exportar reporte', 'error');
     }
 };
