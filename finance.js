@@ -44,6 +44,47 @@ function formatCurrency(amount) {
     return `$${formatted}`;
 }
 
+/**
+ * Format currency input as user types (for input fields)
+ * @param {HTMLInputElement} input - The input element to format
+ */
+function formatCurrencyInput(input) {
+    // Get cursor position before formatting
+    const cursorPosition = input.selectionStart;
+    const oldLength = input.value.length;
+
+    // Remove all non-digit characters
+    let value = input.value.replace(/\D/g, '');
+
+    // Don't format if empty
+    if (value === '') {
+        input.value = '';
+        return;
+    }
+
+    // Convert to number and format
+    const numericValue = parseInt(value, 10);
+    const formatted = numericValue.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    input.value = `$${formatted}`;
+
+    // Restore cursor position (accounting for added characters)
+    const newLength = input.value.length;
+    const newPosition = cursorPosition + (newLength - oldLength);
+    input.setSelectionRange(newPosition, newPosition);
+}
+
+/**
+ * Parse currency input to get numeric value
+ * @param {string} value - The formatted currency string
+ * @returns {number} The numeric value
+ */
+function parseCurrencyInput(value) {
+    if (!value) return 0;
+    // Remove $ and dots, then parse
+    const cleaned = value.replace(/[\$\.]/g, '');
+    return parseInt(cleaned, 10) || 0;
+}
+
 // ==================================================================================
 // SECTION 2: FINANCE MANAGER CLASS
 // ==================================================================================
@@ -91,7 +132,7 @@ class FinanceManager {
             const id = `EXP-${Date.now()}`;
             const expense = {
                 id,
-                amount: parseFloat(expenseData.amount),
+                amount: parseCurrencyInput(expenseData.amount),
                 category: expenseData.category,
                 description: expenseData.description,
                 date: expenseData.date || new Date().toISOString().split('T')[0],
@@ -173,8 +214,8 @@ class FinanceManager {
         try {
             const reconciliation = {
                 date,
-                openingBalance: parseFloat(data.openingBalance) || 0,
-                closingCount: parseFloat(data.closingCount) || 0,
+                openingBalance: parseCurrencyInput(data.openingBalance),
+                closingCount: parseCurrencyInput(data.closingCount),
                 expenses: parseFloat(data.expenses) || 0,
                 notes: data.notes || '',
                 isClosed: data.isClosed || false,
@@ -612,14 +653,13 @@ function renderDailyReconciliationView() {
                         <label style="font-weight: 600; display: block; margin-bottom: 0.5rem;">
                             💵 Apertura de Caja (Efectivo inicial)
                         </label>
-                        <input type="number"
+                        <input type="text"
                                id="openingBalance"
-                               value="${openingBalance}"
+                               value="${formatCurrency(openingBalance)}"
                                ${isClosed ? 'disabled' : ''}
-                               min="0"
-                               step="1000"
+                               oninput="formatCurrencyInput(this)"
                                style="width: 100%; padding: 0.75rem; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 1.1rem;"
-                               placeholder="Ej: 500000">
+                               placeholder="$500.000">
                         <small style="color: #6b7280;">Dinero en efectivo al inicio del día</small>
                     </div>
 
@@ -664,15 +704,13 @@ function renderDailyReconciliationView() {
                         <label style="font-weight: 600; display: block; margin-bottom: 0.5rem;">
                             🧮 Cierre de Caja (Conteo real de efectivo)
                         </label>
-                        <input type="number"
+                        <input type="text"
                                id="closingCount"
-                               value="${actualClosing}"
+                               value="${formatCurrency(actualClosing)}"
                                ${isClosed ? 'disabled' : ''}
-                               min="0"
-                               step="1000"
-                               oninput="calculateDiscrepancy()"
+                               oninput="formatCurrencyInput(this); calculateDiscrepancy()"
                                style="width: 100%; padding: 0.75rem; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 1.1rem;"
-                               placeholder="Ej: 2750000">
+                               placeholder="$2.750.000">
                         <small style="color: #6b7280;">Cuente el efectivo real en caja al final del día</small>
                     </div>
 
@@ -816,8 +854,8 @@ window.loadDailyReconciliationView = function() {
 };
 
 window.calculateDiscrepancy = function() {
-    const openingBalance = parseFloat(document.getElementById('openingBalance').value) || 0;
-    const closingCount = parseFloat(document.getElementById('closingCount').value) || 0;
+    const openingBalance = parseCurrencyInput(document.getElementById('openingBalance').value);
+    const closingCount = parseCurrencyInput(document.getElementById('closingCount').value);
 
     const today = new Date().toISOString().split('T')[0];
     const dailyRevenue = window.FinanceManager.calculateDailyRevenue(today);
@@ -1038,12 +1076,11 @@ window.showAddExpenseModal = function() {
 
                 <div class="form-group">
                     <label style="font-weight: 600; display: block; margin-bottom: 0.5rem;">Monto (COP)*</label>
-                    <input type="number"
+                    <input type="text"
                            id="expenseAmount"
                            required
-                           min="0"
-                           step="1000"
-                           placeholder="Ej: 50000"
+                           oninput="formatCurrencyInput(this)"
+                           placeholder="$50.000"
                            style="width: 100%; padding: 0.75rem; border: 1px solid #e5e7eb; border-radius: 6px;">
                 </div>
 
