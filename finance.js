@@ -672,6 +672,54 @@ function renderDailyReconciliationView() {
                             ${formatCurrency(dailyRevenue.cash)}
                         </div>
                         <small style="color: #6b7280;">${dailyRevenue.cashCount} pagos en efectivo registrados</small>
+
+                        ${dailyRevenue.cashCount > 0 ? `
+                            <button type="button"
+                                    onclick="toggleCashDetails()"
+                                    class="btn btn-sm"
+                                    style="background: #10b981; color: white; margin-top: 0.5rem; width: 100%;">
+                                <span id="cashToggleIcon">▼</span> Ver Detalles
+                            </button>
+                            <div id="cashDetails" style="display: none; margin-top: 0.75rem; max-height: 300px; overflow-y: auto;">
+                                ${dailyRevenue.payments
+                                    .filter(p => p.method === 'Efectivo')
+                                    .map(payment => {
+                                        const student = window.StudentManager.students.get(payment.studentId);
+                                        return `
+                                            <div style="background: white; padding: 0.75rem; margin-bottom: 0.5rem; border-radius: 6px; border-left: 3px solid #10b981;">
+                                                <div style="display: flex; justify-content: space-between; align-items: start;">
+                                                    <div style="flex: 1;">
+                                                        <div style="font-weight: 600; color: #1f2937; margin-bottom: 0.25rem;">
+                                                            👤 ${student?.nombre || 'Estudiante no encontrado'}
+                                                        </div>
+                                                        <div style="font-size: 0.85rem; color: #6b7280; margin-bottom: 0.25rem;">
+                                                            💵 Efectivo
+                                                        </div>
+                                                        ${payment.invoiceNumber ? `
+                                                            <div style="font-size: 0.75rem; color: #9ca3af;">
+                                                                📄 ${payment.invoiceNumber}
+                                                            </div>
+                                                        ` : ''}
+                                                        ${payment.notes ? `
+                                                            <div style="font-size: 0.75rem; color: #9ca3af; margin-top: 0.25rem;">
+                                                                💬 ${payment.notes}
+                                                            </div>
+                                                        ` : ''}
+                                                    </div>
+                                                    <div style="text-align: right;">
+                                                        <div style="font-size: 1.1rem; font-weight: bold; color: #10b981;">
+                                                            ${formatCurrency(payment.amount)}
+                                                        </div>
+                                                        <div style="font-size: 0.75rem; color: #6b7280;">
+                                                            ${new Date(payment.date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        `;
+                                    }).join('')}
+                            </div>
+                        ` : ''}
                     </div>
 
                     <!-- Transfers Received (Auto-calculated) -->
@@ -683,6 +731,54 @@ function renderDailyReconciliationView() {
                             ${formatCurrency(dailyRevenue.transfers)}
                         </div>
                         <small style="color: #6b7280;">${dailyRevenue.transferCount} transferencias registradas</small>
+
+                        ${dailyRevenue.transferCount > 0 ? `
+                            <button type="button"
+                                    onclick="toggleTransferDetails()"
+                                    class="btn btn-sm"
+                                    style="background: #3b82f6; color: white; margin-top: 0.5rem; width: 100%;">
+                                <span id="transferToggleIcon">▼</span> Ver Detalles
+                            </button>
+                            <div id="transferDetails" style="display: none; margin-top: 0.75rem; max-height: 300px; overflow-y: auto;">
+                                ${dailyRevenue.payments
+                                    .filter(p => p.method === 'Transferencia')
+                                    .map(payment => {
+                                        const student = window.StudentManager.students.get(payment.studentId);
+                                        return `
+                                            <div style="background: white; padding: 0.75rem; margin-bottom: 0.5rem; border-radius: 6px; border-left: 3px solid #3b82f6;">
+                                                <div style="display: flex; justify-content: space-between; align-items: start;">
+                                                    <div style="flex: 1;">
+                                                        <div style="font-weight: 600; color: #1f2937; margin-bottom: 0.25rem;">
+                                                            👤 ${student?.nombre || 'Estudiante no encontrado'}
+                                                        </div>
+                                                        <div style="font-size: 0.85rem; color: #6b7280; margin-bottom: 0.25rem;">
+                                                            ${payment.bank ? `🏦 ${payment.bank}` : 'Transferencia'}
+                                                        </div>
+                                                        ${payment.invoiceNumber ? `
+                                                            <div style="font-size: 0.75rem; color: #9ca3af;">
+                                                                📄 ${payment.invoiceNumber}
+                                                            </div>
+                                                        ` : ''}
+                                                        ${payment.notes ? `
+                                                            <div style="font-size: 0.75rem; color: #9ca3af; margin-top: 0.25rem;">
+                                                                💬 ${payment.notes}
+                                                            </div>
+                                                        ` : ''}
+                                                    </div>
+                                                    <div style="text-align: right;">
+                                                        <div style="font-size: 1.1rem; font-weight: bold; color: #3b82f6;">
+                                                            ${formatCurrency(payment.amount)}
+                                                        </div>
+                                                        <div style="font-size: 0.75rem; color: #6b7280;">
+                                                            ${new Date(payment.date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        `;
+                                    }).join('')}
+                            </div>
+                        ` : ''}
                     </div>
 
                     <!-- Expenses (Auto-calculated) -->
@@ -872,6 +968,36 @@ window.calculateDiscrepancy = function() {
         amountEl.textContent = discrepancy === 0 ? '✓ $0' : (discrepancy > 0 ? '+' : '-') + formatCurrency(Math.abs(discrepancy));
         amountEl.style.color = discrepancy === 0 ? '#10b981' : discrepancy > 0 ? '#fbbf24' : '#ef4444';
         statusEl.textContent = discrepancy === 0 ? 'Cuadra perfecto' : discrepancy > 0 ? 'Sobrante' : 'Faltante';
+    }
+};
+
+window.toggleTransferDetails = function() {
+    const details = document.getElementById('transferDetails');
+    const icon = document.getElementById('transferToggleIcon');
+
+    if (details && icon) {
+        if (details.style.display === 'none') {
+            details.style.display = 'block';
+            icon.textContent = '▲';
+        } else {
+            details.style.display = 'none';
+            icon.textContent = '▼';
+        }
+    }
+};
+
+window.toggleCashDetails = function() {
+    const details = document.getElementById('cashDetails');
+    const icon = document.getElementById('cashToggleIcon');
+
+    if (details && icon) {
+        if (details.style.display === 'none') {
+            details.style.display = 'block';
+            icon.textContent = '▲';
+        } else {
+            details.style.display = 'none';
+            icon.textContent = '▼';
+        }
     }
 };
 
