@@ -200,7 +200,12 @@ class FinanceManager {
 
             if (snapshot.exists()) {
                 const data = snapshot.val();
+                console.log('📥 Loading reconciliations from Firebase:', data);
                 Object.entries(data).forEach(([date, reconciliation]) => {
+                    console.log(`📥 Loading reconciliation for ${date}:`, reconciliation);
+                    console.log(`📥   - openingBalance: ${reconciliation.openingBalance}`);
+                    console.log(`📥   - closingCount: ${reconciliation.closingCount}`);
+                    console.log(`📥   - expenses: ${reconciliation.expenses}`);
                     this.dailyReconciliations.set(date, reconciliation);
                 });
             }
@@ -212,6 +217,8 @@ class FinanceManager {
 
     async saveDailyReconciliation(date, data) {
         try {
+            console.log('💾 Saving reconciliation - RAW data received:', data);
+
             const reconciliation = {
                 date,
                 openingBalance: parseCurrencyInput(data.openingBalance),
@@ -226,12 +233,17 @@ class FinanceManager {
                 updatedAt: new Date().toISOString()
             };
 
+            console.log('💾 Reconciliation PARSED data to save:', reconciliation);
+            console.log('💾 Parsed openingBalance:', reconciliation.openingBalance);
+            console.log('💾 Parsed closingCount:', reconciliation.closingCount);
+            console.log('💾 Parsed expenses:', reconciliation.expenses);
+
             const db = window.firebaseModules.database;
             const ref = db.ref(window.FirebaseData.database, `dailyReconciliations/${date}`);
             await db.set(ref, reconciliation);
 
             this.dailyReconciliations.set(date, reconciliation);
-            console.log('✅ Reconciliation saved for:', date);
+            console.log('✅ Reconciliation saved for:', date, '- Full object:', reconciliation);
             return reconciliation;
         } catch (error) {
             console.error('❌ Error saving reconciliation:', error);
@@ -599,6 +611,9 @@ function renderDailyReconciliationView() {
     const reconciliation = window.FinanceManager.getDailyReconciliation(today);
     const dailyRevenue = window.FinanceManager.calculateDailyRevenue(today);
 
+    console.log('🎨 Rendering Cierre Diario for:', today);
+    console.log('🎨 Reconciliation object:', reconciliation);
+
     // Get today's expenses
     const todayExpenses = window.FinanceManager.getExpenses({
         startDate: today,
@@ -611,6 +626,12 @@ function renderDailyReconciliationView() {
     const expectedClosing = openingBalance + dailyRevenue.cash - totalExpenses;
     const actualClosing = reconciliation?.closingCount || 0;
     const discrepancy = actualClosing - expectedClosing;
+
+    console.log('🎨 Display values:');
+    console.log('🎨   - openingBalance:', openingBalance, '(formatted:', formatCurrency(openingBalance) + ')');
+    console.log('🎨   - actualClosing:', actualClosing, '(formatted:', formatCurrency(actualClosing) + ')');
+    console.log('🎨   - dailyRevenue.cash:', dailyRevenue.cash);
+    console.log('🎨   - totalExpenses:', totalExpenses);
 
     const isClosed = reconciliation?.isClosed || false;
     const isDirector = true; // TODO: Check actual user role
