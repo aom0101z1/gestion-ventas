@@ -15,7 +15,10 @@ const studentFields = {
     statusHistory: [], // Array of status changes
     paymentNotes: '', // Special payment agreements
     paymentHistory: [], // History of payment value changes
-    lastModified: null
+    lastModified: null,
+    // NEW FIELD for student categorization
+    modalidad: '', // Main category: Presencial, Compañia, Escuela, Online
+    modalidadDetalle: '' // Subcategory: For Compañia (COATS, OTRA) or Escuela (Hogar Nazareth, Remigio, otro)
 };
 
 // ============================================
@@ -98,7 +101,12 @@ class StudentManager {
                 return studentStatus === filters.status;
             });
         }
-        
+
+        // Filter by modalidad
+        if (filters.modalidad && filters.modalidad !== 'all') {
+            students = students.filter(s => s.modalidad === filters.modalidad);
+        }
+
         if (filters.grupo) {
             students = students.filter(s => s.grupo === filters.grupo);
         }
@@ -390,12 +398,40 @@ function renderStudentForm(student = null) {
                         <label>Grupo</label>
                         <select id="stuGrupo">
                             <option value="">Sin asignar</option>
-                            ${window.groupsData ? Array.from(window.groupsData.keys()).map(g => 
+                            ${window.groupsData ? Array.from(window.groupsData.keys()).map(g =>
                                 `<option value="${g}" ${student?.grupo === g ? 'selected' : ''}>${g}</option>`
                             ).join('') : ''}
                         </select>
                     </div>
-                    
+
+                    <div class="form-group">
+                        <label>Modalidad</label>
+                        <select id="stuModalidad" onchange="handleModalidadChange()">
+                            <option value="">Seleccionar</option>
+                            <option value="Presencial" ${student?.modalidad === 'Presencial' ? 'selected' : ''}>Presencial</option>
+                            <option value="Compañia" ${student?.modalidad === 'Compañia' ? 'selected' : ''}>Compañía</option>
+                            <option value="Escuela" ${student?.modalidad === 'Escuela' ? 'selected' : ''}>Escuela</option>
+                            <option value="Online" ${student?.modalidad === 'Online' ? 'selected' : ''}>Online</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" id="modalidadDetalleGroup" style="display: ${student?.modalidad === 'Compañia' || student?.modalidad === 'Escuela' ? 'block' : 'none'};">
+                        <label id="modalidadDetalleLabel">
+                            ${student?.modalidad === 'Compañia' ? 'Compañía' : student?.modalidad === 'Escuela' ? 'Escuela' : 'Detalle'}
+                        </label>
+                        <select id="stuModalidadDetalle">
+                            <option value="">Seleccionar</option>
+                            ${student?.modalidad === 'Compañia' ? `
+                                <option value="COATS" ${student?.modalidadDetalle === 'COATS' ? 'selected' : ''}>COATS</option>
+                                <option value="OTRA" ${student?.modalidadDetalle === 'OTRA' ? 'selected' : ''}>OTRA</option>
+                            ` : student?.modalidad === 'Escuela' ? `
+                                <option value="Hogar Nazareth" ${student?.modalidadDetalle === 'Hogar Nazareth' ? 'selected' : ''}>Hogar Nazareth</option>
+                                <option value="Remigio" ${student?.modalidadDetalle === 'Remigio' ? 'selected' : ''}>Remigio</option>
+                                <option value="otro" ${student?.modalidadDetalle === 'otro' ? 'selected' : ''}>Otro</option>
+                            ` : ''}
+                        </select>
+                    </div>
+
                     <div class="form-group">
                         <label>Tipo Pago</label>
                         <select id="stuTipoPago">
@@ -446,6 +482,7 @@ function renderStudentTable(students) {
                     <th style="padding: 0.75rem; text-align: left;">Documento</th>
                     <th style="padding: 0.75rem; text-align: left;">Teléfono</th>
                     <th style="padding: 0.75rem; text-align: left;">Grupo</th>
+                    <th style="padding: 0.75rem; text-align: left;">Modalidad</th>
                     <th style="padding: 0.75rem; text-align: left;">Pago</th>
                     <th style="padding: 0.75rem; text-align: center;">Estado</th>
                     <th style="padding: 0.75rem; text-align: center;">Acciones</th>
@@ -470,13 +507,17 @@ function renderStudentTable(students) {
                             <td style="padding: 0.75rem;">${s.tipoDoc || ''} ${s.numDoc || '-'}</td>
                             <td style="padding: 0.75rem;">
                                 ${phoneNumber ? `
-                                    <a href="https://wa.me/57${phoneNumber}" 
+                                    <a href="https://wa.me/57${phoneNumber}"
                                        target="_blank" style="color: #059669;">
                                         ${s.telefono || '-'}
                                     </a>
                                 ` : '-'}
                             </td>
                             <td style="padding: 0.75rem;">${s.grupo || 'Sin grupo'}</td>
+                            <td style="padding: 0.75rem;">
+                                ${s.modalidad || '-'}
+                                ${s.modalidadDetalle ? `<br><small style="color: #6b7280;">${s.modalidadDetalle}</small>` : ''}
+                            </td>
                             <td style="padding: 0.75rem;">
                                 ${s.tipoPago || '-'}<br>
                                 <small>$${(s.valor || 0).toLocaleString()}</small>
@@ -531,18 +572,26 @@ window.loadStudentsTab = async function() {
 
     await window.StudentManager.init();
     
-    // Get current filter from localStorage or default to 'all'
-    const currentFilter = localStorage.getItem('studentStatusFilter') || 'all';
-    
+    // Get current filters from localStorage or default to 'all'
+    const currentStatusFilter = localStorage.getItem('studentStatusFilter') || 'all';
+    const currentModalidadFilter = localStorage.getItem('studentModalidadFilter') || 'all';
+
     container.innerHTML = `
         <div style="padding: 1rem;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <h2>👥 Gestión de Estudiantes</h2>
                 <div style="display: flex; gap: 1rem; align-items: center;">
                     <select id="studentStatusFilter" style="padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 4px;">
-                        <option value="all" ${currentFilter === 'all' ? 'selected' : ''}>Todos</option>
-                        <option value="active" ${currentFilter === 'active' ? 'selected' : ''}>Activos</option>
-                        <option value="inactive" ${currentFilter === 'inactive' ? 'selected' : ''}>Inactivos</option>
+                        <option value="all" ${currentStatusFilter === 'all' ? 'selected' : ''}>Todos</option>
+                        <option value="active" ${currentStatusFilter === 'active' ? 'selected' : ''}>Activos</option>
+                        <option value="inactive" ${currentStatusFilter === 'inactive' ? 'selected' : ''}>Inactivos</option>
+                    </select>
+                    <select id="studentModalidadFilter" style="padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 4px;">
+                        <option value="all" ${currentModalidadFilter === 'all' ? 'selected' : ''}>Todas las modalidades</option>
+                        <option value="Presencial" ${currentModalidadFilter === 'Presencial' ? 'selected' : ''}>Presencial</option>
+                        <option value="Compañia" ${currentModalidadFilter === 'Compañia' ? 'selected' : ''}>Compañía</option>
+                        <option value="Escuela" ${currentModalidadFilter === 'Escuela' ? 'selected' : ''}>Escuela</option>
+                        <option value="Online" ${currentModalidadFilter === 'Online' ? 'selected' : ''}>Online</option>
                     </select>
                     <input type="text" id="studentSearch" placeholder="Buscar..."
                            style="padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 4px;">
@@ -551,10 +600,10 @@ window.loadStudentsTab = async function() {
                     </button>
                 </div>
             </div>
-            
-            
+
+
             <div id="studentTableContainer">
-                ${renderStudentTable(window.StudentManager.getStudents({ status: currentFilter }))}
+                ${renderStudentTable(window.StudentManager.getStudents({ status: currentStatusFilter, modalidad: currentModalidadFilter }))}
             </div>
         </div>
     `;
@@ -562,9 +611,11 @@ window.loadStudentsTab = async function() {
     // Add search listener
     document.getElementById('studentSearch')?.addEventListener('input', (e) => {
         const statusFilter = document.getElementById('studentStatusFilter').value;
+        const modalidadFilter = document.getElementById('studentModalidadFilter').value;
         const filtered = window.StudentManager.getStudents({
             search: e.target.value,
-            status: statusFilter
+            status: statusFilter,
+            modalidad: modalidadFilter
         });
         document.getElementById('studentTableContainer').innerHTML = renderStudentTable(filtered);
     });
@@ -573,9 +624,24 @@ window.loadStudentsTab = async function() {
     document.getElementById('studentStatusFilter')?.addEventListener('change', (e) => {
         localStorage.setItem('studentStatusFilter', e.target.value);
         const searchValue = document.getElementById('studentSearch').value;
+        const modalidadFilter = document.getElementById('studentModalidadFilter').value;
         const filtered = window.StudentManager.getStudents({
             status: e.target.value,
-            search: searchValue
+            search: searchValue,
+            modalidad: modalidadFilter
+        });
+        document.getElementById('studentTableContainer').innerHTML = renderStudentTable(filtered);
+    });
+
+    // Add modalidad filter listener
+    document.getElementById('studentModalidadFilter')?.addEventListener('change', (e) => {
+        localStorage.setItem('studentModalidadFilter', e.target.value);
+        const searchValue = document.getElementById('studentSearch').value;
+        const statusFilter = document.getElementById('studentStatusFilter').value;
+        const filtered = window.StudentManager.getStudents({
+            status: statusFilter,
+            search: searchValue,
+            modalidad: e.target.value
         });
         document.getElementById('studentTableContainer').innerHTML = renderStudentTable(filtered);
     });
@@ -606,6 +672,36 @@ window.showStudentForm = function(studentId = null) {
 window.closeStudentFormModal = function() {
     const modal = document.getElementById('studentFormModal');
     if (modal) modal.remove();
+};
+
+// Handle cascading dropdown for Modalidad field
+window.handleModalidadChange = function() {
+    const modalidad = document.getElementById('stuModalidad').value;
+    const detalleGroup = document.getElementById('modalidadDetalleGroup');
+    const detalleSelect = document.getElementById('stuModalidadDetalle');
+    const detalleLabel = document.getElementById('modalidadDetalleLabel');
+
+    if (modalidad === 'Compañia') {
+        detalleGroup.style.display = 'block';
+        detalleLabel.textContent = 'Compañía';
+        detalleSelect.innerHTML = `
+            <option value="">Seleccionar</option>
+            <option value="COATS">COATS</option>
+            <option value="OTRA">OTRA</option>
+        `;
+    } else if (modalidad === 'Escuela') {
+        detalleGroup.style.display = 'block';
+        detalleLabel.textContent = 'Escuela';
+        detalleSelect.innerHTML = `
+            <option value="">Seleccionar</option>
+            <option value="Hogar Nazareth">Hogar Nazareth</option>
+            <option value="Remigio">Remigio</option>
+            <option value="otro">Otro</option>
+        `;
+    } else {
+        detalleGroup.style.display = 'none';
+        detalleSelect.value = '';
+    }
 };
 
 window.editStudent = function(id) {
@@ -727,6 +823,8 @@ async function saveStudentForm(studentId) {
             docAcudiente: document.getElementById('stuDocAcudiente').value,
             fechaInicio: document.getElementById('stuFechaInicio').value,
             grupo: document.getElementById('stuGrupo').value,
+            modalidad: document.getElementById('stuModalidad').value,
+            modalidadDetalle: document.getElementById('stuModalidadDetalle').value,
             tipoPago: document.getElementById('stuTipoPago').value,
             valor: parseInt(document.getElementById('stuValor').value) || 0,
             diaPago: parseInt(document.getElementById('stuDiaPago').value) || 1
