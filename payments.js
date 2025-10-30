@@ -141,8 +141,25 @@ getPaymentStatus(student) {
         p.year === currentYear
     );
     
-    // If payment exists for this month, mark as paid
+    // If payment exists for this month, check if it's full or partial
     if (payment) {
+        const expectedAmount = student.valor || 0;
+        const paidAmount = payment.amount || 0;
+
+        // Check if payment is partial (less than expected)
+        if (paidAmount < expectedAmount) {
+            const remaining = expectedAmount - paidAmount;
+            return {
+                color: '#f59e0b',
+                status: `Pago Parcial`,
+                icon: '⚠️',
+                partial: true,
+                paidAmount: paidAmount,
+                remaining: remaining
+            };
+        }
+
+        // Full payment
         return { color: '#10b981', status: 'Pagado', icon: '✅' };
     }
     
@@ -415,16 +432,22 @@ async recordPayment(studentId, paymentData) {
         const summary = {
             total: students.length,
             paid: 0,
+            partial: 0,
             pending: 0,
             overdue: 0,
             upcoming: 0,
             totalAmount: 0,
-            collectedAmount: 0
+            collectedAmount: 0,
+            partialAmount: 0
         };
 
         students.forEach(student => {
             const status = this.getPaymentStatus(student);
-            if (status.status === 'Pagado') {
+            if (status.partial) {
+                summary.partial++;
+                summary.collectedAmount += status.paidAmount || 0;
+                summary.partialAmount += status.remaining || 0;
+            } else if (status.status === 'Pagado') {
                 summary.paid++;
                 summary.collectedAmount += student.valor || 0;
             } else if (status.color === '#ef4444') {
@@ -1425,10 +1448,14 @@ const InvoiceGenerator = {
 
 function renderPaymentDashboard() {
     return `
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
             <div style="background: #10b981; color: white; padding: 1.5rem; border-radius: 8px;">
                 <div style="font-size: 2rem; font-weight: bold;" id="paidCount">0</div>
                 <div>Pagados</div>
+            </div>
+            <div style="background: #f59e0b; color: white; padding: 1.5rem; border-radius: 8px;">
+                <div style="font-size: 2rem; font-weight: bold;" id="partialCount">0</div>
+                <div>⚠️ Parciales</div>
             </div>
             <div style="background: #fbbf24; color: white; padding: 1.5rem; border-radius: 8px;">
                 <div style="font-size: 2rem; font-weight: bold;" id="upcomingCount">0</div>
@@ -1497,16 +1524,31 @@ function renderPaymentTable(students) {
                                 ${index + 1}
                             </td>
                             <td style="padding: 0.75rem;">
-                                <span style="
-                                    display: inline-flex;
-                                    align-items: center;
-                                    gap: 0.5rem;
-                                    color: ${status.color};
-                                    font-weight: 500;
-                                ">
-                                    ${status.icon}
-                                    ${status.status}
-                                </span>
+                                <div>
+                                    <span style="
+                                        display: inline-flex;
+                                        align-items: center;
+                                        gap: 0.5rem;
+                                        color: ${status.color};
+                                        font-weight: 500;
+                                    ">
+                                        ${status.icon}
+                                        ${status.status}
+                                    </span>
+                                    ${status.partial ? `
+                                        <div style="
+                                            font-size: 0.75rem;
+                                            color: #6b7280;
+                                            margin-top: 0.25rem;
+                                            line-height: 1.3;
+                                        ">
+                                            Pagado: $${status.paidAmount.toLocaleString()}<br>
+                                            <span style="color: #ef4444; font-weight: 600;">
+                                                Pendiente: $${status.remaining.toLocaleString()}
+                                            </span>
+                                        </div>
+                                    ` : ''}
+                                </div>
                             </td>
                             <td style="padding: 0.75rem; text-align: center;">
                                 <button class="btn btn-sm"
@@ -2274,6 +2316,7 @@ window.loadPaymentsTab = async function() {
                             <select id="paymentFilter" onchange="filterPayments()">
                                 <option value="">Todos</option>
                                 <option value="paid">✅ Pagados</option>
+                                <option value="partial">⚠️ Parciales</option>
                                 <option value="upcoming">🟡 Próximos</option>
                                 <option value="overdue">🔴 Vencidos</option>
                             </select>
@@ -2292,6 +2335,7 @@ window.loadPaymentsTab = async function() {
 
         // Update dashboard
         document.getElementById('paidCount').textContent = summary.paid;
+        document.getElementById('partialCount').textContent = summary.partial;
         document.getElementById('upcomingCount').textContent = summary.upcoming;
         document.getElementById('overdueCount').textContent = summary.overdue;
         document.getElementById('collectedAmount').textContent = `$${summary.collectedAmount.toLocaleString()}`;
@@ -2369,6 +2413,7 @@ window.filterPayments = function() {
         students = students.filter(s => {
             const status = window.PaymentManager.getPaymentStatus(s);
             if (filter === 'paid') return status.status === 'Pagado';
+            if (filter === 'partial') return status.partial === true;
             if (filter === 'upcoming') return status.color === '#fbbf24' || status.color === '#f59e0b';
             if (filter === 'overdue') return status.color === '#ef4444';
             return true;
@@ -2394,6 +2439,7 @@ window.exportPaymentReport = async function() {
             students = students.filter(s => {
                 const status = window.PaymentManager.getPaymentStatus(s);
                 if (filter === 'paid') return status.status === 'Pagado';
+                if (filter === 'partial') return status.partial === true;
                 if (filter === 'upcoming') return status.color === '#fbbf24' || status.color === '#f59e0b';
                 if (filter === 'overdue') return status.color === '#ef4444';
                 return true;
