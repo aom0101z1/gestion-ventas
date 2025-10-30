@@ -593,27 +593,29 @@ function renderStudentTable(students) {
                                     ${isInactive ? '❌ Inactivo' : '✅ Activo'}
                                 </button>
                             </td>
-                            <td style="padding: 0.75rem; text-align: center; white-space: nowrap;">
-                                <button onclick="editStudent('${s.id}')" class="btn btn-sm"
-                                        style="background: #3b82f6; color: white; margin-right: 0.5rem; padding: 0.5rem 0.75rem;"
-                                        title="Editar estudiante">
-                                    <span style="font-size: 1.2rem;">✏️</span>
-                                </button>
-                                <button onclick="viewStudentPayments('${s.id}')" class="btn btn-sm"
-                                        style="background: #10b981; color: white; margin-right: 0.5rem; padding: 0.5rem 0.75rem;"
-                                        title="Ver pagos">
-                                    <span style="font-size: 1.2rem;">💰</span>
-                                </button>
-                                <button onclick="openPaymentNotes('${s.id}')" class="btn btn-sm"
-                                        style="background: #8b5cf6; color: white; margin-right: 0.5rem; padding: 0.5rem 0.75rem;"
-                                        title="Notas de pago">
-                                    <span style="font-size: 1.2rem;">📝</span>
-                                </button>
-                                <button onclick="deleteStudent('${s.id}')" class="btn btn-sm"
-                                        style="background: #ef4444; color: white; padding: 0.5rem 0.75rem;"
-                                        title="Eliminar">
-                                    <span style="font-size: 1.2rem;">🗑️</span>
-                                </button>
+                            <td style="padding: 0.75rem; text-align: center;">
+                                <div style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;">
+                                    <button onclick="editStudent('${s.id}')" class="btn btn-sm"
+                                            style="background: #3b82f6; color: white; padding: 0.5rem 0.75rem; font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif; font-size: 1.2rem; min-width: 42px; height: 36px; line-height: 1;"
+                                            aria-label="Editar" title="Editar">
+                                        ✏️
+                                    </button>
+                                    <button onclick="viewStudentPayments('${s.id}')" class="btn btn-sm"
+                                            style="background: #10b981; color: white; padding: 0.5rem 0.75rem; font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif; font-size: 1.2rem; min-width: 42px; height: 36px; line-height: 1;"
+                                            aria-label="Pagos" title="Ver Pagos">
+                                        💰
+                                    </button>
+                                    <button onclick="openPaymentNotes('${s.id}')" class="btn btn-sm"
+                                            style="background: #8b5cf6; color: white; padding: 0.5rem 0.75rem; font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif; font-size: 1.2rem; min-width: 42px; height: 36px; line-height: 1;"
+                                            aria-label="Notas" title="Notas de Pago">
+                                        📝
+                                    </button>
+                                    <button onclick="deleteStudent('${s.id}')" class="btn btn-sm"
+                                            style="background: #ef4444; color: white; padding: 0.5rem 0.75rem; font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif; font-size: 1.2rem; min-width: 42px; height: 36px; line-height: 1;"
+                                            aria-label="Eliminar" title="Eliminar">
+                                        🗑️
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                     `;
