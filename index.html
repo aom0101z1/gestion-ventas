@@ -527,6 +527,7 @@
                 <button class="tab" onclick="switchTab('reports')" id="reportsTab">📊 Reportes</button>
                 <button class="tab" onclick="switchTab('monitoring')" id="monitoringTab" style="display: none;">👀 Monitoreo</button>
                 <button onclick="switchTab('tasks')" class="tab">📋 Tareas</button>
+                <button class="tab" onclick="switchTab('auditLog')" id="auditLogTab" style="display: none;">📋 Registro</button>
                 <button class="tab" onclick="switchTab('config')" id="configTab" style="display: none;">⚙️ Config</button>
                 <button class="tab" onclick="switchTab('admin')" id="adminTab" style="display: none;">🔐 Admin</button>
                 <button class="tab" onclick="switchTab('socialMedia')" id="socialMediaTab">💬 Social Media</button>
@@ -903,6 +904,11 @@
                 <!-- El contenido se carga dinámicamente desde admin-center.js -->
             </div>
 
+            <!-- ========== SECTION 15: TAB CONTENT - AUDIT LOG ========== -->
+            <div id="auditLogContainer" class="tab-content" style="display: none;">
+                <!-- El contenido se carga dinámicamente desde auditlog.js -->
+            </div>
+
         </div> <!-- End of container -->
     </div> <!-- End of mainApp -->
 
@@ -1273,9 +1279,11 @@ onAuthStateChanged(auth, async (user) => {
                 if (monitoringTab) monitoringTab.style.display = 'block';
                 if (configTab) configTab.style.display = 'block';
                 if (adminTab) adminTab.style.display = 'block';
+                const auditLogTab = document.getElementById('auditLogTab');
+                if (auditLogTab) auditLogTab.style.display = 'block';
                 if (directorConfig) directorConfig.classList.remove('hidden');
                 if (leadsFilters) leadsFilters.style.display = 'flex';
-                
+
                 const header = document.getElementById('leadsTableHeader');
                 if (header) {
                     header.innerHTML = `
@@ -1292,6 +1300,8 @@ onAuthStateChanged(auth, async (user) => {
                 if (monitoringTab) monitoringTab.style.display = 'none';
                 if (configTab) configTab.style.display = 'none';
                 if (adminTab) adminTab.style.display = 'none';
+                const auditLogTab = document.getElementById('auditLogTab');
+                if (auditLogTab) auditLogTab.style.display = 'none';
                 if (directorConfig) directorConfig.classList.add('hidden');
                 if (leadsFilters) leadsFilters.style.display = 'none';
             }
@@ -1501,7 +1511,7 @@ onAuthStateChanged(auth, async (user) => {
                 if (tabName === 'leads') {
                     updateLeadsTable();
                 } else if (tabName === 'config') {
-                    loadConfigData();         
+                    loadConfigData();
                 } else if (tabName === 'pipeline') {
                     loadPipelineData();
                 } else if (tabName === 'reports') {
@@ -1511,6 +1521,10 @@ onAuthStateChanged(auth, async (user) => {
                 } else if (tabName === 'admin') {
                     if (typeof loadAdminTab === 'function') {
                         loadAdminTab();
+                    }
+                } else if (tabName === 'auditLog') {
+                    if (typeof loadAuditLogTab === 'function') {
+                        loadAuditLogTab();
                     }
                 }
                 
@@ -2905,6 +2919,7 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
     <script src="reports.js"></script>
     <script src="finance.js"></script>
     <script src="admin-center.js"></script>
+    <script src="auditlog.js"></script>
     <script src="permission-enforcer.js"></script>
 
     <!-- ========== SECTION 18: MODULE CHECK SCRIPT ========== -->

@@ -66,6 +66,8 @@ class StudentManager {
     async saveStudent(studentData) {
         try {
             const id = studentData.id || `STU-${Date.now()}`;
+            const isNewStudent = !studentData.id;
+
             const student = {
                 ...studentData,
                 id,
@@ -79,9 +81,21 @@ class StudentManager {
             const db = window.firebaseModules.database;
             const ref = db.ref(window.FirebaseData.database, `students/${id}`);
             await db.set(ref, student);
-            
+
             this.students.set(id, student);
             console.log('✅ Student saved:', id);
+
+            // Audit log
+            if (isNewStudent && typeof window.logAudit === 'function') {
+                await window.logAudit(
+                    'Estudiante añadido',
+                    'student',
+                    id,
+                    `${student.nombre} - ${student.tipoDoc} ${student.numDoc}`,
+                    { after: { nombre: student.nombre, documento: `${student.tipoDoc} ${student.numDoc}`, telefono: student.telefono, grupo: student.grupo, modalidad: student.modalidad } }
+                );
+            }
+
             return student;
         } catch (error) {
             console.error('❌ Error saving student:', error);
@@ -128,7 +142,7 @@ class StudentManager {
     // Update student - ENHANCED to track payment history
     async updateStudent(id, updates) {
         const existing = this.students.get(id);
-        
+
         // Track payment value changes
         if (existing && updates.valor !== undefined && updates.valor !== existing.valor) {
             if (!updates.paymentHistory) updates.paymentHistory = existing.paymentHistory || [];
@@ -139,14 +153,39 @@ class StudentManager {
                 notes: updates.paymentChangeReason || 'Manual update'
             });
         }
-        
+
         const db = window.firebaseModules.database;
         const ref = db.ref(window.FirebaseData.database, `students/${id}`);
         updates.updatedAt = new Date().toISOString();
         await db.update(ref, updates);
-        
+
         if (existing) {
             this.students.set(id, { ...existing, ...updates });
+
+            // Audit log - track changed fields
+            if (typeof window.logAudit === 'function') {
+                const changedFields = {};
+                const before = {};
+                const after = {};
+
+                Object.keys(updates).forEach(key => {
+                    if (key !== 'updatedAt' && key !== 'paymentHistory' && existing[key] !== updates[key]) {
+                        before[key] = existing[key];
+                        after[key] = updates[key];
+                        changedFields[key] = true;
+                    }
+                });
+
+                if (Object.keys(changedFields).length > 0) {
+                    await window.logAudit(
+                        'Estudiante editado',
+                        'student',
+                        id,
+                        `${existing.nombre} - Campos modificados: ${Object.keys(changedFields).join(', ')}`,
+                        { before, after }
+                    );
+                }
+            }
         }
         return true;
     }
@@ -154,12 +193,26 @@ class StudentManager {
     // Delete student
     async deleteStudent(id) {
         if (!confirm('¿Eliminar este estudiante?')) return false;
-        
+
+        const student = this.students.get(id);
+
         const db = window.firebaseModules.database;
         const ref = db.ref(window.FirebaseData.database, `students/${id}`);
         await db.remove(ref);
-        
+
         this.students.delete(id);
+
+        // Audit log
+        if (student && typeof window.logAudit === 'function') {
+            await window.logAudit(
+                'Estudiante eliminado',
+                'student',
+                id,
+                `${student.nombre} - ${student.tipoDoc} ${student.numDoc}`,
+                { before: { nombre: student.nombre, documento: `${student.tipoDoc} ${student.numDoc}`, telefono: student.telefono, grupo: student.grupo } }
+            );
+        }
+
         return true;
     }
 
@@ -167,7 +220,7 @@ class StudentManager {
     async toggleStudentStatus(id, inactiveData = null) {
         const student = this.students.get(id);
         if (!student) return false;
-        
+
         const newStatus = student.status === 'active' ? 'inactive' : 'active';
         const statusEntry = {
             previousStatus: student.status,
@@ -175,13 +228,25 @@ class StudentManager {
             changedAt: new Date().toISOString(),
             ...inactiveData
         };
-        
+
         const updates = {
             status: newStatus,
             statusHistory: [...(student.statusHistory || []), statusEntry]
         };
-        
+
         await this.updateStudent(id, updates);
+
+        // Audit log
+        if (typeof window.logAudit === 'function') {
+            await window.logAudit(
+                'Estado de estudiante cambiado',
+                'student',
+                id,
+                `${student.nombre} - ${student.status === 'active' ? 'Activo' : 'Inactivo'} → ${newStatus === 'active' ? 'Activo' : 'Inactivo'}`,
+                { before: { estado: student.status }, after: { estado: newStatus }, razon: inactiveData?.reason || 'No especificada' }
+            );
+        }
+
         return true;
     }
 
