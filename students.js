@@ -593,23 +593,26 @@ function renderStudentTable(students) {
                                     ${isInactive ? '❌ Inactivo' : '✅ Activo'}
                                 </button>
                             </td>
-                            <td style="padding: 0.75rem; text-align: center;">
-                                <button onclick="editStudent('${s.id}')" class="btn btn-sm" 
-                                        style="background: #3b82f6; color: white; margin-right: 0.5rem;">
-                                    ✏️
+                            <td style="padding: 0.75rem; text-align: center; white-space: nowrap;">
+                                <button onclick="editStudent('${s.id}')" class="btn btn-sm"
+                                        style="background: #3b82f6; color: white; margin-right: 0.5rem; padding: 0.5rem 0.75rem;"
+                                        title="Editar estudiante">
+                                    <span style="font-size: 1.2rem;">✏️</span>
                                 </button>
                                 <button onclick="viewStudentPayments('${s.id}')" class="btn btn-sm"
-                                        style="background: #10b981; color: white; margin-right: 0.5rem;">
-                                    💰
+                                        style="background: #10b981; color: white; margin-right: 0.5rem; padding: 0.5rem 0.75rem;"
+                                        title="Ver pagos">
+                                    <span style="font-size: 1.2rem;">💰</span>
                                 </button>
                                 <button onclick="openPaymentNotes('${s.id}')" class="btn btn-sm"
-                                        style="background: #8b5cf6; color: white; margin-right: 0.5rem;"
+                                        style="background: #8b5cf6; color: white; margin-right: 0.5rem; padding: 0.5rem 0.75rem;"
                                         title="Notas de pago">
-                                    📝
+                                    <span style="font-size: 1.2rem;">📝</span>
                                 </button>
                                 <button onclick="deleteStudent('${s.id}')" class="btn btn-sm"
-                                        style="background: #ef4444; color: white;">
-                                    🗑️
+                                        style="background: #ef4444; color: white; padding: 0.5rem 0.75rem;"
+                                        title="Eliminar">
+                                    <span style="font-size: 1.2rem;">🗑️</span>
                                 </button>
                             </td>
                         </tr>
