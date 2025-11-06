@@ -143,12 +143,16 @@ getPaymentStatus(student) {
     
     // If payment exists for this month, check if it's full or partial
     if (payment) {
-        const expectedAmount = student.valor || 0;
-        const paidAmount = payment.amount || 0;
+        // Convert to numbers to ensure proper comparison
+        const expectedAmount = Number(student.valor) || 0;
+        const paidAmount = Number(payment.amount) || 0;
+
+        console.log(`🔍 Checking payment for ${student.nombre}: Expected: $${expectedAmount}, Paid: $${paidAmount}`);
 
         // Check if payment is partial (less than expected)
         if (paidAmount < expectedAmount) {
             const remaining = expectedAmount - paidAmount;
+            console.log(`⚠️ Partial payment detected! Remaining: $${remaining}`);
             return {
                 color: '#f59e0b',
                 status: `Pago Parcial`,
@@ -198,7 +202,7 @@ async recordMultiMonthPayment(studentId, paymentData) {
                 id: `PAY-${Date.now()}-${monthData.month}`,
                 masterPaymentId: masterPaymentId, // Link to the master payment
                 studentId,
-                amount: amountPerMonth,
+                amount: Number(amountPerMonth), // Ensure amount is stored as number
                 method: paymentData.method,
                 bank: paymentData.bank,
                 month: monthData.month.toLowerCase(),
@@ -251,7 +255,7 @@ async recordPayment(studentId, paymentData) {
         const payment = {
             id: `PAY-${Date.now()}`,
             studentId,
-            amount: paymentData.amount,
+            amount: Number(paymentData.amount), // Ensure amount is stored as number
             method: paymentData.method,
             bank: paymentData.bank,
             month: paymentData.month.toLowerCase(), // Ensure lowercase
