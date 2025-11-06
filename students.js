@@ -127,14 +127,30 @@ class StudentManager {
         
         if (filters.search) {
             const search = filters.search.toLowerCase();
-            students = students.filter(s => 
+            students = students.filter(s =>
                 s.nombre?.toLowerCase().includes(search) ||
                 s.numDoc?.includes(search) ||
                 s.telefono?.includes(search)
             );
         }
-        
-        return students.sort((a, b) => 
+
+        // Filter by date range
+        if (filters.startDate || filters.endDate) {
+            students = students.filter(s => {
+                if (!s.createdAt) return false;
+
+                const studentDate = new Date(s.createdAt);
+                const startDate = filters.startDate ? new Date(filters.startDate) : null;
+                const endDate = filters.endDate ? new Date(filters.endDate + 'T23:59:59') : null;
+
+                if (startDate && studentDate < startDate) return false;
+                if (endDate && studentDate > endDate) return false;
+
+                return true;
+            });
+        }
+
+        return students.sort((a, b) =>
             (a.nombre || '').localeCompare(b.nombre || '')
         );
     }
@@ -549,6 +565,7 @@ function renderStudentTable(students) {
                     <th style="padding: 0.75rem; text-align: left;">Grupo</th>
                     <th style="padding: 0.75rem; text-align: left;">Modalidad</th>
                     <th style="padding: 0.75rem; text-align: left;">Pago</th>
+                    <th style="padding: 0.75rem; text-align: center;">Fecha Registro</th>
                     <th style="padding: 0.75rem; text-align: center;">Estado</th>
                     <th style="padding: 0.75rem; text-align: center;">Acciones</th>
                 </tr>
@@ -559,7 +576,17 @@ function renderStudentTable(students) {
                     const phoneNumber = String(s.telefono || '').replace(/\D/g, '');
                     const isInactive = s.status === 'inactive';
                     const rowStyle = isInactive ? 'background: #fee2e2;' : '';
-                    
+
+                    // Format registration date
+                    const formatDate = (isoDate) => {
+                        if (!isoDate) return '-';
+                        const date = new Date(isoDate);
+                        const day = String(date.getDate()).padStart(2, '0');
+                        const month = String(date.getMonth() + 1).padStart(2, '0');
+                        const year = date.getFullYear();
+                        return `${day}/${month}/${year}`;
+                    };
+
                     return `
                         <tr style="border-top: 1px solid #e5e7eb; ${rowStyle}">
                             <td style="padding: 0.75rem; text-align: center; font-weight: bold; color: #6b7280;">
@@ -586,6 +613,11 @@ function renderStudentTable(students) {
                             <td style="padding: 0.75rem;">
                                 ${s.tipoPago || '-'}<br>
                                 <small>$${(s.valor || 0).toLocaleString()}</small>
+                            </td>
+                            <td style="padding: 0.75rem; text-align: center;">
+                                <span style="color: #6b7280; font-size: 0.9rem;">
+                                    ${formatDate(s.createdAt)}
+                                </span>
                             </td>
                             <td style="padding: 0.75rem; text-align: center;">
                                 <button onclick="toggleStatus('${s.id}')" class="btn btn-sm"
@@ -648,29 +680,76 @@ window.loadStudentsTab = async function() {
 
     container.innerHTML = `
         <div style="padding: 1rem;">
+            <!-- Header with title and new student button -->
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <h2>👥 Gestión de Estudiantes</h2>
-                <div style="display: flex; gap: 1rem; align-items: center;">
-                    <select id="studentStatusFilter" style="padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 4px;">
-                        <option value="all" ${currentStatusFilter === 'all' ? 'selected' : ''}>Todos</option>
-                        <option value="active" ${currentStatusFilter === 'active' ? 'selected' : ''}>Activos</option>
-                        <option value="inactive" ${currentStatusFilter === 'inactive' ? 'selected' : ''}>Inactivos</option>
-                    </select>
-                    <select id="studentModalidadFilter" style="padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 4px;">
-                        <option value="all" ${currentModalidadFilter === 'all' ? 'selected' : ''}>Todas las modalidades</option>
-                        <option value="Presencial" ${currentModalidadFilter === 'Presencial' ? 'selected' : ''}>Presencial</option>
-                        <option value="Compañia" ${currentModalidadFilter === 'Compañia' ? 'selected' : ''}>Compañía</option>
-                        <option value="Escuela" ${currentModalidadFilter === 'Escuela' ? 'selected' : ''}>Escuela</option>
-                        <option value="Online" ${currentModalidadFilter === 'Online' ? 'selected' : ''}>Online</option>
-                    </select>
-                    <input type="text" id="studentSearch" placeholder="Buscar..."
-                           style="padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 4px;">
-                    <button onclick="showStudentForm()" class="btn btn-primary">
-                        ➕ Nuevo Estudiante
+                <button onclick="showStudentForm()" class="btn btn-primary">
+                    ➕ Nuevo Estudiante
+                </button>
+            </div>
+
+            <!-- Quick Date Filters -->
+            <div style="background: white; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <h3 style="margin: 0 0 0.75rem 0; font-size: 1rem; color: #374151;">📅 Filtros Rápidos por Fecha de Registro</h3>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
+                    <button onclick="applyQuickDateFilter('today')" class="btn btn-sm" style="background: #3b82f6; color: white;">
+                        📅 Hoy
+                    </button>
+                    <button onclick="applyQuickDateFilter('week')" class="btn btn-sm" style="background: #3b82f6; color: white;">
+                        📅 Esta Semana
+                    </button>
+                    <button onclick="applyQuickDateFilter('month')" class="btn btn-sm" style="background: #3b82f6; color: white;">
+                        📅 Este Mes
+                    </button>
+                    <button onclick="applyQuickDateFilter('last30')" class="btn btn-sm" style="background: #3b82f6; color: white;">
+                        📅 Últimos 30 Días
+                    </button>
+                    <button onclick="applyQuickDateFilter('year')" class="btn btn-sm" style="background: #3b82f6; color: white;">
+                        📅 Este Año
+                    </button>
+                    <button onclick="clearDateFilters()" class="btn btn-sm" style="background: #6b7280; color: white;">
+                        ❌ Limpiar Fechas
+                    </button>
+                </div>
+
+                <!-- Custom Date Range -->
+                <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+                    <div>
+                        <label style="font-size: 0.875rem; color: #6b7280; display: block; margin-bottom: 0.25rem;">Fecha Inicio:</label>
+                        <input type="date" id="studentStartDate" style="padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 4px;">
+                    </div>
+                    <div>
+                        <label style="font-size: 0.875rem; color: #6b7280; display: block; margin-bottom: 0.25rem;">Fecha Fin:</label>
+                        <input type="date" id="studentEndDate" style="padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 4px;">
+                    </div>
+                    <button onclick="applyCustomDateFilter()" class="btn btn-sm" style="background: #10b981; color: white; margin-top: 1.25rem;">
+                        🔍 Filtrar
                     </button>
                 </div>
             </div>
 
+            <!-- Other Filters -->
+            <div style="display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem; flex-wrap: wrap;">
+                <select id="studentStatusFilter" style="padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 4px;">
+                    <option value="all" ${currentStatusFilter === 'all' ? 'selected' : ''}>Todos</option>
+                    <option value="active" ${currentStatusFilter === 'active' ? 'selected' : ''}>Activos</option>
+                    <option value="inactive" ${currentStatusFilter === 'inactive' ? 'selected' : ''}>Inactivos</option>
+                </select>
+                <select id="studentModalidadFilter" style="padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 4px;">
+                    <option value="all" ${currentModalidadFilter === 'all' ? 'selected' : ''}>Todas las modalidades</option>
+                    <option value="Presencial" ${currentModalidadFilter === 'Presencial' ? 'selected' : ''}>Presencial</option>
+                    <option value="Compañia" ${currentModalidadFilter === 'Compañia' ? 'selected' : ''}>Compañía</option>
+                    <option value="Escuela" ${currentModalidadFilter === 'Escuela' ? 'selected' : ''}>Escuela</option>
+                    <option value="Online" ${currentModalidadFilter === 'Online' ? 'selected' : ''}>Online</option>
+                </select>
+                <input type="text" id="studentSearch" placeholder="Buscar por nombre, documento o teléfono..."
+                       style="padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 4px; flex: 1; min-width: 200px;">
+            </div>
+
+            <!-- Results Counter -->
+            <div id="studentResultsCounter" style="background: #f3f4f6; padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1rem; font-weight: 500; color: #374151;">
+                Mostrando ${window.StudentManager.getStudents({ status: currentStatusFilter, modalidad: currentModalidadFilter }).length} estudiantes
+            </div>
 
             <div id="studentTableContainer">
                 ${renderStudentTable(window.StudentManager.getStudents({ status: currentStatusFilter, modalidad: currentModalidadFilter }))}
@@ -679,42 +758,23 @@ window.loadStudentsTab = async function() {
     `;
 
     // Add search listener
-    document.getElementById('studentSearch')?.addEventListener('input', (e) => {
-        const statusFilter = document.getElementById('studentStatusFilter').value;
-        const modalidadFilter = document.getElementById('studentModalidadFilter').value;
-        const filtered = window.StudentManager.getStudents({
-            search: e.target.value,
-            status: statusFilter,
-            modalidad: modalidadFilter
-        });
-        document.getElementById('studentTableContainer').innerHTML = renderStudentTable(filtered);
-    });
+    document.getElementById('studentSearch')?.addEventListener('input', refreshStudentTable);
 
     // Add status filter listener
     document.getElementById('studentStatusFilter')?.addEventListener('change', (e) => {
         localStorage.setItem('studentStatusFilter', e.target.value);
-        const searchValue = document.getElementById('studentSearch').value;
-        const modalidadFilter = document.getElementById('studentModalidadFilter').value;
-        const filtered = window.StudentManager.getStudents({
-            status: e.target.value,
-            search: searchValue,
-            modalidad: modalidadFilter
-        });
-        document.getElementById('studentTableContainer').innerHTML = renderStudentTable(filtered);
+        refreshStudentTable();
     });
 
     // Add modalidad filter listener
     document.getElementById('studentModalidadFilter')?.addEventListener('change', (e) => {
         localStorage.setItem('studentModalidadFilter', e.target.value);
-        const searchValue = document.getElementById('studentSearch').value;
-        const statusFilter = document.getElementById('studentStatusFilter').value;
-        const filtered = window.StudentManager.getStudents({
-            status: statusFilter,
-            search: searchValue,
-            modalidad: e.target.value
-        });
-        document.getElementById('studentTableContainer').innerHTML = renderStudentTable(filtered);
+        refreshStudentTable();
     });
+
+    // Add date filter listeners
+    document.getElementById('studentStartDate')?.addEventListener('change', refreshStudentTable);
+    document.getElementById('studentEndDate')?.addEventListener('change', refreshStudentTable);
 };
 
 // ============================================
@@ -923,5 +983,82 @@ window.viewStudentPayments = function(id) {
     // This will be handled by payments module
     window.showNotification('💰 Ver pagos - Próximamente', 'info');
 };
+
+// ============================================
+// SECTION 10: DATE FILTER FUNCTIONS
+// ============================================
+
+window.applyQuickDateFilter = function(filterType) {
+    const today = new Date();
+    let startDate, endDate;
+
+    switch(filterType) {
+        case 'today':
+            startDate = endDate = today.toISOString().split('T')[0];
+            break;
+        case 'week':
+            const weekStart = new Date(today);
+            weekStart.setDate(today.getDate() - today.getDay());
+            startDate = weekStart.toISOString().split('T')[0];
+            endDate = today.toISOString().split('T')[0];
+            break;
+        case 'month':
+            const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+            startDate = monthStart.toISOString().split('T')[0];
+            endDate = today.toISOString().split('T')[0];
+            break;
+        case 'last30':
+            const last30 = new Date(today);
+            last30.setDate(today.getDate() - 30);
+            startDate = last30.toISOString().split('T')[0];
+            endDate = today.toISOString().split('T')[0];
+            break;
+        case 'year':
+            const yearStart = new Date(today.getFullYear(), 0, 1);
+            startDate = yearStart.toISOString().split('T')[0];
+            endDate = today.toISOString().split('T')[0];
+            break;
+    }
+
+    document.getElementById('studentStartDate').value = startDate;
+    document.getElementById('studentEndDate').value = endDate;
+
+    applyCustomDateFilter();
+};
+
+window.clearDateFilters = function() {
+    document.getElementById('studentStartDate').value = '';
+    document.getElementById('studentEndDate').value = '';
+    refreshStudentTable();
+};
+
+window.applyCustomDateFilter = function() {
+    refreshStudentTable();
+};
+
+function refreshStudentTable() {
+    const statusFilter = document.getElementById('studentStatusFilter').value;
+    const modalidadFilter = document.getElementById('studentModalidadFilter').value;
+    const searchValue = document.getElementById('studentSearch').value;
+    const startDate = document.getElementById('studentStartDate').value;
+    const endDate = document.getElementById('studentEndDate').value;
+
+    const filtered = window.StudentManager.getStudents({
+        status: statusFilter,
+        modalidad: modalidadFilter,
+        search: searchValue,
+        startDate: startDate,
+        endDate: endDate
+    });
+
+    document.getElementById('studentTableContainer').innerHTML = renderStudentTable(filtered);
+
+    // Update counter
+    const counterText = startDate || endDate
+        ? `Mostrando ${filtered.length} estudiantes ${startDate && endDate ? `registrados del ${startDate} al ${endDate}` : startDate ? `registrados desde ${startDate}` : `registrados hasta ${endDate}`}`
+        : `Mostrando ${filtered.length} estudiantes`;
+
+    document.getElementById('studentResultsCounter').textContent = counterText;
+}
 
 console.log('✅ Students module loaded successfully');
