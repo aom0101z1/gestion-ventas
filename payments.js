@@ -362,34 +362,47 @@ async recordPayment(studentId, paymentData) {
 
     // NEW: Get complete payment history for a student (12 months)
     async getStudentPaymentHistory(studentId, year = null) {
-        const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 
+        const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
                        'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
         const targetYear = year || new Date().getFullYear();
         const history = {};
-        
+
         // Get all payments for this student
         const payments = this.getStudentPayments(studentId);
-        
+
         // Get student data for default amount
         const student = window.StudentManager.students.get(studentId);
         const defaultAmount = student?.valor || 0;
-        
+
         // Build history object for each month
         for (const month of months) {
-            const payment = payments.find(p => 
-                p.month?.toLowerCase() === month && 
+            // FIXED: Use filter() instead of find() to get ALL payments for this month
+            const monthPayments = payments.filter(p =>
+                p.month?.toLowerCase() === month &&
                 p.year === targetYear
             );
-            
-            if (payment) {
+
+            if (monthPayments.length > 0) {
+                // Calculate total amount paid for this month
+                const totalAmount = monthPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
                 history[month] = {
                     status: 'paid',
-                    amount: payment.amount,
-                    date: new Date(payment.date).toLocaleDateString('es-CO'),
-                    method: payment.method,
-                    bank: payment.bank,
-                    invoiceNumber: payment.invoiceNumber,
-                    paymentId: payment.id
+                    amount: totalAmount,
+                    payments: monthPayments.map(p => ({
+                        date: new Date(p.date).toLocaleDateString('es-CO'),
+                        amount: p.amount,
+                        method: p.method,
+                        bank: p.bank,
+                        invoiceNumber: p.invoiceNumber,
+                        paymentId: p.id
+                    })),
+                    // Keep backward compatibility with single payment display
+                    date: new Date(monthPayments[0].date).toLocaleDateString('es-CO'),
+                    method: monthPayments[0].method,
+                    bank: monthPayments[0].bank,
+                    invoiceNumber: monthPayments[0].invoiceNumber,
+                    paymentId: monthPayments[0].id
                 };
             } else {
                 // Check if payment is due/overdue for this month
@@ -397,20 +410,22 @@ async recordPayment(studentId, paymentData) {
                 const today = new Date();
                 const currentYear = today.getFullYear();
                 const currentMonth = today.getMonth();
-                
+
                 if (targetYear < currentYear || (targetYear === currentYear && monthIndex < currentMonth)) {
                     // Past month - check if it should have been paid
                     if (student?.diaPago) {
                         history[month] = {
                             status: 'overdue',
                             amount: defaultAmount,
-                            date: null
+                            date: null,
+                            payments: []
                         };
                     } else {
                         history[month] = {
                             status: 'no-payment',
                             amount: 0,
-                            date: null
+                            date: null,
+                            payments: []
                         };
                     }
                 } else if (targetYear === currentYear && monthIndex === currentMonth) {
@@ -419,17 +434,19 @@ async recordPayment(studentId, paymentData) {
                         const payDay = parseInt(student.diaPago);
                         const dueDate = new Date(targetYear, monthIndex, payDay);
                         const isPending = dueDate >= today;
-                        
+
                         history[month] = {
                             status: isPending ? 'pending' : 'overdue',
                             amount: defaultAmount,
-                            date: null
+                            date: null,
+                            payments: []
                         };
                     } else {
                         history[month] = {
                             status: 'no-payment',
                             amount: 0,
-                            date: null
+                            date: null,
+                            payments: []
                         };
                     }
                 } else {
@@ -437,12 +454,13 @@ async recordPayment(studentId, paymentData) {
                     history[month] = {
                         status: 'no-payment',
                         amount: 0,
-                        date: null
+                        date: null,
+                        payments: []
                     };
                 }
             }
         }
-        
+
         return history;
     }
 
@@ -1719,7 +1737,8 @@ function renderPaymentHistoryContent(studentId, history, stats) {
                 ${months.map(month => {
                     const payment = history[month];
                     const color = statusColors[payment.status];
-                    
+                    const hasMultiplePayments = payment.payments && payment.payments.length > 1;
+
                     return `
                         <div style="
                             background: white;
@@ -1737,7 +1756,20 @@ function renderPaymentHistoryContent(studentId, history, stats) {
                                 position: absolute; top: 8px; right: 8px;
                             "></div>
 
-                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px; font-size: 13px;">
+                            ${hasMultiplePayments ?
+                                `<div style="
+                                    background: #3b82f6;
+                                    color: white;
+                                    font-size: 9px;
+                                    padding: 2px 6px;
+                                    border-radius: 10px;
+                                    position: absolute;
+                                    top: 8px;
+                                    left: 8px;
+                                    font-weight: 600;
+                                ">${payment.payments.length} pagos</div>` : ''}
+
+                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px; font-size: 13px; ${hasMultiplePayments ? 'margin-top: 12px;' : ''}">
                                 ${month.charAt(0).toUpperCase() + month.slice(1)}
                             </div>
 
@@ -1745,39 +1777,84 @@ function renderPaymentHistoryContent(studentId, history, stats) {
                                 ${payment.amount > 0 ? '$' + payment.amount.toLocaleString('es-CO') : '-'}
                             </div>
 
-                            <div style="font-size: 11px; color: #6b7280; margin-top: 4px;">
-                                ${payment.date || (payment.status === 'pending' ? 'Pendiente' : payment.status === 'overdue' ? 'Vencido' : '')}
-                            </div>
+                            ${!hasMultiplePayments ? `
+                                <div style="font-size: 11px; color: #6b7280; margin-top: 4px;">
+                                    ${payment.date || (payment.status === 'pending' ? 'Pendiente' : payment.status === 'overdue' ? 'Vencido' : '')}
+                                </div>
 
-                            ${payment.status === 'paid' && payment.method ?
-                                `<div style="font-size: 10px; color: #9ca3af; margin-top: 2px;">
-                                    ${payment.method} ${payment.bank ? '- ' + payment.bank : ''}
-                                </div>` : ''}
+                                ${payment.status === 'paid' && payment.method ?
+                                    `<div style="font-size: 10px; color: #9ca3af; margin-top: 2px;">
+                                        ${payment.method} ${payment.bank ? '- ' + payment.bank : ''}
+                                    </div>` : ''}
 
-                            ${payment.status === 'paid' && payment.invoiceNumber ?
-                                `<button
-                                    onclick="viewPaymentInvoice('${payment.paymentId}')"
-                                    class="btn btn-sm"
-                                    style="
-                                        background: #3b82f6;
-                                        color: white;
-                                        border: none;
-                                        padding: 4px 8px;
-                                        border-radius: 4px;
-                                        font-size: 10px;
-                                        margin-top: 6px;
-                                        width: 100%;
-                                        cursor: pointer;
-                                        display: flex;
-                                        align-items: center;
-                                        justify-content: center;
-                                        gap: 4px;
-                                        transition: background 0.2s;
-                                    "
-                                    onmouseover="this.style.background='#2563eb'"
-                                    onmouseout="this.style.background='#3b82f6'">
-                                    🧾 Ver Factura
-                                </button>` : ''}
+                                ${payment.status === 'paid' && payment.invoiceNumber ?
+                                    `<button
+                                        onclick="viewPaymentInvoice('${payment.paymentId}')"
+                                        class="btn btn-sm"
+                                        style="
+                                            background: #3b82f6;
+                                            color: white;
+                                            border: none;
+                                            padding: 4px 8px;
+                                            border-radius: 4px;
+                                            font-size: 10px;
+                                            margin-top: 6px;
+                                            width: 100%;
+                                            cursor: pointer;
+                                            display: flex;
+                                            align-items: center;
+                                            justify-content: center;
+                                            gap: 4px;
+                                            transition: background 0.2s;
+                                        "
+                                        onmouseover="this.style.background='#2563eb'"
+                                        onmouseout="this.style.background='#3b82f6'">
+                                        🧾 Ver Factura
+                                    </button>` : ''}
+                            ` : `
+                                <!-- Multiple payments - show list -->
+                                <div style="margin-top: 8px; max-height: 200px; overflow-y: auto;">
+                                    ${payment.payments.map((p, index) => `
+                                        <div style="
+                                            background: #f9fafb;
+                                            border-radius: 6px;
+                                            padding: 8px;
+                                            margin-bottom: 6px;
+                                            border-left: 3px solid ${color};
+                                        ">
+                                            <div style="font-size: 10px; color: #6b7280; margin-bottom: 4px;">
+                                                Pago ${index + 1} - ${p.date}
+                                            </div>
+                                            <div style="font-weight: 600; font-size: 12px; color: #374151;">
+                                                $${p.amount.toLocaleString('es-CO')}
+                                            </div>
+                                            <div style="font-size: 9px; color: #9ca3af; margin-top: 2px;">
+                                                ${p.method} ${p.bank ? '- ' + p.bank : ''}
+                                            </div>
+                                            ${p.invoiceNumber ?
+                                                `<button
+                                                    onclick="viewPaymentInvoice('${p.paymentId}')"
+                                                    class="btn btn-sm"
+                                                    style="
+                                                        background: #3b82f6;
+                                                        color: white;
+                                                        border: none;
+                                                        padding: 3px 6px;
+                                                        border-radius: 4px;
+                                                        font-size: 9px;
+                                                        margin-top: 4px;
+                                                        width: 100%;
+                                                        cursor: pointer;
+                                                        transition: background 0.2s;
+                                                    "
+                                                    onmouseover="this.style.background='#2563eb'"
+                                                    onmouseout="this.style.background='#3b82f6'">
+                                                    🧾 Recibo ${index + 1}
+                                                </button>` : ''}
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            `}
                         </div>
                     `;
                 }).join('')}
