@@ -183,6 +183,26 @@ class FirebaseDataManager {
             
             await set(contactRef, contact);
             console.log('✅ Contact added to Firebase:', contactId);
+
+            // Audit log
+            if (typeof window.logAudit === 'function') {
+                await window.logAudit(
+                    'Contacto añadido',
+                    'contact',
+                    contactId,
+                    `${contact.name} - ${contact.phone} - ${contact.source}`,
+                    {
+                        after: {
+                            nombre: contact.name,
+                            telefono: contact.phone,
+                            email: contact.email,
+                            fuente: contact.source,
+                            ubicacion: contact.location
+                        }
+                    }
+                );
+            }
+
             return contact;
         } catch (error) {
             console.error('❌ Error adding contact:', error);
@@ -200,12 +220,30 @@ class FirebaseDataManager {
                 throw new Error('You can only update your own contacts');
             }
             
+            // Get contact details for audit log
+            const contactSnapshot = await get(ref(this.database, `contacts/${contactId}`));
+            const contact = contactSnapshot.val();
+
             await update(ref(this.database, `contacts/${contactId}`), {
                 ...updates,
                 updatedAt: new Date().toISOString()
             });
-            
+
             console.log('✅ Contact updated in Firebase:', contactId);
+
+            // Audit log
+            if (typeof window.logAudit === 'function' && contact) {
+                await window.logAudit(
+                    'Contacto editado',
+                    'contact',
+                    contactId,
+                    `${contact.name} - Campos actualizados`,
+                    {
+                        after: updates
+                    }
+                );
+            }
+
             return true;
         } catch (error) {
             console.error('❌ Error updating contact:', error);
@@ -222,9 +260,33 @@ class FirebaseDataManager {
             if (!canDelete) {
                 throw new Error('You can only delete your own contacts');
             }
-            
+
+            // Get contact details before deleting for audit log
+            const contactSnapshot = await get(ref(this.database, `contacts/${contactId}`));
+            const contact = contactSnapshot.val();
+
             await remove(ref(this.database, `contacts/${contactId}`));
             console.log('✅ Contact deleted from Firebase:', contactId);
+
+            // Audit log
+            if (typeof window.logAudit === 'function' && contact) {
+                await window.logAudit(
+                    'Contacto eliminado',
+                    'contact',
+                    contactId,
+                    `${contact.name} - ${contact.phone} - ${contact.source}`,
+                    {
+                        before: {
+                            nombre: contact.name,
+                            telefono: contact.phone,
+                            email: contact.email,
+                            fuente: contact.source,
+                            estado: contact.status
+                        }
+                    }
+                );
+            }
+
             return true;
         } catch (error) {
             console.error('❌ Error deleting contact:', error);

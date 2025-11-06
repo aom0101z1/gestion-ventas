@@ -148,6 +148,25 @@ class FinanceManager {
 
             this.expenses.set(id, expense);
             console.log('✅ Expense added:', id);
+
+            // Audit log
+            if (typeof window.logAudit === 'function') {
+                await window.logAudit(
+                    'Gasto registrado',
+                    'expense',
+                    id,
+                    `${expense.category} - $${expense.amount.toLocaleString()} - ${expense.description}`,
+                    {
+                        after: {
+                            categoria: expense.category,
+                            monto: expense.amount,
+                            descripcion: expense.description,
+                            fecha: expense.date
+                        }
+                    }
+                );
+            }
+
             return expense;
         } catch (error) {
             console.error('❌ Error adding expense:', error);
@@ -157,12 +176,33 @@ class FinanceManager {
 
     async deleteExpense(id) {
         try {
+            const expense = this.expenses.get(id);
+
             const db = window.firebaseModules.database;
             const ref = db.ref(window.FirebaseData.database, `expenses/${id}`);
             await db.remove(ref);
 
             this.expenses.delete(id);
             console.log('✅ Expense deleted:', id);
+
+            // Audit log
+            if (expense && typeof window.logAudit === 'function') {
+                await window.logAudit(
+                    'Gasto eliminado',
+                    'expense',
+                    id,
+                    `${expense.category} - $${expense.amount.toLocaleString()} - ${expense.description}`,
+                    {
+                        before: {
+                            categoria: expense.category,
+                            monto: expense.amount,
+                            descripcion: expense.description,
+                            fecha: expense.date
+                        }
+                    }
+                );
+            }
+
             return true;
         } catch (error) {
             console.error('❌ Error deleting expense:', error);
@@ -244,6 +284,27 @@ class FinanceManager {
 
             this.dailyReconciliations.set(date, reconciliation);
             console.log('✅ Reconciliation saved for:', date, '- Full object:', reconciliation);
+
+            // Audit log
+            if (typeof window.logAudit === 'function') {
+                await window.logAudit(
+                    'Cierre diario guardado',
+                    'reconciliation',
+                    date,
+                    `Fecha: ${date} - Apertura: $${reconciliation.openingBalance.toLocaleString()} - Cierre: $${reconciliation.closingCount.toLocaleString()}`,
+                    {
+                        after: {
+                            fecha: date,
+                            saldoApertura: reconciliation.openingBalance,
+                            efectivoCierre: reconciliation.closingCount,
+                            gastos: reconciliation.expenses,
+                            diferencia: reconciliation.closingCount - reconciliation.openingBalance - reconciliation.expenses,
+                            cerrado: reconciliation.isClosed
+                        }
+                    }
+                );
+            }
+
             return reconciliation;
         } catch (error) {
             console.error('❌ Error saving reconciliation:', error);
@@ -265,6 +326,25 @@ class FinanceManager {
 
             await this.saveDailyReconciliation(date, reconciliation);
             console.log('✅ Day closed:', date);
+
+            // Audit log
+            if (typeof window.logAudit === 'function') {
+                await window.logAudit(
+                    'Día cerrado',
+                    'reconciliation',
+                    date,
+                    `Día ${date} cerrado - Apertura: $${reconciliation.openingBalance.toLocaleString()} - Cierre: $${reconciliation.closingCount.toLocaleString()}`,
+                    {
+                        after: {
+                            fecha: date,
+                            cerrado: true,
+                            cerradoPor: reconciliation.closedByName,
+                            fechaCierre: reconciliation.closedAt
+                        }
+                    }
+                );
+            }
+
             return true;
         } catch (error) {
             console.error('❌ Error closing day:', error);

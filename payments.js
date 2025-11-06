@@ -228,12 +228,37 @@ async recordMultiMonthPayment(studentId, paymentData) {
         }
         
         console.log(`✅ Multi-month payment recorded: ${payments.length} months`);
-        
+
+        // Audit log
+        if (typeof window.logAudit === 'function') {
+            const student = window.StudentManager?.students.get(studentId);
+            const studentName = student?.nombre || 'Estudiante desconocido';
+            const monthsList = paymentData.selectedMonths.map(m => `${m.month} ${m.year}`).join(', ');
+            await window.logAudit(
+                'Pago registrado',
+                'payment',
+                masterPaymentId,
+                `${studentName} - $${paymentData.totalAmount.toLocaleString()} - ${paymentData.paymentType} (${payments.length} meses)`,
+                {
+                    after: {
+                        estudiante: studentName,
+                        montoTotal: paymentData.totalAmount,
+                        tipoPago: paymentData.paymentType,
+                        periodo: paymentData.paymentPeriod,
+                        meses: monthsList,
+                        cantidadMeses: payments.length,
+                        metodo: paymentData.method,
+                        banco: paymentData.bank
+                    }
+                }
+            );
+        }
+
         // Force UI refresh
         setTimeout(() => {
             window.loadPaymentsTab();
         }, 100);
-        
+
         return {
             masterPaymentId,
             payments,
@@ -270,14 +295,36 @@ async recordPayment(studentId, paymentData) {
         await db.set(ref, payment);
         
         this.payments.set(payment.id, payment);
-        
+
         console.log('✅ Payment recorded:', payment.id);
-        
+
+        // Audit log
+        if (typeof window.logAudit === 'function') {
+            const student = window.StudentManager?.students.get(studentId);
+            const studentName = student?.nombre || 'Estudiante desconocido';
+            await window.logAudit(
+                'Pago registrado',
+                'payment',
+                payment.id,
+                `${studentName} - $${payment.amount.toLocaleString()} - ${payment.month} ${payment.year}`,
+                {
+                    after: {
+                        estudiante: studentName,
+                        monto: payment.amount,
+                        mes: payment.month,
+                        año: payment.year,
+                        metodo: payment.method,
+                        banco: payment.bank
+                    }
+                }
+            );
+        }
+
         // Force UI refresh after payment
         setTimeout(() => {
             window.loadPaymentsTab();
         }, 100);
-        
+
         return payment;
     } catch (error) {
         console.error('❌ Error recording payment:', error);
@@ -1059,7 +1106,27 @@ const InvoiceGenerator = {
         } catch (error) {
             console.error('⚠️ Storage save failed, invoice saved to database only:', error);
         }
-        
+
+        // Audit log
+        if (typeof window.logAudit === 'function') {
+            await window.logAudit(
+                'Factura generada',
+                'invoice',
+                invoiceNumber,
+                `${student.nombre} - Factura ${invoiceNumber} - $${invoiceData.total.toLocaleString()}`,
+                {
+                    after: {
+                        numeroFactura: invoiceNumber,
+                        estudiante: student.nombre,
+                        monto: invoiceData.total,
+                        mes: payment.month,
+                        año: payment.year,
+                        metodoPago: payment.method
+                    }
+                }
+            );
+        }
+
         return invoiceData;
     },
 
@@ -1125,7 +1192,30 @@ const InvoiceGenerator = {
         } catch (error) {
             console.error('⚠️ Storage save failed:', error);
         }
-        
+
+        // Audit log
+        if (typeof window.logAudit === 'function') {
+            const monthsList = paymentResult.payments.map(p => `${p.month} ${p.year}`).join(', ');
+            await window.logAudit(
+                'Factura generada',
+                'invoice',
+                invoiceNumber,
+                `${student.nombre} - Factura ${invoiceNumber} - $${invoiceData.total.toLocaleString()} (${paymentResult.payments.length} meses)`,
+                {
+                    after: {
+                        numeroFactura: invoiceNumber,
+                        estudiante: student.nombre,
+                        monto: invoiceData.total,
+                        tipoPago: paymentResult.paymentType,
+                        periodo: paymentResult.paymentPeriod,
+                        meses: monthsList,
+                        cantidadMeses: paymentResult.payments.length,
+                        metodoPago: paymentResult.payments[0].method
+                    }
+                }
+            );
+        }
+
         return invoiceData;
     },
 

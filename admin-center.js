@@ -160,9 +160,24 @@ class AdminCenterManager {
         permissions: newUser.permissions
       });
       
-      // Log action
-      await this.logAction('CREATE_USER', { userId, email });
-      
+      // Audit log
+      if (typeof window.logAudit === 'function') {
+        await window.logAudit(
+          'Usuario añadido',
+          'user',
+          userId,
+          `${name} (${email})`,
+          {
+            after: {
+              email,
+              nombre: name,
+              rol: 'custom',
+              estado: 'active'
+            }
+          }
+        );
+      }
+
       return userId;
     } catch (error) {
       console.error('Error creating user:', error);
@@ -187,9 +202,19 @@ class AdminCenterManager {
         }
       }
       
-      // Log action
-      await this.logAction('UPDATE_USER', { userId, updates });
-      
+      // Audit log
+      if (typeof window.logAudit === 'function' && user) {
+        await window.logAudit(
+          'Usuario editado',
+          'user',
+          userId,
+          `${user.name || user.email} - Campos actualizados`,
+          {
+            after: updates
+          }
+        );
+      }
+
       return true;
     } catch (error) {
       console.error('Error updating user:', error);
@@ -215,14 +240,32 @@ class AdminCenterManager {
   // Delete user
   async deleteUser(userId) {
     try {
+      const user = this.users.get(userId);
+
       // Soft delete - mark as deleted
       await this.updateUser(userId, {
         'profile/status': 'deleted',
         'profile/deletedAt': new Date().toISOString(),
         'profile/deletedBy': this.currentAdmin.email
       });
-      
-      await this.logAction('DELETE_USER', { userId });
+
+      // Audit log
+      if (typeof window.logAudit === 'function' && user) {
+        await window.logAudit(
+          'Usuario eliminado',
+          'user',
+          userId,
+          `${user.name || user.email}`,
+          {
+            before: {
+              email: user.email,
+              nombre: user.name,
+              rol: user.role
+            }
+          }
+        );
+      }
+
       return true;
     } catch (error) {
       console.error('Error deleting user:', error);
