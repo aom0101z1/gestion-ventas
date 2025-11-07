@@ -1568,6 +1568,14 @@ window.loadDailySalesReport = async function(date) {
 // SECTION 7: INITIALIZATION
 // ============================================
 
+// Close modal function
+window.closeModal = function() {
+    const modal = document.querySelector('.modal-overlay');
+    if (modal) {
+        modal.remove();
+    }
+};
+
 // Create global instances
 window.ProductManager = new ProductManager();
 window.InventoryManager = new InventoryManager();
