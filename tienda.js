@@ -673,26 +673,30 @@ function renderPointOfSale() {
 
             <!-- Right: Summary & Payment -->
             <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; flex-direction: column;">
-                <h3 style="margin: 0 0 16px 0;">💳 Resumen</h3>
+                <h3 style="margin: 0 0 16px 0;">💳 Resumen de Venta</h3>
 
                 <div style="flex: 1;">
                     <div style="padding: 16px; background: #f9fafb; border-radius: 6px; margin-bottom: 16px;">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                            <span style="color: #6b7280;">Items:</span>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb;">
+                            <span style="color: #6b7280; font-size: 14px;">Items:</span>
                             <span style="font-weight: 600;">${currentSale.items.reduce((sum, item) => sum + item.quantity, 0)}</span>
                         </div>
-                        <div style="display: flex; justify-content: space-between; padding-top: 12px; border-top: 2px solid #e5e7eb;">
-                            <span style="font-size: 18px; font-weight: 600;">TOTAL:</span>
-                            <span style="font-size: 24px; font-weight: 700; color: #059669;">
-                                $${currentSale.total.toLocaleString()}
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 16px;">
+                            <span style="color: #374151; font-weight: 500;">Subtotal:</span>
+                            <span style="font-weight: 600; color: #1f2937;">$${currentSale.total.toLocaleString('es-CO')}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding-top: 12px; border-top: 2px solid #059669;">
+                            <span style="font-size: 20px; font-weight: 700; color: #059669;">TOTAL:</span>
+                            <span style="font-size: 28px; font-weight: 700; color: #059669;">
+                                $${currentSale.total.toLocaleString('es-CO')}
                             </span>
                         </div>
                     </div>
 
                     ${currentSale.items.length > 0 ? `
                         <div style="margin-bottom: 16px;">
-                            <label style="display: block; margin-bottom: 8px; font-weight: 600;">Método de Pago:</label>
-                            <select id="paymentMethod" style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px;">
+                            <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #374151;">Método de Pago:</label>
+                            <select id="paymentMethod" style="width: 100%; padding: 12px; border: 2px solid #d1d5db; border-radius: 6px; font-size: 14px;">
                                 <option value="Efectivo">💵 Efectivo</option>
                                 <option value="Nequi">📱 Nequi</option>
                                 <option value="Bancolombia">🏦 Bancolombia</option>
@@ -700,15 +704,23 @@ function renderPointOfSale() {
                         </div>
 
                         <div id="cashPaymentSection" style="margin-bottom: 16px;">
-                            <label style="display: block; margin-bottom: 8px; font-weight: 600;">Recibido:</label>
+                            <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #374151;">Paga con:</label>
                             <input
-                                type="number"
+                                type="text"
                                 id="amountReceived"
-                                placeholder="Cantidad recibida"
-                                style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px;"
+                                placeholder="Ej: 50000"
+                                style="width: 100%; padding: 12px; border: 2px solid #3b82f6; border-radius: 6px; font-size: 18px; font-weight: 600;"
                             >
-                            <div id="changeDisplay" style="margin-top: 8px; padding: 8px; background: #fef3c7; border-radius: 4px; display: none;">
-                                <strong>Cambio:</strong> <span id="changeAmount" style="color: #059669; font-size: 18px; font-weight: 700;"></span>
+                            <div id="changeDisplay" style="margin-top: 12px; padding: 16px; background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); border-radius: 8px; border: 2px solid #059669; display: none;">
+                                <div style="text-align: center; margin-bottom: 8px;">
+                                    <div style="font-size: 12px; color: #065f46; margin-bottom: 4px;">Paga con: <strong id="paysWithAmount">$0</strong></div>
+                                    <div style="font-size: 12px; color: #065f46; margin-bottom: 4px;">Total: <strong>$${currentSale.total.toLocaleString('es-CO')}</strong></div>
+                                    <div style="border-top: 1px solid #059669; margin: 8px 0;"></div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 14px; color: #065f46; font-weight: 600; margin-bottom: 4px;">CAMBIO A DEVOLVER:</div>
+                                    <div id="changeAmount" style="font-size: 32px; font-weight: 700; color: #059669;"></div>
+                                </div>
                             </div>
                         </div>
                     ` : ''}
@@ -725,9 +737,9 @@ function renderPointOfSale() {
                     <button
                         onclick="completeSale()"
                         class="btn"
-                        style="flex: 2; padding: 12px; background: #059669; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;"
+                        style="flex: 2; padding: 12px; background: #059669; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 16px;"
                         ${currentSale.items.length === 0 ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
-                        ✅ COBRAR $${currentSale.total.toLocaleString()}
+                        ✅ COBRAR $${currentSale.total.toLocaleString('es-CO')}
                     </button>
                 </div>
             </div>
@@ -737,33 +749,33 @@ function renderPointOfSale() {
 
 function renderCartItems(items) {
     return items.map(item => `
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #e5e7eb;">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #e5e7eb; background: #fafafa; margin-bottom: 4px; border-radius: 4px;">
             <div style="flex: 1;">
-                <div style="font-weight: 600; color: #1f2937;">${item.productName}</div>
-                <div style="font-size: 14px; color: #6b7280;">$${item.price.toLocaleString()} c/u</div>
+                <div style="font-weight: 600; color: #1f2937; font-size: 15px;">${item.productName}</div>
+                <div style="font-size: 13px; color: #6b7280;">$${item.price.toLocaleString('es-CO')} c/u × ${item.quantity}</div>
             </div>
             <div style="display: flex; align-items: center; gap: 8px;">
                 <button onclick="updateCartQuantity('${item.productId}', ${item.quantity - 1})"
-                        class="btn btn-sm" style="background: #ef4444; color: white; width: 30px; height: 30px; padding: 0;">
+                        class="btn btn-sm" style="background: #ef4444; color: white; width: 32px; height: 32px; padding: 0; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
                     -
                 </button>
                 <input
                     type="number"
                     value="${item.quantity}"
                     onchange="updateCartQuantity('${item.productId}', parseInt(this.value))"
-                    style="width: 50px; text-align: center; padding: 4px; border: 1px solid #d1d5db; border-radius: 4px;"
+                    style="width: 50px; text-align: center; padding: 6px; border: 2px solid #d1d5db; border-radius: 4px; font-weight: 600;"
                     min="1"
                 >
                 <button onclick="updateCartQuantity('${item.productId}', ${item.quantity + 1})"
-                        class="btn btn-sm" style="background: #059669; color: white; width: 30px; height: 30px; padding: 0;">
+                        class="btn btn-sm" style="background: #059669; color: white; width: 32px; height: 32px; padding: 0; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
                     +
                 </button>
             </div>
-            <div style="width: 100px; text-align: right; font-weight: 600; color: #059669;">
-                $${item.subtotal.toLocaleString()}
+            <div style="width: 110px; text-align: right; font-weight: 700; color: #059669; font-size: 16px;">
+                $${item.subtotal.toLocaleString('es-CO')}
             </div>
             <button onclick="removeFromCart('${item.productId}')"
-                    class="btn btn-sm" style="background: #6b7280; color: white; margin-left: 8px;">
+                    class="btn btn-sm" style="background: #6b7280; color: white; margin-left: 8px; border: none; border-radius: 4px; cursor: pointer; width: 36px; height: 36px; padding: 0;">
                 🗑️
             </button>
         </div>
@@ -1352,22 +1364,56 @@ function setupPOSEventListeners() {
         });
     }
 
-    // Amount received calculation
+    // Amount received calculation with formatting
     if (amountReceived) {
         amountReceived.addEventListener('input', function() {
+            // Remove all non-numeric characters
+            let value = this.value.replace(/[^\d]/g, '');
+
+            // Don't process if empty
+            if (!value) {
+                document.getElementById('changeDisplay').style.display = 'none';
+                return;
+            }
+
+            const received = Number(value);
             const total = window.SalesManager.currentSale.total;
-            const received = Number(this.value);
             const change = received - total;
 
             const changeDisplay = document.getElementById('changeDisplay');
             const changeAmount = document.getElementById('changeAmount');
+            const paysWithAmount = document.getElementById('paysWithAmount');
 
-            if (received >= total) {
-                changeDisplay.style.display = 'block';
-                changeAmount.textContent = `$${change.toLocaleString()}`;
+            if (received > 0) {
+                // Update "paga con" display
+                if (paysWithAmount) {
+                    paysWithAmount.textContent = `$${received.toLocaleString('es-CO')}`;
+                }
+
+                if (received >= total) {
+                    changeDisplay.style.display = 'block';
+                    changeAmount.textContent = `$${change.toLocaleString('es-CO')}`;
+                } else {
+                    changeDisplay.style.display = 'none';
+                }
             } else {
                 changeDisplay.style.display = 'none';
             }
+        });
+
+        // Format on blur to add commas
+        amountReceived.addEventListener('blur', function() {
+            let value = this.value.replace(/[^\d]/g, '');
+            if (value) {
+                const formatted = Number(value).toLocaleString('es-CO');
+                this.value = formatted;
+            }
+        });
+
+        // Remove formatting on focus to allow easy editing
+        amountReceived.addEventListener('focus', function() {
+            let value = this.value.replace(/[^\d]/g, '');
+            this.value = value;
         });
     }
 
@@ -1471,7 +1517,9 @@ window.completeSale = async function() {
 
         if (paymentMethod === 'Efectivo') {
             const receivedInput = document.getElementById('amountReceived');
-            amountPaid = Number(receivedInput.value);
+            // Remove all formatting (commas, spaces) before converting to number
+            const cleanValue = receivedInput.value.replace(/[^\d]/g, '');
+            amountPaid = Number(cleanValue);
 
             if (!amountPaid || amountPaid < window.SalesManager.currentSale.total) {
                 window.showNotification('❌ El monto recibido es insuficiente', 'error');
@@ -1481,9 +1529,9 @@ window.completeSale = async function() {
 
         const sale = await window.SalesManager.completeSale(paymentMethod, amountPaid);
 
-        // Show success message
-        const change = sale.change > 0 ? `\nCambio: $${sale.change.toLocaleString()}` : '';
-        window.showNotification(`✅ Venta completada\nTotal: $${sale.total.toLocaleString()}${change}`, 'success');
+        // Show success message with proper formatting
+        const change = sale.change > 0 ? `\nCambio: $${sale.change.toLocaleString('es-CO')}` : '';
+        window.showNotification(`✅ Venta completada\nTotal: $${sale.total.toLocaleString('es-CO')}${change}`, 'success');
 
         // Refresh display
         refreshPOSDisplay();
