@@ -1276,7 +1276,7 @@ window.saveProduct = async function(event, productId) {
             window.showNotification('✅ Producto creado', 'success');
         }
 
-        closeModal();
+        window.closeModal();
         showProductsSection();
     } catch (error) {
         console.error('Error saving product:', error);
