@@ -2925,6 +2925,7 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
     <script src="simple-tasks.js"></script>
     <script src="students.js"></script>
     <script src="payments.js"></script>
+    <script src="tienda.js"></script>
     <script src="groups.js"></script>
     <script src="teachers.js"></script>
     <script src="attendance.js"></script>
@@ -2944,6 +2945,8 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
             console.log('✅ Modules Check:');
             console.log('Students:', !!window.StudentManager);
             console.log('Payments:', !!window.PaymentManager);
+            console.log('Tienda - Products:', !!window.ProductManager);
+            console.log('Tienda - Sales:', !!window.SalesManager);
             console.log('Finance:', !!window.FinanceManager);
             console.log('Groups:', !!window.GroupsManager);
             console.log('Teachers:', !!window.TeacherManager);
