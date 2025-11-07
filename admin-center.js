@@ -12,6 +12,8 @@ const SYSTEM_MODULES = [
   { id: 'tasks', name: 'Tareas', icon: '📋', color: '#06b6d4' },
   { id: 'students', name: 'Estudiantes', icon: '👥', color: '#ec4899' },
   { id: 'payments', name: 'Pagos', icon: '💰', color: '#10b981' },
+  { id: 'tienda', name: 'Tienda', icon: '🛒', color: '#f97316' },
+  { id: 'finance', name: 'Finanzas', icon: '💵', color: '#14b8a6' },
   { id: 'groups', name: 'Grupos', icon: '📚', color: '#8b5cf6' },
   { id: 'teachers', name: 'Profesores', icon: '👩‍🏫', color: '#f59e0b' },
   { id: 'attendance', name: 'Asistencia', icon: '✅', color: '#06b6d4' }
