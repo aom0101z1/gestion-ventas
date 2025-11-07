@@ -711,6 +711,70 @@ function renderPointOfSale() {
                                 placeholder="Ej: 50000"
                                 style="width: 100%; padding: 12px; border: 2px solid #3b82f6; border-radius: 6px; font-size: 18px; font-weight: 600;"
                             >
+
+                            <!-- Quick Bill Buttons -->
+                            <div style="margin-top: 12px;">
+                                <div style="font-size: 11px; color: #6b7280; margin-bottom: 6px; text-align: center;">Billetes comunes:</div>
+                                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+                                    <button onclick="selectBillAmount(10000)" type="button" style="
+                                        padding: 10px;
+                                        background: linear-gradient(135deg, #fca5a5 0%, #dc2626 100%);
+                                        color: white;
+                                        border: 2px solid #991b1b;
+                                        border-radius: 6px;
+                                        cursor: pointer;
+                                        font-weight: 700;
+                                        font-size: 14px;
+                                        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                                        transition: transform 0.1s;
+                                    " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                                        💵 $10,000
+                                    </button>
+                                    <button onclick="selectBillAmount(20000)" type="button" style="
+                                        padding: 10px;
+                                        background: linear-gradient(135deg, #fde047 0%, #eab308 100%);
+                                        color: #422006;
+                                        border: 2px solid #a16207;
+                                        border-radius: 6px;
+                                        cursor: pointer;
+                                        font-weight: 700;
+                                        font-size: 14px;
+                                        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                                        transition: transform 0.1s;
+                                    " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                                        💵 $20,000
+                                    </button>
+                                    <button onclick="selectBillAmount(50000)" type="button" style="
+                                        padding: 10px;
+                                        background: linear-gradient(135deg, #86efac 0%, #16a34a 100%);
+                                        color: white;
+                                        border: 2px solid #15803d;
+                                        border-radius: 6px;
+                                        cursor: pointer;
+                                        font-weight: 700;
+                                        font-size: 14px;
+                                        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                                        transition: transform 0.1s;
+                                    " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                                        💵 $50,000
+                                    </button>
+                                    <button onclick="selectBillAmount(100000)" type="button" style="
+                                        padding: 10px;
+                                        background: linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%);
+                                        color: white;
+                                        border: 2px solid #6d28d9;
+                                        border-radius: 6px;
+                                        cursor: pointer;
+                                        font-weight: 700;
+                                        font-size: 14px;
+                                        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                                        transition: transform 0.1s;
+                                    " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                                        💵 $100,000
+                                    </button>
+                                </div>
+                            </div>
+
                             <div id="changeDisplay" style="margin-top: 12px; padding: 16px; background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); border-radius: 8px; border: 2px solid #059669; display: none;">
                                 <div style="text-align: center; margin-bottom: 8px;">
                                     <div style="font-size: 12px; color: #065f46; margin-bottom: 4px;">Paga con: <strong id="paysWithAmount">$0</strong></div>
@@ -1508,6 +1572,25 @@ window.cancelSale = function() {
         refreshPOSDisplay();
         window.showNotification('Venta cancelada', 'info');
     }
+};
+
+// Quick bill amount selection
+window.selectBillAmount = function(amount) {
+    const amountInput = document.getElementById('amountReceived');
+    if (!amountInput) return;
+
+    // Set the value
+    amountInput.value = amount;
+
+    // Trigger the input event to calculate change
+    const event = new Event('input', { bubbles: true });
+    amountInput.dispatchEvent(event);
+
+    // Focus the input field
+    amountInput.focus();
+
+    // Visual feedback
+    window.showNotification(`💵 Seleccionado: $${amount.toLocaleString('es-CO')}`, 'success');
 };
 
 window.completeSale = async function() {
