@@ -4,6 +4,33 @@
 console.log('📦 Loading Tienda module...');
 
 // ============================================
+// DATE HELPER - COLOMBIA TIMEZONE
+// ============================================
+
+/**
+ * Get current date/time in Colombia timezone (UTC-5)
+ * @returns {string} ISO date string in Colombia timezone
+ */
+function getColombiaDateTime() {
+    const now = new Date();
+    const colombiaTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Bogota' }));
+    return colombiaTime.toISOString();
+}
+
+/**
+ * Get today's date in Colombia timezone (UTC-5)
+ * @returns {string} Date in YYYY-MM-DD format
+ */
+function getTodayInColombia() {
+    const now = new Date();
+    const colombiaTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Bogota' }));
+    const year = colombiaTime.getFullYear();
+    const month = String(colombiaTime.getMonth() + 1).padStart(2, '0');
+    const day = String(colombiaTime.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+// ============================================
 // SECTION 1: PRODUCT MANAGER CLASS
 // ============================================
 
@@ -200,7 +227,7 @@ class InventoryManager {
                 quantity: Number(movementData.quantity),
                 cost: Number(movementData.cost || 0),
                 reason: movementData.reason || '',
-                date: new Date().toISOString(),
+                date: getColombiaDateTime(), // Use Colombia timezone
                 recordedBy: window.FirebaseData.currentUser?.email || 'unknown'
             };
 
@@ -396,7 +423,7 @@ class SalesManager {
                 paymentMethod: paymentMethod,
                 amountPaid: amountPaid || this.currentSale.total,
                 change: amountPaid ? (amountPaid - this.currentSale.total) : 0,
-                date: new Date().toISOString(),
+                date: getColombiaDateTime(), // Use Colombia timezone
                 cashier: window.FirebaseData.currentUser?.email || 'unknown'
             };
 
