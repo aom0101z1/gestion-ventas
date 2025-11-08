@@ -564,6 +564,9 @@ function renderFinanceDashboard() {
                     <button onclick="loadDailyReconciliationView()" class="btn" style="background: #3b82f6; color: white;">
                         📋 Cierre Diario
                     </button>
+                    <button onclick="loadInvoicesView()" class="btn" style="background: #f59e0b; color: white;">
+                        🧾 Facturas Tienda
+                    </button>
                     <button onclick="loadExpensesView()" class="btn" style="background: #8b5cf6; color: white;">
                         💸 Gastos
                     </button>
@@ -1602,6 +1605,231 @@ Generado: ${new Date().toLocaleString('es-ES')}
     URL.revokeObjectURL(url);
 
     window.showNotification('✅ Reporte exportado exitosamente', 'success');
+};
+
+// ==================================================================================
+// INVOICES/SALES VIEW (TIENDA)
+// ==================================================================================
+
+window.loadInvoicesView = async function(filter = 'today') {
+    const container = document.getElementById('financeContainer');
+    if (!container) return;
+
+    // Load sales from SalesManager
+    const today = new Date();
+    let startDate, endDate;
+
+    switch(filter) {
+        case 'today':
+            startDate = endDate = today.toISOString().split('T')[0];
+            break;
+        case 'week':
+            const weekStart = new Date(today);
+            weekStart.setDate(today.getDate() - today.getDay());
+            startDate = weekStart.toISOString().split('T')[0];
+            endDate = today.toISOString().split('T')[0];
+            break;
+        case 'month':
+            const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+            startDate = monthStart.toISOString().split('T')[0];
+            endDate = today.toISOString().split('T')[0];
+            break;
+        case 'all':
+            startDate = '2020-01-01';
+            endDate = today.toISOString().split('T')[0];
+            break;
+    }
+
+    // Get sales from Firebase
+    const db = window.firebaseModules.database;
+    const salesRef = db.ref(window.FirebaseData.database, 'sales');
+    const snapshot = await db.get(salesRef);
+
+    let sales = [];
+    if (snapshot.exists()) {
+        const salesData = snapshot.val();
+        sales = Object.entries(salesData).map(([id, sale]) => ({
+            id,
+            ...sale,
+            dateObj: new Date(sale.date)
+        })).filter(sale => {
+            const saleDate = sale.date.split('T')[0];
+            return saleDate >= startDate && saleDate <= endDate;
+        }).sort((a, b) => b.dateObj - a.dateObj);
+    }
+
+    // Calculate totals
+    const totalSales = sales.reduce((sum, sale) => sum + sale.total, 0);
+    const cashSales = sales.filter(s => s.paymentMethod === 'Efectivo').reduce((sum, s) => sum + s.total, 0);
+    const transferSales = sales.filter(s => s.paymentMethod !== 'Efectivo').reduce((sum, s) => sum + s.total, 0);
+
+    container.innerHTML = renderInvoicesView(sales, filter, totalSales, cashSales, transferSales);
+};
+
+function renderInvoicesView(sales, currentFilter, totalSales, cashSales, transferSales) {
+    const filterOptions = [
+        { value: 'today', label: 'Hoy', icon: '📅' },
+        { value: 'week', label: 'Esta Semana', icon: '📆' },
+        { value: 'month', label: 'Este Mes', icon: '🗓️' },
+        { value: 'all', label: 'Todas', icon: '📊' }
+    ];
+
+    return `
+        <div style="padding: 2rem;">
+            <!-- Page Header -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                <div>
+                    <button onclick="loadFinanceTab()" class="btn btn-secondary" style="margin-bottom: 0.5rem;">
+                        ← Volver al Dashboard
+                    </button>
+                    <h1 style="margin: 0;">🧾 Facturas de Tienda</h1>
+                    <p style="margin: 0.5rem 0 0 0; color: #6b7280;">
+                        Historial de ventas del sistema POS
+                    </p>
+                </div>
+                <button onclick="exportInvoicesReport()" class="btn btn-primary" style="background: #f59e0b; color: white;">
+                    📥 Exportar
+                </button>
+            </div>
+
+            <!-- Filter Buttons -->
+            <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 2rem;">
+                <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
+                    ${filterOptions.map(option => `
+                        <button
+                            onclick="loadInvoicesView('${option.value}')"
+                            class="btn"
+                            style="
+                                flex: 1;
+                                padding: 0.75rem;
+                                background: ${currentFilter === option.value ? '#f59e0b' : 'white'};
+                                color: ${currentFilter === option.value ? 'white' : '#374151'};
+                                border: 2px solid ${currentFilter === option.value ? '#f59e0b' : '#e5e7eb'};
+                                font-weight: ${currentFilter === option.value ? '600' : '400'};
+                                transition: all 0.2s;
+                            ">
+                            ${option.icon} ${option.label}
+                        </button>
+                    `).join('')}
+                </div>
+
+                <!-- Totals Summary -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem;">
+                    <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 1.5rem; border-radius: 8px;">
+                        <div style="font-size: 0.9rem; opacity: 0.9;">Total Ventas</div>
+                        <div style="font-size: 2rem; font-weight: bold;">${formatCurrency(totalSales)}</div>
+                        <div style="font-size: 0.8rem; opacity: 0.8;">${sales.length} facturas</div>
+                    </div>
+                    <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; padding: 1.5rem; border-radius: 8px;">
+                        <div style="font-size: 0.9rem; opacity: 0.9;">Efectivo</div>
+                        <div style="font-size: 2rem; font-weight: bold;">${formatCurrency(cashSales)}</div>
+                        <div style="font-size: 0.8rem; opacity: 0.8;">${sales.filter(s => s.paymentMethod === 'Efectivo').length} ventas</div>
+                    </div>
+                    <div style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white; padding: 1.5rem; border-radius: 8px;">
+                        <div style="font-size: 0.9rem; opacity: 0.9;">Transferencias</div>
+                        <div style="font-size: 2rem; font-weight: bold;">${formatCurrency(transferSales)}</div>
+                        <div style="font-size: 0.8rem; opacity: 0.8;">${sales.filter(s => s.paymentMethod !== 'Efectivo').length} ventas</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sales Table -->
+            <div style="background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <h3 style="margin: 0 0 1.5rem 0;">📋 Detalle de Facturas</h3>
+
+                ${sales.length === 0 ? `
+                    <div style="text-align: center; padding: 3rem; color: #6b7280;">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">📭</div>
+                        <p>No hay ventas en el período seleccionado</p>
+                    </div>
+                ` : `
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead style="background: #f3f4f6;">
+                                <tr>
+                                    <th style="padding: 0.75rem; text-align: left;">Fecha/Hora</th>
+                                    <th style="padding: 0.75rem; text-align: left;">ID Venta</th>
+                                    <th style="padding: 0.75rem; text-align: left;">Productos</th>
+                                    <th style="padding: 0.75rem; text-align: center;">Items</th>
+                                    <th style="padding: 0.75rem; text-align: left;">Método Pago</th>
+                                    <th style="padding: 0.75rem; text-align: right;">Total</th>
+                                    <th style="padding: 0.75rem; text-align: right;">Pago</th>
+                                    <th style="padding: 0.75rem; text-align: right;">Cambio</th>
+                                    <th style="padding: 0.75rem; text-align: left;">Cajero</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${sales.map(sale => `
+                                    <tr style="border-bottom: 1px solid #e5e7eb;">
+                                        <td style="padding: 0.75rem;">
+                                            <div style="font-weight: 500;">${new Date(sale.date).toLocaleDateString('es-CO')}</div>
+                                            <div style="font-size: 0.8rem; color: #6b7280;">${new Date(sale.date).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}</div>
+                                        </td>
+                                        <td style="padding: 0.75rem;">
+                                            <code style="font-size: 0.8rem; background: #f3f4f6; padding: 0.25rem 0.5rem; border-radius: 4px;">${sale.id.slice(0, 8)}</code>
+                                        </td>
+                                        <td style="padding: 0.75rem;">
+                                            <button onclick="toggleSaleDetails('${sale.id}')" class="btn btn-sm" style="background: #3b82f6; color: white; font-size: 0.8rem; padding: 0.25rem 0.75rem;">
+                                                Ver Productos
+                                            </button>
+                                            <div id="sale-details-${sale.id}" style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: #f9fafb; border-radius: 4px;">
+                                                ${sale.items.map(item => `
+                                                    <div style="font-size: 0.85rem; margin-bottom: 0.25rem;">
+                                                        • ${item.productName} × ${item.quantity} = <strong>${formatCurrency(item.subtotal)}</strong>
+                                                    </div>
+                                                `).join('')}
+                                            </div>
+                                        </td>
+                                        <td style="padding: 0.75rem; text-align: center;">
+                                            <span style="background: #dbeafe; color: #1e40af; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.85rem; font-weight: 600;">
+                                                ${sale.items.reduce((sum, item) => sum + item.quantity, 0)}
+                                            </span>
+                                        </td>
+                                        <td style="padding: 0.75rem;">
+                                            <span style="
+                                                background: ${sale.paymentMethod === 'Efectivo' ? '#d1fae5' : sale.paymentMethod === 'Nequi' ? '#fef3c7' : '#dbeafe'};
+                                                color: ${sale.paymentMethod === 'Efectivo' ? '#065f46' : sale.paymentMethod === 'Nequi' ? '#92400e' : '#1e40af'};
+                                                padding: 0.25rem 0.75rem;
+                                                border-radius: 12px;
+                                                font-size: 0.85rem;
+                                                font-weight: 500;
+                                            ">
+                                                ${sale.paymentMethod === 'Efectivo' ? '💵' : sale.paymentMethod === 'Nequi' ? '📱' : '🏦'} ${sale.paymentMethod}
+                                            </span>
+                                        </td>
+                                        <td style="padding: 0.75rem; text-align: right; font-weight: 600; color: #059669; font-size: 1rem;">
+                                            ${formatCurrency(sale.total)}
+                                        </td>
+                                        <td style="padding: 0.75rem; text-align: right; color: #6b7280;">
+                                            ${sale.amountPaid ? formatCurrency(sale.amountPaid) : '-'}
+                                        </td>
+                                        <td style="padding: 0.75rem; text-align: right; color: #6b7280;">
+                                            ${sale.change ? formatCurrency(sale.change) : '-'}
+                                        </td>
+                                        <td style="padding: 0.75rem; font-size: 0.85rem;">
+                                            ${sale.cashier || 'N/A'}
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `}
+            </div>
+        </div>
+    `;
+}
+
+window.toggleSaleDetails = function(saleId) {
+    const details = document.getElementById(`sale-details-${saleId}`);
+    if (details) {
+        details.style.display = details.style.display === 'none' ? 'block' : 'none';
+    }
+};
+
+window.exportInvoicesReport = function() {
+    // TODO: Implement export functionality
+    window.showNotification('📥 Funcionalidad de exportación en desarrollo', 'info');
 };
 
 console.log('✅ Finance module loaded successfully');
