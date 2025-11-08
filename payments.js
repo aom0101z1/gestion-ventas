@@ -5,6 +5,35 @@
 console.log('💰 Loading payments module...');
 
 // ==================================================================================
+// DATE HELPER - COLOMBIA TIMEZONE
+// ==================================================================================
+
+/**
+ * Get current date/time in Colombia timezone (UTC-5)
+ * Returns ISO string with Colombia time
+ * @returns {string} ISO date string in Colombia timezone
+ */
+function getColombiaDateTime() {
+    const now = new Date();
+    // Convert to Colombia timezone (UTC-5)
+    const colombiaTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Bogota' }));
+    return colombiaTime.toISOString();
+}
+
+/**
+ * Get today's date in Colombia timezone (UTC-5)
+ * @returns {string} Date in YYYY-MM-DD format
+ */
+function getTodayInColombia() {
+    const now = new Date();
+    const colombiaTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Bogota' }));
+    const year = colombiaTime.getFullYear();
+    const month = String(colombiaTime.getMonth() + 1).padStart(2, '0');
+    const day = String(colombiaTime.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+// ==================================================================================
 // PAYMENT CONFIGURATION - Semester dates and payment options
 // ==================================================================================
 
@@ -207,7 +236,7 @@ async recordMultiMonthPayment(studentId, paymentData) {
                 bank: paymentData.bank,
                 month: monthData.month.toLowerCase(),
                 year: monthData.year,
-                date: new Date().toISOString(),
+                date: getColombiaDateTime(), // Use Colombia timezone
                 registeredBy: window.FirebaseData.currentUser?.uid,
                 notes: paymentData.notes || '',
                 paymentType: paymentData.paymentType, // 'semester', 'annual', etc
@@ -285,7 +314,7 @@ async recordPayment(studentId, paymentData) {
             bank: paymentData.bank,
             month: paymentData.month.toLowerCase(), // Ensure lowercase
             year: paymentData.year || new Date().getFullYear(),
-            date: new Date().toISOString(),
+            date: getColombiaDateTime(), // Use Colombia timezone
             registeredBy: window.FirebaseData.currentUser?.uid,
             notes: paymentData.notes || ''
         };
@@ -338,7 +367,7 @@ async recordPayment(studentId, paymentData) {
         const ref = db.ref(window.FirebaseData.database, `students/${studentId}/pagos/${month}`);
         await db.set(ref, {
             paid,
-            date: new Date().toISOString(),
+            date: getColombiaDateTime(), // Use Colombia timezone
             updatedBy: window.FirebaseData.currentUser?.uid
         });
     }
