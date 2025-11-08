@@ -366,11 +366,22 @@ class FinanceManager {
     // REVENUE CALCULATIONS
     // ==================================================================================
 
-    calculateDailyRevenue(date) {
-        const payments = Array.from(window.PaymentManager.payments.values()).filter(p => {
-            const paymentDate = p.date ? p.date.split('T')[0] : null;
-            return paymentDate === date;
-        });
+    async calculateDailyRevenue(date) {
+        // Query Firebase directly instead of using in-memory cache
+        const db = window.firebaseModules.database;
+        const paymentsRef = db.ref(window.FirebaseData.database, 'payments');
+        const snapshot = await db.get(paymentsRef);
+
+        let payments = [];
+        if (snapshot.exists()) {
+            const paymentsData = snapshot.val();
+            payments = Object.entries(paymentsData)
+                .map(([id, payment]) => ({ id, ...payment }))
+                .filter(p => {
+                    const paymentDate = p.date ? p.date.split('T')[0] : null;
+                    return paymentDate === date;
+                });
+        }
 
         const cashPayments = payments.filter(p => p.method === 'Efectivo');
         const transferPayments = payments.filter(p => p.method === 'Transferencia');
@@ -541,13 +552,13 @@ class FinanceManager {
 // ==================================================================================
 
 // Render main finance dashboard
-function renderFinanceDashboard() {
+async function renderFinanceDashboard() {
     const today = window.getTodayInColombia();
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth() + 1;
 
     // Get today's data
-    const dailyRevenue = window.FinanceManager.calculateDailyRevenue(today);
+    const dailyRevenue = await window.FinanceManager.calculateDailyRevenue(today);
     const reconciliation = window.FinanceManager.getDailyReconciliation(today);
     const expectedRevenue = window.FinanceManager.calculateExpectedMonthlyRevenue();
     const monthlyMetrics = window.FinanceManager.calculateMonthlyMetrics(currentYear, currentMonth);
@@ -695,10 +706,10 @@ function renderFinanceDashboard() {
 }
 
 // Render Daily Cash Reconciliation View
-function renderDailyReconciliationView() {
+async function renderDailyReconciliationView() {
     const today = window.getTodayInColombia();
     const reconciliation = window.FinanceManager.getDailyReconciliation(today);
-    const dailyRevenue = window.FinanceManager.calculateDailyRevenue(today);
+    const dailyRevenue = await window.FinanceManager.calculateDailyRevenue(today);
 
     console.log('🎨 Rendering Cierre Diario for:', today);
     console.log('🎨 Reconciliation object:', reconciliation);
@@ -1049,22 +1060,22 @@ window.loadFinanceTab = async function() {
 
     await window.FinanceManager.init();
 
-    container.innerHTML = renderFinanceDashboard();
+    container.innerHTML = await renderFinanceDashboard();
 };
 
-window.loadDailyReconciliationView = function() {
+window.loadDailyReconciliationView = async function() {
     const container = document.getElementById('financeContainer');
     if (!container) return;
 
-    container.innerHTML = renderDailyReconciliationView();
+    container.innerHTML = await renderDailyReconciliationView();
 };
 
-window.calculateDiscrepancy = function() {
+window.calculateDiscrepancy = async function() {
     const openingBalance = parseCurrencyInput(document.getElementById('openingBalance').value);
     const closingCount = parseCurrencyInput(document.getElementById('closingCount').value);
 
     const today = window.getTodayInColombia();
-    const dailyRevenue = window.FinanceManager.calculateDailyRevenue(today);
+    const dailyRevenue = await window.FinanceManager.calculateDailyRevenue(today);
     const todayExpenses = window.FinanceManager.getExpenses({ startDate: today, endDate: today });
     const totalExpenses = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
 
@@ -1627,7 +1638,7 @@ window.loadTodayMovementsView = async function() {
     console.log('📊 Loading today movements for date:', today);
 
     // Get today's revenue (students payments)
-    const dailyRevenue = window.FinanceManager.calculateDailyRevenue(today);
+    const dailyRevenue = await window.FinanceManager.calculateDailyRevenue(today);
     console.log('💰 Daily revenue calculated:', dailyRevenue);
 
     // Get today's expenses
