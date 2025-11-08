@@ -1618,12 +1618,16 @@ window.loadTodayMovementsView = async function() {
     const today = new Date().toISOString().split('T')[0];
     const db = window.firebaseModules.database;
 
+    console.log('📊 Loading today movements for date:', today);
+
     // Get today's revenue (students payments)
     const dailyRevenue = window.FinanceManager.calculateDailyRevenue(today);
+    console.log('💰 Daily revenue calculated:', dailyRevenue);
 
     // Get today's expenses
     const todayExpenses = window.FinanceManager.getExpenses({ startDate: today, endDate: today });
     const totalExpenses = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
+    console.log('💸 Today expenses:', todayExpenses.length, 'total:', totalExpenses);
 
     // Get today's student payments (detailed)
     const paymentsRef = db.ref(window.FirebaseData.database, 'payments');
@@ -1632,6 +1636,7 @@ window.loadTodayMovementsView = async function() {
     let todayPayments = [];
     if (paymentsSnapshot.exists()) {
         const paymentsData = paymentsSnapshot.val();
+        console.log('📚 Total payments in database:', Object.keys(paymentsData).length);
         todayPayments = Object.entries(paymentsData)
             .map(([id, payment]) => ({ id, ...payment }))
             .filter(payment => {
@@ -1639,6 +1644,10 @@ window.loadTodayMovementsView = async function() {
                 return paymentDate === today;
             })
             .sort((a, b) => new Date(b.date) - new Date(a.date));
+        console.log('📚 Today payments filtered:', todayPayments.length);
+        if (todayPayments.length > 0) {
+            console.log('📚 First payment example:', todayPayments[0]);
+        }
     }
 
     // Get students map for names
@@ -1660,11 +1669,28 @@ window.loadTodayMovementsView = async function() {
     let storeSalesDetails = [];
     if (salesSnapshot.exists()) {
         const salesData = salesSnapshot.val();
-        storeSalesDetails = Object.entries(salesData)
-            .map(([id, sale]) => ({ id, ...sale }))
-            .filter(sale => sale.date.split('T')[0] === today)
+        console.log('🛒 Total sales in database:', Object.keys(salesData).length);
+        const allSales = Object.entries(salesData).map(([id, sale]) => ({ id, ...sale }));
+        console.log('🛒 First sale example (raw):', allSales[0]);
+
+        storeSalesDetails = allSales
+            .filter(sale => {
+                if (!sale.date) {
+                    console.warn('🛒 Sale without date:', sale.id);
+                    return false;
+                }
+                const saleDate = sale.date.split('T')[0];
+                const matches = saleDate === today;
+                if (matches) {
+                    console.log('🛒 Matched sale:', sale.id, 'date:', saleDate);
+                }
+                return matches;
+            })
             .sort((a, b) => new Date(b.date) - new Date(a.date));
         storeSales = storeSalesDetails.reduce((sum, sale) => sum + sale.total, 0);
+        console.log('🛒 Today sales filtered:', storeSalesDetails.length, 'total:', storeSales);
+    } else {
+        console.log('🛒 No sales found in database');
     }
 
     // Calculate balance
