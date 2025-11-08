@@ -25,6 +25,25 @@ const ExpenseCategories = {
 };
 
 // ==================================================================================
+// DATE HELPER - COLOMBIA TIMEZONE
+// ==================================================================================
+
+/**
+ * Get today's date in Colombia timezone (UTC-5)
+ * This fixes timezone issues where server might be in different timezone
+ * @returns {string} Date in YYYY-MM-DD format
+ */
+function getTodayInColombia() {
+    const now = new Date();
+    // Convert to Colombia timezone (UTC-5)
+    const colombiaTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Bogota' }));
+    const year = colombiaTime.getFullYear();
+    const month = String(colombiaTime.getMonth() + 1).padStart(2, '0');
+    const day = String(colombiaTime.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+// ==================================================================================
 // CURRENCY FORMATTING HELPER
 // ==================================================================================
 
@@ -135,7 +154,7 @@ class FinanceManager {
                 amount: parseCurrencyInput(expenseData.amount),
                 category: expenseData.category,
                 description: expenseData.description,
-                date: expenseData.date || new Date().toISOString().split('T')[0],
+                date: expenseData.date || getTodayInColombia(),
                 receiptUrl: expenseData.receiptUrl || null,
                 registeredBy: window.FirebaseData.currentUser?.uid,
                 registeredByName: window.FirebaseData.currentUser?.email,
@@ -536,7 +555,7 @@ class FinanceManager {
 
 // Render main finance dashboard
 function renderFinanceDashboard() {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayInColombia();
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth() + 1;
 
@@ -690,7 +709,7 @@ function renderFinanceDashboard() {
 
 // Render Daily Cash Reconciliation View
 function renderDailyReconciliationView() {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayInColombia();
     const reconciliation = window.FinanceManager.getDailyReconciliation(today);
     const dailyRevenue = window.FinanceManager.calculateDailyRevenue(today);
 
@@ -1057,7 +1076,7 @@ window.calculateDiscrepancy = function() {
     const openingBalance = parseCurrencyInput(document.getElementById('openingBalance').value);
     const closingCount = parseCurrencyInput(document.getElementById('closingCount').value);
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayInColombia();
     const dailyRevenue = window.FinanceManager.calculateDailyRevenue(today);
     const todayExpenses = window.FinanceManager.getExpenses({ startDate: today, endDate: today });
     const totalExpenses = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
@@ -1108,7 +1127,7 @@ window.toggleCashDetails = function() {
 window.saveDailyReconciliation = async function(event) {
     event.preventDefault();
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayInColombia();
 
     const data = {
         openingBalance: document.getElementById('openingBalance').value,
@@ -1272,7 +1291,7 @@ window.loadExpensesView = function() {
 };
 
 window.showAddExpenseModal = function() {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayInColombia();
 
     const modal = document.createElement('div');
     modal.id = 'expenseModal';
@@ -1615,7 +1634,7 @@ window.loadTodayMovementsView = async function() {
     const container = document.getElementById('financeContainer');
     if (!container) return;
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayInColombia();
     const db = window.firebaseModules.database;
 
     console.log('📊 Loading today movements for date:', today);
