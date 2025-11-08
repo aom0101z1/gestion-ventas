@@ -1616,6 +1616,7 @@ window.loadTodayMovementsView = async function() {
     if (!container) return;
 
     const today = new Date().toISOString().split('T')[0];
+    const db = window.firebaseModules.database;
 
     // Get today's revenue (students payments)
     const dailyRevenue = window.FinanceManager.calculateDailyRevenue(today);
@@ -1624,17 +1625,46 @@ window.loadTodayMovementsView = async function() {
     const todayExpenses = window.FinanceManager.getExpenses({ startDate: today, endDate: today });
     const totalExpenses = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
 
+    // Get today's student payments (detailed)
+    const paymentsRef = db.ref(window.FirebaseData.database, 'payments');
+    const paymentsSnapshot = await db.get(paymentsRef);
+
+    let todayPayments = [];
+    if (paymentsSnapshot.exists()) {
+        const paymentsData = paymentsSnapshot.val();
+        todayPayments = Object.entries(paymentsData)
+            .map(([id, payment]) => ({ id, ...payment }))
+            .filter(payment => {
+                const paymentDate = payment.date ? payment.date.split('T')[0] : null;
+                return paymentDate === today;
+            })
+            .sort((a, b) => new Date(b.date) - new Date(a.date));
+    }
+
+    // Get students map for names
+    const studentsRef = db.ref(window.FirebaseData.database, 'students');
+    const studentsSnapshot = await db.get(studentsRef);
+    const students = new Map();
+    if (studentsSnapshot.exists()) {
+        const studentsData = studentsSnapshot.val();
+        Object.entries(studentsData).forEach(([id, student]) => {
+            students.set(id, student);
+        });
+    }
+
     // Get today's store sales
-    const db = window.firebaseModules.database;
     const salesRef = db.ref(window.FirebaseData.database, 'sales');
-    const snapshot = await db.get(salesRef);
+    const salesSnapshot = await db.get(salesRef);
 
     let storeSales = 0;
-    if (snapshot.exists()) {
-        const salesData = snapshot.val();
-        storeSales = Object.values(salesData)
+    let storeSalesDetails = [];
+    if (salesSnapshot.exists()) {
+        const salesData = salesSnapshot.val();
+        storeSalesDetails = Object.entries(salesData)
+            .map(([id, sale]) => ({ id, ...sale }))
             .filter(sale => sale.date.split('T')[0] === today)
-            .reduce((sum, sale) => sum + sale.total, 0);
+            .sort((a, b) => new Date(b.date) - new Date(a.date));
+        storeSales = storeSalesDetails.reduce((sum, sale) => sum + sale.total, 0);
     }
 
     // Calculate balance
@@ -1745,30 +1775,89 @@ window.loadTodayMovementsView = async function() {
                 <div style="background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                     <h3 style="margin: 0 0 1.5rem 0; color: #10b981;">💰 Detalle de Ingresos</h3>
 
-                    <div style="margin-bottom: 1.5rem; padding: 1rem; background: #f0fdf4; border-radius: 8px; border-left: 4px solid #10b981;">
-                        <div style="font-weight: 600; color: #065f46; margin-bottom: 0.75rem;">Pagos de Estudiantes</div>
-                        <div style="display: grid; gap: 0.5rem;">
-                            <div style="display: flex; justify-content: space-between;">
-                                <span style="color: #6b7280;">Efectivo:</span>
-                                <strong style="color: #10b981;">${formatCurrency(dailyRevenue.cash)}</strong>
-                            </div>
-                            <div style="display: flex; justify-content: space-between;">
-                                <span style="color: #6b7280;">Transferencias:</span>
-                                <strong style="color: #10b981;">${formatCurrency(dailyRevenue.transfers)}</strong>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; padding-top: 0.5rem; border-top: 1px solid #d1fae5;">
-                                <span style="font-weight: 600;">Subtotal:</span>
-                                <strong style="color: #059669;">${formatCurrency(dailyRevenue.total)}</strong>
-                            </div>
+                    <!-- Student Payments List -->
+                    <div style="margin-bottom: 1.5rem;">
+                        <div style="font-weight: 600; color: #065f46; margin-bottom: 0.75rem; padding: 0.5rem; background: #f0fdf4; border-radius: 6px;">
+                            📚 Pagos de Estudiantes (${todayPayments.length})
                         </div>
+                        ${todayPayments.length === 0 ? `
+                            <div style="text-align: center; padding: 1.5rem; color: #6b7280; font-size: 0.9rem;">
+                                No hay pagos de estudiantes hoy
+                            </div>
+                        ` : `
+                            <div style="max-height: 250px; overflow-y: auto; border: 1px solid #d1fae5; border-radius: 6px;">
+                                ${todayPayments.map(payment => {
+                                    const student = students.get(payment.studentId);
+                                    const studentName = student ? student.nombre : 'Estudiante desconocido';
+                                    const paymentTime = new Date(payment.date).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+                                    return `
+                                        <div style="padding: 0.75rem; border-bottom: 1px solid #f0fdf4; display: flex; justify-content: space-between; align-items: center;">
+                                            <div style="flex: 1;">
+                                                <div style="font-weight: 500; color: #1f2937; font-size: 0.9rem;">${studentName}</div>
+                                                <div style="font-size: 0.75rem; color: #6b7280;">
+                                                    ${paymentTime} •
+                                                    <span style="color: ${payment.method === 'Efectivo' ? '#059669' : '#3b82f6'};">
+                                                        ${payment.method === 'Efectivo' ? '💵' : payment.method === 'Nequi' ? '📱' : '🏦'} ${payment.method}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div style="font-weight: 700; color: #10b981; font-size: 0.95rem;">
+                                                ${formatCurrency(payment.amount)}
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                            <div style="padding: 0.75rem; background: #f0fdf4; border-radius: 6px; margin-top: 0.5rem;">
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="font-weight: 600; color: #065f46;">Total Estudiantes:</span>
+                                    <strong style="color: #059669; font-size: 1.1rem;">${formatCurrency(dailyRevenue.total)}</strong>
+                                </div>
+                            </div>
+                        `}
                     </div>
 
-                    <div style="padding: 1rem; background: #fef3c7; border-radius: 8px; border-left: 4px solid #f59e0b;">
-                        <div style="font-weight: 600; color: #92400e; margin-bottom: 0.75rem;">Ventas de Tienda</div>
-                        <div style="display: flex; justify-content: space-between;">
-                            <span style="color: #6b7280;">Total ventas POS:</span>
-                            <strong style="color: #d97706; font-size: 1.2rem;">${formatCurrency(storeSales)}</strong>
+                    <!-- Store Sales List -->
+                    <div>
+                        <div style="font-weight: 600; color: #92400e; margin-bottom: 0.75rem; padding: 0.5rem; background: #fef3c7; border-radius: 6px;">
+                            🛒 Ventas de Tienda (${storeSalesDetails.length})
                         </div>
+                        ${storeSalesDetails.length === 0 ? `
+                            <div style="text-align: center; padding: 1.5rem; color: #6b7280; font-size: 0.9rem;">
+                                No hay ventas de tienda hoy
+                            </div>
+                        ` : `
+                            <div style="max-height: 250px; overflow-y: auto; border: 1px solid #fef3c7; border-radius: 6px;">
+                                ${storeSalesDetails.map(sale => {
+                                    const saleTime = new Date(sale.date).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+                                    const itemsCount = sale.items.reduce((sum, item) => sum + item.quantity, 0);
+                                    return `
+                                        <div style="padding: 0.75rem; border-bottom: 1px solid #fef3c7; display: flex; justify-content: space-between; align-items: center;">
+                                            <div style="flex: 1;">
+                                                <div style="font-weight: 500; color: #1f2937; font-size: 0.9rem;">
+                                                    Venta #${sale.id.slice(0, 6)} (${itemsCount} items)
+                                                </div>
+                                                <div style="font-size: 0.75rem; color: #6b7280;">
+                                                    ${saleTime} •
+                                                    <span style="color: ${sale.paymentMethod === 'Efectivo' ? '#d97706' : '#3b82f6'};">
+                                                        ${sale.paymentMethod === 'Efectivo' ? '💵' : sale.paymentMethod === 'Nequi' ? '📱' : '🏦'} ${sale.paymentMethod}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div style="font-weight: 700; color: #d97706; font-size: 0.95rem;">
+                                                ${formatCurrency(sale.total)}
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                            <div style="padding: 0.75rem; background: #fef3c7; border-radius: 6px; margin-top: 0.5rem;">
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="font-weight: 600; color: #92400e;">Total Tienda:</span>
+                                    <strong style="color: #d97706; font-size: 1.1rem;">${formatCurrency(storeSales)}</strong>
+                                </div>
+                            </div>
+                        `}
                     </div>
 
                 </div>
