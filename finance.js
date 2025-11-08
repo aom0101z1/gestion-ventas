@@ -805,7 +805,7 @@ async function renderDailyReconciliationView() {
                                 ${dailyRevenue.payments
                                     .filter(p => p.method === 'Efectivo')
                                     .map(payment => {
-                                        const student = window.StudentManager.students.get(payment.studentId);
+                                        const student = students.get(payment.studentId);
                                         return `
                                             <div style="background: white; padding: 0.75rem; margin-bottom: 0.5rem; border-radius: 6px; border-left: 3px solid #10b981;">
                                                 <div style="display: flex; justify-content: space-between; align-items: start;">
@@ -864,7 +864,7 @@ async function renderDailyReconciliationView() {
                                 ${dailyRevenue.payments
                                     .filter(p => p.method === 'Transferencia')
                                     .map(payment => {
-                                        const student = window.StudentManager.students.get(payment.studentId);
+                                        const student = students.get(payment.studentId);
                                         return `
                                             <div style="background: white; padding: 0.75rem; margin-bottom: 0.5rem; border-radius: 6px; border-left: 3px solid #3b82f6;">
                                                 <div style="display: flex; justify-content: space-between; align-items: start;">
@@ -1012,7 +1012,7 @@ async function renderDailyReconciliationView() {
                         </thead>
                         <tbody>
                             ${dailyRevenue.payments.map(payment => {
-                                const student = window.StudentManager.students.get(payment.studentId);
+                                const student = students.get(payment.studentId);
                                 const time = payment.date ? new Date(payment.date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '-';
                                 return `
                                     <tr style="border-top: 1px solid #e5e7eb;">
