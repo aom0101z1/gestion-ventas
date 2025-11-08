@@ -711,6 +711,18 @@ async function renderDailyReconciliationView() {
     const reconciliation = window.FinanceManager.getDailyReconciliation(today);
     const dailyRevenue = await window.FinanceManager.calculateDailyRevenue(today);
 
+    // Get students map for names
+    const db = window.firebaseModules.database;
+    const studentsRef = db.ref(window.FirebaseData.database, 'students');
+    const studentsSnapshot = await db.get(studentsRef);
+    const students = new Map();
+    if (studentsSnapshot.exists()) {
+        const studentsData = studentsSnapshot.val();
+        Object.entries(studentsData).forEach(([id, student]) => {
+            students.set(id, student);
+        });
+    }
+
     console.log('🎨 Rendering Cierre Diario for:', today);
     console.log('🎨 Reconciliation object:', reconciliation);
 
