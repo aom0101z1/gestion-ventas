@@ -25,23 +25,41 @@ const ExpenseCategories = {
 };
 
 // ==================================================================================
-// DATE HELPER - COLOMBIA TIMEZONE
+// DATE HELPERS - USE LOCAL COMPUTER TIME
 // ==================================================================================
 
 /**
- * Get today's date in Colombia timezone (UTC-5)
- * This fixes timezone issues where server might be in different timezone
+ * Get today's date from local computer
+ * Simple: just uses the computer's date, no timezone conversions
  * @returns {string} Date in YYYY-MM-DD format
  */
-function getTodayInColombia() {
+function getLocalDate() {
     const now = new Date();
-    // Convert to Colombia timezone (UTC-5)
-    const colombiaTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Bogota' }));
-    const year = colombiaTime.getFullYear();
-    const month = String(colombiaTime.getMonth() + 1).padStart(2, '0');
-    const day = String(colombiaTime.getDate()).padStart(2, '0');
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
 }
+
+/**
+ * Get current date/time from local computer
+ * Format: YYYY-MM-DDTHH:mm:ss.sss (local time, no UTC conversion)
+ * @returns {string} DateTime string
+ */
+function getLocalDateTime() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    const ms = String(now.getMilliseconds()).padStart(3, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${ms}`;
+}
+
+// Backwards compatibility alias
+const getTodayInColombia = getLocalDate;
 
 // ==================================================================================
 // CURRENCY FORMATTING HELPER

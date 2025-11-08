@@ -5,33 +5,42 @@
 console.log('💰 Loading payments module...');
 
 // ==================================================================================
-// DATE HELPER - COLOMBIA TIMEZONE
+// DATE HELPERS - USE LOCAL COMPUTER TIME
 // ==================================================================================
 
 /**
- * Get current date/time in Colombia timezone (UTC-5)
- * Returns ISO string with Colombia time
- * @returns {string} ISO date string in Colombia timezone
+ * Get today's date from local computer
+ * Simple: just uses the computer's date, no timezone conversions
+ * @returns {string} Date in YYYY-MM-DD format
  */
-function getColombiaDateTime() {
+function getLocalDate() {
     const now = new Date();
-    // Convert to Colombia timezone (UTC-5)
-    const colombiaTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Bogota' }));
-    return colombiaTime.toISOString();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 }
 
 /**
- * Get today's date in Colombia timezone (UTC-5)
- * @returns {string} Date in YYYY-MM-DD format
+ * Get current date/time from local computer
+ * Format: YYYY-MM-DDTHH:mm:ss.sss (local time, no UTC conversion)
+ * @returns {string} DateTime string
  */
-function getTodayInColombia() {
+function getLocalDateTime() {
     const now = new Date();
-    const colombiaTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Bogota' }));
-    const year = colombiaTime.getFullYear();
-    const month = String(colombiaTime.getMonth() + 1).padStart(2, '0');
-    const day = String(colombiaTime.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    const ms = String(now.getMilliseconds()).padStart(3, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${ms}`;
 }
+
+// Backwards compatibility aliases
+const getTodayInColombia = getLocalDate;
+const getColombiaDateTime = getLocalDateTime;
 
 // ==================================================================================
 // PAYMENT CONFIGURATION - Semester dates and payment options
