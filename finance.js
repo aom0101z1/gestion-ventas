@@ -25,41 +25,10 @@ const ExpenseCategories = {
 };
 
 // ==================================================================================
-// DATE HELPERS - USE LOCAL COMPUTER TIME
+// DATE HELPERS - Imported from date-utils.js
 // ==================================================================================
-
-/**
- * Get today's date from local computer
- * Simple: just uses the computer's date, no timezone conversions
- * @returns {string} Date in YYYY-MM-DD format
- */
-function getLocalDate() {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-}
-
-/**
- * Get current date/time from local computer
- * Format: YYYY-MM-DDTHH:mm:ss.sss (local time, no UTC conversion)
- * @returns {string} DateTime string
- */
-function getLocalDateTime() {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    const seconds = String(now.getSeconds()).padStart(2, '0');
-    const ms = String(now.getMilliseconds()).padStart(3, '0');
-    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${ms}`;
-}
-
-// Backwards compatibility alias
-const getTodayInColombia = getLocalDate;
+// Functions: window.getLocalDate(), window.getLocalDateTime()
+// Aliases: window.window.getTodayInColombia(), window.getColombiaDateTime()
 
 // ==================================================================================
 // CURRENCY FORMATTING HELPER
@@ -172,7 +141,7 @@ class FinanceManager {
                 amount: parseCurrencyInput(expenseData.amount),
                 category: expenseData.category,
                 description: expenseData.description,
-                date: expenseData.date || getTodayInColombia(),
+                date: expenseData.date || window.getTodayInColombia(),
                 receiptUrl: expenseData.receiptUrl || null,
                 registeredBy: window.FirebaseData.currentUser?.uid,
                 registeredByName: window.FirebaseData.currentUser?.email,
@@ -573,7 +542,7 @@ class FinanceManager {
 
 // Render main finance dashboard
 function renderFinanceDashboard() {
-    const today = getTodayInColombia();
+    const today = window.getTodayInColombia();
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth() + 1;
 
@@ -727,7 +696,7 @@ function renderFinanceDashboard() {
 
 // Render Daily Cash Reconciliation View
 function renderDailyReconciliationView() {
-    const today = getTodayInColombia();
+    const today = window.getTodayInColombia();
     const reconciliation = window.FinanceManager.getDailyReconciliation(today);
     const dailyRevenue = window.FinanceManager.calculateDailyRevenue(today);
 
@@ -1094,7 +1063,7 @@ window.calculateDiscrepancy = function() {
     const openingBalance = parseCurrencyInput(document.getElementById('openingBalance').value);
     const closingCount = parseCurrencyInput(document.getElementById('closingCount').value);
 
-    const today = getTodayInColombia();
+    const today = window.getTodayInColombia();
     const dailyRevenue = window.FinanceManager.calculateDailyRevenue(today);
     const todayExpenses = window.FinanceManager.getExpenses({ startDate: today, endDate: today });
     const totalExpenses = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
@@ -1145,7 +1114,7 @@ window.toggleCashDetails = function() {
 window.saveDailyReconciliation = async function(event) {
     event.preventDefault();
 
-    const today = getTodayInColombia();
+    const today = window.getTodayInColombia();
 
     const data = {
         openingBalance: document.getElementById('openingBalance').value,
@@ -1309,7 +1278,7 @@ window.loadExpensesView = function() {
 };
 
 window.showAddExpenseModal = function() {
-    const today = getTodayInColombia();
+    const today = window.getTodayInColombia();
 
     const modal = document.createElement('div');
     modal.id = 'expenseModal';
@@ -1652,7 +1621,7 @@ window.loadTodayMovementsView = async function() {
     const container = document.getElementById('financeContainer');
     if (!container) return;
 
-    const today = getTodayInColombia();
+    const today = window.getTodayInColombia();
     const db = window.firebaseModules.database;
 
     console.log('📊 Loading today movements for date:', today);

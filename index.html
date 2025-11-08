@@ -2956,6 +2956,8 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
     </script>
 
     <!-- ========== SECTION 17: EXTERNAL MODULE SCRIPTS ========== -->
+    <!-- Date utilities must load first (used by finance, payments, tienda) -->
+    <script src="date-utils.js"></script>
     <script src="fixes.js"></script>
     <script src="social.js"></script>
     <script src="pipeline.js"></script>

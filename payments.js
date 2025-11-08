@@ -5,42 +5,10 @@
 console.log('💰 Loading payments module...');
 
 // ==================================================================================
-// DATE HELPERS - USE LOCAL COMPUTER TIME
+// DATE HELPERS - Imported from date-utils.js
 // ==================================================================================
-
-/**
- * Get today's date from local computer
- * Simple: just uses the computer's date, no timezone conversions
- * @returns {string} Date in YYYY-MM-DD format
- */
-function getLocalDate() {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-}
-
-/**
- * Get current date/time from local computer
- * Format: YYYY-MM-DDTHH:mm:ss.sss (local time, no UTC conversion)
- * @returns {string} DateTime string
- */
-function getLocalDateTime() {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    const seconds = String(now.getSeconds()).padStart(2, '0');
-    const ms = String(now.getMilliseconds()).padStart(3, '0');
-    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${ms}`;
-}
-
-// Backwards compatibility aliases
-const getTodayInColombia = getLocalDate;
-const getColombiaDateTime = getLocalDateTime;
+// Functions: window.getLocalDate(), window.getLocalDateTime()
+// Aliases: window.getTodayInColombia(), window.window.getColombiaDateTime()
 
 // ==================================================================================
 // PAYMENT CONFIGURATION - Semester dates and payment options
@@ -245,7 +213,7 @@ async recordMultiMonthPayment(studentId, paymentData) {
                 bank: paymentData.bank,
                 month: monthData.month.toLowerCase(),
                 year: monthData.year,
-                date: getColombiaDateTime(), // Use Colombia timezone
+                date: window.getColombiaDateTime(), // Use Colombia timezone
                 registeredBy: window.FirebaseData.currentUser?.uid,
                 notes: paymentData.notes || '',
                 paymentType: paymentData.paymentType, // 'semester', 'annual', etc
@@ -323,7 +291,7 @@ async recordPayment(studentId, paymentData) {
             bank: paymentData.bank,
             month: paymentData.month.toLowerCase(), // Ensure lowercase
             year: paymentData.year || new Date().getFullYear(),
-            date: getColombiaDateTime(), // Use Colombia timezone
+            date: window.getColombiaDateTime(), // Use Colombia timezone
             registeredBy: window.FirebaseData.currentUser?.uid,
             notes: paymentData.notes || ''
         };
@@ -376,7 +344,7 @@ async recordPayment(studentId, paymentData) {
         const ref = db.ref(window.FirebaseData.database, `students/${studentId}/pagos/${month}`);
         await db.set(ref, {
             paid,
-            date: getColombiaDateTime(), // Use Colombia timezone
+            date: window.getColombiaDateTime(), // Use Colombia timezone
             updatedBy: window.FirebaseData.currentUser?.uid
         });
     }
