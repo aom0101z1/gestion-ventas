@@ -564,8 +564,8 @@ function renderFinanceDashboard() {
                     <button onclick="loadDailyReconciliationView()" class="btn" style="background: #3b82f6; color: white;">
                         📋 Cierre Diario
                     </button>
-                    <button onclick="loadInvoicesView()" class="btn" style="background: #f59e0b; color: white;">
-                        🧾 Facturas Tienda
+                    <button onclick="loadTodayMovementsView()" class="btn" style="background: #f59e0b; color: white;">
+                        📊 Ingresos y Gastos Hoy
                     </button>
                     <button onclick="loadExpensesView()" class="btn" style="background: #8b5cf6; color: white;">
                         💸 Gastos
@@ -1608,228 +1608,174 @@ Generado: ${new Date().toLocaleString('es-ES')}
 };
 
 // ==================================================================================
-// INVOICES/SALES VIEW (TIENDA)
+// TODAY'S INCOME & EXPENSES VIEW (SIMPLE)
 // ==================================================================================
 
-window.loadInvoicesView = async function(filter = 'today') {
+window.loadTodayMovementsView = async function() {
     const container = document.getElementById('financeContainer');
     if (!container) return;
 
-    // Load sales from SalesManager
-    const today = new Date();
-    let startDate, endDate;
+    const today = new Date().toISOString().split('T')[0];
 
-    switch(filter) {
-        case 'today':
-            startDate = endDate = today.toISOString().split('T')[0];
-            break;
-        case 'week':
-            const weekStart = new Date(today);
-            weekStart.setDate(today.getDate() - today.getDay());
-            startDate = weekStart.toISOString().split('T')[0];
-            endDate = today.toISOString().split('T')[0];
-            break;
-        case 'month':
-            const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-            startDate = monthStart.toISOString().split('T')[0];
-            endDate = today.toISOString().split('T')[0];
-            break;
-        case 'all':
-            startDate = '2020-01-01';
-            endDate = today.toISOString().split('T')[0];
-            break;
-    }
+    // Get today's revenue (students payments)
+    const dailyRevenue = window.FinanceManager.calculateDailyRevenue(today);
 
-    // Get sales from Firebase
+    // Get today's expenses
+    const todayExpenses = window.FinanceManager.getExpenses({ startDate: today, endDate: today });
+    const totalExpenses = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+    // Get today's store sales
     const db = window.firebaseModules.database;
     const salesRef = db.ref(window.FirebaseData.database, 'sales');
     const snapshot = await db.get(salesRef);
 
-    let sales = [];
+    let storeSales = 0;
     if (snapshot.exists()) {
         const salesData = snapshot.val();
-        sales = Object.entries(salesData).map(([id, sale]) => ({
-            id,
-            ...sale,
-            dateObj: new Date(sale.date)
-        })).filter(sale => {
-            const saleDate = sale.date.split('T')[0];
-            return saleDate >= startDate && saleDate <= endDate;
-        }).sort((a, b) => b.dateObj - a.dateObj);
+        storeSales = Object.values(salesData)
+            .filter(sale => sale.date.split('T')[0] === today)
+            .reduce((sum, sale) => sum + sale.total, 0);
     }
 
-    // Calculate totals
-    const totalSales = sales.reduce((sum, sale) => sum + sale.total, 0);
-    const cashSales = sales.filter(s => s.paymentMethod === 'Efectivo').reduce((sum, s) => sum + s.total, 0);
-    const transferSales = sales.filter(s => s.paymentMethod !== 'Efectivo').reduce((sum, s) => sum + s.total, 0);
+    // Calculate balance
+    const totalIncome = dailyRevenue.total + storeSales;
+    const balance = totalIncome - totalExpenses;
 
-    container.innerHTML = renderInvoicesView(sales, filter, totalSales, cashSales, transferSales);
-};
-
-function renderInvoicesView(sales, currentFilter, totalSales, cashSales, transferSales) {
-    const filterOptions = [
-        { value: 'today', label: 'Hoy', icon: '📅' },
-        { value: 'week', label: 'Esta Semana', icon: '📆' },
-        { value: 'month', label: 'Este Mes', icon: '🗓️' },
-        { value: 'all', label: 'Todas', icon: '📊' }
-    ];
-
-    return `
+    container.innerHTML = `
         <div style="padding: 2rem;">
             <!-- Page Header -->
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-                <div>
-                    <button onclick="loadFinanceTab()" class="btn btn-secondary" style="margin-bottom: 0.5rem;">
-                        ← Volver al Dashboard
-                    </button>
-                    <h1 style="margin: 0;">🧾 Facturas de Tienda</h1>
-                    <p style="margin: 0.5rem 0 0 0; color: #6b7280;">
-                        Historial de ventas del sistema POS
-                    </p>
-                </div>
-                <button onclick="exportInvoicesReport()" class="btn btn-primary" style="background: #f59e0b; color: white;">
-                    📥 Exportar
+            <div style="margin-bottom: 2rem;">
+                <button onclick="loadFinanceTab()" class="btn btn-secondary" style="margin-bottom: 0.5rem;">
+                    ← Volver al Dashboard
                 </button>
+                <h1 style="margin: 0;">📊 Ingresos y Gastos de Hoy</h1>
+                <p style="margin: 0.5rem 0 0 0; color: #6b7280;">
+                    ${new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                </p>
             </div>
 
-            <!-- Filter Buttons -->
-            <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 2rem;">
-                <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
-                    ${filterOptions.map(option => `
-                        <button
-                            onclick="loadInvoicesView('${option.value}')"
-                            class="btn"
-                            style="
-                                flex: 1;
-                                padding: 0.75rem;
-                                background: ${currentFilter === option.value ? '#f59e0b' : 'white'};
-                                color: ${currentFilter === option.value ? 'white' : '#374151'};
-                                border: 2px solid ${currentFilter === option.value ? '#f59e0b' : '#e5e7eb'};
-                                font-weight: ${currentFilter === option.value ? '600' : '400'};
-                                transition: all 0.2s;
-                            ">
-                            ${option.icon} ${option.label}
-                        </button>
-                    `).join('')}
+            <!-- Main Summary Cards -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin-bottom: 2rem;">
+
+                <!-- INGRESOS -->
+                <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 2rem; border-radius: 16px; box-shadow: 0 8px 16px rgba(16, 185, 129, 0.3);">
+                    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                        <div style="font-size: 3rem;">💰</div>
+                        <div>
+                            <div style="font-size: 1rem; opacity: 0.9;">INGRESOS</div>
+                            <div style="font-size: 2.5rem; font-weight: 700;">${formatCurrency(totalIncome)}</div>
+                        </div>
+                    </div>
+                    <div style="border-top: 1px solid rgba(255,255,255,0.3); padding-top: 1rem; margin-top: 1rem;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <span style="opacity: 0.9;">Pagos Estudiantes:</span>
+                            <strong>${formatCurrency(dailyRevenue.total)}</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span style="opacity: 0.9;">Ventas Tienda:</span>
+                            <strong>${formatCurrency(storeSales)}</strong>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- Totals Summary -->
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem;">
-                    <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 1.5rem; border-radius: 8px;">
-                        <div style="font-size: 0.9rem; opacity: 0.9;">Total Ventas</div>
-                        <div style="font-size: 2rem; font-weight: bold;">${formatCurrency(totalSales)}</div>
-                        <div style="font-size: 0.8rem; opacity: 0.8;">${sales.length} facturas</div>
+                <!-- GASTOS -->
+                <div style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; padding: 2rem; border-radius: 16px; box-shadow: 0 8px 16px rgba(239, 68, 68, 0.3);">
+                    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                        <div style="font-size: 3rem;">💸</div>
+                        <div>
+                            <div style="font-size: 1rem; opacity: 0.9;">GASTOS</div>
+                            <div style="font-size: 2.5rem; font-weight: 700;">${formatCurrency(totalExpenses)}</div>
+                        </div>
                     </div>
-                    <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; padding: 1.5rem; border-radius: 8px;">
-                        <div style="font-size: 0.9rem; opacity: 0.9;">Efectivo</div>
-                        <div style="font-size: 2rem; font-weight: bold;">${formatCurrency(cashSales)}</div>
-                        <div style="font-size: 0.8rem; opacity: 0.8;">${sales.filter(s => s.paymentMethod === 'Efectivo').length} ventas</div>
-                    </div>
-                    <div style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white; padding: 1.5rem; border-radius: 8px;">
-                        <div style="font-size: 0.9rem; opacity: 0.9;">Transferencias</div>
-                        <div style="font-size: 2rem; font-weight: bold;">${formatCurrency(transferSales)}</div>
-                        <div style="font-size: 0.8rem; opacity: 0.8;">${sales.filter(s => s.paymentMethod !== 'Efectivo').length} ventas</div>
+                    <div style="border-top: 1px solid rgba(255,255,255,0.3); padding-top: 1rem; margin-top: 1rem;">
+                        <div style="display: flex; justify-content: space-between;">
+                            <span style="opacity: 0.9;">Total de gastos:</span>
+                            <strong>${todayExpenses.length} registros</strong>
+                        </div>
                     </div>
                 </div>
+
+                <!-- BALANCE -->
+                <div style="background: linear-gradient(135deg, ${balance >= 0 ? '#3b82f6' : '#f59e0b'} 0%, ${balance >= 0 ? '#2563eb' : '#d97706'} 100%); color: white; padding: 2rem; border-radius: 16px; box-shadow: 0 8px 16px rgba(59, 130, 246, 0.3);">
+                    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                        <div style="font-size: 3rem;">${balance >= 0 ? '📈' : '📉'}</div>
+                        <div>
+                            <div style="font-size: 1rem; opacity: 0.9;">BALANCE</div>
+                            <div style="font-size: 2.5rem; font-weight: 700;">${formatCurrency(Math.abs(balance))}</div>
+                        </div>
+                    </div>
+                    <div style="border-top: 1px solid rgba(255,255,255,0.3); padding-top: 1rem; margin-top: 1rem;">
+                        <div style="text-align: center; font-size: 1.1rem; font-weight: 600;">
+                            ${balance >= 0 ? '✅ Ganancia del día' : '⚠️ Gastos superan ingresos'}
+                        </div>
+                    </div>
+                </div>
+
             </div>
 
-            <!-- Sales Table -->
-            <div style="background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                <h3 style="margin: 0 0 1.5rem 0;">📋 Detalle de Facturas</h3>
+            <!-- Detailed Lists -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
 
-                ${sales.length === 0 ? `
-                    <div style="text-align: center; padding: 3rem; color: #6b7280;">
-                        <div style="font-size: 3rem; margin-bottom: 1rem;">📭</div>
-                        <p>No hay ventas en el período seleccionado</p>
+                <!-- Expenses List -->
+                <div style="background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <h3 style="margin: 0 0 1.5rem 0; color: #ef4444;">💸 Gastos de Hoy</h3>
+                    ${todayExpenses.length === 0 ? `
+                        <div style="text-align: center; padding: 2rem; color: #6b7280;">
+                            <div style="font-size: 2rem; margin-bottom: 0.5rem;">✅</div>
+                            <p>No hay gastos registrados hoy</p>
+                        </div>
+                    ` : `
+                        <div style="max-height: 400px; overflow-y: auto;">
+                            ${todayExpenses.map(expense => `
+                                <div style="padding: 1rem; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
+                                    <div style="flex: 1;">
+                                        <div style="font-weight: 600; color: #1f2937;">${expense.category}</div>
+                                        <div style="font-size: 0.85rem; color: #6b7280;">${expense.description || 'Sin descripción'}</div>
+                                    </div>
+                                    <div style="font-weight: 700; color: #ef4444; font-size: 1.1rem;">
+                                        ${formatCurrency(expense.amount)}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `}
+                </div>
+
+                <!-- Income Details -->
+                <div style="background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <h3 style="margin: 0 0 1.5rem 0; color: #10b981;">💰 Detalle de Ingresos</h3>
+
+                    <div style="margin-bottom: 1.5rem; padding: 1rem; background: #f0fdf4; border-radius: 8px; border-left: 4px solid #10b981;">
+                        <div style="font-weight: 600; color: #065f46; margin-bottom: 0.75rem;">Pagos de Estudiantes</div>
+                        <div style="display: grid; gap: 0.5rem;">
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="color: #6b7280;">Efectivo:</span>
+                                <strong style="color: #10b981;">${formatCurrency(dailyRevenue.cash)}</strong>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="color: #6b7280;">Transferencias:</span>
+                                <strong style="color: #10b981;">${formatCurrency(dailyRevenue.transfers)}</strong>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; padding-top: 0.5rem; border-top: 1px solid #d1fae5;">
+                                <span style="font-weight: 600;">Subtotal:</span>
+                                <strong style="color: #059669;">${formatCurrency(dailyRevenue.total)}</strong>
+                            </div>
+                        </div>
                     </div>
-                ` : `
-                    <div style="overflow-x: auto;">
-                        <table style="width: 100%; border-collapse: collapse;">
-                            <thead style="background: #f3f4f6;">
-                                <tr>
-                                    <th style="padding: 0.75rem; text-align: left;">Fecha/Hora</th>
-                                    <th style="padding: 0.75rem; text-align: left;">ID Venta</th>
-                                    <th style="padding: 0.75rem; text-align: left;">Productos</th>
-                                    <th style="padding: 0.75rem; text-align: center;">Items</th>
-                                    <th style="padding: 0.75rem; text-align: left;">Método Pago</th>
-                                    <th style="padding: 0.75rem; text-align: right;">Total</th>
-                                    <th style="padding: 0.75rem; text-align: right;">Pago</th>
-                                    <th style="padding: 0.75rem; text-align: right;">Cambio</th>
-                                    <th style="padding: 0.75rem; text-align: left;">Cajero</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${sales.map(sale => `
-                                    <tr style="border-bottom: 1px solid #e5e7eb;">
-                                        <td style="padding: 0.75rem;">
-                                            <div style="font-weight: 500;">${new Date(sale.date).toLocaleDateString('es-CO')}</div>
-                                            <div style="font-size: 0.8rem; color: #6b7280;">${new Date(sale.date).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}</div>
-                                        </td>
-                                        <td style="padding: 0.75rem;">
-                                            <code style="font-size: 0.8rem; background: #f3f4f6; padding: 0.25rem 0.5rem; border-radius: 4px;">${sale.id.slice(0, 8)}</code>
-                                        </td>
-                                        <td style="padding: 0.75rem;">
-                                            <button onclick="toggleSaleDetails('${sale.id}')" class="btn btn-sm" style="background: #3b82f6; color: white; font-size: 0.8rem; padding: 0.25rem 0.75rem;">
-                                                Ver Productos
-                                            </button>
-                                            <div id="sale-details-${sale.id}" style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: #f9fafb; border-radius: 4px;">
-                                                ${sale.items.map(item => `
-                                                    <div style="font-size: 0.85rem; margin-bottom: 0.25rem;">
-                                                        • ${item.productName} × ${item.quantity} = <strong>${formatCurrency(item.subtotal)}</strong>
-                                                    </div>
-                                                `).join('')}
-                                            </div>
-                                        </td>
-                                        <td style="padding: 0.75rem; text-align: center;">
-                                            <span style="background: #dbeafe; color: #1e40af; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.85rem; font-weight: 600;">
-                                                ${sale.items.reduce((sum, item) => sum + item.quantity, 0)}
-                                            </span>
-                                        </td>
-                                        <td style="padding: 0.75rem;">
-                                            <span style="
-                                                background: ${sale.paymentMethod === 'Efectivo' ? '#d1fae5' : sale.paymentMethod === 'Nequi' ? '#fef3c7' : '#dbeafe'};
-                                                color: ${sale.paymentMethod === 'Efectivo' ? '#065f46' : sale.paymentMethod === 'Nequi' ? '#92400e' : '#1e40af'};
-                                                padding: 0.25rem 0.75rem;
-                                                border-radius: 12px;
-                                                font-size: 0.85rem;
-                                                font-weight: 500;
-                                            ">
-                                                ${sale.paymentMethod === 'Efectivo' ? '💵' : sale.paymentMethod === 'Nequi' ? '📱' : '🏦'} ${sale.paymentMethod}
-                                            </span>
-                                        </td>
-                                        <td style="padding: 0.75rem; text-align: right; font-weight: 600; color: #059669; font-size: 1rem;">
-                                            ${formatCurrency(sale.total)}
-                                        </td>
-                                        <td style="padding: 0.75rem; text-align: right; color: #6b7280;">
-                                            ${sale.amountPaid ? formatCurrency(sale.amountPaid) : '-'}
-                                        </td>
-                                        <td style="padding: 0.75rem; text-align: right; color: #6b7280;">
-                                            ${sale.change ? formatCurrency(sale.change) : '-'}
-                                        </td>
-                                        <td style="padding: 0.75rem; font-size: 0.85rem;">
-                                            ${sale.cashier || 'N/A'}
-                                        </td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
+
+                    <div style="padding: 1rem; background: #fef3c7; border-radius: 8px; border-left: 4px solid #f59e0b;">
+                        <div style="font-weight: 600; color: #92400e; margin-bottom: 0.75rem;">Ventas de Tienda</div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span style="color: #6b7280;">Total ventas POS:</span>
+                            <strong style="color: #d97706; font-size: 1.2rem;">${formatCurrency(storeSales)}</strong>
+                        </div>
                     </div>
-                `}
+
+                </div>
+
             </div>
         </div>
     `;
-}
-
-window.toggleSaleDetails = function(saleId) {
-    const details = document.getElementById(`sale-details-${saleId}`);
-    if (details) {
-        details.style.display = details.style.display === 'none' ? 'block' : 'none';
-    }
-};
-
-window.exportInvoicesReport = function() {
-    // TODO: Implement export functionality
-    window.showNotification('📥 Funcionalidad de exportación en desarrollo', 'info');
 };
 
 console.log('✅ Finance module loaded successfully');
