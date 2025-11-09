@@ -2487,19 +2487,116 @@ window.loadPaymentsTab = async function() {
                 ${renderPaymentDashboard()}
 
                 <div style="background: white; padding: 1rem; border-radius: 8px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                        <h3>Estado de Pagos</h3>
-                        <div style="display: flex; gap: 1rem;">
-                            <select id="paymentFilter" onchange="filterPayments()">
-                                <option value="">Todos</option>
-                                <option value="paid">✅ Pagados</option>
-                                <option value="partial">⚠️ Parciales</option>
-                                <option value="upcoming">🟡 Próximos</option>
-                                <option value="overdue">🔴 Vencidos</option>
-                            </select>
-                            <button onclick="exportPaymentReport()" class="btn btn-secondary">
-                                📊 Exportar
-                            </button>
+                    <!-- Advanced Filters Section -->
+                    <div style="background: #f9fafb; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <h3 style="margin: 0;">🔍 Filtros Avanzados</h3>
+                            <div style="display: flex; gap: 0.5rem;">
+                                <button onclick="clearPaymentFilters()" class="btn btn-sm" style="background: #6b7280; color: white; padding: 0.5rem 1rem;">
+                                    🔄 Limpiar Filtros
+                                </button>
+                                <button onclick="exportPaymentReport()" class="btn btn-sm" style="background: #10b981; color: white; padding: 0.5rem 1rem;">
+                                    📊 Exportar
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Filter Grid -->
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                            <!-- Search by Name -->
+                            <div>
+                                <label style="display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.25rem; color: #374151;">
+                                    👤 Buscar Estudiante
+                                </label>
+                                <input
+                                    type="text"
+                                    id="searchNameFilter"
+                                    placeholder="Nombre del estudiante..."
+                                    oninput="filterPayments()"
+                                    style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                            </div>
+
+                            <!-- Status Filter -->
+                            <div>
+                                <label style="display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.25rem; color: #374151;">
+                                    📊 Estado de Pago
+                                </label>
+                                <select id="paymentFilter" onchange="filterPayments()" style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                                    <option value="">Todos los estados</option>
+                                    <option value="paid">✅ Pagados</option>
+                                    <option value="partial">⚠️ Parciales</option>
+                                    <option value="upcoming">🟡 Próximos</option>
+                                    <option value="overdue">🔴 Vencidos</option>
+                                </select>
+                            </div>
+
+                            <!-- Payment Method Filter -->
+                            <div>
+                                <label style="display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.25rem; color: #374151;">
+                                    💳 Método de Pago
+                                </label>
+                                <select id="methodFilter" onchange="filterPayments()" style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                                    <option value="">Todos los métodos</option>
+                                    <option value="Efectivo">💵 Efectivo</option>
+                                    <option value="Transferencia">🏦 Transferencia</option>
+                                    <option value="Nequi">📱 Nequi</option>
+                                </select>
+                            </div>
+
+                            <!-- Bank Filter -->
+                            <div>
+                                <label style="display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.25rem; color: #374151;">
+                                    🏦 Banco
+                                </label>
+                                <select id="bankFilter" onchange="filterPayments()" style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                                    <option value="">Todos los bancos</option>
+                                    <option value="Bancolombia">Bancolombia</option>
+                                    <option value="Nequi">Nequi</option>
+                                    <option value="Daviplata">Daviplata</option>
+                                    <option value="Banco de Bogotá">Banco de Bogotá</option>
+                                    <option value="Davivienda">Davivienda</option>
+                                </select>
+                            </div>
+
+                            <!-- Month/Year Filter -->
+                            <div>
+                                <label style="display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.25rem; color: #374151;">
+                                    📅 Mes
+                                </label>
+                                <select id="monthFilter" onchange="filterPayments()" style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                                    <option value="">Todos los meses</option>
+                                    <option value="enero">Enero</option>
+                                    <option value="febrero">Febrero</option>
+                                    <option value="marzo">Marzo</option>
+                                    <option value="abril">Abril</option>
+                                    <option value="mayo">Mayo</option>
+                                    <option value="junio">Junio</option>
+                                    <option value="julio">Julio</option>
+                                    <option value="agosto">Agosto</option>
+                                    <option value="septiembre">Septiembre</option>
+                                    <option value="octubre">Octubre</option>
+                                    <option value="noviembre">Noviembre</option>
+                                    <option value="diciembre">Diciembre</option>
+                                </select>
+                            </div>
+
+                            <!-- Year Filter -->
+                            <div>
+                                <label style="display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.25rem; color: #374151;">
+                                    📆 Año
+                                </label>
+                                <select id="yearFilter" onchange="filterPayments()" style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                                    <option value="">Todos los años</option>
+                                    <option value="2025" selected>2025</option>
+                                    <option value="2024">2024</option>
+                                    <option value="2026">2026</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Results Counter -->
+                        <div id="filterResults" style="margin-top: 1rem; padding: 0.5rem; background: white; border-radius: 6px; text-align: center; font-size: 0.875rem; color: #6b7280;">
+                            Mostrando <strong id="filteredCount">${students.length}</strong> de <strong id="totalCount">${students.length}</strong> estudiantes
                         </div>
                     </div>
 
@@ -2583,21 +2680,98 @@ Métodos de pago: Nequi/Bancolombia o efectivo en la escuela.`;
 };
 
 window.filterPayments = function() {
-    const filter = document.getElementById('paymentFilter').value;
+    // Get all filter values
+    const searchName = document.getElementById('searchNameFilter')?.value.toLowerCase() || '';
+    const statusFilter = document.getElementById('paymentFilter')?.value || '';
+    const methodFilter = document.getElementById('methodFilter')?.value || '';
+    const bankFilter = document.getElementById('bankFilter')?.value || '';
+    const monthFilter = document.getElementById('monthFilter')?.value || '';
+    const yearFilter = document.getElementById('yearFilter')?.value || '';
+
     let students = window.StudentManager.getStudents();
-    
-    if (filter) {
+    const totalCount = students.length;
+
+    // Apply name search filter
+    if (searchName) {
+        students = students.filter(s => {
+            const name = (s.nombre || '').toLowerCase();
+            const phone = (s.telefono || '').toLowerCase();
+            const doc = (s.documento || '').toLowerCase();
+            return name.includes(searchName) || phone.includes(searchName) || doc.includes(searchName);
+        });
+    }
+
+    // Apply status filter
+    if (statusFilter) {
         students = students.filter(s => {
             const status = window.PaymentManager.getPaymentStatus(s);
-            if (filter === 'paid') return status.status === 'Pagado';
-            if (filter === 'partial') return status.partial === true;
-            if (filter === 'upcoming') return status.color === '#fbbf24' || status.color === '#f59e0b';
-            if (filter === 'overdue') return status.color === '#ef4444';
+            if (statusFilter === 'paid') return status.status === 'Pagado';
+            if (statusFilter === 'partial') return status.partial === true;
+            if (statusFilter === 'upcoming') return status.color === '#fbbf24' || status.color === '#f59e0b';
+            if (statusFilter === 'overdue') return status.color === '#ef4444';
             return true;
         });
     }
-    
+
+    // Apply payment method/bank/month/year filters
+    if (methodFilter || bankFilter || monthFilter || yearFilter) {
+        students = students.filter(s => {
+            // Get current month payment for this student
+            const currentYear = yearFilter ? parseInt(yearFilter) : new Date().getFullYear();
+            const currentMonth = monthFilter || new Date().toLocaleDateString('es-ES', { month: 'long' }).toLowerCase();
+
+            const payment = Array.from(window.PaymentManager.payments.values()).find(p =>
+                p.studentId === s.id &&
+                p.month?.toLowerCase() === currentMonth &&
+                p.year === currentYear
+            );
+
+            // If no payment found and filters are active, exclude this student
+            if (!payment && (methodFilter || bankFilter || monthFilter || yearFilter)) {
+                return false;
+            }
+
+            // Check method filter
+            if (methodFilter && payment?.method !== methodFilter) {
+                return false;
+            }
+
+            // Check bank filter
+            if (bankFilter && payment?.bank !== bankFilter) {
+                return false;
+            }
+
+            return true;
+        });
+    }
+
+    // Update results counter
+    const filteredCount = students.length;
+    const filteredCountEl = document.getElementById('filteredCount');
+    const totalCountEl = document.getElementById('totalCount');
+    if (filteredCountEl) filteredCountEl.textContent = filteredCount;
+    if (totalCountEl) totalCountEl.textContent = totalCount;
+
+    // Update table
     document.getElementById('paymentTableContainer').innerHTML = renderPaymentTable(students);
+
+    // Show notification if heavily filtered
+    if (filteredCount === 0 && totalCount > 0) {
+        console.log('⚠️ No se encontraron resultados con los filtros actuales');
+    }
+};
+
+// Clear all filters
+window.clearPaymentFilters = function() {
+    document.getElementById('searchNameFilter').value = '';
+    document.getElementById('paymentFilter').value = '';
+    document.getElementById('methodFilter').value = '';
+    document.getElementById('bankFilter').value = '';
+    document.getElementById('monthFilter').value = '';
+    document.getElementById('yearFilter').value = '2025';
+
+    filterPayments();
+    window.showNotification('🔄 Filtros limpiados', 'success');
 };
 
 window.exportPaymentReport = async function() {
