@@ -2469,6 +2469,7 @@ window.loadPaymentsTab = async function() {
 
     try {
         // Initialize systems
+        await window.StudentManager.init(); // Initialize StudentManager first!
         await window.PaymentManager.init();
         await window.InvoiceStorage.init();
 
@@ -2586,8 +2587,8 @@ window.loadPaymentsTab = async function() {
                                     📆 Año
                                 </label>
                                 <select id="yearFilter" onchange="filterPayments()" style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
-                                    <option value="">Todos los años</option>
-                                    <option value="2025" selected>2025</option>
+                                    <option value="" selected>Todos los años</option>
+                                    <option value="2025">2025</option>
                                     <option value="2024">2024</option>
                                     <option value="2026">2026</option>
                                 </select>
@@ -2716,32 +2717,37 @@ window.filterPayments = function() {
     // Apply payment method/bank/month/year filters
     if (methodFilter || bankFilter || monthFilter || yearFilter) {
         students = students.filter(s => {
-            // Get current month payment for this student
-            const currentYear = yearFilter ? parseInt(yearFilter) : new Date().getFullYear();
-            const currentMonth = monthFilter || new Date().toLocaleDateString('es-ES', { month: 'long' }).toLowerCase();
+            // Get student's payments
+            const studentPayments = Array.from(window.PaymentManager.payments.values()).filter(p => p.studentId === s.id);
 
-            const payment = Array.from(window.PaymentManager.payments.values()).find(p =>
-                p.studentId === s.id &&
-                p.month?.toLowerCase() === currentMonth &&
-                p.year === currentYear
-            );
-
-            // If no payment found and filters are active, exclude this student
-            if (!payment && (methodFilter || bankFilter || monthFilter || yearFilter)) {
-                return false;
+            // If no payments at all, only show if no specific filters are active
+            if (studentPayments.length === 0) {
+                return !(methodFilter || bankFilter || monthFilter || yearFilter);
             }
 
-            // Check method filter
-            if (methodFilter && payment?.method !== methodFilter) {
-                return false;
+            // Filter payments by year if specified
+            let relevantPayments = studentPayments;
+            if (yearFilter) {
+                relevantPayments = relevantPayments.filter(p => p.year === parseInt(yearFilter));
             }
 
-            // Check bank filter
-            if (bankFilter && payment?.bank !== bankFilter) {
-                return false;
+            // Filter payments by month if specified
+            if (monthFilter) {
+                relevantPayments = relevantPayments.filter(p => p.month?.toLowerCase() === monthFilter);
             }
 
-            return true;
+            // Filter by method if specified
+            if (methodFilter) {
+                relevantPayments = relevantPayments.filter(p => p.method === methodFilter);
+            }
+
+            // Filter by bank if specified
+            if (bankFilter) {
+                relevantPayments = relevantPayments.filter(p => p.bank === bankFilter);
+            }
+
+            // Student passes filter if they have at least one payment matching all criteria
+            return relevantPayments.length > 0;
         });
     }
 
@@ -2768,7 +2774,7 @@ window.clearPaymentFilters = function() {
     document.getElementById('methodFilter').value = '';
     document.getElementById('bankFilter').value = '';
     document.getElementById('monthFilter').value = '';
-    document.getElementById('yearFilter').value = '2025';
+    document.getElementById('yearFilter').value = ''; // All years by default
 
     filterPayments();
     window.showNotification('🔄 Filtros limpiados', 'success');
