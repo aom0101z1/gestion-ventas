@@ -81,14 +81,23 @@ function formatCurrencyInput(input) {
 
 /**
  * Parse currency input to get numeric value
- * @param {string} value - The formatted currency string
+ * @param {string|number} value - The formatted currency string or number
  * @returns {number} The numeric value
  */
 function parseCurrencyInput(value) {
-    if (!value) return 0;
-    // Remove $ and dots, then parse
-    const cleaned = value.replace(/[\$\.]/g, '');
-    return parseInt(cleaned, 10) || 0;
+    if (!value && value !== 0) return 0;
+
+    // If already a number, return it
+    if (typeof value === 'number') return value;
+
+    // If string, parse it
+    if (typeof value === 'string') {
+        // Remove $ and dots, then parse
+        const cleaned = value.replace(/[\$\.]/g, '');
+        return parseInt(cleaned, 10) || 0;
+    }
+
+    return 0;
 }
 
 // ==================================================================================
