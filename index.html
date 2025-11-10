@@ -2162,6 +2162,11 @@ onAuthStateChanged(auth, async (user) => {
                         const source = lead.source || 'No especificado';
                         const sourceDisplay = source.length > 30 ? source.substring(0, 30) + '...' : source;
                         
+                        // Only show delete button for admin/director
+                        const deleteButton = (userProfile.role === 'director' || userProfile.role === 'admin')
+                            ? `<button onclick="deleteLead('${lead.id}')" class="btn btn-warning" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; background: #ef4444;">🗑️</button>`
+                            : `<span style="color: #9ca3af; font-size: 0.75rem;">Solo lectura</span>`;
+
                         rows.push(`
                             <tr>
                                 <td style="font-weight: 500;">${lead.name || 'Sin nombre'}</td>
@@ -2174,7 +2179,7 @@ onAuthStateChanged(auth, async (user) => {
                                     <button onclick="showLeadDetails('${lead.id}')" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; margin-right: 0.25rem;">
                                         📋 Ver
                                     </button>
-                                    <button onclick="deleteLead('${lead.id}')" class="btn btn-warning" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; background: #ef4444;">🗑️</button>
+                                    ${deleteButton}
                                 </td>
                             </tr>
                         `);

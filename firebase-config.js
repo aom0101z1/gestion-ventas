@@ -212,14 +212,14 @@ class FirebaseDataManager {
 
     async updateContact(contactId, updates) {
         if (!this.currentUser) throw new Error('User not authenticated');
-        
+
         try {
-            // First check if user can update this contact
-            const canUpdate = await this.canUserAccessContact(contactId);
-            if (!canUpdate) {
-                throw new Error('You can only update your own contacts');
+            // RESTRICTION: Only admin/director can update leads
+            const userProfile = await this.loadUserProfile();
+            if (!userProfile || (userProfile.role !== 'director' && userProfile.role !== 'admin')) {
+                throw new Error('Solo administradores pueden modificar leads');
             }
-            
+
             // Get contact details for audit log
             const contactSnapshot = await get(ref(this.database, `contacts/${contactId}`));
             const contact = contactSnapshot.val();
@@ -253,12 +253,12 @@ class FirebaseDataManager {
 
     async deleteContact(contactId) {
         if (!this.currentUser) throw new Error('User not authenticated');
-        
+
         try {
-            // Check permissions
-            const canDelete = await this.canUserAccessContact(contactId);
-            if (!canDelete) {
-                throw new Error('You can only delete your own contacts');
+            // RESTRICTION: Only admin/director can delete leads
+            const userProfile = await this.loadUserProfile();
+            if (!userProfile || (userProfile.role !== 'director' && userProfile.role !== 'admin')) {
+                throw new Error('Solo administradores pueden eliminar leads');
             }
 
             // Get contact details before deleting for audit log

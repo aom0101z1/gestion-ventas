@@ -88,34 +88,44 @@ function drag(ev) {
 // Función drop (procesa el drop)
 async function drop(ev) {
     ev.preventDefault();
-    
+
     const leadElementId = ev.dataTransfer.getData("text");
     const leadId = leadElementId.replace('lead-', '');
     const newStatus = ev.currentTarget.dataset.status;
-    
+
     console.log('🎯 Drop:', leadId, 'to', newStatus);
-    
+
     try {
         // Actualizar en Firebase
-        await window.FirebaseData.updateContact(leadId, { 
+        await window.FirebaseData.updateContact(leadId, {
             status: newStatus,
             lastUpdated: new Date().toISOString()
         });
-        
+
         console.log('✅ Lead actualizado');
-        
+
         if (window.showNotification) {
             window.showNotification(`Lead movido a ${newStatus}`, 'success');
         }
-        
+
         // Recargar pipeline
         setTimeout(() => loadPipelineData(), 300);
-        
+
     } catch (error) {
         console.error('❌ Error:', error);
-        if (window.showNotification) {
-            window.showNotification('Error al mover lead', 'error');
+
+        // Show specific error message
+        let errorMessage = 'Error al mover lead';
+        if (error.message && error.message.includes('administradores')) {
+            errorMessage = '⚠️ Solo administradores pueden modificar leads';
         }
+
+        if (window.showNotification) {
+            window.showNotification(errorMessage, 'error');
+        }
+
+        // Reload pipeline to reset the UI
+        setTimeout(() => loadPipelineData(), 300);
     }
 }
 
