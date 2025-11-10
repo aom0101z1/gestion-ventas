@@ -15,14 +15,27 @@ async function loadPipelineData() {
         return;
     }
 
+    // FILTER OUT COMPANY CONTACTS - Only show individual contacts in pipeline
+    const individualContacts = allContacts.filter(c => {
+        const contactType = c.contactType || 'individual';
+        return contactType === 'individual';
+    });
+
+    console.log(`📊 Pipeline: ${individualContacts.length} individual contacts (${allContacts.length - individualContacts.length} company contacts excluded)`);
+
+    if (!individualContacts.length) {
+        container.innerHTML = '<div style="text-align: center; padding: 2rem; color: #666;">No hay contactos individuales en el pipeline.<br>Los contactos empresariales no usan el sistema de pipeline.</div>';
+        return;
+    }
+
     // Agrupar leads por status
     const groups = {
-        'Nuevo': allContacts.filter(c => c.status === 'Nuevo'),
-        'Contactado': allContacts.filter(c => c.status === 'Contactado'),
-        'Interesado': allContacts.filter(c => c.status === 'Interesado'),
-        'Negociación': allContacts.filter(c => c.status === 'Negociación'),
-        'Convertido': allContacts.filter(c => c.status === 'Convertido'),
-        'Perdido': allContacts.filter(c => c.status === 'Perdido')
+        'Nuevo': individualContacts.filter(c => c.status === 'Nuevo'),
+        'Contactado': individualContacts.filter(c => c.status === 'Contactado'),
+        'Interesado': individualContacts.filter(c => c.status === 'Interesado'),
+        'Negociación': individualContacts.filter(c => c.status === 'Negociación'),
+        'Convertido': individualContacts.filter(c => c.status === 'Convertido'),
+        'Perdido': individualContacts.filter(c => c.status === 'Perdido')
     };
 
     // Render grid 2x3
