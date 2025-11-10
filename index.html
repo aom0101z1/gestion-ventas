@@ -816,46 +816,108 @@
             <!-- ========== SECTION 8: TAB CONTENT - LEADS ========== -->
             <div id="leads" class="tab-content hidden">
                 <h2 id="leadsTitle">👥 Gestión de Leads</h2>
-                
-                <div style="margin-bottom: 1rem;">
-                    <button onclick="refreshAllData()" class="btn btn-primary" style="margin-right: 1rem;">🔄 Sync Firebase</button>
-                    
-                    <div id="leadsFilters" style="display: none; margin-top: 1rem;">
-                        <select id="salespersonFilter" onchange="updateLeadsTable()" style="padding: 0.5rem; border-radius: 5px; border: 1px solid #ccc; margin-right: 0.5rem;">
-                            <option value="">Todos los vendedores</option>
-                        </select>
-                        <select id="statusFilter" onchange="updateLeadsTable()" style="padding: 0.5rem; border-radius: 5px; border: 1px solid #ccc;">
-                            <option value="">Todos los estados</option>
-                            <option value="Nuevo">Nuevo</option>
-                            <option value="Contactado">Contactado</option>
-                            <option value="Interesado">Interesado</option>
-                            <option value="Negociación">Negociación</option>
-                            <option value="Convertido">Convertido</option>
-                            <option value="Perdido">Perdido</option>
-                        </select>
-                    </div>
+
+                <!-- Lead Type Tabs -->
+                <div style="display: flex; gap: 0.5rem; margin-bottom: 2rem; justify-content: center;">
+                    <button class="lead-type-tab active" onclick="switchLeadType('general')" id="generalLeadTab" style="
+                        padding: 0.75rem 2rem;
+                        border: 2px solid #667eea;
+                        background: #667eea;
+                        color: white;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-weight: 600;
+                        transition: all 0.2s ease;
+                    ">
+                        👤 General
+                    </button>
+                    <button class="lead-type-tab" onclick="switchLeadType('company')" id="companyLeadTab" style="
+                        padding: 0.75rem 2rem;
+                        border: 2px solid #667eea;
+                        background: white;
+                        color: #667eea;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-weight: 600;
+                        transition: all 0.2s ease;
+                    ">
+                        🏢 Empresas
+                    </button>
                 </div>
-                
-                <table class="table">
-                    <thead>
-                        <tr id="leadsTableHeader">
-                            <th>Nombre</th>
-                            <th>Teléfono</th>
-                            <th>Fuente</th>
-                            <th>Estado</th>
-                            <th>Fecha</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody id="leadsTable">
-                        <tr>
-                            <td colspan="6" style="text-align: center; color: #666; padding: 2rem;">
-                                <div class="loading-spinner"></div><br>
-                                Cargando leads desde Firebase...
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+
+                <!-- GENERAL LEADS VIEW -->
+                <div id="generalLeadsView">
+                    <div style="margin-bottom: 1rem;">
+                        <button onclick="refreshAllData()" class="btn btn-primary" style="margin-right: 1rem;">🔄 Sync Firebase</button>
+
+                        <div id="leadsFilters" style="display: none; margin-top: 1rem;">
+                            <select id="salespersonFilter" onchange="updateLeadsTable('individual')" style="padding: 0.5rem; border-radius: 5px; border: 1px solid #ccc; margin-right: 0.5rem;">
+                                <option value="">Todos los vendedores</option>
+                            </select>
+                            <select id="statusFilter" onchange="updateLeadsTable('individual')" style="padding: 0.5rem; border-radius: 5px; border: 1px solid #ccc;">
+                                <option value="">Todos los estados</option>
+                                <option value="Nuevo">Nuevo</option>
+                                <option value="Contactado">Contactado</option>
+                                <option value="Interesado">Interesado</option>
+                                <option value="Negociación">Negociación</option>
+                                <option value="Convertido">Convertido</option>
+                                <option value="Perdido">Perdido</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <table class="table">
+                        <thead>
+                            <tr id="leadsTableHeader">
+                                <th>Nombre</th>
+                                <th>Teléfono</th>
+                                <th>Fuente</th>
+                                <th>Estado</th>
+                                <th>Fecha</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leadsTable">
+                            <tr>
+                                <td colspan="6" style="text-align: center; color: #666; padding: 2rem;">
+                                    <div class="loading-spinner"></div><br>
+                                    Cargando leads individuales...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- COMPANY LEADS VIEW -->
+                <div id="companyLeadsView" style="display: none;">
+                    <div style="margin-bottom: 1rem;">
+                        <button onclick="refreshAllData()" class="btn btn-primary" style="margin-right: 1rem;">🔄 Sync Firebase</button>
+                    </div>
+
+                    <table class="table">
+                        <thead>
+                            <tr id="companyLeadsTableHeader">
+                                <th>Empresa</th>
+                                <th>Tipo</th>
+                                <th>Contacto</th>
+                                <th>Cargo</th>
+                                <th>Teléfono</th>
+                                <th>Est. Leads</th>
+                                <th>Servicio</th>
+                                <th>Fecha</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="companyLeadsTable">
+                            <tr>
+                                <td colspan="9" style="text-align: center; color: #666; padding: 2rem;">
+                                    <div class="loading-spinner"></div><br>
+                                    Cargando contactos empresariales...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             <!-- ========== SECTION 9: TAB CONTENT - PIPELINE ========== -->
@@ -1791,6 +1853,53 @@ onAuthStateChanged(auth, async (user) => {
             console.log('✅ Contact type switched successfully');
         }
 
+        // ========== LEAD TYPE TAB SWITCHING ==========
+        function switchLeadType(type) {
+            console.log('🔄 Switching lead type to:', type);
+
+            const generalTab = document.getElementById('generalLeadTab');
+            const companyTab = document.getElementById('companyLeadTab');
+            const generalView = document.getElementById('generalLeadsView');
+            const companyView = document.getElementById('companyLeadsView');
+
+            if (type === 'general') {
+                // Show general leads, hide company leads
+                generalView.style.display = 'block';
+                companyView.style.display = 'none';
+
+                // Update tab styles
+                generalTab.style.background = '#667eea';
+                generalTab.style.color = 'white';
+                generalTab.classList.add('active');
+
+                companyTab.style.background = 'white';
+                companyTab.style.color = '#667eea';
+                companyTab.classList.remove('active');
+
+                // Load individual leads
+                updateLeadsTable('individual');
+
+            } else if (type === 'company') {
+                // Show company leads, hide general leads
+                generalView.style.display = 'none';
+                companyView.style.display = 'block';
+
+                // Update tab styles
+                companyTab.style.background = '#667eea';
+                companyTab.style.color = 'white';
+                companyTab.classList.add('active');
+
+                generalTab.style.background = 'white';
+                generalTab.style.color = '#667eea';
+                generalTab.classList.remove('active');
+
+                // Load company leads
+                updateLeadsTable('company');
+            }
+
+            console.log('✅ Lead type switched successfully');
+        }
+
         // ========== SECTION 16.9: TAB NAVIGATION ==========
         function switchTab(tabName) {
             console.log('📑 Switching to tab:', tabName);
@@ -2371,106 +2480,141 @@ onAuthStateChanged(auth, async (user) => {
         }
 
         // ========== SECTION 16.12: LEADS TABLE FUNCTIONS ==========
-        async function updateLeadsTable() {
+        async function updateLeadsTable(contactTypeFilter = 'individual') {
             try {
-                console.log('📋 Updating leads table');
-                
+                console.log('📋 Updating leads table for type:', contactTypeFilter);
+
                 if (!window.FirebaseData || !window.FirebaseData.currentUser) {
                     console.log('❌ Firebase not available');
-                    const tbody = document.getElementById('leadsTable');
+                    const tbody = contactTypeFilter === 'company' ? document.getElementById('companyLeadsTable') : document.getElementById('leadsTable');
                     if (tbody) {
-                        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #dc2626; padding: 2rem;">❌ Firebase no disponible</td></tr>';
+                        const colspan = contactTypeFilter === 'company' ? '9' : '6';
+                        tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align: center; color: #dc2626; padding: 2rem;">❌ Firebase no disponible</td></tr>`;
                     }
                     return;
                 }
-                
+
                 const userProfile = await window.FirebaseData.loadUserProfile();
                 if (!userProfile) {
                     console.log('❌ No user profile available');
                     return;
                 }
-                
+
                 let data = await window.FirebaseData.getFilteredContacts();
-                console.log('📊 Filtered data:', data.length, 'records');
-                
-                const tbody = document.getElementById('leadsTable');
+                console.log('📊 All contacts:', data.length, 'records');
+
+                // FILTER BY CONTACT TYPE
+                data = data.filter(contact => {
+                    const type = contact.contactType || 'individual';
+                    return type === contactTypeFilter;
+                });
+
+                console.log(`📊 Filtered ${contactTypeFilter} contacts:`, data.length, 'records');
+
+                const tbody = contactTypeFilter === 'company' ? document.getElementById('companyLeadsTable') : document.getElementById('leadsTable');
                 if (!tbody) {
-                    console.log('❌ Leads table not found');
+                    console.log('❌ Table not found');
                     return;
                 }
-                
+
                 if (data.length === 0) {
-                    const colSpan = userProfile.role === 'director' ? '7' : '6';
-                    tbody.innerHTML = `<tr><td colspan="${colSpan}" style="text-align: center; color: #666; padding: 2rem;">No hay leads registrados en Firebase</td></tr>`;
+                    const colspan = contactTypeFilter === 'company' ? '9' : (userProfile.role === 'director' ? '7' : '6');
+                    const message = contactTypeFilter === 'company' ? 'No hay contactos empresariales registrados' : 'No hay leads individuales registrados';
+                    tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align: center; color: #666; padding: 2rem;">${message}</td></tr>`;
                     return;
                 }
-                
+
                 // Sort by date (newest first)
                 data.sort((a, b) => {
                     const dateA = new Date(a.date + ' ' + (a.time || '00:00:00'));
                     const dateB = new Date(b.date + ' ' + (b.time || '00:00:00'));
                     return dateB - dateA;
                 });
-                
-                // Generate table rows with proper error handling
+
+                // Generate table rows
                 const rows = [];
-                for (const lead of data) {
-                    try {
-                        const salespersonCell = userProfile.role === 'director' 
-                            ? `<td><span style="background: #667eea; color: white; padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.8rem;">${await getUserDisplayName(lead.salespersonId)}</span></td>`
-                            : '';
-                        
-                        const source = lead.source || 'No especificado';
-                        const sourceDisplay = source.length > 30 ? source.substring(0, 30) + '...' : source;
 
-                        // Contact type badge
-                        const contactType = lead.contactType || 'individual';
-                        const typeBadge = contactType === 'company'
-                            ? `<span style="background: #f97316; color: white; padding: 0.15rem 0.4rem; border-radius: 8px; font-size: 0.7rem; margin-left: 0.5rem;">🏢 Empresa</span>`
-                            : `<span style="background: #10b981; color: white; padding: 0.15rem 0.4rem; border-radius: 8px; font-size: 0.7rem; margin-left: 0.5rem;">👤 Individual</span>`;
+                if (contactTypeFilter === 'company') {
+                    // COMPANY LEADS TABLE
+                    for (const lead of data) {
+                        try {
+                            const salespersonCell = userProfile.role === 'director'
+                                ? `<td><span style="background: #667eea; color: white; padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.8rem;">${await getUserDisplayName(lead.salespersonId)}</span></td>`
+                                : '';
 
-                        // Display name (for companies, show company name)
-                        const displayName = contactType === 'company'
-                            ? (lead.companyName || 'Sin nombre')
-                            : (lead.name || 'Sin nombre');
+                            const deleteButton = (userProfile.role === 'director' || userProfile.role === 'admin')
+                                ? `<button onclick="deleteLead('${lead.id}')" class="btn btn-warning" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; background: #ef4444;">🗑️</button>`
+                                : `<span style="color: #9ca3af; font-size: 0.75rem;">Solo lectura</span>`;
 
-                        // Only show delete button for admin/director
-                        const deleteButton = (userProfile.role === 'director' || userProfile.role === 'admin')
-                            ? `<button onclick="deleteLead('${lead.id}')" class="btn btn-warning" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; background: #ef4444;">🗑️</button>`
-                            : `<span style="color: #9ca3af; font-size: 0.75rem;">Solo lectura</span>`;
+                            rows.push(`
+                                <tr>
+                                    <td style="font-weight: 500;">${lead.companyName || 'Sin nombre'}</td>
+                                    <td>${lead.companyType || '-'}</td>
+                                    <td>${lead.contactName || '-'}</td>
+                                    <td style="font-size: 0.85rem;">${lead.contactPosition || '-'}</td>
+                                    <td>${lead.phone || '-'}</td>
+                                    <td style="text-align: center;">${lead.estimatedLeads || 0}</td>
+                                    <td style="font-size: 0.85rem;">${lead.serviceType || '-'}</td>
+                                    <td style="font-size: 0.9rem;">${formatDate(lead.date)}</td>
+                                    <td>
+                                        <button onclick="showLeadDetails('${lead.id}')" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; margin-right: 0.25rem;">
+                                            📋 Ver
+                                        </button>
+                                        ${deleteButton}
+                                    </td>
+                                </tr>
+                            `);
+                        } catch (rowError) {
+                            console.error('❌ Error rendering company row:', lead.id, rowError);
+                        }
+                    }
 
-                        rows.push(`
-                            <tr>
-                                <td style="font-weight: 500;">
-                                    ${displayName}
-                                    ${typeBadge}
-                                </td>
-                                <td>${lead.phone || 'Sin teléfono'}</td>
-                                <td style="font-size: 0.9rem;">${sourceDisplay}</td>
-                                <td><span class="status-badge status-${(lead.status || 'nuevo').toLowerCase().replace(' ', '').replace('ó', 'o')}">${lead.status || 'Nuevo'}</span></td>
-                                <td style="font-size: 0.9rem;">${formatDate(lead.date)}</td>
-                                ${salespersonCell}
-                                <td>
-                                    <button onclick="showLeadDetails('${lead.id}')" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; margin-right: 0.25rem;">
-                                        📋 Ver
-                                    </button>
-                                    ${deleteButton}
-                                </td>
-                            </tr>
-                        `);
-                    } catch (rowError) {
-                        console.error('❌ Error rendering row for lead:', lead.id, rowError);
+                } else {
+                    // INDIVIDUAL LEADS TABLE
+                    for (const lead of data) {
+                        try {
+                            const salespersonCell = userProfile.role === 'director'
+                                ? `<td><span style="background: #667eea; color: white; padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.8rem;">${await getUserDisplayName(lead.salespersonId)}</span></td>`
+                                : '';
+
+                            const source = lead.source || 'No especificado';
+                            const sourceDisplay = source.length > 30 ? source.substring(0, 30) + '...' : source;
+
+                            const deleteButton = (userProfile.role === 'director' || userProfile.role === 'admin')
+                                ? `<button onclick="deleteLead('${lead.id}')" class="btn btn-warning" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; background: #ef4444;">🗑️</button>`
+                                : `<span style="color: #9ca3af; font-size: 0.75rem;">Solo lectura</span>`;
+
+                            rows.push(`
+                                <tr>
+                                    <td style="font-weight: 500;">${lead.name || 'Sin nombre'}</td>
+                                    <td>${lead.phone || 'Sin teléfono'}</td>
+                                    <td style="font-size: 0.9rem;">${sourceDisplay}</td>
+                                    <td><span class="status-badge status-${(lead.status || 'nuevo').toLowerCase().replace(' ', '').replace('ó', 'o')}">${lead.status || 'Nuevo'}</span></td>
+                                    <td style="font-size: 0.9rem;">${formatDate(lead.date)}</td>
+                                    ${salespersonCell}
+                                    <td>
+                                        <button onclick="showLeadDetails('${lead.id}')" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; margin-right: 0.25rem;">
+                                            📋 Ver
+                                        </button>
+                                        ${deleteButton}
+                                    </td>
+                                </tr>
+                            `);
+                        } catch (rowError) {
+                            console.error('❌ Error rendering individual row:', lead.id, rowError);
+                        }
                     }
                 }
-                
+
                 tbody.innerHTML = rows.join('');
                 console.log('✅ Leads table updated with', data.length, 'records');
-                
+
             } catch (error) {
                 console.error('❌ Error updating leads table:', error);
-                const tbody = document.getElementById('leadsTable');
+                const tbody = contactTypeFilter === 'company' ? document.getElementById('companyLeadsTable') : document.getElementById('leadsTable');
                 if (tbody) {
-                    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #dc2626; padding: 2rem;">❌ Error: ${error.message}</td></tr>`;
+                    const colspan = contactTypeFilter === 'company' ? '9' : '6';
+                    tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align: center; color: #dc2626; padding: 2rem;">❌ Error: ${error.message}</td></tr>`;
                 }
             }
         }
