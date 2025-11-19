@@ -701,28 +701,95 @@ async function renderFinanceDashboard() {
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth() + 1;
 
-    // Get today's data
-    const dailyRevenue = await window.FinanceManager.calculateDailyRevenue(today);
-    const reconciliation = window.FinanceManager.getDailyReconciliation(today);
-    const expectedRevenue = window.FinanceManager.calculateExpectedMonthlyRevenue();
-    const monthlyMetrics = await window.FinanceManager.calculateMonthlyMetrics(currentYear, currentMonth);
-    const collectionRate = await window.FinanceManager.calculateCollectionRate(currentYear, currentMonth);
+    // Get current financial context
+    const isAdmin = window.userRole === 'admin' || window.userRole === 'director';
+    const context = isAdmin ? (window.financialContext || 'business') : 'business';
 
-    // Calculate discrepancy if reconciliation exists
+    console.log('💰 Rendering dashboard with context:', context);
+
+    // Get monthly expenses filtered by context
+    const startDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`;
+    const endDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-31`;
+    const allExpenses = window.FinanceManager.getExpenses({ startDate, endDate });
+
+    let monthlyExpenses = 0;
+    let monthlyExpensesBusiness = 0;
+    let monthlyExpensesPersonal = 0;
+
+    if (context === 'business') {
+        const businessExpenses = allExpenses.filter(e => !e.type || e.type === 'business');
+        monthlyExpenses = businessExpenses.reduce((sum, e) => sum + e.amount, 0);
+    } else if (context === 'personal') {
+        const personalExpenses = allExpenses.filter(e => e.type === 'personal');
+        monthlyExpenses = personalExpenses.reduce((sum, e) => sum + e.amount, 0);
+    } else {
+        // Combined
+        const businessExpenses = allExpenses.filter(e => !e.type || e.type === 'business');
+        const personalExpenses = allExpenses.filter(e => e.type === 'personal');
+        monthlyExpensesBusiness = businessExpenses.reduce((sum, e) => sum + e.amount, 0);
+        monthlyExpensesPersonal = personalExpenses.reduce((sum, e) => sum + e.amount, 0);
+        monthlyExpenses = monthlyExpensesBusiness + monthlyExpensesPersonal;
+    }
+
+    // Get otros ingresos filtered by context
+    const db = window.firebaseModules.database;
+    const otrosIngresosRef = db.ref(window.FirebaseData.database, 'otrosIngresos');
+    const otrosSnapshot = await db.get(otrosIngresosRef);
+
+    let otrosIngresosTotal = 0;
+    let otrosIngresosBusiness = 0;
+    let otrosIngresosPersonal = 0;
+
+    if (otrosSnapshot.exists()) {
+        const allOtrosIngresos = Object.values(otrosSnapshot.val()).filter(i =>
+            i.fecha && i.fecha.startsWith(`${currentYear}-${String(currentMonth).padStart(2, '0')}`)
+        );
+
+        if (context === 'business') {
+            const businessIngresos = allOtrosIngresos.filter(i => !i.type || i.type === 'business');
+            otrosIngresosTotal = businessIngresos.reduce((sum, i) => sum + (i.monto || 0), 0);
+        } else if (context === 'personal') {
+            const personalIngresos = allOtrosIngresos.filter(i => i.type === 'personal');
+            otrosIngresosTotal = personalIngresos.reduce((sum, i) => sum + (i.monto || 0), 0);
+        } else {
+            // Combined
+            const businessIngresos = allOtrosIngresos.filter(i => !i.type || i.type === 'business');
+            const personalIngresos = allOtrosIngresos.filter(i => i.type === 'personal');
+            otrosIngresosBusiness = businessIngresos.reduce((sum, i) => sum + (i.monto || 0), 0);
+            otrosIngresosPersonal = personalIngresos.reduce((sum, i) => sum + (i.monto || 0), 0);
+            otrosIngresosTotal = otrosIngresosBusiness + otrosIngresosPersonal;
+        }
+    }
+
+    // Get business data (only for business and combined contexts)
+    let dailyRevenue, reconciliation, expectedRevenue, monthlyMetrics, collectionRate;
     let expectedClosing = 0;
     let discrepancy = 0;
-    if (reconciliation) {
-        expectedClosing = reconciliation.openingBalance + dailyRevenue.cash - reconciliation.expenses;
-        discrepancy = reconciliation.closingCount - expectedClosing;
+
+    if (context !== 'personal') {
+        dailyRevenue = await window.FinanceManager.calculateDailyRevenue(today);
+        reconciliation = window.FinanceManager.getDailyReconciliation(today);
+        expectedRevenue = window.FinanceManager.calculateExpectedMonthlyRevenue();
+        monthlyMetrics = await window.FinanceManager.calculateMonthlyMetrics(currentYear, currentMonth);
+        collectionRate = await window.FinanceManager.calculateCollectionRate(currentYear, currentMonth);
+
+        // Calculate discrepancy if reconciliation exists
+        if (reconciliation) {
+            expectedClosing = reconciliation.openingBalance + dailyRevenue.cash - reconciliation.expenses;
+            discrepancy = reconciliation.closingCount - expectedClosing;
+        }
     }
 
     return `
         <div style="padding: 2rem;">
             <!-- Page Header -->
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-                <h1 style="margin: 0;">💰 Dashboard Financiero</h1>
+                <h1 style="margin: 0;">
+                    💰 Dashboard Financiero
+                    ${context === 'business' ? '- 🏢 Negocio' : context === 'personal' ? '- 🏠 Personal' : '- 📊 Combinado'}
+                </h1>
                 <div style="display: flex; gap: 1rem;">
-                    ${(window.financialContext || 'business') !== 'personal' ? `
+                    ${context !== 'personal' ? `
                     <button onclick="loadDailyReconciliationView()" class="btn" style="background: #3b82f6; color: white;">
                         📋 Cierre Diario
                     </button>
@@ -739,95 +806,199 @@ async function renderFinanceDashboard() {
                 </div>
             </div>
 
-            <!-- Today's Summary -->
-            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 2rem; border-radius: 12px; margin-bottom: 2rem;">
-                <h2 style="margin: 0 0 1rem 0;">HOY - ${new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h2>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+            ${context === 'personal' ? `
+                <!-- PERSONAL VIEW -->
+                <!-- Monthly Overview - Personal -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+                    <!-- Personal Income Card -->
+                    <div style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                            <div style="background: #10b981; width: 50px; height: 50px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
+                                💰
+                            </div>
+                            <div>
+                                <div style="font-size: 0.9rem; color: #6b7280;">Ingresos Personales</div>
+                                <div style="font-size: 1.5rem; font-weight: bold; color: #1f2937;">${formatCurrency(otrosIngresosTotal)}</div>
+                            </div>
+                        </div>
+                        <div style="font-size: 0.85rem; color: #6b7280;">Este mes</div>
+                    </div>
+
+                    <!-- Personal Expenses Card -->
+                    <div style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                            <div style="background: #ef4444; width: 50px; height: 50px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
+                                💸
+                            </div>
+                            <div>
+                                <div style="font-size: 0.9rem; color: #6b7280;">Gastos Personales</div>
+                                <div style="font-size: 1.5rem; font-weight: bold; color: #1f2937;">${formatCurrency(monthlyExpenses)}</div>
+                            </div>
+                        </div>
+                        <div style="font-size: 0.85rem; color: #6b7280;">Este mes</div>
+                    </div>
+
+                    <!-- Personal Balance Card -->
+                    <div style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                            <div style="background: ${otrosIngresosTotal - monthlyExpenses >= 0 ? '#8b5cf6' : '#f59e0b'}; width: 50px; height: 50px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
+                                📊
+                            </div>
+                            <div>
+                                <div style="font-size: 0.9rem; color: #6b7280;">Balance Personal</div>
+                                <div style="font-size: 1.5rem; font-weight: bold; color: ${otrosIngresosTotal - monthlyExpenses >= 0 ? '#10b981' : '#ef4444'};">
+                                    ${formatCurrency(otrosIngresosTotal - monthlyExpenses)}
+                                </div>
+                            </div>
+                        </div>
+                        <div style="font-size: 0.85rem; color: #6b7280;">${otrosIngresosTotal > 0 ? ((otrosIngresosTotal - monthlyExpenses) / otrosIngresosTotal * 100).toFixed(1) : 0}% margen</div>
+                    </div>
+                </div>
+            ` : context === 'business' ? `
+                <!-- BUSINESS VIEW -->
+                <!-- Today's Summary -->
+                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 2rem; border-radius: 12px; margin-bottom: 2rem;">
+                    <h2 style="margin: 0 0 1rem 0;">HOY - ${new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h2>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                        <div>
+                            <div style="font-size: 0.9rem; opacity: 0.9;">Efectivo Recibido</div>
+                            <div style="font-size: 2rem; font-weight: bold;">${formatCurrency(dailyRevenue.cash)}</div>
+                            <div style="font-size: 0.8rem; opacity: 0.8;">${dailyRevenue.cashCount} pagos</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.9rem; opacity: 0.9;">Transferencias</div>
+                            <div style="font-size: 2rem; font-weight: bold;">${formatCurrency(dailyRevenue.transfers)}</div>
+                            <div style="font-size: 0.8rem; opacity: 0.8;">${dailyRevenue.transferCount} pagos</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.9rem; opacity: 0.9;">Total Recaudado</div>
+                            <div style="font-size: 2rem; font-weight: bold;">${formatCurrency(dailyRevenue.total)}</div>
+                            <div style="font-size: 0.8rem; opacity: 0.8;">${dailyRevenue.cashCount + dailyRevenue.transferCount} pagos</div>
+                        </div>
+                        ${reconciliation ? `
+                            <div>
+                                <div style="font-size: 0.9rem; opacity: 0.9;">Estado Cierre</div>
+                                <div style="font-size: 2rem; font-weight: bold;">${reconciliation.isClosed ? '🔒 Cerrado' : '🔓 Abierto'}</div>
+                                <div style="font-size: 0.8rem; opacity: 0.8;">${discrepancy !== 0 ? `Diferencia: ${formatCurrency(Math.abs(discrepancy))}` : 'Sin diferencia'}</div>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+
+                <!-- Monthly Overview - Business -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+                    <!-- MRR Card -->
+                    <div style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                            <div style="background: #10b981; width: 50px; height: 50px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
+                                💵
+                            </div>
+                            <div>
+                                <div style="font-size: 0.9rem; color: #6b7280;">MRR Esperado</div>
+                                <div style="font-size: 1.5rem; font-weight: bold; color: #1f2937;">${formatCurrency(expectedRevenue.totalExpected)}</div>
+                            </div>
+                        </div>
+                        <div style="font-size: 0.85rem; color: #6b7280;">${expectedRevenue.activeStudents} estudiantes activos</div>
+                    </div>
+
+                    <!-- Revenue Card -->
+                    <div style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                            <div style="background: #3b82f6; width: 50px; height: 50px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
+                                📈
+                            </div>
+                            <div>
+                                <div style="font-size: 0.9rem; color: #6b7280;">Recaudado Este Mes</div>
+                                <div style="font-size: 1.5rem; font-weight: bold; color: #1f2937;">${formatCurrency(monthlyMetrics.tuitionRevenue + monthlyMetrics.tiendaRevenue + otrosIngresosTotal)}</div>
+                            </div>
+                        </div>
+                        <div style="font-size: 0.85rem; color: #6b7280;">${collectionRate.rate.toFixed(1)}% tasa de cobro</div>
+                    </div>
+
+                    <!-- Expenses Card -->
+                    <div style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                            <div style="background: #ef4444; width: 50px; height: 50px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
+                                💸
+                            </div>
+                            <div>
+                                <div style="font-size: 0.9rem; color: #6b7280;">Gastos Este Mes</div>
+                                <div style="font-size: 1.5rem; font-weight: bold; color: #1f2937;">${formatCurrency(monthlyExpenses)}</div>
+                            </div>
+                        </div>
+                        <div style="font-size: 0.85rem; color: #6b7280;">Negocio</div>
+                    </div>
+
+                    <!-- Profit Card -->
+                    <div style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                            <div style="background: #8b5cf6; width: 50px; height: 50px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
+                                💰
+                            </div>
+                            <div>
+                                <div style="font-size: 0.9rem; color: #6b7280;">Utilidad (EBITDA)</div>
+                                <div style="font-size: 1.5rem; font-weight: bold; color: ${monthlyMetrics.ebitda >= 0 ? '#10b981' : '#ef4444'};">
+                                    ${formatCurrency(monthlyMetrics.ebitda)}
+                                </div>
+                            </div>
+                        </div>
+                        <div style="font-size: 0.85rem; color: #6b7280;">${monthlyMetrics.profitMargin.toFixed(1)}% margen</div>
+                    </div>
+                </div>
+            ` : `
+                <!-- COMBINED VIEW -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem;">
+                    <!-- Business Column -->
                     <div>
-                        <div style="font-size: 0.9rem; opacity: 0.9;">Efectivo Recibido</div>
-                        <div style="font-size: 2rem; font-weight: bold;">${formatCurrency(dailyRevenue.cash)}</div>
-                        <div style="font-size: 0.8rem; opacity: 0.8;">${dailyRevenue.cashCount} pagos</div>
-                    </div>
-                    <div>
-                        <div style="font-size: 0.9rem; opacity: 0.9;">Transferencias</div>
-                        <div style="font-size: 2rem; font-weight: bold;">${formatCurrency(dailyRevenue.transfers)}</div>
-                        <div style="font-size: 0.8rem; opacity: 0.8;">${dailyRevenue.transferCount} pagos</div>
-                    </div>
-                    <div>
-                        <div style="font-size: 0.9rem; opacity: 0.9;">Total Recaudado</div>
-                        <div style="font-size: 2rem; font-weight: bold;">${formatCurrency(dailyRevenue.total)}</div>
-                        <div style="font-size: 0.8rem; opacity: 0.8;">${dailyRevenue.cashCount + dailyRevenue.transferCount} pagos</div>
-                    </div>
-                    ${reconciliation ? `
-                        <div>
-                            <div style="font-size: 0.9rem; opacity: 0.9;">Estado Cierre</div>
-                            <div style="font-size: 2rem; font-weight: bold;">${reconciliation.isClosed ? '🔒 Cerrado' : '🔓 Abierto'}</div>
-                            <div style="font-size: 0.8rem; opacity: 0.8;">${discrepancy !== 0 ? `Diferencia: ${formatCurrency(Math.abs(discrepancy))}` : 'Sin diferencia'}</div>
-                        </div>
-                    ` : ''}
-                </div>
-            </div>
-
-            <!-- Monthly Overview -->
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
-                <!-- MRR Card -->
-                <div style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
-                        <div style="background: #10b981; width: 50px; height: 50px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
-                            💵
-                        </div>
-                        <div>
-                            <div style="font-size: 0.9rem; color: #6b7280;">MRR Esperado</div>
-                            <div style="font-size: 1.5rem; font-weight: bold; color: #1f2937;">${formatCurrency(expectedRevenue.totalExpected)}</div>
-                        </div>
-                    </div>
-                    <div style="font-size: 0.85rem; color: #6b7280;">${expectedRevenue.activeStudents} estudiantes activos</div>
-                </div>
-
-                <!-- Revenue Card -->
-                <div style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
-                        <div style="background: #3b82f6; width: 50px; height: 50px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
-                            📈
-                        </div>
-                        <div>
-                            <div style="font-size: 0.9rem; color: #6b7280;">Recaudado Este Mes</div>
-                            <div style="font-size: 1.5rem; font-weight: bold; color: #1f2937;">${formatCurrency(monthlyMetrics.revenue)}</div>
-                        </div>
-                    </div>
-                    <div style="font-size: 0.85rem; color: #6b7280;">${collectionRate.rate.toFixed(1)}% tasa de cobro</div>
-                </div>
-
-                <!-- Expenses Card -->
-                <div style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
-                        <div style="background: #ef4444; width: 50px; height: 50px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
-                            💸
-                        </div>
-                        <div>
-                            <div style="font-size: 0.9rem; color: #6b7280;">Gastos Este Mes</div>
-                            <div style="font-size: 1.5rem; font-weight: bold; color: #1f2937;">${formatCurrency(monthlyMetrics.expenses)}</div>
-                        </div>
-                    </div>
-                    <div style="font-size: 0.85rem; color: #6b7280;">${monthlyMetrics.expenseBreakdown ? Object.keys(monthlyMetrics.expenseBreakdown).length : 0} categorías</div>
-                </div>
-
-                <!-- Profit Card -->
-                <div style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
-                        <div style="background: #8b5cf6; width: 50px; height: 50px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
-                            💰
-                        </div>
-                        <div>
-                            <div style="font-size: 0.9rem; color: #6b7280;">Utilidad (EBITDA)</div>
-                            <div style="font-size: 1.5rem; font-weight: bold; color: ${monthlyMetrics.ebitda >= 0 ? '#10b981' : '#ef4444'};">
-                                ${formatCurrency(monthlyMetrics.ebitda)}
+                        <h3 style="margin: 0 0 1rem 0; color: #3b82f6;">🏢 Negocio</h3>
+                        <div style="display: grid; gap: 1rem;">
+                            <div style="background: white; padding: 1rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                <div style="font-size: 0.85rem; color: #6b7280;">Ingresos del Mes</div>
+                                <div style="font-size: 1.3rem; font-weight: bold; color: #10b981;">
+                                    ${formatCurrency(monthlyMetrics.tuitionRevenue + monthlyMetrics.tiendaRevenue + otrosIngresosBusiness)}
+                                </div>
+                            </div>
+                            <div style="background: white; padding: 1rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                <div style="font-size: 0.85rem; color: #6b7280;">Gastos del Mes</div>
+                                <div style="font-size: 1.3rem; font-weight: bold; color: #ef4444;">
+                                    ${formatCurrency(monthlyExpensesBusiness + monthlyMetrics.tiendaCost)}
+                                </div>
+                            </div>
+                            <div style="background: white; padding: 1rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                <div style="font-size: 0.85rem; color: #6b7280;">Balance Negocio</div>
+                                <div style="font-size: 1.3rem; font-weight: bold; color: ${monthlyMetrics.ebitda >= 0 ? '#10b981' : '#ef4444'};">
+                                    ${formatCurrency(monthlyMetrics.ebitda)}
+                                </div>
                             </div>
                         </div>
                     </div>
-                    <div style="font-size: 0.85rem; color: #6b7280;">${monthlyMetrics.profitMargin.toFixed(1)}% margen</div>
+
+                    <!-- Personal Column -->
+                    <div>
+                        <h3 style="margin: 0 0 1rem 0; color: #ec4899;">🏠 Personal</h3>
+                        <div style="display: grid; gap: 1rem;">
+                            <div style="background: white; padding: 1rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                <div style="font-size: 0.85rem; color: #6b7280;">Ingresos del Mes</div>
+                                <div style="font-size: 1.3rem; font-weight: bold; color: #10b981;">
+                                    ${formatCurrency(otrosIngresosPersonal)}
+                                </div>
+                            </div>
+                            <div style="background: white; padding: 1rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                <div style="font-size: 0.85rem; color: #6b7280;">Gastos del Mes</div>
+                                <div style="font-size: 1.3rem; font-weight: bold; color: #ef4444;">
+                                    ${formatCurrency(monthlyExpensesPersonal)}
+                                </div>
+                            </div>
+                            <div style="background: white; padding: 1rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                <div style="font-size: 0.85rem; color: #6b7280;">Balance Personal</div>
+                                <div style="font-size: 1.3rem; font-weight: bold; color: ${(otrosIngresosPersonal - monthlyExpensesPersonal) >= 0 ? '#10b981' : '#ef4444'};">
+                                    ${formatCurrency(otrosIngresosPersonal - monthlyExpensesPersonal)}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            `}
 
             <!-- Quick Actions -->
             <div style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
