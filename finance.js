@@ -2538,24 +2538,53 @@ window.deleteOtroIngreso = async function(id) {
 // ==================================================================================
 
 async function renderExpensesViewEnhanced() {
+    // Get current financial context
+    const context = window.financialContext || 'business';
+
     // Generate the expenses view HTML
-    const expenses = window.FinanceManager.getExpenses();
+    let allExpenses = window.FinanceManager.getExpenses();
+
+    // Filter by financial context
+    let expenses = allExpenses;
+    if (context === 'business') {
+        expenses = allExpenses.filter(e => !e.type || e.type === 'business');
+    } else if (context === 'personal') {
+        expenses = allExpenses.filter(e => e.type === 'personal');
+    }
+    // If 'combined', show all expenses
+
     const currentMonth = new Date().toISOString().slice(0, 7);
-    const monthExpenses = window.FinanceManager.getExpenses({
-        startDate: currentMonth + '-01',
-        endDate: currentMonth + '-31'
+
+    // Filter month expenses by context too
+    let monthExpenses = expenses.filter(e => {
+        const expenseMonth = e.date.slice(0, 7);
+        return expenseMonth === currentMonth;
     });
+
     const monthTotal = monthExpenses.reduce((sum, e) => sum + e.amount, 0);
 
-    // Group by category
+    // Group by category (and optionally by type for combined view)
     const byCategory = {};
-    monthExpenses.forEach(expense => {
-        if (!byCategory[expense.category]) {
-            byCategory[expense.category] = { total: 0, count: 0 };
-        }
-        byCategory[expense.category].total += expense.amount;
-        byCategory[expense.category].count++;
-    });
+    if (context === 'combined') {
+        // For combined view, group by type first
+        const businessExpenses = monthExpenses.filter(e => !e.type || e.type === 'business');
+        const personalExpenses = monthExpenses.filter(e => e.type === 'personal');
+
+        const businessTotal = businessExpenses.reduce((sum, e) => sum + e.amount, 0);
+        const personalTotal = personalExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+        byCategory['🏢 Negocio'] = { total: businessTotal, count: businessExpenses.length };
+        byCategory['🏠 Personal'] = { total: personalTotal, count: personalExpenses.length };
+    } else {
+        // For single context, group by actual category
+        monthExpenses.forEach(expense => {
+            if (!byCategory[expense.category]) {
+                byCategory[expense.category] = { total: 0, count: 0 };
+            }
+            byCategory[expense.category].total += expense.amount;
+            byCategory[expense.category].count++;
+        });
+    }
 
     return `
         <div style="padding: 2rem; max-width: 1200px; margin: 0 auto;">
@@ -2604,6 +2633,7 @@ async function renderExpensesViewEnhanced() {
                     <table style="width: 100%; border-collapse: collapse;">
                         <thead style="background: #f3f4f6;">
                             <tr>
+                                ${context === 'combined' ? '<th style="padding: 0.75rem; text-align: left;">Tipo</th>' : ''}
                                 <th style="padding: 0.75rem; text-align: left;">Fecha</th>
                                 <th style="padding: 0.75rem; text-align: left;">Categoría</th>
                                 <th style="padding: 0.75rem; text-align: left;">Descripción</th>
@@ -2613,8 +2643,13 @@ async function renderExpensesViewEnhanced() {
                             </tr>
                         </thead>
                         <tbody>
-                            ${expenses.map(expense => `
+                            ${expenses.map(expense => {
+                                const expenseType = expense.type || 'business';
+                                const typeIcon = expenseType === 'business' ? '🏢' : '🏠';
+                                const typeLabel = expenseType === 'business' ? 'Negocio' : 'Personal';
+                                return `
                                 <tr style="border-top: 1px solid #e5e7eb;">
+                                    ${context === 'combined' ? `<td style="padding: 0.75rem;"><span style="font-size: 0.85rem;">${typeIcon} ${typeLabel}</span></td>` : ''}
                                     <td style="padding: 0.75rem;">${new Date(expense.date).toLocaleDateString('es-ES')}</td>
                                     <td style="padding: 0.75rem;">
                                         <span style="background: #e5e7eb; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.85rem;">
@@ -2634,11 +2669,11 @@ async function renderExpensesViewEnhanced() {
                                         </button>
                                     </td>
                                 </tr>
-                            `).join('')}
+                            `}).join('')}
                         </tbody>
                         <tfoot style="background: #f3f4f6; font-weight: bold;">
                             <tr>
-                                <td colspan="3" style="padding: 0.75rem; text-align: right;">TOTAL:</td>
+                                <td colspan="${context === 'combined' ? '4' : '3'}" style="padding: 0.75rem; text-align: right;">TOTAL:</td>
                                 <td style="padding: 0.75rem; text-align: right; color: #ef4444;">
                                     -${formatCurrency(expenses.reduce((sum, e) => sum + e.amount, 0))}
                                 </td>
