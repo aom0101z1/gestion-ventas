@@ -10,18 +10,56 @@ console.log('💰 Loading finance module...');
 // SECTION 1: EXPENSE CATEGORIES CONFIGURATION
 // ==================================================================================
 
-const ExpenseCategories = {
-    RENT: 'Arriendo',
+// Business Expense Categories
+const BusinessExpenseCategories = {
+    RENT: 'Arriendo Local',
     SALARIES: 'Salarios Profesores',
-    WATER: 'Agua',
-    ELECTRICITY: 'Luz',
-    INTERNET: 'Internet',
+    WATER: 'Agua Negocio',
+    ELECTRICITY: 'Luz Negocio',
+    INTERNET: 'Internet Negocio',
     GOOGLE: 'Servicios Google',
     HOSTING: 'Hosting',
     MARKETING: 'Marketing',
     SUPPLIES: 'Materiales',
     MAINTENANCE: 'Mantenimiento',
-    OTHER: 'Otros'
+    INVENTORY: 'Inventario/Compras',
+    OTHER: 'Otros Negocio'
+};
+
+// Personal Expense Categories
+const PersonalExpenseCategories = {
+    RENT: 'Arriendo Vivienda',
+    FOOD: 'Alimentación',
+    TRANSPORT: 'Transporte',
+    HEALTH: 'Salud',
+    EDUCATION: 'Educación Personal',
+    ENTERTAINMENT: 'Entretenimiento',
+    WATER: 'Agua Hogar',
+    ELECTRICITY: 'Luz Hogar',
+    INTERNET: 'Internet Hogar',
+    GAS: 'Gas',
+    PHONE: 'Teléfono/Celular',
+    CLOTHING: 'Ropa',
+    INSURANCE: 'Seguros',
+    SAVINGS: 'Ahorro/Inversión',
+    OTHER: 'Otros Personal'
+};
+
+// Legacy support - defaults to business categories
+const ExpenseCategories = BusinessExpenseCategories;
+
+// ==================================================================================
+// FINANCIAL CONTEXT - Business, Personal, or Combined
+// ==================================================================================
+
+// Global variable to track current financial context
+window.financialContext = localStorage.getItem('financialContext') || 'business'; // 'business' | 'personal' | 'combined'
+
+// Function to set financial context and persist it
+window.setFinancialContext = function(context) {
+    window.financialContext = context;
+    localStorage.setItem('financialContext', context);
+    console.log('💼 Financial context set to:', context);
 };
 
 // ==================================================================================
@@ -151,6 +189,7 @@ class FinanceManager {
                 category: expenseData.category,
                 description: expenseData.description,
                 date: expenseData.date || window.getTodayInColombia(),
+                type: expenseData.type || 'business', // 'business' | 'personal'
                 receiptUrl: expenseData.receiptUrl || null,
                 registeredBy: window.FirebaseData.currentUser?.uid,
                 registeredByName: window.FirebaseData.currentUser?.email,
@@ -1185,11 +1224,29 @@ window.loadFinanceTab = async function(activeTab = 'dashboard') {
 
     console.log('🔐 Permission check:', { userRole, isAdmin, isDirector, canViewAdvanced });
 
+    // Get current financial context
+    const currentContext = window.financialContext || 'business';
+
     // Render tabs header
     const tabsHeader = `
         <div style="background: white; border-bottom: 2px solid #e5e7eb; margin-bottom: 0;">
             <div style="padding: 1rem 2rem 0 2rem;">
-                <h1 style="margin: 0 0 1rem 0;">💰 Módulo de Finanzas</h1>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h1 style="margin: 0;">💰 Módulo de Finanzas</h1>
+
+                    <!-- Financial Context Selector -->
+                    <div style="display: flex; gap: 0.5rem; background: #f3f4f6; padding: 0.25rem; border-radius: 8px;">
+                        <button onclick="changeFinancialContext('business')" style="padding: 0.5rem 1rem; border: none; background: ${currentContext === 'business' ? '#3b82f6' : 'transparent'}; color: ${currentContext === 'business' ? 'white' : '#6b7280'}; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 0.9rem; transition: all 0.2s;">
+                            🏢 Negocio
+                        </button>
+                        <button onclick="changeFinancialContext('personal')" style="padding: 0.5rem 1rem; border: none; background: ${currentContext === 'personal' ? '#3b82f6' : 'transparent'}; color: ${currentContext === 'personal' ? 'white' : '#6b7280'}; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 0.9rem; transition: all 0.2s;">
+                            🏠 Personal
+                        </button>
+                        <button onclick="changeFinancialContext('combined')" style="padding: 0.5rem 1rem; border: none; background: ${currentContext === 'combined' ? '#3b82f6' : 'transparent'}; color: ${currentContext === 'combined' ? 'white' : '#6b7280'}; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 0.9rem; transition: all 0.2s;">
+                            📊 Combinado
+                        </button>
+                    </div>
+                </div>
                 <div style="display: flex; gap: 0.5rem; overflow-x: auto;">
                     <button onclick="loadFinanceTab('dashboard')" class="finance-tab ${activeTab === 'dashboard' ? 'active' : ''}" style="padding: 0.75rem 1.5rem; border: none; background: ${activeTab === 'dashboard' ? '#3b82f6' : 'transparent'}; color: ${activeTab === 'dashboard' ? 'white' : '#6b7280'}; border-radius: 8px 8px 0 0; cursor: pointer; font-weight: 500; white-space: nowrap;">
                         📊 Dashboard
@@ -1254,6 +1311,29 @@ window.loadFinanceTab = async function(activeTab = 'dashboard') {
 
     console.log('✅ Finance tab loaded successfully');
 };
+
+// Change financial context and reload current tab
+window.changeFinancialContext = function(context) {
+    window.setFinancialContext(context);
+
+    // Reload the finance module to reflect the new context
+    const currentTab = getCurrentActiveTab();
+    window.loadFinanceTab(currentTab);
+};
+
+// Helper function to get current active tab
+function getCurrentActiveTab() {
+    const tabs = ['dashboard', 'cierre', 'otros-ingresos', 'gastos', 'reportes'];
+
+    // Try to detect from URL hash if available
+    if (window.location.hash) {
+        const hashTab = window.location.hash.substring(1);
+        if (tabs.includes(hashTab)) return hashTab;
+    }
+
+    // Default to dashboard
+    return 'dashboard';
+}
 
 window.loadDailyReconciliationView = async function() {
     const container = document.getElementById('financeContainer');
@@ -1503,11 +1583,25 @@ window.showAddExpenseModal = function() {
             <h2 style="margin: 0 0 1.5rem 0;">➕ Registrar Gasto</h2>
 
             <form id="expenseForm" onsubmit="saveExpense(event)" style="display: grid; gap: 1rem;">
+                <!-- Type Selector -->
+                <div class="form-group">
+                    <label style="font-weight: 600; display: block; margin-bottom: 0.5rem;">Tipo de Gasto*</label>
+                    <div style="display: flex; gap: 0.5rem; background: #f3f4f6; padding: 0.25rem; border-radius: 6px;">
+                        <button type="button" onclick="toggleExpenseType('business')" id="expenseTypeBusiness" style="flex: 1; padding: 0.5rem; border: none; background: #3b82f6; color: white; border-radius: 4px; cursor: pointer; font-weight: 500;">
+                            🏢 Negocio
+                        </button>
+                        <button type="button" onclick="toggleExpenseType('personal')" id="expenseTypePersonal" style="flex: 1; padding: 0.5rem; border: none; background: transparent; color: #6b7280; border-radius: 4px; cursor: pointer; font-weight: 500;">
+                            🏠 Personal
+                        </button>
+                    </div>
+                    <input type="hidden" id="expenseType" value="business">
+                </div>
+
                 <div class="form-group">
                     <label style="font-weight: 600; display: block; margin-bottom: 0.5rem;">Categoría*</label>
                     <select id="expenseCategory" required style="width: 100%; padding: 0.75rem; border: 1px solid #e5e7eb; border-radius: 6px;">
                         <option value="">Seleccionar...</option>
-                        ${Object.entries(ExpenseCategories).map(([key, label]) => `
+                        ${Object.entries(BusinessExpenseCategories).map(([key, label]) => `
                             <option value="${label}">${label}</option>
                         `).join('')}
                     </select>
@@ -1562,6 +1656,42 @@ window.closeExpenseModal = function() {
     if (modal) modal.remove();
 };
 
+// Toggle expense type and update categories
+window.toggleExpenseType = function(type) {
+    const typeInput = document.getElementById('expenseType');
+    const businessBtn = document.getElementById('expenseTypeBusiness');
+    const personalBtn = document.getElementById('expenseTypePersonal');
+    const categorySelect = document.getElementById('expenseCategory');
+
+    // Update hidden input
+    typeInput.value = type;
+
+    // Update button styles
+    if (type === 'business') {
+        businessBtn.style.background = '#3b82f6';
+        businessBtn.style.color = 'white';
+        personalBtn.style.background = 'transparent';
+        personalBtn.style.color = '#6b7280';
+
+        // Update categories to business
+        categorySelect.innerHTML = '<option value="">Seleccionar...</option>' +
+            Object.entries(BusinessExpenseCategories).map(([key, label]) =>
+                `<option value="${label}">${label}</option>`
+            ).join('');
+    } else {
+        personalBtn.style.background = '#3b82f6';
+        personalBtn.style.color = 'white';
+        businessBtn.style.background = 'transparent';
+        businessBtn.style.color = '#6b7280';
+
+        // Update categories to personal
+        categorySelect.innerHTML = '<option value="">Seleccionar...</option>' +
+            Object.entries(PersonalExpenseCategories).map(([key, label]) =>
+                `<option value="${label}">${label}</option>`
+            ).join('');
+    }
+};
+
 window.saveExpense = async function(event) {
     event.preventDefault();
 
@@ -1569,7 +1699,8 @@ window.saveExpense = async function(event) {
         category: document.getElementById('expenseCategory').value,
         amount: document.getElementById('expenseAmount').value,
         date: document.getElementById('expenseDate').value,
-        description: document.getElementById('expenseDescription').value
+        description: document.getElementById('expenseDescription').value,
+        type: document.getElementById('expenseType').value // Add type field
     };
 
     try {
@@ -2315,6 +2446,7 @@ window.saveOtroIngreso = async function() {
             fecha,
             concepto,
             monto,
+            type: 'business', // Will be set by form later: 'business' | 'personal'
             metodoPago,
             notas,
             registradoPor: window.FirebaseData.currentUser?.email || 'unknown',
