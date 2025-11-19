@@ -3431,3 +3431,4 @@ async function renderAdvancedReportsView() {
 }
 
 console.log('✅ Finance module loaded successfully');
+console.log('🔍 Verifying window.showAddOtroIngresoModal exists:', typeof window.showAddOtroIngresoModal);
