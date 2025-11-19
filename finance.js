@@ -1224,8 +1224,8 @@ window.loadFinanceTab = async function(activeTab = 'dashboard') {
 
     console.log('🔐 Permission check:', { userRole, isAdmin, isDirector, canViewAdvanced });
 
-    // Get current financial context
-    const currentContext = window.financialContext || 'business';
+    // Get current financial context - Only admin can use personal/combined
+    const currentContext = isAdmin ? (window.financialContext || 'business') : 'business';
 
     // Render tabs header
     const tabsHeader = `
@@ -1234,7 +1234,8 @@ window.loadFinanceTab = async function(activeTab = 'dashboard') {
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                     <h1 style="margin: 0;">💰 Módulo de Finanzas</h1>
 
-                    <!-- Financial Context Selector -->
+                    <!-- Financial Context Selector - ADMIN ONLY -->
+                    ${isAdmin ? `
                     <div style="display: flex; gap: 0.5rem; background: #f3f4f6; padding: 0.25rem; border-radius: 8px;">
                         <button onclick="changeFinancialContext('business')" style="padding: 0.5rem 1rem; border: none; background: ${currentContext === 'business' ? '#3b82f6' : 'transparent'}; color: ${currentContext === 'business' ? 'white' : '#6b7280'}; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 0.9rem; transition: all 0.2s;">
                             🏢 Negocio
@@ -1246,6 +1247,7 @@ window.loadFinanceTab = async function(activeTab = 'dashboard') {
                             📊 Combinado
                         </button>
                     </div>
+                    ` : ''}
                 </div>
                 <div style="display: flex; gap: 0.5rem; overflow-x: auto;">
                     <button onclick="loadFinanceTab('dashboard')" class="finance-tab ${activeTab === 'dashboard' ? 'active' : ''}" style="padding: 0.75rem 1.5rem; border: none; background: ${activeTab === 'dashboard' ? '#3b82f6' : 'transparent'}; color: ${activeTab === 'dashboard' ? 'white' : '#6b7280'}; border-radius: 8px 8px 0 0; cursor: pointer; font-weight: 500; white-space: nowrap;">
@@ -1562,6 +1564,7 @@ window.loadExpensesView = function() {
 
 window.showAddExpenseModal = function() {
     const today = window.getTodayInColombia();
+    const isAdmin = window.userRole === 'admin';
 
     const modal = document.createElement('div');
     modal.id = 'expenseModal';
@@ -1583,7 +1586,8 @@ window.showAddExpenseModal = function() {
             <h2 style="margin: 0 0 1.5rem 0;">➕ Registrar Gasto</h2>
 
             <form id="expenseForm" onsubmit="saveExpense(event)" style="display: grid; gap: 1rem;">
-                <!-- Type Selector -->
+                <!-- Type Selector - ADMIN ONLY -->
+                ${isAdmin ? `
                 <div class="form-group">
                     <label style="font-weight: 600; display: block; margin-bottom: 0.5rem;">Tipo de Gasto*</label>
                     <div style="display: flex; gap: 0.5rem; background: #f3f4f6; padding: 0.25rem; border-radius: 6px;">
@@ -1596,6 +1600,7 @@ window.showAddExpenseModal = function() {
                     </div>
                     <input type="hidden" id="expenseType" value="business">
                 </div>
+                ` : '<input type="hidden" id="expenseType" value="business">'}
 
                 <div class="form-group">
                     <label style="font-weight: 600; display: block; margin-bottom: 0.5rem;">Categoría*</label>
@@ -2239,8 +2244,9 @@ window.loadTodayMovementsView = async function() {
 
 // Render Otros Ingresos View
 async function renderOtrosIngresosView() {
-    // Get current financial context
-    const context = window.financialContext || 'business';
+    // Get current financial context - Only admin can use personal/combined
+    const isAdmin = window.userRole === 'admin';
+    const context = isAdmin ? (window.financialContext || 'business') : 'business';
 
     // Get other income records from Firebase
     const db = window.firebaseModules.database;
@@ -2348,12 +2354,15 @@ async function renderOtrosIngresosView() {
 
 // Show add otro ingreso modal
 window.showAddOtroIngresoModal = function() {
+    const isAdmin = window.userRole === 'admin';
+
     const modalHTML = `
         <div id="otroIngresoModal" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;">
             <div style="background: white; padding: 2rem; border-radius: 12px; max-width: 500px; width: 90%;">
                 <h2 style="margin: 0 0 1.5rem 0;">💵 Registrar Otro Ingreso</h2>
 
-                <!-- Type Selector -->
+                <!-- Type Selector - ADMIN ONLY -->
+                ${isAdmin ? `
                 <div style="margin-bottom: 1rem;">
                     <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Tipo de Ingreso</label>
                     <div style="display: flex; gap: 0.5rem; background: #f3f4f6; padding: 0.25rem; border-radius: 6px;">
@@ -2366,6 +2375,7 @@ window.showAddOtroIngresoModal = function() {
                     </div>
                     <input type="hidden" id="otroIngresoType" value="business">
                 </div>
+                ` : '<input type="hidden" id="otroIngresoType" value="business">'}
 
                 <div style="margin-bottom: 1rem;">
                     <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Fecha</label>
@@ -2556,8 +2566,9 @@ window.deleteOtroIngreso = async function(id) {
 // ==================================================================================
 
 async function renderExpensesViewEnhanced() {
-    // Get current financial context
-    const context = window.financialContext || 'business';
+    // Get current financial context - Only admin can use personal/combined
+    const isAdmin = window.userRole === 'admin';
+    const context = isAdmin ? (window.financialContext || 'business') : 'business';
 
     // Generate the expenses view HTML
     let allExpenses = window.FinanceManager.getExpenses();
