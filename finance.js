@@ -1221,6 +1221,7 @@ window.loadFinanceTab = async function(activeTab = 'dashboard') {
     await window.FinanceManager.init();
 
     // Check user permissions - use window.userRole which is set during login
+    console.log('🔍 DEBUG - window.userRole value:', window.userRole);
     const userRole = window.userRole || 'vendedor';
     const isAdmin = userRole === 'admin';
     const isDirector = userRole === 'director';

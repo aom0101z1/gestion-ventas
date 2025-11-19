@@ -1451,7 +1451,8 @@ onAuthStateChanged(auth, async (user) => {
                 if (!profile) {
                     throw new Error('User profile not found. Contact administrator.');
                 }
-                
+
+                window.userRole = profile.role;
                 userRole = profile.role;
                 console.log('👤 User role loaded:', userRole);
                 
@@ -3129,8 +3130,9 @@ onAuthStateChanged(auth, async (user) => {
             try {
                 if (confirm('¿Estás seguro de que quieres cerrar sesión?')) {
                     await window.FirebaseData.logout();
-                    
+
                     currentUser = null;
+                    window.userRole = null;
                     userRole = null;
                     isInitialized = false;
                     
