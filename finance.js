@@ -1223,13 +1223,13 @@ window.loadFinanceTab = async function(activeTab = 'dashboard') {
     // Check user permissions - use window.userRole which is set during login
     console.log('🔍 DEBUG - window.userRole value:', window.userRole);
     const userRole = window.userRole || 'vendedor';
-    const isAdmin = userRole === 'admin';
+    const isAdmin = userRole === 'admin' || userRole === 'director'; // Director has admin privileges
     const isDirector = userRole === 'director';
     const canViewAdvanced = isAdmin || isDirector;
 
     console.log('🔐 Permission check:', { userRole, isAdmin, isDirector, canViewAdvanced });
 
-    // Get current financial context - Only admin can use personal/combined
+    // Get current financial context - Admin and Director can use personal/combined
     const currentContext = isAdmin ? (window.financialContext || 'business') : 'business';
 
     // Render tabs header
@@ -1571,7 +1571,7 @@ window.loadExpensesView = function() {
 
 window.showAddExpenseModal = function() {
     const today = window.getTodayInColombia();
-    const isAdmin = window.userRole === 'admin';
+    const isAdmin = window.userRole === 'admin' || window.userRole === 'director';
 
     const modal = document.createElement('div');
     modal.id = 'expenseModal';
@@ -2251,8 +2251,8 @@ window.loadTodayMovementsView = async function() {
 
 // Render Otros Ingresos View
 async function renderOtrosIngresosView() {
-    // Get current financial context - Only admin can use personal/combined
-    const isAdmin = window.userRole === 'admin';
+    // Get current financial context - Admin and Director can use personal/combined
+    const isAdmin = window.userRole === 'admin' || window.userRole === 'director';
     const context = isAdmin ? (window.financialContext || 'business') : 'business';
 
     // Get other income records from Firebase
@@ -2361,7 +2361,7 @@ async function renderOtrosIngresosView() {
 
 // Show add otro ingreso modal
 window.showAddOtroIngresoModal = function() {
-    const isAdmin = window.userRole === 'admin';
+    const isAdmin = window.userRole === 'admin' || window.userRole === 'director';
 
     const modalHTML = `
         <div id="otroIngresoModal" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;">
@@ -2573,8 +2573,8 @@ window.deleteOtroIngreso = async function(id) {
 // ==================================================================================
 
 async function renderExpensesViewEnhanced() {
-    // Get current financial context - Only admin can use personal/combined
-    const isAdmin = window.userRole === 'admin';
+    // Get current financial context - Admin and Director can use personal/combined
+    const isAdmin = window.userRole === 'admin' || window.userRole === 'director';
     const context = isAdmin ? (window.financialContext || 'business') : 'business';
 
     // Generate the expenses view HTML
@@ -2736,7 +2736,7 @@ async function renderAdvancedReportsView() {
     const currentMonth = new Date().getMonth() + 1;
 
     // Get current financial context
-    const isAdmin = window.userRole === 'admin';
+    const isAdmin = window.userRole === 'admin' || window.userRole === 'director';
     const context = isAdmin ? (window.financialContext || 'business') : 'business';
 
     // Get data
