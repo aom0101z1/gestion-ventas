@@ -1177,8 +1177,8 @@ window.loadFinanceTab = async function(activeTab = 'dashboard') {
 
     await window.FinanceManager.init();
 
-    // Check user permissions
-    const userRole = window.FirebaseData?.currentUser?.role || 'vendedor';
+    // Check user permissions - use window.userRole which is set during login
+    const userRole = window.userRole || 'vendedor';
     const isAdmin = userRole === 'admin';
     const isDirector = userRole === 'director';
     const canViewAdvanced = isAdmin || isDirector;
