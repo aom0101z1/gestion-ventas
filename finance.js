@@ -2729,85 +2729,101 @@ async function renderOtrosIngresosView() {
 window.showAddOtroIngresoModal = function() {
     console.log('🔵 showAddOtroIngresoModal called!');
     console.log('window.userRole:', window.userRole);
+    console.log('window.getTodayInColombia exists:', typeof window.getTodayInColombia);
+
     const isAdmin = window.userRole === 'admin' || window.userRole === 'director';
+    console.log('isAdmin:', isAdmin);
 
-    const modalHTML = `
-        <div id="otroIngresoModal" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;">
-            <div style="background: white; padding: 2rem; border-radius: 12px; max-width: 500px; width: 90%;">
-                <h2 style="margin: 0 0 1.5rem 0;">💵 Registrar Otro Ingreso</h2>
+    try {
+        const today = window.getTodayInColombia();
+        console.log('Today date:', today);
 
-                <!-- Type Selector - ADMIN ONLY -->
-                ${isAdmin ? `
-                <div style="margin-bottom: 1rem;">
-                    <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Tipo de Ingreso</label>
-                    <div style="display: flex; gap: 0.5rem; background: #f3f4f6; padding: 0.25rem; border-radius: 6px;">
-                        <button type="button" onclick="toggleIngresoType('business')" id="ingresoTypeBusiness" style="flex: 1; padding: 0.5rem; border: none; background: #3b82f6; color: white; border-radius: 4px; cursor: pointer; font-weight: 500;">
-                            🏢 Negocio
+        const modalHTML = `
+            <div id="otroIngresoModal" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;">
+                <div style="background: white; padding: 2rem; border-radius: 12px; max-width: 500px; width: 90%;">
+                    <h2 style="margin: 0 0 1.5rem 0;">💵 Registrar Otro Ingreso</h2>
+
+                    <!-- Type Selector - ADMIN ONLY -->
+                    ${isAdmin ? `
+                    <div style="margin-bottom: 1rem;">
+                        <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Tipo de Ingreso</label>
+                        <div style="display: flex; gap: 0.5rem; background: #f3f4f6; padding: 0.25rem; border-radius: 6px;">
+                            <button type="button" onclick="toggleIngresoType('business')" id="ingresoTypeBusiness" style="flex: 1; padding: 0.5rem; border: none; background: #3b82f6; color: white; border-radius: 4px; cursor: pointer; font-weight: 500;">
+                                🏢 Negocio
+                            </button>
+                            <button type="button" onclick="toggleIngresoType('personal')" id="ingresoTypePersonal" style="flex: 1; padding: 0.5rem; border: none; background: transparent; color: #6b7280; border-radius: 4px; cursor: pointer; font-weight: 500;">
+                                🏠 Personal
+                            </button>
+                        </div>
+                        <input type="hidden" id="otroIngresoType" value="business">
+                    </div>
+                    ` : '<input type="hidden" id="otroIngresoType" value="business">'}
+
+                    <div style="margin-bottom: 1rem;">
+                        <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Fecha</label>
+                        <input type="date" id="otroIngresoFecha" value="${today}" style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
+                    </div>
+
+                    <div style="margin-bottom: 1rem;">
+                        <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Concepto</label>
+                        <select id="otroIngresoConcepto" onchange="handleConceptoChange()" style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
+                            <option value="">Seleccione...</option>
+                            <option value="Matrícula">Matrícula</option>
+                            <option value="Venta de Materiales">Venta de Materiales</option>
+                            <option value="Servicios Adicionales">Servicios Adicionales</option>
+                            <option value="Donaciones">Donaciones</option>
+                            <option value="Intereses">Intereses Bancarios</option>
+                            <option value="Otro">Otro (especificar)</option>
+                        </select>
+                    </div>
+
+                    <div id="otroConceptoContainer" style="margin-bottom: 1rem; display: none;">
+                        <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Especificar Concepto</label>
+                        <input type="text" id="otroConceptoText" placeholder="Escriba el concepto..." style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
+                    </div>
+
+                    <div style="margin-bottom: 1rem;">
+                        <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Monto</label>
+                        <input type="text" id="otroIngresoMonto" placeholder="$0" style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;" oninput="formatCurrencyInput(this)">
+                    </div>
+
+                    <div style="margin-bottom: 1rem;">
+                        <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Método de Pago</label>
+                        <select id="otroIngresoMetodo" style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
+                            <option value="Efectivo">Efectivo</option>
+                            <option value="Transferencia">Transferencia</option>
+                            <option value="Nequi">Nequi</option>
+                            <option value="Bancolombia">Bancolombia</option>
+                        </select>
+                    </div>
+
+                    <div style="margin-bottom: 1.5rem;">
+                        <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Notas (opcional)</label>
+                        <textarea id="otroIngresoNotas" rows="3" placeholder="Detalles adicionales..." style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; resize: vertical;"></textarea>
+                    </div>
+
+                    <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+                        <button onclick="closeOtroIngresoModal()" class="btn" style="background: #6b7280; color: white; padding: 0.5rem 1.5rem;">
+                            Cancelar
                         </button>
-                        <button type="button" onclick="toggleIngresoType('personal')" id="ingresoTypePersonal" style="flex: 1; padding: 0.5rem; border: none; background: transparent; color: #6b7280; border-radius: 4px; cursor: pointer; font-weight: 500;">
-                            🏠 Personal
+                        <button onclick="saveOtroIngreso()" class="btn" style="background: #10b981; color: white; padding: 0.5rem 1.5rem;">
+                            Guardar
                         </button>
                     </div>
-                    <input type="hidden" id="otroIngresoType" value="business">
-                </div>
-                ` : '<input type="hidden" id="otroIngresoType" value="business">'}
-
-                <div style="margin-bottom: 1rem;">
-                    <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Fecha</label>
-                    <input type="date" id="otroIngresoFecha" value="${window.getTodayInColombia()}" style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
-                </div>
-
-                <div style="margin-bottom: 1rem;">
-                    <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Concepto</label>
-                    <select id="otroIngresoConcepto" onchange="handleConceptoChange()" style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
-                        <option value="">Seleccione...</option>
-                        <option value="Matrícula">Matrícula</option>
-                        <option value="Venta de Materiales">Venta de Materiales</option>
-                        <option value="Servicios Adicionales">Servicios Adicionales</option>
-                        <option value="Donaciones">Donaciones</option>
-                        <option value="Intereses">Intereses Bancarios</option>
-                        <option value="Otro">Otro (especificar)</option>
-                    </select>
-                </div>
-
-                <div id="otroConceptoContainer" style="margin-bottom: 1rem; display: none;">
-                    <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Especificar Concepto</label>
-                    <input type="text" id="otroConceptoText" placeholder="Escriba el concepto..." style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
-                </div>
-
-                <div style="margin-bottom: 1rem;">
-                    <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Monto</label>
-                    <input type="text" id="otroIngresoMonto" placeholder="$0" style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;" oninput="formatCurrencyInput(this)">
-                </div>
-
-                <div style="margin-bottom: 1rem;">
-                    <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Método de Pago</label>
-                    <select id="otroIngresoMetodo" style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
-                        <option value="Efectivo">Efectivo</option>
-                        <option value="Transferencia">Transferencia</option>
-                        <option value="Nequi">Nequi</option>
-                        <option value="Bancolombia">Bancolombia</option>
-                    </select>
-                </div>
-
-                <div style="margin-bottom: 1.5rem;">
-                    <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Notas (opcional)</label>
-                    <textarea id="otroIngresoNotas" rows="3" placeholder="Detalles adicionales..." style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; resize: vertical;"></textarea>
-                </div>
-
-                <div style="display: flex; gap: 1rem; justify-content: flex-end;">
-                    <button onclick="closeOtroIngresoModal()" class="btn" style="background: #6b7280; color: white; padding: 0.5rem 1.5rem;">
-                        Cancelar
-                    </button>
-                    <button onclick="saveOtroIngreso()" class="btn" style="background: #10b981; color: white; padding: 0.5rem 1.5rem;">
-                        Guardar
-                    </button>
                 </div>
             </div>
-        </div>
-    `;
+        `;
 
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
+        console.log('Modal HTML length:', modalHTML.length);
+        console.log('About to insert modal into DOM...');
+
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+        console.log('✅ Modal inserted successfully!');
+        console.log('Modal element exists:', document.getElementById('otroIngresoModal') !== null);
+    } catch (error) {
+        console.error('❌ Error in showAddOtroIngresoModal:', error);
+    }
 };
 
 window.handleConceptoChange = function() {
