@@ -2727,6 +2727,8 @@ async function renderOtrosIngresosView() {
 
 // Show add otro ingreso modal
 window.showAddOtroIngresoModal = function() {
+    console.log('🔵 showAddOtroIngresoModal called!');
+    console.log('window.userRole:', window.userRole);
     const isAdmin = window.userRole === 'admin' || window.userRole === 'director';
 
     const modalHTML = `
