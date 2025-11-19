@@ -501,8 +501,8 @@ async recordPayment(studentId, paymentData) {
         };
     }
 
-    // Get payment summary
-    async getPaymentSummary() {
+    // Get payment summary with optional date range filter
+    async getPaymentSummary(startDate = null, endDate = null) {
         const students = Array.from(window.StudentManager.students.values());
         const summary = {
             total: students.length,
@@ -513,27 +513,88 @@ async recordPayment(studentId, paymentData) {
             upcoming: 0,
             totalAmount: 0,
             collectedAmount: 0,
-            partialAmount: 0
+            partialAmount: 0,
+            dateRange: startDate && endDate ? { startDate, endDate } : null
         };
 
-        students.forEach(student => {
-            const status = this.getPaymentStatus(student);
-            if (status.partial) {
-                summary.partial++;
-                summary.collectedAmount += status.paidAmount || 0;
-                summary.partialAmount += status.remaining || 0;
-            } else if (status.status === 'Pagado') {
-                summary.paid++;
-                summary.collectedAmount += student.valor || 0;
-            } else if (status.color === '#ef4444') {
-                summary.overdue++;
-            } else if (status.color === '#fbbf24' || status.color === '#f59e0b') {
-                summary.upcoming++;
-            } else {
-                summary.pending++;
-            }
-            summary.totalAmount += student.valor || 0;
-        });
+        // If date range is specified, count based on payments in that range
+        if (startDate && endDate) {
+            const studentsWithPaymentsInRange = new Set();
+
+            students.forEach(student => {
+                if (!student.pagos) return;
+
+                let paidInRange = 0;
+                let partialInRange = 0;
+                let totalExpectedInRange = 0;
+                let hasPaymentInRange = false;
+
+                // Analyze all payments in date range
+                Object.values(student.pagos).forEach(payment => {
+                    if (!payment.date) return;
+
+                    const paymentDate = payment.date.split('T')[0];
+                    if (paymentDate >= startDate && paymentDate <= endDate) {
+                        hasPaymentInRange = true;
+                        const amount = payment.amount || 0;
+
+                        if (payment.status === 'paid') {
+                            paidInRange += amount;
+                            summary.collectedAmount += amount;
+                        } else if (payment.status === 'partial') {
+                            partialInRange += amount;
+                            summary.collectedAmount += amount;
+                        }
+                    }
+                });
+
+                // If student has payments in range, categorize them
+                if (hasPaymentInRange) {
+                    studentsWithPaymentsInRange.add(student.id);
+
+                    // Count by payment completion status in that period
+                    const status = this.getPaymentStatus(student);
+
+                    if (status.partial) {
+                        summary.partial++;
+                    } else if (status.status === 'Pagado') {
+                        summary.paid++;
+                    } else if (status.color === '#ef4444') {
+                        summary.overdue++;
+                    } else if (status.color === '#fbbf24' || status.color === '#f59e0b') {
+                        summary.upcoming++;
+                    } else {
+                        summary.pending++;
+                    }
+                }
+
+                summary.totalAmount += student.valor || 0;
+            });
+
+            // Update total to reflect filtered students
+            summary.total = studentsWithPaymentsInRange.size;
+        } else {
+            // No date filter - use original logic
+            students.forEach(student => {
+                const status = this.getPaymentStatus(student);
+
+                if (status.partial) {
+                    summary.partial++;
+                    summary.collectedAmount += status.paidAmount || 0;
+                    summary.partialAmount += status.remaining || 0;
+                } else if (status.status === 'Pagado') {
+                    summary.paid++;
+                    summary.collectedAmount += student.valor || 0;
+                } else if (status.color === '#ef4444') {
+                    summary.overdue++;
+                } else if (status.color === '#fbbf24' || status.color === '#f59e0b') {
+                    summary.upcoming++;
+                } else {
+                    summary.pending++;
+                }
+                summary.totalAmount += student.valor || 0;
+            });
+        }
 
         return summary;
     }
@@ -1566,7 +1627,7 @@ const InvoiceGenerator = {
 
 function renderPaymentDashboard() {
     return `
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
             <div style="background: #10b981; color: white; padding: 1.5rem; border-radius: 8px;">
                 <div style="font-size: 2rem; font-weight: bold;" id="paidCount">0</div>
                 <div>Pagados</div>
@@ -1586,6 +1647,54 @@ function renderPaymentDashboard() {
             <div style="background: #3b82f6; color: white; padding: 1.5rem; border-radius: 8px;">
                 <div style="font-size: 1.5rem; font-weight: bold;" id="collectedAmount">$0</div>
                 <div>Recaudado</div>
+            </div>
+        </div>
+
+        <!-- Date Range Selector -->
+        <div style="background: #f0f9ff; border: 2px solid #3b82f6; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
+            <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem;">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="font-weight: 600; color: #1e40af;">📅 Rango de Fechas:</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <label style="font-size: 0.875rem; color: #374151;">Desde:</label>
+                    <input
+                        type="date"
+                        id="paymentStartDate"
+                        style="padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;"
+                    >
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <label style="font-size: 0.875rem; color: #374151;">Hasta:</label>
+                    <input
+                        type="date"
+                        id="paymentEndDate"
+                        style="padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;"
+                    >
+                </div>
+                <button
+                    onclick="applyDateRangeFilter()"
+                    class="btn"
+                    style="background: #3b82f6; color: white; padding: 0.5rem 1rem; border-radius: 6px; border: none; cursor: pointer; font-weight: 500;">
+                    🔍 Aplicar
+                </button>
+                <button
+                    onclick="clearDateRangeFilter()"
+                    class="btn"
+                    style="background: #6b7280; color: white; padding: 0.5rem 1rem; border-radius: 6px; border: none; cursor: pointer; font-weight: 500;">
+                    🔄 Ver Todos
+                </button>
+                <div id="dateRangeInfo" style="font-size: 0.875rem; color: #059669; font-weight: 500; margin-left: auto;"></div>
+            </div>
+            <!-- Quick Presets -->
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; padding-top: 0.5rem; border-top: 1px solid #bfdbfe;">
+                <span style="font-size: 0.75rem; color: #6b7280; align-self: center;">Accesos rápidos:</span>
+                <button onclick="setDateRangePreset('today')" class="btn btn-sm" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; padding: 0.25rem 0.75rem; font-size: 0.75rem;">Hoy</button>
+                <button onclick="setDateRangePreset('thisWeek')" class="btn btn-sm" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; padding: 0.25rem 0.75rem; font-size: 0.75rem;">Esta Semana</button>
+                <button onclick="setDateRangePreset('thisMonth')" class="btn btn-sm" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; padding: 0.25rem 0.75rem; font-size: 0.75rem;">Este Mes</button>
+                <button onclick="setDateRangePreset('lastMonth')" class="btn btn-sm" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; padding: 0.25rem 0.75rem; font-size: 0.75rem;">Mes Anterior</button>
+                <button onclick="setDateRangePreset('thisYear')" class="btn btn-sm" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; padding: 0.25rem 0.75rem; font-size: 0.75rem;">Este Año</button>
+                <button onclick="setDateRangePreset('last30days')" class="btn btn-sm" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; padding: 0.25rem 0.75rem; font-size: 0.75rem;">Últimos 30 Días</button>
             </div>
         </div>
     `;
@@ -2439,6 +2548,12 @@ window.updateInstallmentAmounts = function() {
 window.PaymentManager = new PaymentManager();
 window.InvoiceStorage = new InvoiceStorageManager();
 
+// Global state for date range filter
+window.activeDateRangeFilter = {
+    startDate: null,
+    endDate: null
+};
+
 window.loadPaymentsTab = async function() {
     console.log('💰 Loading payments tab');
 
@@ -2692,6 +2807,21 @@ window.filterPayments = function() {
     let students = window.StudentManager.getStudents();
     const totalCount = students.length;
 
+    // Apply date range filter first if active
+    if (window.activeDateRangeFilter.startDate && window.activeDateRangeFilter.endDate) {
+        students = students.filter(student => {
+            if (!student.pagos) return false;
+
+            // Check if student has any payment in the date range
+            return Object.values(student.pagos).some(payment => {
+                if (!payment.date) return false;
+                const paymentDate = payment.date.split('T')[0];
+                return paymentDate >= window.activeDateRangeFilter.startDate &&
+                       paymentDate <= window.activeDateRangeFilter.endDate;
+            });
+        });
+    }
+
     // Apply name search filter
     if (searchName) {
         students = students.filter(s => {
@@ -2758,6 +2888,20 @@ window.filterPayments = function() {
     if (filteredCountEl) filteredCountEl.textContent = filteredCount;
     if (totalCountEl) totalCountEl.textContent = totalCount;
 
+    // Always recalculate summary when filters are active
+    const hasActiveFilters = monthFilter || yearFilter || window.activeDateRangeFilter.startDate || statusFilter || methodFilter || bankFilter;
+
+    if (hasActiveFilters) {
+        // Calculate summary from filtered students
+        const filteredSummary = calculateFilteredSummary(students, monthFilter, yearFilter);
+        updatePaymentSummaryDisplay(filteredSummary);
+    } else {
+        // No filters - show all data
+        window.PaymentManager.getPaymentSummary().then(summary => {
+            updatePaymentSummaryDisplay(summary);
+        });
+    }
+
     // Update table
     document.getElementById('paymentTableContainer').innerHTML = renderPaymentTable(students);
 
@@ -2767,8 +2911,89 @@ window.filterPayments = function() {
     }
 };
 
+// Calculate summary for filtered students (by month/year or date range)
+function calculateFilteredSummary(students, monthFilter, yearFilter) {
+    const summary = {
+        paid: 0,
+        partial: 0,
+        upcoming: 0,
+        overdue: 0,
+        collectedAmount: 0
+    };
+
+    const hasDateRange = window.activeDateRangeFilter.startDate && window.activeDateRangeFilter.endDate;
+
+    students.forEach(student => {
+        if (!student.pagos) return;
+
+        // Check if student has ANY payment matching the filter
+        let hasMatchingPayment = false;
+        let hasPaidPayment = false;
+        let hasPartialPayment = false;
+        let collectedFromStudent = 0;
+
+        Object.values(student.pagos).forEach(payment => {
+            let matchesFilter = false;
+
+            // If date range is active, use that for filtering
+            if (hasDateRange) {
+                if (payment.date) {
+                    const paymentDate = payment.date.split('T')[0];
+                    matchesFilter = paymentDate >= window.activeDateRangeFilter.startDate &&
+                                  paymentDate <= window.activeDateRangeFilter.endDate;
+                }
+            } else {
+                // Otherwise use month/year filter
+                matchesFilter = true;
+
+                if (monthFilter && payment.month) {
+                    matchesFilter = matchesFilter && payment.month.toLowerCase() === monthFilter.toLowerCase();
+                }
+
+                if (yearFilter && payment.year) {
+                    matchesFilter = matchesFilter && payment.year.toString() === yearFilter.toString();
+                }
+            }
+
+            if (matchesFilter) {
+                hasMatchingPayment = true;
+
+                // Track payment status
+                if (payment.status === 'paid') {
+                    hasPaidPayment = true;
+                    collectedFromStudent += payment.amount || 0;
+                } else if (payment.status === 'partial') {
+                    hasPartialPayment = true;
+                    collectedFromStudent += payment.amount || 0;
+                }
+            }
+        });
+
+        // Only count student if they have payments in the filtered period
+        if (!hasMatchingPayment) return;
+
+        summary.collectedAmount += collectedFromStudent;
+
+        // Determine student's overall status for this period
+        const status = window.PaymentManager.getPaymentStatus(student);
+
+        // Count by status - but only if student has payment activity in the period
+        if (status.partial || hasPartialPayment) {
+            summary.partial++;
+        } else if (status.status === 'Pagado' || hasPaidPayment) {
+            summary.paid++;
+        } else if (status.color === '#ef4444') {
+            summary.overdue++;
+        } else if (status.color === '#fbbf24' || status.color === '#f59e0b') {
+            summary.upcoming++;
+        }
+    });
+
+    return summary;
+}
+
 // Clear all filters
-window.clearPaymentFilters = function() {
+window.clearPaymentFilters = async function() {
     document.getElementById('searchNameFilter').value = '';
     document.getElementById('paymentFilter').value = '';
     document.getElementById('methodFilter').value = '';
@@ -2776,8 +3001,157 @@ window.clearPaymentFilters = function() {
     document.getElementById('monthFilter').value = '';
     document.getElementById('yearFilter').value = ''; // All years by default
 
+    // Reset summary boxes to show all data (unless date range filter is active)
+    if (!window.activeDateRangeFilter.startDate) {
+        const summary = await window.PaymentManager.getPaymentSummary();
+        updatePaymentSummaryDisplay(summary);
+    }
+
     filterPayments();
     window.showNotification('🔄 Filtros limpiados', 'success');
+};
+
+// Apply date range filter
+window.applyDateRangeFilter = async function() {
+    const startDate = document.getElementById('paymentStartDate')?.value;
+    const endDate = document.getElementById('paymentEndDate')?.value;
+
+    if (!startDate || !endDate) {
+        window.showNotification('⚠️ Por favor seleccione ambas fechas', 'warning');
+        return;
+    }
+
+    if (startDate > endDate) {
+        window.showNotification('⚠️ La fecha de inicio debe ser anterior a la fecha final', 'warning');
+        return;
+    }
+
+    try {
+        // Store date range in global state
+        window.activeDateRangeFilter.startDate = startDate;
+        window.activeDateRangeFilter.endDate = endDate;
+
+        // Update summary with date range
+        const summary = await window.PaymentManager.getPaymentSummary(startDate, endDate);
+        updatePaymentSummaryDisplay(summary);
+
+        // Update the student table to show only students with payments in range
+        filterPayments();
+
+        // Update date range info display
+        const startDateFormatted = new Date(startDate).toLocaleDateString('es-CO', {
+            year: 'numeric', month: 'long', day: 'numeric'
+        });
+        const endDateFormatted = new Date(endDate).toLocaleDateString('es-CO', {
+            year: 'numeric', month: 'long', day: 'numeric'
+        });
+
+        const infoElement = document.getElementById('dateRangeInfo');
+        if (infoElement) {
+            infoElement.innerHTML = `✅ Mostrando: ${startDateFormatted} - ${endDateFormatted}`;
+        }
+
+        window.showNotification(`✅ Filtro aplicado: ${startDateFormatted} al ${endDateFormatted}`, 'success');
+    } catch (error) {
+        console.error('Error applying date range filter:', error);
+        window.showNotification('❌ Error al aplicar filtro de fechas', 'error');
+    }
+};
+
+// Clear date range filter
+window.clearDateRangeFilter = async function() {
+    document.getElementById('paymentStartDate').value = '';
+    document.getElementById('paymentEndDate').value = '';
+
+    // Clear global state
+    window.activeDateRangeFilter.startDate = null;
+    window.activeDateRangeFilter.endDate = null;
+
+    const infoElement = document.getElementById('dateRangeInfo');
+    if (infoElement) {
+        infoElement.innerHTML = '';
+    }
+
+    try {
+        // Update summary without date range (show all)
+        const summary = await window.PaymentManager.getPaymentSummary();
+        updatePaymentSummaryDisplay(summary);
+
+        // Update the student table to show all students
+        filterPayments();
+
+        window.showNotification('🔄 Mostrando todos los pagos', 'success');
+    } catch (error) {
+        console.error('Error clearing date range filter:', error);
+        window.showNotification('❌ Error al limpiar filtro', 'error');
+    }
+};
+
+// Helper function to update summary display
+function updatePaymentSummaryDisplay(summary) {
+    document.getElementById('paidCount').textContent = summary.paid;
+    document.getElementById('partialCount').textContent = summary.partial;
+    document.getElementById('upcomingCount').textContent = summary.upcoming;
+    document.getElementById('overdueCount').textContent = summary.overdue;
+    document.getElementById('collectedAmount').textContent = `$${summary.collectedAmount.toLocaleString('es-CO')}`;
+}
+
+// Set date range preset
+window.setDateRangePreset = function(preset) {
+    const today = new Date();
+    let startDate, endDate;
+
+    switch (preset) {
+        case 'today':
+            startDate = endDate = today;
+            break;
+
+        case 'thisWeek':
+            const dayOfWeek = today.getDay();
+            const monday = new Date(today);
+            monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+            startDate = monday;
+            endDate = today;
+            break;
+
+        case 'thisMonth':
+            startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+            endDate = today;
+            break;
+
+        case 'lastMonth':
+            startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            endDate = new Date(today.getFullYear(), today.getMonth(), 0);
+            break;
+
+        case 'thisYear':
+            startDate = new Date(today.getFullYear(), 0, 1);
+            endDate = today;
+            break;
+
+        case 'last30days':
+            startDate = new Date(today);
+            startDate.setDate(today.getDate() - 30);
+            endDate = today;
+            break;
+
+        default:
+            return;
+    }
+
+    // Format dates as YYYY-MM-DD for input fields
+    const formatDate = (date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    document.getElementById('paymentStartDate').value = formatDate(startDate);
+    document.getElementById('paymentEndDate').value = formatDate(endDate);
+
+    // Automatically apply the filter
+    applyDateRangeFilter();
 };
 
 window.exportPaymentReport = async function() {

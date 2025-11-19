@@ -378,12 +378,14 @@ class FinanceManager {
     async calculateDailyRevenue(date) {
         // Query Firebase directly instead of using in-memory cache
         const db = window.firebaseModules.database;
+
+        // Get student tuition payments
         const paymentsRef = db.ref(window.FirebaseData.database, 'payments');
-        const snapshot = await db.get(paymentsRef);
+        const paymentsSnapshot = await db.get(paymentsRef);
 
         let payments = [];
-        if (snapshot.exists()) {
-            const paymentsData = snapshot.val();
+        if (paymentsSnapshot.exists()) {
+            const paymentsData = paymentsSnapshot.val();
             payments = Object.entries(paymentsData)
                 .map(([id, payment]) => ({ id, ...payment }))
                 .filter(p => {
@@ -398,13 +400,62 @@ class FinanceManager {
         const cashTotal = cashPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
         const transferTotal = transferPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
 
+        // Get tienda sales
+        const salesRef = db.ref(window.FirebaseData.database, 'sales');
+        const salesSnapshot = await db.get(salesRef);
+
+        let tiendaSales = [];
+        let tiendaCash = 0;
+        let tiendaTransfers = 0;
+        let tiendaNequi = 0;
+        let tiendaBancolombia = 0;
+
+        if (salesSnapshot.exists()) {
+            const salesData = salesSnapshot.val();
+            tiendaSales = Object.entries(salesData)
+                .map(([id, sale]) => ({ id, ...sale }))
+                .filter(s => {
+                    const saleDate = s.date ? s.date.split('T')[0] : null;
+                    return saleDate === date;
+                });
+
+            // Calculate tienda totals by payment method
+            tiendaSales.forEach(sale => {
+                const amount = sale.total || 0;
+                if (sale.paymentMethod === 'Efectivo') {
+                    tiendaCash += amount;
+                } else if (sale.paymentMethod === 'Nequi') {
+                    tiendaNequi += amount;
+                } else if (sale.paymentMethod === 'Bancolombia') {
+                    tiendaBancolombia += amount;
+                }
+            });
+
+            tiendaTransfers = tiendaNequi + tiendaBancolombia;
+        }
+
         return {
-            total: cashTotal + transferTotal,
-            cash: cashTotal,
-            transfers: transferTotal,
+            // Combined totals
+            total: cashTotal + transferTotal + tiendaCash + tiendaTransfers,
+            cash: cashTotal + tiendaCash,
+            transfers: transferTotal + tiendaTransfers,
             cashCount: cashPayments.length,
             transferCount: transferPayments.length,
-            payments: payments
+            payments: payments,
+
+            // Tuition breakdown
+            tuitionTotal: cashTotal + transferTotal,
+            tuitionCash: cashTotal,
+            tuitionTransfers: transferTotal,
+
+            // Tienda breakdown
+            tiendaTotal: tiendaCash + tiendaTransfers,
+            tiendaCash: tiendaCash,
+            tiendaTransfers: tiendaTransfers,
+            tiendaNequi: tiendaNequi,
+            tiendaBancolombia: tiendaBancolombia,
+            tiendaSalesCount: tiendaSales.length,
+            tiendaSales: tiendaSales
         };
     }
 
@@ -453,7 +504,7 @@ class FinanceManager {
     // BUSINESS METRICS
     // ==================================================================================
 
-    calculateMonthlyMetrics(year, month) {
+    async calculateMonthlyMetrics(year, month) {
         // Get all payments for the month
         const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
         const endDate = `${year}-${String(month).padStart(2, '0')}-31`;
@@ -463,23 +514,67 @@ class FinanceManager {
             return paymentDate >= startDate && paymentDate <= endDate;
         });
 
-        const revenue = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+        const tuitionRevenue = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+
+        // Get tienda sales for the month
+        const db = window.firebaseModules.database;
+        const salesRef = db.ref(window.FirebaseData.database, 'sales');
+        const salesSnapshot = await db.get(salesRef);
+
+        let tiendaRevenue = 0;
+        let tiendaCost = 0;
+        let tiendaSalesCount = 0;
+
+        if (salesSnapshot.exists()) {
+            const salesData = salesSnapshot.val();
+            const tiendaSales = Object.values(salesData).filter(s => {
+                const saleDate = s.date ? s.date.split('T')[0] : null;
+                return saleDate >= startDate && saleDate <= endDate;
+            });
+
+            tiendaRevenue = tiendaSales.reduce((sum, s) => sum + (s.total || 0), 0);
+            tiendaSalesCount = tiendaSales.length;
+
+            // Calculate cost of goods sold for tienda
+            if (window.ProductManager?.products) {
+                tiendaSales.forEach(sale => {
+                    sale.items?.forEach(item => {
+                        const product = window.ProductManager.products.get(item.productId);
+                        if (product) {
+                            tiendaCost += product.cost * item.quantity;
+                        }
+                    });
+                });
+            }
+        }
+
+        const totalRevenue = tuitionRevenue + tiendaRevenue;
 
         // Get expenses for the month
         const expenses = this.getExpenses({ startDate, endDate });
         const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
 
-        // Calculate profit
-        const grossProfit = revenue - totalExpenses;
+        // Calculate profit (including COGS for tienda)
+        const grossProfit = totalRevenue - totalExpenses - tiendaCost;
 
         // EBITDA (in this simple case, same as gross profit since we don't track depreciation/amortization)
         const ebitda = grossProfit;
 
         // Calculate margin
-        const profitMargin = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
+        const profitMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
+
+        // Calculate tienda profit margin
+        const tiendaProfit = tiendaRevenue - tiendaCost;
+        const tiendaMargin = tiendaRevenue > 0 ? (tiendaProfit / tiendaRevenue) * 100 : 0;
 
         return {
-            revenue,
+            revenue: totalRevenue,
+            tuitionRevenue,
+            tiendaRevenue,
+            tiendaCost,
+            tiendaProfit,
+            tiendaMargin,
+            tiendaSalesCount,
             expenses: totalExpenses,
             grossProfit,
             ebitda,
@@ -500,9 +595,10 @@ class FinanceManager {
         return breakdown;
     }
 
-    calculateCollectionRate(year, month) {
+    async calculateCollectionRate(year, month) {
         const expectedRevenue = this.calculateExpectedMonthlyRevenue();
-        const actualRevenue = this.calculateMonthlyMetrics(year, month).revenue;
+        const monthlyMetrics = await this.calculateMonthlyMetrics(year, month);
+        const actualRevenue = monthlyMetrics.tuitionRevenue; // Only tuition for collection rate
 
         const rate = expectedRevenue.totalExpected > 0
             ? (actualRevenue / expectedRevenue.totalExpected) * 100
@@ -570,8 +666,8 @@ async function renderFinanceDashboard() {
     const dailyRevenue = await window.FinanceManager.calculateDailyRevenue(today);
     const reconciliation = window.FinanceManager.getDailyReconciliation(today);
     const expectedRevenue = window.FinanceManager.calculateExpectedMonthlyRevenue();
-    const monthlyMetrics = window.FinanceManager.calculateMonthlyMetrics(currentYear, currentMonth);
-    const collectionRate = window.FinanceManager.calculateCollectionRate(currentYear, currentMonth);
+    const monthlyMetrics = await window.FinanceManager.calculateMonthlyMetrics(currentYear, currentMonth);
+    const collectionRate = await window.FinanceManager.calculateCollectionRate(currentYear, currentMonth);
 
     // Calculate discrepancy if reconciliation exists
     let expectedClosing = 0;
@@ -1070,8 +1166,8 @@ async function renderDailyReconciliationView() {
 
 window.FinanceManager = new FinanceManager();
 
-window.loadFinanceTab = async function() {
-    console.log('💰 Loading finance tab');
+window.loadFinanceTab = async function(activeTab = 'dashboard') {
+    console.log('💰 Loading finance tab, activeTab:', activeTab);
 
     const container = document.getElementById('financeContainer');
     if (!container) {
@@ -1081,7 +1177,75 @@ window.loadFinanceTab = async function() {
 
     await window.FinanceManager.init();
 
-    container.innerHTML = await renderFinanceDashboard();
+    // Check user permissions
+    const userRole = window.FirebaseData?.currentUser?.role || 'vendedor';
+    const isAdmin = userRole === 'admin';
+    const isDirector = userRole === 'director';
+    const canViewAdvanced = isAdmin || isDirector;
+
+    // Render tabs header
+    const tabsHeader = `
+        <div style="background: white; border-bottom: 2px solid #e5e7eb; margin-bottom: 0;">
+            <div style="padding: 1rem 2rem 0 2rem;">
+                <h1 style="margin: 0 0 1rem 0;">💰 Módulo de Finanzas</h1>
+                <div style="display: flex; gap: 0.5rem; overflow-x: auto;">
+                    <button onclick="loadFinanceTab('dashboard')" class="finance-tab ${activeTab === 'dashboard' ? 'active' : ''}" style="padding: 0.75rem 1.5rem; border: none; background: ${activeTab === 'dashboard' ? '#3b82f6' : 'transparent'}; color: ${activeTab === 'dashboard' ? 'white' : '#6b7280'}; border-radius: 8px 8px 0 0; cursor: pointer; font-weight: 500; white-space: nowrap;">
+                        📊 Dashboard
+                    </button>
+                    <button onclick="loadFinanceTab('cierre')" class="finance-tab ${activeTab === 'cierre' ? 'active' : ''}" style="padding: 0.75rem 1.5rem; border: none; background: ${activeTab === 'cierre' ? '#3b82f6' : 'transparent'}; color: ${activeTab === 'cierre' ? 'white' : '#6b7280'}; border-radius: 8px 8px 0 0; cursor: pointer; font-weight: 500; white-space: nowrap;">
+                        📋 Cierre Diario
+                    </button>
+                    ${canViewAdvanced ? `
+                        <button onclick="loadFinanceTab('otros-ingresos')" class="finance-tab ${activeTab === 'otros-ingresos' ? 'active' : ''}" style="padding: 0.75rem 1.5rem; border: none; background: ${activeTab === 'otros-ingresos' ? '#3b82f6' : 'transparent'}; color: ${activeTab === 'otros-ingresos' ? 'white' : '#6b7280'}; border-radius: 8px 8px 0 0; cursor: pointer; font-weight: 500; white-space: nowrap;">
+                            💵 Otros Ingresos
+                        </button>
+                        <button onclick="loadFinanceTab('gastos')" class="finance-tab ${activeTab === 'gastos' ? 'active' : ''}" style="padding: 0.75rem 1.5rem; border: none; background: ${activeTab === 'gastos' ? '#3b82f6' : 'transparent'}; color: ${activeTab === 'gastos' ? 'white' : '#6b7280'}; border-radius: 8px 8px 0 0; cursor: pointer; font-weight: 500; white-space: nowrap;">
+                            💸 Gastos
+                        </button>
+                        <button onclick="loadFinanceTab('reportes')" class="finance-tab ${activeTab === 'reportes' ? 'active' : ''}" style="padding: 0.75rem 1.5rem; border: none; background: ${activeTab === 'reportes' ? '#3b82f6' : 'transparent'}; color: ${activeTab === 'reportes' ? 'white' : '#6b7280'}; border-radius: 8px 8px 0 0; cursor: pointer; font-weight: 500; white-space: nowrap;">
+                            📈 Reportes Avanzados
+                        </button>
+                    ` : ''}
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Render content based on active tab
+    let content = '';
+    switch(activeTab) {
+        case 'dashboard':
+            content = await renderFinanceDashboard();
+            break;
+        case 'cierre':
+            content = await renderDailyReconciliationView();
+            break;
+        case 'otros-ingresos':
+            if (canViewAdvanced) {
+                content = await renderOtrosIngresosView();
+            } else {
+                content = '<div style="padding: 2rem; text-align: center;">❌ No tienes permisos para ver esta sección</div>';
+            }
+            break;
+        case 'gastos':
+            if (canViewAdvanced) {
+                content = await renderExpensesViewEnhanced();
+            } else {
+                content = '<div style="padding: 2rem; text-align: center;">❌ No tienes permisos para ver esta sección</div>';
+            }
+            break;
+        case 'reportes':
+            if (canViewAdvanced) {
+                content = await renderAdvancedReportsView();
+            } else {
+                content = '<div style="padding: 2rem; text-align: center;">❌ No tienes permisos para ver esta sección</div>';
+            }
+            break;
+        default:
+            content = await renderFinanceDashboard();
+    }
+
+    container.innerHTML = tabsHeader + content;
 };
 
 window.loadDailyReconciliationView = async function() {
@@ -1429,15 +1593,15 @@ window.deleteExpenseConfirm = async function(id) {
 // REPORTS VIEW
 // ==================================================================================
 
-window.loadReportsView = function() {
+window.loadReportsView = async function() {
     const container = document.getElementById('financeContainer');
     if (!container) return;
 
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth() + 1;
-    const monthlyMetrics = window.FinanceManager.calculateMonthlyMetrics(currentYear, currentMonth);
+    const monthlyMetrics = await window.FinanceManager.calculateMonthlyMetrics(currentYear, currentMonth);
     const expectedRevenue = window.FinanceManager.calculateExpectedMonthlyRevenue();
-    const collectionRate = window.FinanceManager.calculateCollectionRate(currentYear, currentMonth);
+    const collectionRate = await window.FinanceManager.calculateCollectionRate(currentYear, currentMonth);
     const studentGrowth = window.FinanceManager.calculateStudentGrowth(6);
 
     container.innerHTML = `
@@ -1597,12 +1761,12 @@ window.loadReportsView = function() {
     `;
 };
 
-window.exportFinancialReport = function() {
+window.exportFinancialReport = async function() {
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth() + 1;
-    const monthlyMetrics = window.FinanceManager.calculateMonthlyMetrics(currentYear, currentMonth);
+    const monthlyMetrics = await window.FinanceManager.calculateMonthlyMetrics(currentYear, currentMonth);
     const expectedRevenue = window.FinanceManager.calculateExpectedMonthlyRevenue();
-    const collectionRate = window.FinanceManager.calculateCollectionRate(currentYear, currentMonth);
+    const collectionRate = await window.FinanceManager.calculateCollectionRate(currentYear, currentMonth);
 
     const reportText = `
 ===========================================
@@ -1930,5 +2094,414 @@ window.loadTodayMovementsView = async function() {
         </div>
     `;
 };
+
+// ==================================================================================
+// SECTION 5: OTROS INGRESOS (ADMIN ONLY)
+// ==================================================================================
+
+// Render Otros Ingresos View
+async function renderOtrosIngresosView() {
+    // Get other income records from Firebase
+    const db = window.firebaseModules.database;
+    const otrosIngresosRef = db.ref(window.FirebaseData.database, 'otrosIngresos');
+    const snapshot = await db.get(otrosIngresosRef);
+
+    let otrosIngresos = [];
+    if (snapshot.exists()) {
+        otrosIngresos = Object.values(snapshot.val()).sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+    }
+
+    // Calculate totals
+    const totalThisMonth = otrosIngresos
+        .filter(i => i.fecha && i.fecha.startsWith(new Date().toISOString().slice(0, 7)))
+        .reduce((sum, i) => sum + (i.monto || 0), 0);
+
+    const totalAllTime = otrosIngresos.reduce((sum, i) => sum + (i.monto || 0), 0);
+
+    return `
+        <div style="padding: 2rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                <div>
+                    <h2 style="margin: 0;">💵 Otros Ingresos</h2>
+                    <p style="margin: 0.5rem 0 0 0; color: #6b7280;">Registra ingresos adicionales que no provienen de matrículas o tienda</p>
+                </div>
+                <button onclick="showAddOtroIngresoModal()" class="btn" style="background: #10b981; color: white; padding: 0.75rem 1.5rem;">
+                    ➕ Registrar Ingreso
+                </button>
+            </div>
+
+            <!-- Summary Cards -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+                <div style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <div style="color: #6b7280; font-size: 0.875rem; margin-bottom: 0.5rem;">Este Mes</div>
+                    <div style="font-size: 2rem; font-weight: bold; color: #10b981;">${formatCurrency(totalThisMonth)}</div>
+                </div>
+                <div style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <div style="color: #6b7280; font-size: 0.875rem; margin-bottom: 0.5rem;">Total Histórico</div>
+                    <div style="font-size: 2rem; font-weight: bold; color: #3b82f6;">${formatCurrency(totalAllTime)}</div>
+                </div>
+                <div style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <div style="color: #6b7280; font-size: 0.875rem; margin-bottom: 0.5rem;">Total Registros</div>
+                    <div style="font-size: 2rem; font-weight: bold; color: #1f2937;">${otrosIngresos.length}</div>
+                </div>
+            </div>
+
+            <!-- Income List -->
+            <div style="background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); overflow: hidden;">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead style="background: #f9fafb; border-bottom: 2px solid #e5e7eb;">
+                        <tr>
+                            <th style="padding: 1rem; text-align: left; font-weight: 600; color: #374151;">Fecha</th>
+                            <th style="padding: 1rem; text-align: left; font-weight: 600; color: #374151;">Concepto</th>
+                            <th style="padding: 1rem; text-align: left; font-weight: 600; color: #374151;">Monto</th>
+                            <th style="padding: 1rem; text-align: left; font-weight: 600; color: #374151;">Método</th>
+                            <th style="padding: 1rem; text-align: left; font-weight: 600; color: #374151;">Registrado Por</th>
+                            <th style="padding: 1rem; text-align: center; font-weight: 600; color: #374151;">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${otrosIngresos.length === 0 ? `
+                            <tr>
+                                <td colspan="6" style="padding: 3rem; text-align: center; color: #9ca3af;">
+                                    No hay otros ingresos registrados
+                                </td>
+                            </tr>
+                        ` : otrosIngresos.map(ingreso => `
+                            <tr style="border-bottom: 1px solid #e5e7eb;">
+                                <td style="padding: 1rem;">${new Date(ingreso.fecha).toLocaleDateString('es-CO')}</td>
+                                <td style="padding: 1rem;">
+                                    <div style="font-weight: 500;">${ingreso.concepto}</div>
+                                    ${ingreso.notas ? `<div style="font-size: 0.875rem; color: #6b7280;">${ingreso.notas}</div>` : ''}
+                                </td>
+                                <td style="padding: 1rem; font-weight: 600; color: #10b981;">${formatCurrency(ingreso.monto)}</td>
+                                <td style="padding: 1rem;">${ingreso.metodoPago}</td>
+                                <td style="padding: 1rem; font-size: 0.875rem; color: #6b7280;">${ingreso.registradoPor || 'N/A'}</td>
+                                <td style="padding: 1rem; text-align: center;">
+                                    <button onclick="deleteOtroIngreso('${ingreso.id}')" class="btn btn-sm" style="background: #ef4444; color: white; padding: 0.25rem 0.75rem;">
+                                        🗑️ Eliminar
+                                    </button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+}
+
+// Show add otro ingreso modal
+window.showAddOtroIngresoModal = function() {
+    const modalHTML = `
+        <div id="otroIngresoModal" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;">
+            <div style="background: white; padding: 2rem; border-radius: 12px; max-width: 500px; width: 90%;">
+                <h2 style="margin: 0 0 1.5rem 0;">💵 Registrar Otro Ingreso</h2>
+
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Fecha</label>
+                    <input type="date" id="otroIngresoFecha" value="${window.getTodayInColombia()}" style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
+                </div>
+
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Concepto</label>
+                    <select id="otroIngresoConcepto" onchange="handleConceptoChange()" style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
+                        <option value="">Seleccione...</option>
+                        <option value="Matrícula">Matrícula</option>
+                        <option value="Venta de Materiales">Venta de Materiales</option>
+                        <option value="Servicios Adicionales">Servicios Adicionales</option>
+                        <option value="Donaciones">Donaciones</option>
+                        <option value="Intereses">Intereses Bancarios</option>
+                        <option value="Otro">Otro (especificar)</option>
+                    </select>
+                </div>
+
+                <div id="otroConceptoContainer" style="margin-bottom: 1rem; display: none;">
+                    <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Especificar Concepto</label>
+                    <input type="text" id="otroConceptoText" placeholder="Escriba el concepto..." style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
+                </div>
+
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Monto</label>
+                    <input type="text" id="otroIngresoMonto" placeholder="$0" style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;" oninput="formatCurrencyInput(this)">
+                </div>
+
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Método de Pago</label>
+                    <select id="otroIngresoMetodo" style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
+                        <option value="Efectivo">Efectivo</option>
+                        <option value="Transferencia">Transferencia</option>
+                        <option value="Nequi">Nequi</option>
+                        <option value="Bancolombia">Bancolombia</option>
+                    </select>
+                </div>
+
+                <div style="margin-bottom: 1.5rem;">
+                    <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Notas (opcional)</label>
+                    <textarea id="otroIngresoNotas" rows="3" placeholder="Detalles adicionales..." style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; resize: vertical;"></textarea>
+                </div>
+
+                <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+                    <button onclick="closeOtroIngresoModal()" class="btn" style="background: #6b7280; color: white; padding: 0.5rem 1.5rem;">
+                        Cancelar
+                    </button>
+                    <button onclick="saveOtroIngreso()" class="btn" style="background: #10b981; color: white; padding: 0.5rem 1.5rem;">
+                        Guardar
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+};
+
+window.handleConceptoChange = function() {
+    const concepto = document.getElementById('otroIngresoConcepto').value;
+    const otroContainer = document.getElementById('otroConceptoContainer');
+
+    if (concepto === 'Otro') {
+        otroContainer.style.display = 'block';
+    } else {
+        otroContainer.style.display = 'none';
+    }
+};
+
+window.closeOtroIngresoModal = function() {
+    const modal = document.getElementById('otroIngresoModal');
+    if (modal) modal.remove();
+};
+
+window.saveOtroIngreso = async function() {
+    try {
+        const fecha = document.getElementById('otroIngresoFecha').value;
+        let concepto = document.getElementById('otroIngresoConcepto').value;
+        const montoStr = document.getElementById('otroIngresoMonto').value;
+        const metodoPago = document.getElementById('otroIngresoMetodo').value;
+        const notas = document.getElementById('otroIngresoNotas').value;
+
+        // Validation
+        if (!fecha || !concepto || !montoStr) {
+            window.showNotification('⚠️ Por favor complete todos los campos obligatorios', 'warning');
+            return;
+        }
+
+        // If "Otro" was selected, use custom text
+        if (concepto === 'Otro') {
+            const otroTexto = document.getElementById('otroConceptoText').value.trim();
+            if (!otroTexto) {
+                window.showNotification('⚠️ Por favor especifique el concepto', 'warning');
+                return;
+            }
+            concepto = otroTexto;
+        }
+
+        const monto = parseCurrencyInput(montoStr);
+
+        if (monto <= 0) {
+            window.showNotification('⚠️ El monto debe ser mayor a cero', 'warning');
+            return;
+        }
+
+        const id = `OING-${Date.now()}`;
+        const otroIngreso = {
+            id,
+            fecha,
+            concepto,
+            monto,
+            metodoPago,
+            notas,
+            registradoPor: window.FirebaseData.currentUser?.email || 'unknown',
+            creadoEn: new Date().toISOString()
+        };
+
+        // Save to Firebase
+        const db = window.firebaseModules.database;
+        const ref = db.ref(window.FirebaseData.database, `otrosIngresos/${id}`);
+        await db.set(ref, otroIngreso);
+
+        // Audit log
+        if (typeof window.logAudit === 'function') {
+            await window.logAudit(
+                'Otro ingreso registrado',
+                'otro-ingreso',
+                id,
+                `${concepto} - ${formatCurrency(monto)}`,
+                { after: otroIngreso }
+            );
+        }
+
+        window.showNotification('✅ Ingreso registrado exitosamente', 'success');
+        closeOtroIngresoModal();
+        loadFinanceTab('otros-ingresos');
+
+    } catch (error) {
+        console.error('Error saving otro ingreso:', error);
+        window.showNotification('❌ Error al guardar ingreso', 'error');
+    }
+};
+
+window.deleteOtroIngreso = async function(id) {
+    if (!confirm('¿Está seguro de eliminar este ingreso?')) return;
+
+    try {
+        const db = window.firebaseModules.database;
+        const ref = db.ref(window.FirebaseData.database, `otrosIngresos/${id}`);
+        await db.remove(ref);
+
+        window.showNotification('✅ Ingreso eliminado', 'success');
+        loadFinanceTab('otros-ingresos');
+    } catch (error) {
+        console.error('Error deleting otro ingreso:', error);
+        window.showNotification('❌ Error al eliminar ingreso', 'error');
+    }
+};
+
+// ==================================================================================
+// SECTION 6: GASTOS MEJORADOS (ADMIN ONLY)
+// ==================================================================================
+
+async function renderExpensesViewEnhanced() {
+    // Reuse existing loadExpensesView but call it
+    await window.loadExpensesView();
+    return ''; // Content already rendered
+}
+
+// ==================================================================================
+// SECTION 7: REPORTES AVANZADOS (ADMIN ONLY)
+// ==================================================================================
+
+async function renderAdvancedReportsView() {
+    const currentYear = new Date().getFullYear();
+    const currentMonth = new Date().getMonth() + 1;
+
+    // Get data
+    const monthlyMetrics = await window.FinanceManager.calculateMonthlyMetrics(currentYear, currentMonth);
+    const expectedRevenue = window.FinanceManager.calculateExpectedMonthlyRevenue();
+
+    // Get otros ingresos
+    const db = window.firebaseModules.database;
+    const otrosIngresosRef = db.ref(window.FirebaseData.database, 'otrosIngresos');
+    const otrosSnapshot = await db.get(otrosIngresosRef);
+
+    let otrosIngresosTotal = 0;
+    if (otrosSnapshot.exists()) {
+        const otrosIngresos = Object.values(otrosSnapshot.val()).filter(i =>
+            i.fecha && i.fecha.startsWith(`${currentYear}-${String(currentMonth).padStart(2, '0')}`)
+        );
+        otrosIngresosTotal = otrosIngresos.reduce((sum, i) => sum + (i.monto || 0), 0);
+    }
+
+    // Calculate totals
+    const totalIngresos = monthlyMetrics.tuitionRevenue + monthlyMetrics.tiendaRevenue + otrosIngresosTotal;
+    const totalEgresos = monthlyMetrics.expenses + monthlyMetrics.tiendaCost;
+    const utilidadNeta = totalIngresos - totalEgresos;
+    const margenUtilidad = totalIngresos > 0 ? (utilidadNeta / totalIngresos * 100) : 0;
+
+    return `
+        <div style="padding: 2rem;">
+            <div style="margin-bottom: 2rem;">
+                <h2 style="margin: 0;">📈 Reportes Avanzados</h2>
+                <p style="margin: 0.5rem 0 0 0; color: #6b7280;">Estado de Resultados y Balance Financiero - ${new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</p>
+            </div>
+
+            <!-- Estado de Resultados -->
+            <div style="background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); padding: 2rem; margin-bottom: 2rem;">
+                <h3 style="margin: 0 0 1.5rem 0; font-size: 1.5rem;">💰 Estado de Resultados (P&L)</h3>
+
+                <!-- Ingresos -->
+                <div style="margin-bottom: 2rem;">
+                    <div style="font-weight: 600; font-size: 1.1rem; color: #10b981; margin-bottom: 1rem; border-bottom: 2px solid #10b981; padding-bottom: 0.5rem;">
+                        INGRESOS
+                    </div>
+                    <div style="display: grid; gap: 0.75rem; margin-left: 1rem;">
+                        <div style="display: flex; justify-content: space-between;">
+                            <span>Matrículas y Mensualidades</span>
+                            <span style="font-weight: 600;">${formatCurrency(monthlyMetrics.tuitionRevenue)}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span>Tienda/Cafetería</span>
+                            <span style="font-weight: 600;">${formatCurrency(monthlyMetrics.tiendaRevenue)}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span>Otros Ingresos</span>
+                            <span style="font-weight: 600;">${formatCurrency(otrosIngresosTotal)}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding-top: 0.75rem; border-top: 2px solid #e5e7eb; font-size: 1.1rem;">
+                            <span style="font-weight: 700;">TOTAL INGRESOS</span>
+                            <span style="font-weight: 700; color: #10b981;">${formatCurrency(totalIngresos)}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Egresos -->
+                <div style="margin-bottom: 2rem;">
+                    <div style="font-weight: 600; font-size: 1.1rem; color: #ef4444; margin-bottom: 1rem; border-bottom: 2px solid #ef4444; padding-bottom: 0.5rem;">
+                        EGRESOS
+                    </div>
+                    <div style="display: grid; gap: 0.75rem; margin-left: 1rem;">
+                        <div style="display: flex; justify-content: space-between;">
+                            <span>Gastos Operacionales</span>
+                            <span style="font-weight: 600;">${formatCurrency(monthlyMetrics.expenses)}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span>Costo de Mercancía (Tienda)</span>
+                            <span style="font-weight: 600;">${formatCurrency(monthlyMetrics.tiendaCost)}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding-top: 0.75rem; border-top: 2px solid #e5e7eb; font-size: 1.1rem;">
+                            <span style="font-weight: 700;">TOTAL EGRESOS</span>
+                            <span style="font-weight: 700; color: #ef4444;">${formatCurrency(totalEgresos)}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Utilidad Neta -->
+                <div style="background: ${utilidadNeta >= 0 ? '#d1fae5' : '#fee2e2'}; padding: 1.5rem; border-radius: 8px; border: 2px solid ${utilidadNeta >= 0 ? '#10b981' : '#ef4444'};">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="font-weight: 700; font-size: 1.2rem; color: #1f2937;">UTILIDAD NETA</div>
+                            <div style="font-size: 0.875rem; color: #6b7280; margin-top: 0.25rem;">
+                                Margen: ${margenUtilidad.toFixed(2)}%
+                            </div>
+                        </div>
+                        <div style="font-weight: 700; font-size: 2rem; color: ${utilidadNeta >= 0 ? '#10b981' : '#ef4444'};">
+                            ${formatCurrency(utilidadNeta)}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Métricas Adicionales -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem;">
+                <div style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <div style="color: #6b7280; font-size: 0.875rem; margin-bottom: 0.5rem;">Margen Tienda</div>
+                    <div style="font-size: 1.5rem; font-weight: bold; color: ${monthlyMetrics.tiendaMargin > 0 ? '#10b981' : '#ef4444'};">
+                        ${monthlyMetrics.tiendaMargin?.toFixed(2) || 0}%
+                    </div>
+                </div>
+
+                <div style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <div style="color: #6b7280; font-size: 0.875rem; margin-bottom: 0.5rem;">Ganancia Tienda</div>
+                    <div style="font-size: 1.5rem; font-weight: bold; color: #10b981;">
+                        ${formatCurrency(monthlyMetrics.tiendaProfit || 0)}
+                    </div>
+                </div>
+
+                <div style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <div style="color: #6b7280; font-size: 0.875rem; margin-bottom: 0.5rem;">Pagos Recibidos</div>
+                    <div style="font-size: 1.5rem; font-weight: bold; color: #3b82f6;">
+                        ${monthlyMetrics.paymentCount} pagos
+                    </div>
+                </div>
+
+                <div style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <div style="color: #6b7280; font-size: 0.875rem; margin-bottom: 0.5rem;">Ventas Tienda</div>
+                    <div style="font-size: 1.5rem; font-weight: bold; color: #8b5cf6;">
+                        ${monthlyMetrics.tiendaSalesCount || 0} ventas
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
 
 console.log('✅ Finance module loaded successfully');

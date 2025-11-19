@@ -49,13 +49,15 @@ class ReportsManager {
         try {
             console.log('🔄 Refreshing reports data...');
             const db = window.firebaseModules.database;
-            
+
             // Fetch all data in parallel
-            const [studentsSnapshot, paymentsSnapshot, contactsSnapshot, invoicesSnapshot] = await Promise.all([
+            const [studentsSnapshot, paymentsSnapshot, contactsSnapshot, invoicesSnapshot, salesSnapshot, productsSnapshot] = await Promise.all([
                 db.get(db.ref(window.FirebaseData.database, 'students')),
                 db.get(db.ref(window.FirebaseData.database, 'payments')),
                 db.get(db.ref(window.FirebaseData.database, 'contacts')),
-                db.get(db.ref(window.FirebaseData.database, 'invoices'))
+                db.get(db.ref(window.FirebaseData.database, 'invoices')),
+                db.get(db.ref(window.FirebaseData.database, 'sales')),
+                db.get(db.ref(window.FirebaseData.database, 'products'))
             ]);
 
             // Process data
@@ -64,6 +66,8 @@ class ReportsManager {
                 payments: this.processPaymentsData(paymentsSnapshot.val() || {}),
                 contacts: this.processContactsData(contactsSnapshot.val() || {}),
                 invoices: this.processInvoicesData(invoicesSnapshot.val() || {}),
+                sales: this.processSalesData(salesSnapshot.val() || {}),
+                products: this.processProductsData(productsSnapshot.val() || {}),
                 lastUpdate: new Date()
             };
 
@@ -71,13 +75,31 @@ class ReportsManager {
                 students: this.cachedData.students.length,
                 payments: this.cachedData.payments.length,
                 contacts: this.cachedData.contacts.length,
-                invoices: this.cachedData.invoices.length
+                invoices: this.cachedData.invoices.length,
+                sales: this.cachedData.sales.length,
+                products: this.cachedData.products.length
             });
 
         } catch (error) {
             console.error('❌ Error refreshing reports data:', error);
             throw error;
         }
+    }
+
+    processSalesData(rawData) {
+        return Object.keys(rawData).map(id => ({
+            id,
+            ...rawData[id],
+            date: new Date(rawData[id].date || Date.now()),
+            total: parseFloat(rawData[id].total || 0)
+        })).sort((a, b) => a.date - b.date);
+    }
+
+    processProductsData(rawData) {
+        return Object.keys(rawData).map(id => ({
+            id,
+            ...rawData[id]
+        }));
     }
 
     processStudentsData(rawData) {
@@ -280,6 +302,149 @@ class ReportsManager {
         };
     }
 
+    // ===== TIENDA (STORE) REPORTS =====
+
+    async getTiendaReport(period = 'monthly', customStart = null, customEnd = null) {
+        if (!this.cachedData.sales) await this.refreshData();
+
+        const sales = this.filterByPeriod(this.cachedData.sales, period, 'date', customStart, customEnd);
+        const products = this.cachedData.products || [];
+
+        // Calculate revenue and costs
+        let totalRevenue = 0;
+        let totalCost = 0;
+        let cashSales = 0;
+        let transferSales = 0;
+        const paymentMethods = {};
+        const categoryRevenue = {};
+        const productSales = {};
+        const customerPurchases = {};
+        const hourlySales = Array(24).fill(0);
+
+        sales.forEach(sale => {
+            totalRevenue += sale.total;
+
+            // Payment methods
+            const method = sale.paymentMethod || 'No especificado';
+            paymentMethods[method] = (paymentMethods[method] || 0) + sale.total;
+
+            if (method === 'Efectivo') {
+                cashSales += sale.total;
+            } else {
+                transferSales += sale.total;
+            }
+
+            // Customer tracking
+            if (sale.customerId) {
+                if (!customerPurchases[sale.customerId]) {
+                    customerPurchases[sale.customerId] = {
+                        name: sale.customerName,
+                        count: 0,
+                        total: 0
+                    };
+                }
+                customerPurchases[sale.customerId].count++;
+                customerPurchases[sale.customerId].total += sale.total;
+            }
+
+            // Hourly sales
+            const hour = sale.date.getHours();
+            hourlySales[hour] += sale.total;
+
+            // Product analysis
+            sale.items?.forEach(item => {
+                const product = products.find(p => p.id === item.productId);
+
+                // Product sales tracking
+                if (!productSales[item.productName]) {
+                    productSales[item.productName] = {
+                        quantity: 0,
+                        revenue: 0,
+                        cost: 0,
+                        category: product?.category || 'Otros'
+                    };
+                }
+                productSales[item.productName].quantity += item.quantity;
+                productSales[item.productName].revenue += item.subtotal;
+
+                if (product) {
+                    const itemCost = product.cost * item.quantity;
+                    productSales[item.productName].cost += itemCost;
+                    totalCost += itemCost;
+
+                    // Category revenue
+                    const category = product.category || 'Otros';
+                    categoryRevenue[category] = (categoryRevenue[category] || 0) + item.subtotal;
+                }
+            });
+        });
+
+        // Calculate profit and margins
+        const grossProfit = totalRevenue - totalCost;
+        const profitMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
+
+        // Top products by revenue
+        const topProducts = Object.entries(productSales)
+            .map(([name, data]) => ({
+                name,
+                ...data,
+                profit: data.revenue - data.cost,
+                margin: data.revenue > 0 ? ((data.revenue - data.cost) / data.revenue * 100) : 0
+            }))
+            .sort((a, b) => b.revenue - a.revenue)
+            .slice(0, 10);
+
+        // Top customers
+        const topCustomers = Object.entries(customerPurchases)
+            .map(([id, data]) => ({ id, ...data }))
+            .sort((a, b) => b.total - a.total)
+            .slice(0, 10);
+
+        // Peak hours
+        const peakHour = hourlySales.indexOf(Math.max(...hourlySales));
+
+        // Daily trend
+        const dailySales = this.groupByDay(sales);
+
+        return {
+            // Summary
+            totalRevenue,
+            totalCost,
+            grossProfit,
+            profitMargin,
+            totalSales: sales.length,
+            avgSaleAmount: totalRevenue / (sales.length || 1),
+
+            // Payment breakdown
+            cashSales,
+            transferSales,
+            paymentMethods,
+
+            // Products
+            topProducts,
+            totalProductsSold: Object.values(productSales).reduce((sum, p) => sum + p.quantity, 0),
+            uniqueProductsSold: Object.keys(productSales).length,
+
+            // Categories
+            categoryRevenue,
+            topCategory: Object.entries(categoryRevenue).sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A',
+
+            // Customers
+            topCustomers,
+            totalCustomers: Object.keys(customerPurchases).length,
+            customerSalesPercentage: sales.length > 0 ? (sales.filter(s => s.customerId).length / sales.length * 100) : 0,
+
+            // Time analysis
+            hourlySales,
+            peakHour,
+            dailySales,
+
+            // Period info
+            period,
+            dateRange: this.getDateRange(period, customStart, customEnd)
+        };
+    }
+
     // ===== HELPER FUNCTIONS =====
 
     groupByDay(data, dateField = 'date') {
@@ -467,6 +632,11 @@ window.generateStudentReport = async (period, customStart, customEnd) => {
 window.generateSalesReport = async (period, customStart, customEnd) => {
     await window.ReportsManager.init();
     return await window.ReportsManager.getSalesReport(period, customStart, customEnd);
+};
+
+window.generateTiendaReport = async (period, customStart, customEnd) => {
+    await window.ReportsManager.init();
+    return await window.ReportsManager.getTiendaReport(period, customStart, customEnd);
 };
 
 console.log('📊 Reports module loaded');

@@ -387,7 +387,7 @@ class SalesManager {
         };
     }
 
-    async completeSale(paymentMethod, amountPaid = null) {
+    async completeSale(paymentMethod, amountPaid = null, customerId = null) {
         try {
             if (this.currentSale.items.length === 0) {
                 throw new Error('No hay productos en la venta');
@@ -402,6 +402,8 @@ class SalesManager {
                 paymentMethod: paymentMethod,
                 amountPaid: amountPaid || this.currentSale.total,
                 change: amountPaid ? (amountPaid - this.currentSale.total) : 0,
+                customerId: customerId || null,
+                customerName: customerId ? this.currentSale.customerName : null,
                 date: window.getColombiaDateTime(), // Use Colombia timezone
                 cashier: window.FirebaseData.currentUser?.email || 'unknown'
             };
@@ -503,6 +505,35 @@ class SalesManager {
             .slice(0, 10);
 
         return report;
+    }
+
+    async getCustomerPurchaseHistory(customerId) {
+        try {
+            const db = window.firebaseModules.database;
+            const ref = db.ref(window.FirebaseData.database, 'sales');
+            const snapshot = await db.get(ref);
+
+            if (!snapshot.exists()) return [];
+
+            const sales = Object.values(snapshot.val())
+                .filter(sale => sale.customerId === customerId)
+                .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            const totalSpent = sales.reduce((sum, sale) => sum + sale.total, 0);
+            const totalPurchases = sales.length;
+            const avgPurchase = totalPurchases > 0 ? totalSpent / totalPurchases : 0;
+
+            return {
+                sales,
+                totalSpent,
+                totalPurchases,
+                avgPurchase,
+                lastPurchase: sales[0]?.date || null
+            };
+        } catch (error) {
+            console.error('❌ Error getting customer purchase history:', error);
+            throw error;
+        }
     }
 }
 
@@ -651,6 +682,27 @@ function renderPointOfSale() {
         <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px; height: calc(100vh - 200px);">
             <!-- Left: Product Scanner & Cart -->
             <div style="display: flex; flex-direction: column; gap: 16px;">
+                <!-- Customer Selection (Optional) -->
+                <div style="background: white; padding: 16px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <label style="font-weight: 600; margin-right: 12px;">👤 Cliente/Estudiante (opcional):</label>
+                        <div style="display: flex; gap: 8px; flex: 1;">
+                            <input
+                                type="text"
+                                id="customerSearch"
+                                placeholder="Buscar estudiante por nombre..."
+                                style="flex: 1; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;"
+                                autocomplete="off"
+                            >
+                            <button onclick="clearCustomerSelection()" class="btn btn-sm" style="background: #6b7280; color: white;">
+                                Limpiar
+                            </button>
+                        </div>
+                    </div>
+                    <div id="customerSearchResults" style="margin-top: 8px;"></div>
+                    <div id="selectedCustomerDisplay" style="margin-top: 8px;"></div>
+                </div>
+
                 <!-- Scanner Input -->
                 <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
                     <h3 style="margin: 0 0 16px 0;">🔍 Escanear Producto</h3>
@@ -1401,6 +1453,18 @@ function setupPOSEventListeners() {
     const barcodeInput = document.getElementById('barcodeInput');
     const paymentMethod = document.getElementById('paymentMethod');
     const amountReceived = document.getElementById('amountReceived');
+    const customerSearch = document.getElementById('customerSearch');
+
+    // Customer search
+    if (customerSearch) {
+        customerSearch.addEventListener('input', function(e) {
+            if (e.target.value.length >= 2) {
+                showCustomerSearchResults(e.target.value);
+            } else {
+                document.getElementById('customerSearchResults').innerHTML = '';
+            }
+        });
+    }
 
     // Barcode scanning
     barcodeInput.addEventListener('keypress', function(e) {
@@ -1599,6 +1663,65 @@ window.selectBillAmount = function(amount) {
     window.showNotification(`💵 Seleccionado: $${amount.toLocaleString('es-CO')}`, 'success');
 };
 
+// Customer search and selection
+function showCustomerSearchResults(search) {
+    if (!window.StudentManager?.students) {
+        console.warn('StudentManager not available');
+        return;
+    }
+
+    const searchLower = search.toLowerCase();
+    const students = Array.from(window.StudentManager.students.values())
+        .filter(s => {
+            const name = (s.nombre || '').toLowerCase();
+            return name.includes(searchLower) && s.status !== 'inactive';
+        })
+        .slice(0, 5);
+
+    const container = document.getElementById('customerSearchResults');
+
+    if (students.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+
+    container.innerHTML = `
+        <div style="border: 1px solid #d1d5db; border-radius: 6px; max-height: 150px; overflow-y: auto; background: white;">
+            ${students.map(s => `
+                <div
+                    onclick="selectCustomer('${s.id}', '${s.nombre.replace(/'/g, "\\'")}')"
+                    style="padding: 8px; border-bottom: 1px solid #e5e7eb; cursor: pointer;"
+                    onmouseover="this.style.background='#f3f4f6'"
+                    onmouseout="this.style.background='white'">
+                    <div style="font-weight: 600;">${s.nombre}</div>
+                    <div style="font-size: 12px; color: #6b7280;">${s.email || s.telefono || ''}</div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+window.selectCustomer = function(customerId, customerName) {
+    window.SalesManager.currentSale.customerId = customerId;
+    window.SalesManager.currentSale.customerName = customerName;
+
+    document.getElementById('customerSearch').value = '';
+    document.getElementById('customerSearchResults').innerHTML = '';
+    document.getElementById('selectedCustomerDisplay').innerHTML = `
+        <div style="padding: 8px; background: #d1fae5; border-radius: 6px; border: 1px solid #059669;">
+            <strong>Cliente seleccionado:</strong> ${customerName}
+        </div>
+    `;
+};
+
+window.clearCustomerSelection = function() {
+    window.SalesManager.currentSale.customerId = null;
+    window.SalesManager.currentSale.customerName = null;
+    document.getElementById('customerSearch').value = '';
+    document.getElementById('customerSearchResults').innerHTML = '';
+    document.getElementById('selectedCustomerDisplay').innerHTML = '';
+};
+
 window.completeSale = async function() {
     try {
         const paymentMethod = document.getElementById('paymentMethod').value;
@@ -1616,11 +1739,15 @@ window.completeSale = async function() {
             }
         }
 
-        const sale = await window.SalesManager.completeSale(paymentMethod, amountPaid);
+        // Get selected customer ID
+        const customerId = window.SalesManager.currentSale.customerId || null;
+
+        const sale = await window.SalesManager.completeSale(paymentMethod, amountPaid, customerId);
 
         // Show success message with proper formatting
         const change = sale.change > 0 ? `\nCambio: $${sale.change.toLocaleString('es-CO')}` : '';
-        window.showNotification(`✅ Venta completada\nTotal: $${sale.total.toLocaleString('es-CO')}${change}`, 'success');
+        const customer = sale.customerName ? `\nCliente: ${sale.customerName}` : '';
+        window.showNotification(`✅ Venta completada${customer}\nTotal: $${sale.total.toLocaleString('es-CO')}${change}`, 'success');
 
         // Refresh display
         refreshPOSDisplay();
