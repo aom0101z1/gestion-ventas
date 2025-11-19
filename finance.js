@@ -1918,6 +1918,18 @@ window.loadReportsView = async function() {
     const container = document.getElementById('financeContainer');
     if (!container) return;
 
+    // Get current financial context
+    const isAdmin = window.userRole === 'admin' || window.userRole === 'director';
+    const context = isAdmin ? (window.financialContext || 'business') : 'business';
+
+    console.log('📊 Loading reports with context:', context);
+
+    // For personal view, just redirect to advanced reports which already has filtering
+    if (context !== 'business') {
+        return await loadFinanceTab('reportes');
+    }
+
+    // Business view - continue with original logic
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth() + 1;
     const monthlyMetrics = await window.FinanceManager.calculateMonthlyMetrics(currentYear, currentMonth);
@@ -1933,7 +1945,7 @@ window.loadReportsView = async function() {
                     <button onclick="loadFinanceTab()" class="btn btn-secondary" style="margin-bottom: 0.5rem;">
                         ← Volver al Dashboard
                     </button>
-                    <h1 style="margin: 0;">📊 Reportes Financieros</h1>
+                    <h1 style="margin: 0;">📊 Reportes Financieros - 🏢 Negocio</h1>
                 </div>
                 <button onclick="exportFinancialReport()" class="btn btn-primary" style="background: #8b5cf6; color: white;">
                     📥 Exportar Reporte
@@ -2083,15 +2095,80 @@ window.loadReportsView = async function() {
 };
 
 window.exportFinancialReport = async function() {
+    // Get current financial context
+    const isAdmin = window.userRole === 'admin' || window.userRole === 'director';
+    const context = isAdmin ? (window.financialContext || 'business') : 'business';
+
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth() + 1;
-    const monthlyMetrics = await window.FinanceManager.calculateMonthlyMetrics(currentYear, currentMonth);
-    const expectedRevenue = window.FinanceManager.calculateExpectedMonthlyRevenue();
-    const collectionRate = await window.FinanceManager.calculateCollectionRate(currentYear, currentMonth);
 
-    const reportText = `
+    const contextLabel = context === 'business' ? 'NEGOCIO' : context === 'personal' ? 'PERSONAL' : 'COMBINADO';
+    const contextIcon = context === 'business' ? '🏢' : context === 'personal' ? '🏠' : '📊';
+
+    let reportText = '';
+
+    if (context === 'personal') {
+        // PERSONAL REPORT
+        const startDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`;
+        const endDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-31`;
+
+        // Get personal expenses
+        const allExpenses = window.FinanceManager.getExpenses({ startDate, endDate });
+        const personalExpenses = allExpenses.filter(e => e.type === 'personal');
+        const totalExpenses = personalExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+        // Get personal otros ingresos
+        const db = window.firebaseModules.database;
+        const otrosIngresosRef = db.ref(window.FirebaseData.database, 'otrosIngresos');
+        const otrosSnapshot = await db.get(otrosIngresosRef);
+
+        let otrosIngresosTotal = 0;
+        if (otrosSnapshot.exists()) {
+            const allOtrosIngresos = Object.values(otrosSnapshot.val()).filter(i =>
+                i.fecha && i.fecha.startsWith(`${currentYear}-${String(currentMonth).padStart(2, '0')}`)
+            );
+            const personalIngresos = allOtrosIngresos.filter(i => i.type === 'personal');
+            otrosIngresosTotal = personalIngresos.reduce((sum, i) => sum + (i.monto || 0), 0);
+        }
+
+        const balance = otrosIngresosTotal - totalExpenses;
+        const margin = otrosIngresosTotal > 0 ? (balance / otrosIngresosTotal * 100) : 0;
+
+        reportText = `
 ===========================================
-REPORTE FINANCIERO - CIUDAD BILINGÜE
+${contextIcon} REPORTE FINANCIERO ${contextLabel}
+CIUDAD BILINGÜE
+${new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+===========================================
+
+RESUMEN PERSONAL:
+-----------------
+Ingresos Personales:    ${formatCurrency(otrosIngresosTotal)}
+Gastos Personales:      ${formatCurrency(totalExpenses)}
+Balance Personal:       ${formatCurrency(balance)}
+Margen:                 ${margin.toFixed(1)}%
+
+GASTOS PERSONALES:
+-----------------
+${personalExpenses.length > 0 ? personalExpenses
+    .map(e => `${e.date} - ${e.category}: ${formatCurrency(e.amount)} ${e.description ? '(' + e.description + ')' : ''}`)
+    .join('\n') : 'Sin gastos personales registrados'}
+
+===========================================
+Generado: ${new Date().toLocaleString('es-ES')}
+===========================================
+        `.trim();
+
+    } else if (context === 'business') {
+        // BUSINESS REPORT
+        const monthlyMetrics = await window.FinanceManager.calculateMonthlyMetrics(currentYear, currentMonth);
+        const expectedRevenue = window.FinanceManager.calculateExpectedMonthlyRevenue();
+        const collectionRate = await window.FinanceManager.calculateCollectionRate(currentYear, currentMonth);
+
+        reportText = `
+===========================================
+${contextIcon} REPORTE FINANCIERO ${contextLabel}
+CIUDAD BILINGÜE
 ${new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
 ===========================================
 
@@ -2117,17 +2194,36 @@ ${monthlyMetrics.expenseBreakdown ? Object.entries(monthlyMetrics.expenseBreakdo
 ===========================================
 Generado: ${new Date().toLocaleString('es-ES')}
 ===========================================
-    `.trim();
+        `.trim();
 
-    const blob = new Blob([reportText], { type: 'text/plain' });
+    } else {
+        // COMBINED REPORT
+        reportText = `
+===========================================
+${contextIcon} REPORTE FINANCIERO ${contextLabel}
+CIUDAD BILINGÜE
+${new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+===========================================
+
+NOTA: Este reporte contiene información combinada
+de negocio y personal. Use el tab "Reportes Avanzados"
+para ver el desglose completo con columnas separadas.
+
+===========================================
+Generado: ${new Date().toLocaleString('es-ES')}
+===========================================
+        `.trim();
+    }
+
+    const blob = new Blob([reportText], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Reporte-Financiero-${new Date().toISOString().slice(0, 7)}.txt`;
+    a.download = `Reporte-${contextLabel}-${new Date().toISOString().slice(0, 7)}.txt`;
     a.click();
     URL.revokeObjectURL(url);
 
-    window.showNotification('✅ Reporte exportado exitosamente', 'success');
+    window.showNotification(`✅ Reporte ${contextLabel} exportado exitosamente`, 'success');
 };
 
 // ==================================================================================
