@@ -1740,9 +1740,12 @@ window.loadExpensesView = function() {
     `;
 };
 
-window.showAddExpenseModal = function() {
+window.showAddExpenseModal = async function() {
     const today = window.getTodayInColombia();
     const isAdmin = window.userRole === 'admin' || window.userRole === 'director';
+
+    // Load custom categories from Firebase
+    const customCategories = await window.loadCustomExpenseCategories();
 
     const modal = document.createElement('div');
     modal.id = 'expenseModal';
@@ -1781,12 +1784,28 @@ window.showAddExpenseModal = function() {
                 ` : '<input type="hidden" id="expenseType" value="business">'}
 
                 <div class="form-group">
-                    <label style="font-weight: 600; display: block; margin-bottom: 0.5rem;">Categoría*</label>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <label style="font-weight: 600;">Categoría*</label>
+                        ${isAdmin ? `
+                            <button type="button" onclick="showManageCategoriesModal()" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                ⚙️ Gestionar
+                            </button>
+                        ` : ''}
+                    </div>
                     <select id="expenseCategory" required style="width: 100%; padding: 0.75rem; border: 1px solid #e5e7eb; border-radius: 6px;">
                         <option value="">Seleccionar...</option>
-                        ${Object.entries(BusinessExpenseCategories).map(([key, label]) => `
-                            <option value="${label}">${label}</option>
-                        `).join('')}
+                        <optgroup label="Categorías Predeterminadas">
+                            ${Object.entries(BusinessExpenseCategories).map(([key, label]) => `
+                                <option value="${label}">${label}</option>
+                            `).join('')}
+                        </optgroup>
+                        ${customCategories.business.length > 0 ? `
+                            <optgroup label="Categorías Personalizadas">
+                                ${customCategories.business.map(cat => `
+                                    <option value="${cat}">${cat}</option>
+                                `).join('')}
+                            </optgroup>
+                        ` : ''}
                     </select>
                 </div>
 
@@ -1839,12 +1858,200 @@ window.closeExpenseModal = function() {
     if (modal) modal.remove();
 };
 
+// Load custom expense categories from Firebase
+window.loadCustomExpenseCategories = async function() {
+    try {
+        const db = window.firebaseModules.database;
+        const categoriesRef = db.ref(window.FirebaseData.database, 'system/customExpenseCategories');
+        const snapshot = await db.get(categoriesRef);
+
+        if (snapshot.exists()) {
+            return snapshot.val();
+        }
+        return { business: [], personal: [] };
+    } catch (error) {
+        console.error('Error loading custom categories:', error);
+        return { business: [], personal: [] };
+    }
+};
+
+// Save custom expense categories to Firebase
+window.saveCustomExpenseCategories = async function(categories) {
+    try {
+        const db = window.firebaseModules.database;
+        const categoriesRef = db.ref(window.FirebaseData.database, 'system/customExpenseCategories');
+        await db.set(categoriesRef, categories);
+        console.log('✅ Custom categories saved');
+        return true;
+    } catch (error) {
+        console.error('Error saving custom categories:', error);
+        alert('Error al guardar las categorías personalizadas');
+        return false;
+    }
+};
+
+// Show manage categories modal
+window.showManageCategoriesModal = async function() {
+    const customCategories = await window.loadCustomExpenseCategories();
+
+    const modal = document.createElement('div');
+    modal.id = 'manageCategoriesModal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10002;
+    `;
+
+    modal.innerHTML = `
+        <div style="background: white; padding: 2rem; border-radius: 12px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto;">
+            <h2 style="margin: 0 0 1.5rem 0;">⚙️ Gestionar Categorías de Gastos</h2>
+
+            <div style="margin-bottom: 2rem;">
+                <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;">➕ Agregar Nueva Categoría</h3>
+                <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+                    <input type="text"
+                           id="newCategoryName"
+                           placeholder="Ej: Cafetería, Aseo, etc."
+                           style="flex: 1; padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 6px;">
+                    <select id="newCategoryType" style="padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 6px;">
+                        <option value="business">Negocio</option>
+                        <option value="personal">Personal</option>
+                    </select>
+                    <button onclick="addNewCategory()" style="padding: 0.5rem 1rem; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; white-space: nowrap;">
+                        ✓ Agregar
+                    </button>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 2rem;">
+                <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;">🏢 Categorías de Negocio Personalizadas</h3>
+                <div id="businessCategoriesList" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    ${customCategories.business.length === 0 ?
+                        '<p style="color: #9ca3af; font-style: italic;">No hay categorías personalizadas</p>' :
+                        customCategories.business.map((cat, index) => `
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; background: #f3f4f6; border-radius: 6px;">
+                                <span>${cat}</span>
+                                <button onclick="deleteCategory('business', ${index})" style="padding: 0.25rem 0.5rem; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.875rem;">
+                                    🗑️ Eliminar
+                                </button>
+                            </div>
+                        `).join('')
+                    }
+                </div>
+            </div>
+
+            <div style="margin-bottom: 2rem;">
+                <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;">🏠 Categorías Personales Personalizadas</h3>
+                <div id="personalCategoriesList" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    ${customCategories.personal.length === 0 ?
+                        '<p style="color: #9ca3af; font-style: italic;">No hay categorías personalizadas</p>' :
+                        customCategories.personal.map((cat, index) => `
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; background: #fce7f3; border-radius: 6px;">
+                                <span>${cat}</span>
+                                <button onclick="deleteCategory('personal', ${index})" style="padding: 0.25rem 0.5rem; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.875rem;">
+                                    🗑️ Eliminar
+                                </button>
+                            </div>
+                        `).join('')
+                    }
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end;">
+                <button onclick="closeManageCategoriesModal()" style="padding: 0.5rem 1.5rem; background: #6b7280; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+};
+
+window.closeManageCategoriesModal = function() {
+    const modal = document.getElementById('manageCategoriesModal');
+    if (modal) modal.remove();
+};
+
+window.addNewCategory = async function() {
+    const nameInput = document.getElementById('newCategoryName');
+    const typeSelect = document.getElementById('newCategoryType');
+    const categoryName = nameInput.value.trim();
+    const categoryType = typeSelect.value;
+
+    if (!categoryName) {
+        alert('Por favor ingrese un nombre para la categoría');
+        return;
+    }
+
+    // Load current categories
+    const customCategories = await window.loadCustomExpenseCategories();
+
+    // Check if category already exists
+    if (customCategories[categoryType].includes(categoryName)) {
+        alert('Esta categoría ya existe');
+        return;
+    }
+
+    // Add new category
+    customCategories[categoryType].push(categoryName);
+
+    // Save to Firebase
+    const saved = await window.saveCustomExpenseCategories(customCategories);
+
+    if (saved) {
+        // Close and reopen modal to refresh
+        window.closeManageCategoriesModal();
+        window.showManageCategoriesModal();
+
+        // Show success message
+        alert(`Categoría "${categoryName}" agregada exitosamente`);
+    }
+};
+
+window.deleteCategory = async function(type, categoryIndex) {
+    // Load current categories
+    const customCategories = await window.loadCustomExpenseCategories();
+
+    // Get category name for confirmation
+    const categoryName = customCategories[type][categoryIndex];
+
+    if (!confirm(`¿Está seguro de eliminar la categoría "${categoryName}"?`)) {
+        return;
+    }
+
+    // Remove category by index
+    customCategories[type].splice(categoryIndex, 1);
+
+    // Save to Firebase
+    const saved = await window.saveCustomExpenseCategories(customCategories);
+
+    if (saved) {
+        // Close and reopen modal to refresh
+        window.closeManageCategoriesModal();
+        window.showManageCategoriesModal();
+
+        // Show success message
+        alert(`Categoría "${categoryName}" eliminada exitosamente`);
+    }
+};
+
 // Toggle expense type and update categories
-window.toggleExpenseType = function(type) {
+window.toggleExpenseType = async function(type) {
     const typeInput = document.getElementById('expenseType');
     const businessBtn = document.getElementById('expenseTypeBusiness');
     const personalBtn = document.getElementById('expenseTypePersonal');
     const categorySelect = document.getElementById('expenseCategory');
+
+    // Load custom categories
+    const customCategories = await window.loadCustomExpenseCategories();
 
     // Update hidden input
     typeInput.value = type;
@@ -1858,9 +2065,16 @@ window.toggleExpenseType = function(type) {
 
         // Update categories to business
         categorySelect.innerHTML = '<option value="">Seleccionar...</option>' +
+            '<optgroup label="Categorías Predeterminadas">' +
             Object.entries(BusinessExpenseCategories).map(([key, label]) =>
                 `<option value="${label}">${label}</option>`
-            ).join('');
+            ).join('') +
+            '</optgroup>' +
+            (customCategories.business.length > 0 ?
+                '<optgroup label="Categorías Personalizadas">' +
+                customCategories.business.map(cat => `<option value="${cat}">${cat}</option>`).join('') +
+                '</optgroup>'
+            : '');
     } else {
         personalBtn.style.background = '#3b82f6';
         personalBtn.style.color = 'white';
@@ -1869,9 +2083,16 @@ window.toggleExpenseType = function(type) {
 
         // Update categories to personal
         categorySelect.innerHTML = '<option value="">Seleccionar...</option>' +
+            '<optgroup label="Categorías Predeterminadas">' +
             Object.entries(PersonalExpenseCategories).map(([key, label]) =>
                 `<option value="${label}">${label}</option>`
-            ).join('');
+            ).join('') +
+            '</optgroup>' +
+            (customCategories.personal.length > 0 ?
+                '<optgroup label="Categorías Personalizadas">' +
+                customCategories.personal.map(cat => `<option value="${cat}">${cat}</option>`).join('') +
+                '</optgroup>'
+            : '');
     }
 };
 
