@@ -1183,6 +1183,8 @@ window.loadFinanceTab = async function(activeTab = 'dashboard') {
     const isDirector = userRole === 'director';
     const canViewAdvanced = isAdmin || isDirector;
 
+    console.log('🔐 Permission check:', { userRole, isAdmin, isDirector, canViewAdvanced });
+
     // Render tabs header
     const tabsHeader = `
         <div style="background: white; border-bottom: 2px solid #e5e7eb; margin-bottom: 0;">
@@ -1245,7 +1247,12 @@ window.loadFinanceTab = async function(activeTab = 'dashboard') {
             content = await renderFinanceDashboard();
     }
 
+    console.log('📝 Rendering tabs. Advanced tabs visible:', canViewAdvanced);
+    console.log('📄 Tab header HTML length:', tabsHeader.length);
+
     container.innerHTML = tabsHeader + content;
+
+    console.log('✅ Finance tab loaded successfully');
 };
 
 window.loadDailyReconciliationView = async function() {
