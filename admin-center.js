@@ -303,7 +303,9 @@ class AdminCenterManager {
   // Reset password
   async resetPassword(email) {
     try {
-      await window.FirebaseData.auth.sendPasswordResetEmail(email);
+      // Use Firebase v9 modular syntax
+      const sendPasswordResetEmail = window.firebaseModules.auth.sendPasswordResetEmail;
+      await sendPasswordResetEmail(window.FirebaseData.auth, email);
       await this.logAction('RESET_PASSWORD', { email });
       return true;
     } catch (error) {

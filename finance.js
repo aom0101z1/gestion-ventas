@@ -2368,9 +2368,118 @@ window.deleteOtroIngreso = async function(id) {
 // ==================================================================================
 
 async function renderExpensesViewEnhanced() {
-    // Reuse existing loadExpensesView but call it
-    await window.loadExpensesView();
-    return ''; // Content already rendered
+    // Generate the expenses view HTML
+    const expenses = window.FinanceManager.getExpenses();
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const monthExpenses = window.FinanceManager.getExpenses({
+        startDate: currentMonth + '-01',
+        endDate: currentMonth + '-31'
+    });
+    const monthTotal = monthExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+    // Group by category
+    const byCategory = {};
+    monthExpenses.forEach(expense => {
+        if (!byCategory[expense.category]) {
+            byCategory[expense.category] = { total: 0, count: 0 };
+        }
+        byCategory[expense.category].total += expense.amount;
+        byCategory[expense.category].count++;
+    });
+
+    return `
+        <div style="padding: 2rem; max-width: 1200px; margin: 0 auto;">
+            <!-- Header -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                <div>
+                    <h1 style="margin: 0;">💸 Gestión de Gastos</h1>
+                </div>
+                <button onclick="showAddExpenseModal()" class="btn btn-primary" style="background: #ef4444; color: white;">
+                    ➕ Registrar Gasto
+                </button>
+            </div>
+
+            <!-- Monthly Summary -->
+            <div style="background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 2rem;">
+                <h2 style="margin: 0 0 1.5rem 0;">📊 Resumen del Mes Actual</h2>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem;">
+                    <div>
+                        <div style="font-size: 0.9rem; color: #6b7280;">Total Gastado</div>
+                        <div style="font-size: 2rem; font-weight: bold; color: #ef4444;">${formatCurrency(monthTotal)}</div>
+                        <div style="font-size: 0.85rem; color: #6b7280;">${monthExpenses.length} gastos registrados</div>
+                    </div>
+                    ${Object.entries(byCategory).slice(0, 3).map(([category, data]) => `
+                        <div>
+                            <div style="font-size: 0.9rem; color: #6b7280;">${category}</div>
+                            <div style="font-size: 1.5rem; font-weight: bold;">${formatCurrency(data.total)}</div>
+                            <div style="font-size: 0.85rem; color: #6b7280;">${data.count} gastos</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+
+            <!-- Expenses Table -->
+            <div style="background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <h3 style="margin: 0 0 1rem 0;">📋 Historial de Gastos</h3>
+
+                ${expenses.length === 0 ? `
+                    <div style="text-align: center; padding: 3rem; color: #6b7280;">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">📭</div>
+                        <p>No hay gastos registrados</p>
+                        <button onclick="showAddExpenseModal()" class="btn btn-primary" style="margin-top: 1rem;">
+                            ➕ Registrar Primer Gasto
+                        </button>
+                    </div>
+                ` : `
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead style="background: #f3f4f6;">
+                            <tr>
+                                <th style="padding: 0.75rem; text-align: left;">Fecha</th>
+                                <th style="padding: 0.75rem; text-align: left;">Categoría</th>
+                                <th style="padding: 0.75rem; text-align: left;">Descripción</th>
+                                <th style="padding: 0.75rem; text-align: right;">Monto</th>
+                                <th style="padding: 0.75rem; text-align: left;">Registrado por</th>
+                                <th style="padding: 0.75rem; text-align: center;">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${expenses.map(expense => `
+                                <tr style="border-top: 1px solid #e5e7eb;">
+                                    <td style="padding: 0.75rem;">${new Date(expense.date).toLocaleDateString('es-ES')}</td>
+                                    <td style="padding: 0.75rem;">
+                                        <span style="background: #e5e7eb; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.85rem;">
+                                            ${expense.category}
+                                        </span>
+                                    </td>
+                                    <td style="padding: 0.75rem;">${expense.description || '-'}</td>
+                                    <td style="padding: 0.75rem; text-align: right; font-weight: 600; color: #ef4444;">
+                                        -${formatCurrency(expense.amount)}
+                                    </td>
+                                    <td style="padding: 0.75rem; font-size: 0.85rem; color: #6b7280;">
+                                        ${expense.registeredByName || 'Sistema'}
+                                    </td>
+                                    <td style="padding: 0.75rem; text-align: center;">
+                                        <button onclick="deleteExpenseConfirm('${expense.id}')" class="btn btn-sm" style="background: #ef4444; color: white; padding: 0.25rem 0.5rem;">
+                                            🗑️
+                                        </button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                        <tfoot style="background: #f3f4f6; font-weight: bold;">
+                            <tr>
+                                <td colspan="3" style="padding: 0.75rem; text-align: right;">TOTAL:</td>
+                                <td style="padding: 0.75rem; text-align: right; color: #ef4444;">
+                                    -${formatCurrency(expenses.reduce((sum, e) => sum + e.amount, 0))}
+                                </td>
+                                <td colspan="2"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                `}
+            </div>
+        </div>
+    `;
 }
 
 // ==================================================================================
