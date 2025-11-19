@@ -2335,6 +2335,20 @@ window.showAddOtroIngresoModal = function() {
             <div style="background: white; padding: 2rem; border-radius: 12px; max-width: 500px; width: 90%;">
                 <h2 style="margin: 0 0 1.5rem 0;">💵 Registrar Otro Ingreso</h2>
 
+                <!-- Type Selector -->
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Tipo de Ingreso</label>
+                    <div style="display: flex; gap: 0.5rem; background: #f3f4f6; padding: 0.25rem; border-radius: 6px;">
+                        <button type="button" onclick="toggleIngresoType('business')" id="ingresoTypeBusiness" style="flex: 1; padding: 0.5rem; border: none; background: #3b82f6; color: white; border-radius: 4px; cursor: pointer; font-weight: 500;">
+                            🏢 Negocio
+                        </button>
+                        <button type="button" onclick="toggleIngresoType('personal')" id="ingresoTypePersonal" style="flex: 1; padding: 0.5rem; border: none; background: transparent; color: #6b7280; border-radius: 4px; cursor: pointer; font-weight: 500;">
+                            🏠 Personal
+                        </button>
+                    </div>
+                    <input type="hidden" id="otroIngresoType" value="business">
+                </div>
+
                 <div style="margin-bottom: 1rem;">
                     <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Fecha</label>
                     <input type="date" id="otroIngresoFecha" value="${window.getTodayInColombia()}" style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
@@ -2409,6 +2423,29 @@ window.closeOtroIngresoModal = function() {
     if (modal) modal.remove();
 };
 
+// Toggle ingreso type
+window.toggleIngresoType = function(type) {
+    const typeInput = document.getElementById('otroIngresoType');
+    const businessBtn = document.getElementById('ingresoTypeBusiness');
+    const personalBtn = document.getElementById('ingresoTypePersonal');
+
+    // Update hidden input
+    typeInput.value = type;
+
+    // Update button styles
+    if (type === 'business') {
+        businessBtn.style.background = '#3b82f6';
+        businessBtn.style.color = 'white';
+        personalBtn.style.background = 'transparent';
+        personalBtn.style.color = '#6b7280';
+    } else {
+        personalBtn.style.background = '#3b82f6';
+        personalBtn.style.color = 'white';
+        businessBtn.style.background = 'transparent';
+        businessBtn.style.color = '#6b7280';
+    }
+};
+
 window.saveOtroIngreso = async function() {
     try {
         const fecha = document.getElementById('otroIngresoFecha').value;
@@ -2416,6 +2453,7 @@ window.saveOtroIngreso = async function() {
         const montoStr = document.getElementById('otroIngresoMonto').value;
         const metodoPago = document.getElementById('otroIngresoMetodo').value;
         const notas = document.getElementById('otroIngresoNotas').value;
+        const type = document.getElementById('otroIngresoType').value;
 
         // Validation
         if (!fecha || !concepto || !montoStr) {
@@ -2446,7 +2484,7 @@ window.saveOtroIngreso = async function() {
             fecha,
             concepto,
             monto,
-            type: 'business', // Will be set by form later: 'business' | 'personal'
+            type, // 'business' | 'personal'
             metodoPago,
             notas,
             registradoPor: window.FirebaseData.currentUser?.email || 'unknown',
