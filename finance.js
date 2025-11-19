@@ -2239,15 +2239,27 @@ window.loadTodayMovementsView = async function() {
 
 // Render Otros Ingresos View
 async function renderOtrosIngresosView() {
+    // Get current financial context
+    const context = window.financialContext || 'business';
+
     // Get other income records from Firebase
     const db = window.firebaseModules.database;
     const otrosIngresosRef = db.ref(window.FirebaseData.database, 'otrosIngresos');
     const snapshot = await db.get(otrosIngresosRef);
 
-    let otrosIngresos = [];
+    let allOtrosIngresos = [];
     if (snapshot.exists()) {
-        otrosIngresos = Object.values(snapshot.val()).sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+        allOtrosIngresos = Object.values(snapshot.val()).sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
     }
+
+    // Filter by financial context
+    let otrosIngresos = allOtrosIngresos;
+    if (context === 'business') {
+        otrosIngresos = allOtrosIngresos.filter(i => !i.type || i.type === 'business');
+    } else if (context === 'personal') {
+        otrosIngresos = allOtrosIngresos.filter(i => i.type === 'personal');
+    }
+    // If 'combined', show all
 
     // Calculate totals
     const totalThisMonth = otrosIngresos
@@ -2289,6 +2301,7 @@ async function renderOtrosIngresosView() {
                 <table style="width: 100%; border-collapse: collapse;">
                     <thead style="background: #f9fafb; border-bottom: 2px solid #e5e7eb;">
                         <tr>
+                            ${context === 'combined' ? '<th style="padding: 1rem; text-align: left; font-weight: 600; color: #374151;">Tipo</th>' : ''}
                             <th style="padding: 1rem; text-align: left; font-weight: 600; color: #374151;">Fecha</th>
                             <th style="padding: 1rem; text-align: left; font-weight: 600; color: #374151;">Concepto</th>
                             <th style="padding: 1rem; text-align: left; font-weight: 600; color: #374151;">Monto</th>
@@ -2300,12 +2313,17 @@ async function renderOtrosIngresosView() {
                     <tbody>
                         ${otrosIngresos.length === 0 ? `
                             <tr>
-                                <td colspan="6" style="padding: 3rem; text-align: center; color: #9ca3af;">
+                                <td colspan="${context === 'combined' ? '7' : '6'}" style="padding: 3rem; text-align: center; color: #9ca3af;">
                                     No hay otros ingresos registrados
                                 </td>
                             </tr>
-                        ` : otrosIngresos.map(ingreso => `
+                        ` : otrosIngresos.map(ingreso => {
+                            const ingresoType = ingreso.type || 'business';
+                            const typeIcon = ingresoType === 'business' ? '🏢' : '🏠';
+                            const typeLabel = ingresoType === 'business' ? 'Negocio' : 'Personal';
+                            return `
                             <tr style="border-bottom: 1px solid #e5e7eb;">
+                                ${context === 'combined' ? `<td style="padding: 1rem;"><span style="font-size: 0.875rem;">${typeIcon} ${typeLabel}</span></td>` : ''}
                                 <td style="padding: 1rem;">${new Date(ingreso.fecha).toLocaleDateString('es-CO')}</td>
                                 <td style="padding: 1rem;">
                                     <div style="font-weight: 500;">${ingreso.concepto}</div>
@@ -2320,7 +2338,7 @@ async function renderOtrosIngresosView() {
                                     </button>
                                 </td>
                             </tr>
-                        `).join('')}
+                        `}).join('')}
                     </tbody>
                 </table>
             </div>
