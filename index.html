@@ -1319,12 +1319,9 @@ window.firebaseModules = {
             async getFilteredContacts() {
                 const userProfile = await this.loadUserProfile();
                 const allContacts = await this.getAllContacts();
-                
-                if (userProfile && userProfile.role === 'director') {
-                    return allContacts;
-                } else {
-                    return allContacts.filter(contact => contact.salespersonId === this.currentUser.uid);
-                }
+
+                // Changed: All users can now see all contacts/leads
+                return allContacts;
             }
 
             async updateContact(contactId, updates) {

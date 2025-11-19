@@ -332,17 +332,12 @@ class FirebaseDataManager {
     async getFilteredContacts() {
         const userProfile = await this.loadUserProfile();
         if (!userProfile) return [];
-        
+
         const allContacts = await this.getAllContacts();
-        
-        if (userProfile.role === 'director') {
-            console.log('👑 Director - returning all contacts:', allContacts.length);
-            return allContacts;
-        } else {
-            const filtered = allContacts.filter(contact => contact.salespersonId === this.currentUser.uid);
-            console.log('👤 Salesperson - filtered contacts:', filtered.length);
-            return filtered;
-        }
+
+        // Changed: All users can now see all contacts/leads
+        console.log('👥 All users - returning all contacts:', allContacts.length);
+        return allContacts;
     }
 
     // ===== REAL-TIME LISTENERS =====
