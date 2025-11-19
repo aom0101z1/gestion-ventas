@@ -722,9 +722,11 @@ async function renderFinanceDashboard() {
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
                 <h1 style="margin: 0;">💰 Dashboard Financiero</h1>
                 <div style="display: flex; gap: 1rem;">
+                    ${(window.financialContext || 'business') !== 'personal' ? `
                     <button onclick="loadDailyReconciliationView()" class="btn" style="background: #3b82f6; color: white;">
                         📋 Cierre Diario
                     </button>
+                    ` : ''}
                     <button onclick="loadTodayMovementsView()" class="btn" style="background: #f59e0b; color: white;">
                         📊 Ingresos y Gastos Hoy
                     </button>
@@ -831,9 +833,11 @@ async function renderFinanceDashboard() {
             <div style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                 <h3 style="margin: 0 0 1rem 0;">Acciones Rápidas</h3>
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                    ${(window.financialContext || 'business') !== 'personal' ? `
                     <button onclick="loadDailyReconciliationView()" class="btn" style="background: #3b82f6; color: white; padding: 1rem;">
                         📋 Abrir Cierre Diario
                     </button>
+                    ` : ''}
                     <button onclick="showAddExpenseModal()" class="btn" style="background: #ef4444; color: white; padding: 1rem;">
                         ➕ Registrar Gasto
                     </button>
@@ -1253,9 +1257,11 @@ window.loadFinanceTab = async function(activeTab = 'dashboard') {
                     <button onclick="loadFinanceTab('dashboard')" class="finance-tab ${activeTab === 'dashboard' ? 'active' : ''}" style="padding: 0.75rem 1.5rem; border: none; background: ${activeTab === 'dashboard' ? '#3b82f6' : 'transparent'}; color: ${activeTab === 'dashboard' ? 'white' : '#6b7280'}; border-radius: 8px 8px 0 0; cursor: pointer; font-weight: 500; white-space: nowrap;">
                         📊 Dashboard
                     </button>
+                    ${currentContext !== 'personal' ? `
                     <button onclick="loadFinanceTab('cierre')" class="finance-tab ${activeTab === 'cierre' ? 'active' : ''}" style="padding: 0.75rem 1.5rem; border: none; background: ${activeTab === 'cierre' ? '#3b82f6' : 'transparent'}; color: ${activeTab === 'cierre' ? 'white' : '#6b7280'}; border-radius: 8px 8px 0 0; cursor: pointer; font-weight: 500; white-space: nowrap;">
                         📋 Cierre Diario
                     </button>
+                    ` : ''}
                     ${canViewAdvanced ? `
                         <button onclick="loadFinanceTab('otros-ingresos')" class="finance-tab ${activeTab === 'otros-ingresos' ? 'active' : ''}" style="padding: 0.75rem 1.5rem; border: none; background: ${activeTab === 'otros-ingresos' ? '#3b82f6' : 'transparent'}; color: ${activeTab === 'otros-ingresos' ? 'white' : '#6b7280'}; border-radius: 8px 8px 0 0; cursor: pointer; font-weight: 500; white-space: nowrap;">
                             💵 Otros Ingresos
@@ -2662,7 +2668,7 @@ async function renderExpensesViewEnhanced() {
                     <table style="width: 100%; border-collapse: collapse;">
                         <thead style="background: #f3f4f6;">
                             <tr>
-                                ${context === 'combined' ? '<th style="padding: 0.75rem; text-align: left;">Tipo</th>' : ''}
+                                <th style="padding: 0.75rem; text-align: left;">Tipo</th>
                                 <th style="padding: 0.75rem; text-align: left;">Fecha</th>
                                 <th style="padding: 0.75rem; text-align: left;">Categoría</th>
                                 <th style="padding: 0.75rem; text-align: left;">Descripción</th>
@@ -2675,10 +2681,14 @@ async function renderExpensesViewEnhanced() {
                             ${expenses.map(expense => {
                                 const expenseType = expense.type || 'business';
                                 const typeIcon = expenseType === 'business' ? '🏢' : '🏠';
-                                const typeLabel = expenseType === 'business' ? 'Negocio' : 'Personal';
+                                const typeLabel = expenseType === 'business' ? 'Empresa' : 'Personal';
                                 return `
                                 <tr style="border-top: 1px solid #e5e7eb;">
-                                    ${context === 'combined' ? `<td style="padding: 0.75rem;"><span style="font-size: 0.85rem;">${typeIcon} ${typeLabel}</span></td>` : ''}
+                                    <td style="padding: 0.75rem;">
+                                        <span style="background: ${expenseType === 'business' ? '#dbeafe' : '#fce7f3'}; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.85rem; color: ${expenseType === 'business' ? '#1e40af' : '#9d174d'};">
+                                            ${typeIcon} ${typeLabel}
+                                        </span>
+                                    </td>
                                     <td style="padding: 0.75rem;">${new Date(expense.date).toLocaleDateString('es-ES')}</td>
                                     <td style="padding: 0.75rem;">
                                         <span style="background: #e5e7eb; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.85rem;">
@@ -2702,7 +2712,7 @@ async function renderExpensesViewEnhanced() {
                         </tbody>
                         <tfoot style="background: #f3f4f6; font-weight: bold;">
                             <tr>
-                                <td colspan="${context === 'combined' ? '4' : '3'}" style="padding: 0.75rem; text-align: right;">TOTAL:</td>
+                                <td colspan="4" style="padding: 0.75rem; text-align: right;">TOTAL:</td>
                                 <td style="padding: 0.75rem; text-align: right; color: #ef4444;">
                                     -${formatCurrency(expenses.reduce((sum, e) => sum + e.amount, 0))}
                                 </td>
@@ -2724,28 +2734,91 @@ async function renderAdvancedReportsView() {
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth() + 1;
 
+    // Get current financial context
+    const isAdmin = window.userRole === 'admin';
+    const context = isAdmin ? (window.financialContext || 'business') : 'business';
+
     // Get data
     const monthlyMetrics = await window.FinanceManager.calculateMonthlyMetrics(currentYear, currentMonth);
     const expectedRevenue = window.FinanceManager.calculateExpectedMonthlyRevenue();
 
-    // Get otros ingresos
+    // Get otros ingresos and filter by context
     const db = window.firebaseModules.database;
     const otrosIngresosRef = db.ref(window.FirebaseData.database, 'otrosIngresos');
     const otrosSnapshot = await db.get(otrosIngresosRef);
 
     let otrosIngresosTotal = 0;
+    let otrosIngresosBusiness = 0;
+    let otrosIngresosPersonal = 0;
+
     if (otrosSnapshot.exists()) {
-        const otrosIngresos = Object.values(otrosSnapshot.val()).filter(i =>
+        const allOtrosIngresos = Object.values(otrosSnapshot.val()).filter(i =>
             i.fecha && i.fecha.startsWith(`${currentYear}-${String(currentMonth).padStart(2, '0')}`)
         );
-        otrosIngresosTotal = otrosIngresos.reduce((sum, i) => sum + (i.monto || 0), 0);
+
+        // Filter by context
+        if (context === 'business') {
+            const businessIngresos = allOtrosIngresos.filter(i => !i.type || i.type === 'business');
+            otrosIngresosTotal = businessIngresos.reduce((sum, i) => sum + (i.monto || 0), 0);
+        } else if (context === 'personal') {
+            const personalIngresos = allOtrosIngresos.filter(i => i.type === 'personal');
+            otrosIngresosTotal = personalIngresos.reduce((sum, i) => sum + (i.monto || 0), 0);
+        } else {
+            // Combined view - calculate both
+            const businessIngresos = allOtrosIngresos.filter(i => !i.type || i.type === 'business');
+            const personalIngresos = allOtrosIngresos.filter(i => i.type === 'personal');
+            otrosIngresosBusiness = businessIngresos.reduce((sum, i) => sum + (i.monto || 0), 0);
+            otrosIngresosPersonal = personalIngresos.reduce((sum, i) => sum + (i.monto || 0), 0);
+            otrosIngresosTotal = otrosIngresosBusiness + otrosIngresosPersonal;
+        }
     }
 
-    // Calculate totals
-    const totalIngresos = monthlyMetrics.tuitionRevenue + monthlyMetrics.tiendaRevenue + otrosIngresosTotal;
-    const totalEgresos = monthlyMetrics.expenses + monthlyMetrics.tiendaCost;
-    const utilidadNeta = totalIngresos - totalEgresos;
-    const margenUtilidad = totalIngresos > 0 ? (utilidadNeta / totalIngresos * 100) : 0;
+    // Get expenses and filter by context
+    const startDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`;
+    const endDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-31`;
+    const allExpenses = window.FinanceManager.getExpenses({ startDate, endDate });
+
+    let expensesTotal = 0;
+    let expensesBusiness = 0;
+    let expensesPersonal = 0;
+
+    if (context === 'business') {
+        const businessExpenses = allExpenses.filter(e => !e.type || e.type === 'business');
+        expensesTotal = businessExpenses.reduce((sum, e) => sum + e.amount, 0);
+    } else if (context === 'personal') {
+        const personalExpenses = allExpenses.filter(e => e.type === 'personal');
+        expensesTotal = personalExpenses.reduce((sum, e) => sum + e.amount, 0);
+    } else {
+        // Combined view - calculate both
+        const businessExpenses = allExpenses.filter(e => !e.type || e.type === 'business');
+        const personalExpenses = allExpenses.filter(e => e.type === 'personal');
+        expensesBusiness = businessExpenses.reduce((sum, e) => sum + e.amount, 0);
+        expensesPersonal = personalExpenses.reduce((sum, e) => sum + e.amount, 0);
+        expensesTotal = expensesBusiness + expensesPersonal;
+    }
+
+    // Calculate totals based on context
+    let totalIngresos, totalEgresos, utilidadNeta, margenUtilidad;
+
+    if (context === 'personal') {
+        // Personal context: Only personal income and expenses
+        totalIngresos = otrosIngresosTotal;
+        totalEgresos = expensesTotal;
+        utilidadNeta = totalIngresos - totalEgresos;
+        margenUtilidad = totalIngresos > 0 ? (utilidadNeta / totalIngresos * 100) : 0;
+    } else if (context === 'business') {
+        // Business context: Business income, expenses, tuition, tienda
+        totalIngresos = monthlyMetrics.tuitionRevenue + monthlyMetrics.tiendaRevenue + otrosIngresosTotal;
+        totalEgresos = expensesTotal + monthlyMetrics.tiendaCost;
+        utilidadNeta = totalIngresos - totalEgresos;
+        margenUtilidad = totalIngresos > 0 ? (utilidadNeta / totalIngresos * 100) : 0;
+    } else {
+        // Combined context: Will be handled separately in the UI
+        totalIngresos = monthlyMetrics.tuitionRevenue + monthlyMetrics.tiendaRevenue + otrosIngresosTotal;
+        totalEgresos = expensesTotal + monthlyMetrics.tiendaCost;
+        utilidadNeta = totalIngresos - totalEgresos;
+        margenUtilidad = totalIngresos > 0 ? (utilidadNeta / totalIngresos * 100) : 0;
+    }
 
     return `
         <div style="padding: 2rem;">
@@ -2756,59 +2829,191 @@ async function renderAdvancedReportsView() {
 
             <!-- Estado de Resultados -->
             <div style="background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); padding: 2rem; margin-bottom: 2rem;">
-                <h3 style="margin: 0 0 1.5rem 0; font-size: 1.5rem;">💰 Estado de Resultados (P&L)</h3>
+                <h3 style="margin: 0 0 1.5rem 0; font-size: 1.5rem;">
+                    💰 Estado de Resultados (P&L)
+                    ${context === 'business' ? '- 🏢 Negocio' : context === 'personal' ? '- 🏠 Personal' : '- 📊 Combinado'}
+                </h3>
 
-                <!-- Ingresos -->
-                <div style="margin-bottom: 2rem;">
-                    <div style="font-weight: 600; font-size: 1.1rem; color: #10b981; margin-bottom: 1rem; border-bottom: 2px solid #10b981; padding-bottom: 0.5rem;">
-                        INGRESOS
-                    </div>
-                    <div style="display: grid; gap: 0.75rem; margin-left: 1rem;">
-                        <div style="display: flex; justify-content: space-between;">
-                            <span>Matrículas y Mensualidades</span>
-                            <span style="font-weight: 600;">${formatCurrency(monthlyMetrics.tuitionRevenue)}</span>
+                ${context === 'personal' ? `
+                    <!-- PERSONAL VIEW -->
+                    <!-- Ingresos Personales -->
+                    <div style="margin-bottom: 2rem;">
+                        <div style="font-weight: 600; font-size: 1.1rem; color: #10b981; margin-bottom: 1rem; border-bottom: 2px solid #10b981; padding-bottom: 0.5rem;">
+                            INGRESOS PERSONALES
                         </div>
-                        <div style="display: flex; justify-content: space-between;">
-                            <span>Tienda/Cafetería</span>
-                            <span style="font-weight: 600;">${formatCurrency(monthlyMetrics.tiendaRevenue)}</span>
-                        </div>
-                        <div style="display: flex; justify-content: space-between;">
-                            <span>Otros Ingresos</span>
-                            <span style="font-weight: 600;">${formatCurrency(otrosIngresosTotal)}</span>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; padding-top: 0.75rem; border-top: 2px solid #e5e7eb; font-size: 1.1rem;">
-                            <span style="font-weight: 700;">TOTAL INGRESOS</span>
-                            <span style="font-weight: 700; color: #10b981;">${formatCurrency(totalIngresos)}</span>
+                        <div style="display: grid; gap: 0.75rem; margin-left: 1rem;">
+                            <div style="display: flex; justify-content: space-between;">
+                                <span>Otros Ingresos</span>
+                                <span style="font-weight: 600;">${formatCurrency(otrosIngresosTotal)}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; padding-top: 0.75rem; border-top: 2px solid #e5e7eb; font-size: 1.1rem;">
+                                <span style="font-weight: 700;">TOTAL INGRESOS</span>
+                                <span style="font-weight: 700; color: #10b981;">${formatCurrency(totalIngresos)}</span>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- Egresos -->
-                <div style="margin-bottom: 2rem;">
-                    <div style="font-weight: 600; font-size: 1.1rem; color: #ef4444; margin-bottom: 1rem; border-bottom: 2px solid #ef4444; padding-bottom: 0.5rem;">
-                        EGRESOS
-                    </div>
-                    <div style="display: grid; gap: 0.75rem; margin-left: 1rem;">
-                        <div style="display: flex; justify-content: space-between;">
-                            <span>Gastos Operacionales</span>
-                            <span style="font-weight: 600;">${formatCurrency(monthlyMetrics.expenses)}</span>
+                    <!-- Gastos Personales -->
+                    <div style="margin-bottom: 2rem;">
+                        <div style="font-weight: 600; font-size: 1.1rem; color: #ef4444; margin-bottom: 1rem; border-bottom: 2px solid #ef4444; padding-bottom: 0.5rem;">
+                            GASTOS PERSONALES
                         </div>
-                        <div style="display: flex; justify-content: space-between;">
-                            <span>Costo de Mercancía (Tienda)</span>
-                            <span style="font-weight: 600;">${formatCurrency(monthlyMetrics.tiendaCost)}</span>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; padding-top: 0.75rem; border-top: 2px solid #e5e7eb; font-size: 1.1rem;">
-                            <span style="font-weight: 700;">TOTAL EGRESOS</span>
-                            <span style="font-weight: 700; color: #ef4444;">${formatCurrency(totalEgresos)}</span>
+                        <div style="display: grid; gap: 0.75rem; margin-left: 1rem;">
+                            <div style="display: flex; justify-content: space-between;">
+                                <span>Gastos Personales</span>
+                                <span style="font-weight: 600;">${formatCurrency(expensesTotal)}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; padding-top: 0.75rem; border-top: 2px solid #e5e7eb; font-size: 1.1rem;">
+                                <span style="font-weight: 700;">TOTAL GASTOS</span>
+                                <span style="font-weight: 700; color: #ef4444;">${formatCurrency(totalEgresos)}</span>
+                            </div>
                         </div>
                     </div>
-                </div>
+                ` : context === 'business' ? `
+                    <!-- BUSINESS VIEW -->
+                    <!-- Ingresos Negocio -->
+                    <div style="margin-bottom: 2rem;">
+                        <div style="font-weight: 600; font-size: 1.1rem; color: #10b981; margin-bottom: 1rem; border-bottom: 2px solid #10b981; padding-bottom: 0.5rem;">
+                            INGRESOS NEGOCIO
+                        </div>
+                        <div style="display: grid; gap: 0.75rem; margin-left: 1rem;">
+                            <div style="display: flex; justify-content: space-between;">
+                                <span>Matrículas y Mensualidades</span>
+                                <span style="font-weight: 600;">${formatCurrency(monthlyMetrics.tuitionRevenue)}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span>Tienda/Cafetería</span>
+                                <span style="font-weight: 600;">${formatCurrency(monthlyMetrics.tiendaRevenue)}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span>Otros Ingresos</span>
+                                <span style="font-weight: 600;">${formatCurrency(otrosIngresosTotal)}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; padding-top: 0.75rem; border-top: 2px solid #e5e7eb; font-size: 1.1rem;">
+                                <span style="font-weight: 700;">TOTAL INGRESOS</span>
+                                <span style="font-weight: 700; color: #10b981;">${formatCurrency(totalIngresos)}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Egresos Negocio -->
+                    <div style="margin-bottom: 2rem;">
+                        <div style="font-weight: 600; font-size: 1.1rem; color: #ef4444; margin-bottom: 1rem; border-bottom: 2px solid #ef4444; padding-bottom: 0.5rem;">
+                            EGRESOS NEGOCIO
+                        </div>
+                        <div style="display: grid; gap: 0.75rem; margin-left: 1rem;">
+                            <div style="display: flex; justify-content: space-between;">
+                                <span>Gastos Operacionales</span>
+                                <span style="font-weight: 600;">${formatCurrency(expensesTotal)}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span>Costo de Mercancía (Tienda)</span>
+                                <span style="font-weight: 600;">${formatCurrency(monthlyMetrics.tiendaCost)}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; padding-top: 0.75rem; border-top: 2px solid #e5e7eb; font-size: 1.1rem;">
+                                <span style="font-weight: 700;">TOTAL EGRESOS</span>
+                                <span style="font-weight: 700; color: #ef4444;">${formatCurrency(totalEgresos)}</span>
+                            </div>
+                        </div>
+                    </div>
+                ` : `
+                    <!-- COMBINED VIEW - Separated Columns -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem;">
+                        <!-- Business Column -->
+                        <div>
+                            <div style="font-weight: 600; font-size: 1.1rem; color: #3b82f6; margin-bottom: 1rem; border-bottom: 2px solid #3b82f6; padding-bottom: 0.5rem;">
+                                🏢 NEGOCIO
+                            </div>
+
+                            <!-- Ingresos Negocio -->
+                            <div style="margin-bottom: 1.5rem;">
+                                <div style="font-weight: 600; color: #10b981; margin-bottom: 0.5rem;">INGRESOS</div>
+                                <div style="display: grid; gap: 0.5rem; margin-left: 0.5rem; font-size: 0.9rem;">
+                                    <div style="display: flex; justify-content: space-between;">
+                                        <span>Matrículas</span>
+                                        <span>${formatCurrency(monthlyMetrics.tuitionRevenue)}</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between;">
+                                        <span>Tienda</span>
+                                        <span>${formatCurrency(monthlyMetrics.tiendaRevenue)}</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between;">
+                                        <span>Otros Ingresos</span>
+                                        <span>${formatCurrency(otrosIngresosBusiness)}</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; padding-top: 0.5rem; border-top: 1px solid #e5e7eb; font-weight: 600;">
+                                        <span>TOTAL</span>
+                                        <span style="color: #10b981;">${formatCurrency(monthlyMetrics.tuitionRevenue + monthlyMetrics.tiendaRevenue + otrosIngresosBusiness)}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Egresos Negocio -->
+                            <div>
+                                <div style="font-weight: 600; color: #ef4444; margin-bottom: 0.5rem;">EGRESOS</div>
+                                <div style="display: grid; gap: 0.5rem; margin-left: 0.5rem; font-size: 0.9rem;">
+                                    <div style="display: flex; justify-content: space-between;">
+                                        <span>Gastos Operacionales</span>
+                                        <span>${formatCurrency(expensesBusiness)}</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between;">
+                                        <span>Costo Tienda</span>
+                                        <span>${formatCurrency(monthlyMetrics.tiendaCost)}</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; padding-top: 0.5rem; border-top: 1px solid #e5e7eb; font-weight: 600;">
+                                        <span>TOTAL</span>
+                                        <span style="color: #ef4444;">${formatCurrency(expensesBusiness + monthlyMetrics.tiendaCost)}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Personal Column -->
+                        <div>
+                            <div style="font-weight: 600; font-size: 1.1rem; color: #ec4899; margin-bottom: 1rem; border-bottom: 2px solid #ec4899; padding-bottom: 0.5rem;">
+                                🏠 PERSONAL
+                            </div>
+
+                            <!-- Ingresos Personal -->
+                            <div style="margin-bottom: 1.5rem;">
+                                <div style="font-weight: 600; color: #10b981; margin-bottom: 0.5rem;">INGRESOS</div>
+                                <div style="display: grid; gap: 0.5rem; margin-left: 0.5rem; font-size: 0.9rem;">
+                                    <div style="display: flex; justify-content: space-between;">
+                                        <span>Otros Ingresos</span>
+                                        <span>${formatCurrency(otrosIngresosPersonal)}</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; padding-top: 0.5rem; border-top: 1px solid #e5e7eb; font-weight: 600;">
+                                        <span>TOTAL</span>
+                                        <span style="color: #10b981;">${formatCurrency(otrosIngresosPersonal)}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Gastos Personal -->
+                            <div>
+                                <div style="font-weight: 600; color: #ef4444; margin-bottom: 0.5rem;">GASTOS</div>
+                                <div style="display: grid; gap: 0.5rem; margin-left: 0.5rem; font-size: 0.9rem;">
+                                    <div style="display: flex; justify-content: space-between;">
+                                        <span>Gastos Personales</span>
+                                        <span>${formatCurrency(expensesPersonal)}</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; padding-top: 0.5rem; border-top: 1px solid #e5e7eb; font-weight: 600;">
+                                        <span>TOTAL</span>
+                                        <span style="color: #ef4444;">${formatCurrency(expensesPersonal)}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `}
 
                 <!-- Utilidad Neta -->
                 <div style="background: ${utilidadNeta >= 0 ? '#d1fae5' : '#fee2e2'}; padding: 1.5rem; border-radius: 8px; border: 2px solid ${utilidadNeta >= 0 ? '#10b981' : '#ef4444'};">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <div>
-                            <div style="font-weight: 700; font-size: 1.2rem; color: #1f2937;">UTILIDAD NETA</div>
+                            <div style="font-weight: 700; font-size: 1.2rem; color: #1f2937;">
+                                ${context === 'combined' ? 'UTILIDAD NETA TOTAL' : 'UTILIDAD NETA'}
+                            </div>
                             <div style="font-size: 0.875rem; color: #6b7280; margin-top: 0.25rem;">
                                 Margen: ${margenUtilidad.toFixed(2)}%
                             </div>
@@ -2820,7 +3025,8 @@ async function renderAdvancedReportsView() {
                 </div>
             </div>
 
-            <!-- Métricas Adicionales -->
+            <!-- Métricas Adicionales (Business only) -->
+            ${context !== 'personal' ? `
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem;">
                 <div style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                     <div style="color: #6b7280; font-size: 0.875rem; margin-bottom: 0.5rem;">Margen Tienda</div>
@@ -2850,6 +3056,7 @@ async function renderAdvancedReportsView() {
                     </div>
                 </div>
             </div>
+            ` : ''}
         </div>
     `;
 }
