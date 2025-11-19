@@ -2141,15 +2141,42 @@ window.loadTodayMovementsView = async function() {
     const today = window.getTodayInColombia();
     const db = window.firebaseModules.database;
 
-    console.log('📊 Loading today movements for date:', today);
+    // Get current financial context
+    const isAdmin = window.userRole === 'admin' || window.userRole === 'director';
+    const context = isAdmin ? (window.financialContext || 'business') : 'business';
 
-    // Get today's revenue (students payments)
-    const dailyRevenue = await window.FinanceManager.calculateDailyRevenue(today);
-    console.log('💰 Daily revenue calculated:', dailyRevenue);
+    console.log('📊 Loading today movements for date:', today, 'context:', context);
 
-    // Get today's expenses
-    const todayExpenses = window.FinanceManager.getExpenses({ startDate: today, endDate: today });
-    const totalExpenses = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
+    // Get today's revenue (students payments) - only for business/combined
+    let dailyRevenue = { total: 0, cash: 0, transfers: 0, cashCount: 0, transferCount: 0 };
+    if (context !== 'personal') {
+        dailyRevenue = await window.FinanceManager.calculateDailyRevenue(today);
+        console.log('💰 Daily revenue calculated:', dailyRevenue);
+    }
+
+    // Get today's expenses filtered by context
+    const allTodayExpenses = window.FinanceManager.getExpenses({ startDate: today, endDate: today });
+    let todayExpenses = [];
+    let totalExpenses = 0;
+    let totalExpensesBusiness = 0;
+    let totalExpensesPersonal = 0;
+
+    if (context === 'business') {
+        todayExpenses = allTodayExpenses.filter(e => !e.type || e.type === 'business');
+        totalExpenses = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
+    } else if (context === 'personal') {
+        todayExpenses = allTodayExpenses.filter(e => e.type === 'personal');
+        totalExpenses = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
+    } else {
+        // Combined
+        const businessExpenses = allTodayExpenses.filter(e => !e.type || e.type === 'business');
+        const personalExpenses = allTodayExpenses.filter(e => e.type === 'personal');
+        totalExpensesBusiness = businessExpenses.reduce((sum, e) => sum + e.amount, 0);
+        totalExpensesPersonal = personalExpenses.reduce((sum, e) => sum + e.amount, 0);
+        totalExpenses = totalExpensesBusiness + totalExpensesPersonal;
+        todayExpenses = allTodayExpenses;
+    }
+
     console.log('💸 Today expenses:', todayExpenses.length, 'total:', totalExpenses);
 
     // Get today's student payments (detailed)
@@ -2184,40 +2211,64 @@ window.loadTodayMovementsView = async function() {
         });
     }
 
-    // Get today's store sales
-    const salesRef = db.ref(window.FirebaseData.database, 'sales');
-    const salesSnapshot = await db.get(salesRef);
-
+    // Get today's store sales (only for business/combined)
     let storeSales = 0;
     let storeSalesDetails = [];
-    if (salesSnapshot.exists()) {
-        const salesData = salesSnapshot.val();
-        console.log('🛒 Total sales in database:', Object.keys(salesData).length);
-        const allSales = Object.entries(salesData).map(([id, sale]) => ({ id, ...sale }));
-        console.log('🛒 First sale example (raw):', allSales[0]);
+    if (context !== 'personal') {
+        const salesRef = db.ref(window.FirebaseData.database, 'sales');
+        const salesSnapshot = await db.get(salesRef);
 
-        storeSalesDetails = allSales
-            .filter(sale => {
-                if (!sale.date) {
-                    console.warn('🛒 Sale without date:', sale.id);
-                    return false;
-                }
-                const saleDate = sale.date.split('T')[0];
-                const matches = saleDate === today;
-                if (matches) {
-                    console.log('🛒 Matched sale:', sale.id, 'date:', saleDate);
-                }
-                return matches;
-            })
-            .sort((a, b) => new Date(b.date) - new Date(a.date));
-        storeSales = storeSalesDetails.reduce((sum, sale) => sum + sale.total, 0);
-        console.log('🛒 Today sales filtered:', storeSalesDetails.length, 'total:', storeSales);
-    } else {
-        console.log('🛒 No sales found in database');
+        if (salesSnapshot.exists()) {
+            const salesData = salesSnapshot.val();
+            console.log('🛒 Total sales in database:', Object.keys(salesData).length);
+            const allSales = Object.entries(salesData).map(([id, sale]) => ({ id, ...sale }));
+
+            storeSalesDetails = allSales
+                .filter(sale => {
+                    if (!sale.date) {
+                        console.warn('🛒 Sale without date:', sale.id);
+                        return false;
+                    }
+                    const saleDate = sale.date.split('T')[0];
+                    return saleDate === today;
+                })
+                .sort((a, b) => new Date(b.date) - new Date(a.date));
+            storeSales = storeSalesDetails.reduce((sum, sale) => sum + sale.total, 0);
+            console.log('🛒 Today sales filtered:', storeSalesDetails.length, 'total:', storeSales);
+        }
+    }
+
+    // Get today's otros ingresos filtered by context
+    const otrosIngresosRef = db.ref(window.FirebaseData.database, 'otrosIngresos');
+    const otrosSnapshot = await db.get(otrosIngresosRef);
+
+    let otrosIngresosTotal = 0;
+    let otrosIngresosBusiness = 0;
+    let otrosIngresosPersonal = 0;
+
+    if (otrosSnapshot.exists()) {
+        const allOtrosIngresos = Object.values(otrosSnapshot.val()).filter(i =>
+            i.fecha && i.fecha === today
+        );
+
+        if (context === 'business') {
+            const businessIngresos = allOtrosIngresos.filter(i => !i.type || i.type === 'business');
+            otrosIngresosTotal = businessIngresos.reduce((sum, i) => sum + (i.monto || 0), 0);
+        } else if (context === 'personal') {
+            const personalIngresos = allOtrosIngresos.filter(i => i.type === 'personal');
+            otrosIngresosTotal = personalIngresos.reduce((sum, i) => sum + (i.monto || 0), 0);
+        } else {
+            // Combined
+            const businessIngresos = allOtrosIngresos.filter(i => !i.type || i.type === 'business');
+            const personalIngresos = allOtrosIngresos.filter(i => i.type === 'personal');
+            otrosIngresosBusiness = businessIngresos.reduce((sum, i) => sum + (i.monto || 0), 0);
+            otrosIngresosPersonal = personalIngresos.reduce((sum, i) => sum + (i.monto || 0), 0);
+            otrosIngresosTotal = otrosIngresosBusiness + otrosIngresosPersonal;
+        }
     }
 
     // Calculate balance
-    const totalIncome = dailyRevenue.total + storeSales;
+    const totalIncome = dailyRevenue.total + storeSales + otrosIngresosTotal;
     const balance = totalIncome - totalExpenses;
 
     container.innerHTML = `
@@ -2227,7 +2278,10 @@ window.loadTodayMovementsView = async function() {
                 <button onclick="loadFinanceTab()" class="btn btn-secondary" style="margin-bottom: 0.5rem;">
                     ← Volver al Dashboard
                 </button>
-                <h1 style="margin: 0;">📊 Ingresos y Gastos de Hoy</h1>
+                <h1 style="margin: 0;">
+                    📊 Ingresos y Gastos de Hoy
+                    ${context === 'business' ? '- 🏢 Negocio' : context === 'personal' ? '- 🏠 Personal' : '- 📊 Combinado'}
+                </h1>
                 <p style="margin: 0.5rem 0 0 0; color: #6b7280;">
                     ${new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                 </p>
@@ -2246,14 +2300,48 @@ window.loadTodayMovementsView = async function() {
                         </div>
                     </div>
                     <div style="border-top: 1px solid rgba(255,255,255,0.3); padding-top: 1rem; margin-top: 1rem;">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                            <span style="opacity: 0.9;">Pagos Estudiantes:</span>
-                            <strong>${formatCurrency(dailyRevenue.total)}</strong>
-                        </div>
-                        <div style="display: flex; justify-content: space-between;">
-                            <span style="opacity: 0.9;">Ventas Tienda:</span>
-                            <strong>${formatCurrency(storeSales)}</strong>
-                        </div>
+                        ${context === 'personal' ? `
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="opacity: 0.9;">Otros Ingresos:</span>
+                                <strong>${formatCurrency(otrosIngresosTotal)}</strong>
+                            </div>
+                        ` : context === 'business' ? `
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                <span style="opacity: 0.9;">Pagos Estudiantes:</span>
+                                <strong>${formatCurrency(dailyRevenue.total)}</strong>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                <span style="opacity: 0.9;">Ventas Tienda:</span>
+                                <strong>${formatCurrency(storeSales)}</strong>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="opacity: 0.9;">Otros Ingresos:</span>
+                                <strong>${formatCurrency(otrosIngresosTotal)}</strong>
+                            </div>
+                        ` : `
+                            <div style="margin-bottom: 0.75rem;">
+                                <div style="font-size: 0.85rem; opacity: 0.8; margin-bottom: 0.25rem;">🏢 Negocio:</div>
+                                <div style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 0.25rem;">
+                                    <span>Pagos:</span>
+                                    <strong>${formatCurrency(dailyRevenue.total)}</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 0.25rem;">
+                                    <span>Tienda:</span>
+                                    <strong>${formatCurrency(storeSales)}</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; font-size: 0.9rem;">
+                                    <span>Otros:</span>
+                                    <strong>${formatCurrency(otrosIngresosBusiness)}</strong>
+                                </div>
+                            </div>
+                            <div style="border-top: 1px solid rgba(255,255,255,0.2); padding-top: 0.75rem;">
+                                <div style="font-size: 0.85rem; opacity: 0.8; margin-bottom: 0.25rem;">🏠 Personal:</div>
+                                <div style="display: flex; justify-content: space-between; font-size: 0.9rem;">
+                                    <span>Otros:</span>
+                                    <strong>${formatCurrency(otrosIngresosPersonal)}</strong>
+                                </div>
+                            </div>
+                        `}
                     </div>
                 </div>
 
@@ -2267,10 +2355,21 @@ window.loadTodayMovementsView = async function() {
                         </div>
                     </div>
                     <div style="border-top: 1px solid rgba(255,255,255,0.3); padding-top: 1rem; margin-top: 1rem;">
-                        <div style="display: flex; justify-content: space-between;">
-                            <span style="opacity: 0.9;">Total de gastos:</span>
-                            <strong>${todayExpenses.length} registros</strong>
-                        </div>
+                        ${context === 'combined' ? `
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                <span style="opacity: 0.9;">🏢 Negocio:</span>
+                                <strong>${formatCurrency(totalExpensesBusiness)}</strong>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="opacity: 0.9;">🏠 Personal:</span>
+                                <strong>${formatCurrency(totalExpensesPersonal)}</strong>
+                            </div>
+                        ` : `
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="opacity: 0.9;">Total de gastos:</span>
+                                <strong>${todayExpenses.length} registros</strong>
+                            </div>
+                        `}
                     </div>
                 </div>
 
