@@ -2641,6 +2641,167 @@ window.fixDateShift = async function() {
     }
 };
 
+/**
+ * Complete diagnostic of Nov 18, 19, and 20 with actual payment and expense data
+ */
+window.fullDiagnosticNov18to20 = async function() {
+    console.log('🔍 ========================================');
+    console.log('🔍 DIAGNÓSTICO COMPLETO NOV 18, 19 Y 20');
+    console.log('🔍 ========================================');
+
+    try {
+        const db = window.firebaseModules.database;
+
+        // Get all closures
+        const closuresRef = db.ref(window.FirebaseData.database, 'dailyReconciliations');
+        const closuresSnapshot = await db.get(closuresRef);
+        const closures = closuresSnapshot.exists() ? closuresSnapshot.val() : {};
+
+        // Get all payments
+        const paymentsRef = db.ref(window.FirebaseData.database, 'payments');
+        const paymentsSnapshot = await db.get(paymentsRef);
+        const allPayments = paymentsSnapshot.exists() ? Object.values(paymentsSnapshot.val()) : [];
+
+        // Get all expenses
+        const expensesRef = db.ref(window.FirebaseData.database, 'expenses');
+        const expensesSnapshot = await db.get(expensesRef);
+        const allExpenses = expensesSnapshot.exists() ? Object.values(expensesSnapshot.val()) : [];
+
+        // Filter by dates
+        const nov18Payments = allPayments.filter(p => p.date && p.date.startsWith('2025-11-18'));
+        const nov19Payments = allPayments.filter(p => p.date && p.date.startsWith('2025-11-19'));
+        const nov20Payments = allPayments.filter(p => p.date && p.date.startsWith('2025-11-20'));
+
+        const nov18Expenses = allExpenses.filter(e => e.date && e.date.startsWith('2025-11-18'));
+        const nov19Expenses = allExpenses.filter(e => e.date && e.date.startsWith('2025-11-19'));
+        const nov20Expenses = allExpenses.filter(e => e.date && e.date.startsWith('2025-11-20'));
+
+        // Calculate totals
+        const calcTotal = (items) => items.reduce((sum, item) => sum + (item.amount || 0), 0);
+
+        console.log('\n📅 ========== NOV 18 ==========');
+        console.log('CIERRE GUARDADO:', closures['2025-11-18'] ? 'SÍ' : 'NO');
+        if (closures['2025-11-18']) {
+            console.log('   Apertura:', closures['2025-11-18'].openingBalance);
+            console.log('   Cierre:', closures['2025-11-18'].closingCount);
+            console.log('   Gastos guardados:', closures['2025-11-18'].expenses);
+        }
+        console.log('PAGOS REALES:');
+        console.log('   Cantidad:', nov18Payments.length);
+        console.log('   Total:', calcTotal(nov18Payments));
+        nov18Payments.forEach(p => {
+            console.log(`   - $${p.amount.toLocaleString()} ${p.method} (${p.studentId})`);
+        });
+        console.log('GASTOS REALES:');
+        console.log('   Cantidad:', nov18Expenses.length);
+        console.log('   Total:', calcTotal(nov18Expenses));
+        nov18Expenses.forEach(e => {
+            console.log(`   - $${e.amount.toLocaleString()} ${e.category}`);
+        });
+
+        console.log('\n📅 ========== NOV 19 ==========');
+        console.log('CIERRE GUARDADO:', closures['2025-11-19'] ? 'SÍ' : 'NO');
+        if (closures['2025-11-19']) {
+            console.log('   Apertura:', closures['2025-11-19'].openingBalance);
+            console.log('   Cierre:', closures['2025-11-19'].closingCount);
+            console.log('   Gastos guardados:', closures['2025-11-19'].expenses);
+        }
+        console.log('PAGOS REALES:');
+        console.log('   Cantidad:', nov19Payments.length);
+        console.log('   Total:', calcTotal(nov19Payments));
+        nov19Payments.forEach(p => {
+            console.log(`   - $${p.amount.toLocaleString()} ${p.method} (${p.studentId || 'N/A'})`);
+        });
+        console.log('GASTOS REALES:');
+        console.log('   Cantidad:', nov19Expenses.length);
+        console.log('   Total:', calcTotal(nov19Expenses));
+        nov19Expenses.forEach(e => {
+            console.log(`   - $${e.amount.toLocaleString()} ${e.category}`);
+        });
+
+        console.log('\n📅 ========== NOV 20 (HOY) ==========');
+        console.log('CIERRE GUARDADO:', closures['2025-11-20'] ? 'SÍ' : 'NO');
+        if (closures['2025-11-20']) {
+            console.log('   Apertura:', closures['2025-11-20'].openingBalance);
+            console.log('   Cierre:', closures['2025-11-20'].closingCount);
+            console.log('   Gastos guardados:', closures['2025-11-20'].expenses);
+        }
+        console.log('PAGOS REALES:');
+        console.log('   Cantidad:', nov20Payments.length);
+        console.log('   Total:', calcTotal(nov20Payments));
+        nov20Payments.forEach(p => {
+            console.log(`   - $${p.amount.toLocaleString()} ${p.method} (${p.studentId || 'N/A'})`);
+        });
+        console.log('GASTOS REALES:');
+        console.log('   Cantidad:', nov20Expenses.length);
+        console.log('   Total:', calcTotal(nov20Expenses));
+        nov20Expenses.forEach(e => {
+            console.log(`   - $${e.amount.toLocaleString()} ${e.category}`);
+        });
+
+        // Create summary
+        const summary =
+            '📊 RESUMEN COMPLETO\n\n' +
+            '═══ NOV 18 ═══\n' +
+            `Cierre guardado: ${closures['2025-11-18'] ? 'SÍ' : 'NO'}\n` +
+            (closures['2025-11-18'] ?
+                `Apertura: $${(closures['2025-11-18'].openingBalance || 0).toLocaleString()}\n` +
+                `Cierre: $${(closures['2025-11-18'].closingCount || 0).toLocaleString()}\n`
+                : '') +
+            `Pagos: ${nov18Payments.length} = $${calcTotal(nov18Payments).toLocaleString()}\n` +
+            `Gastos: ${nov18Expenses.length} = $${calcTotal(nov18Expenses).toLocaleString()}\n\n` +
+
+            '═══ NOV 19 ═══\n' +
+            `Cierre guardado: ${closures['2025-11-19'] ? 'SÍ' : 'NO'}\n` +
+            (closures['2025-11-19'] ?
+                `Apertura: $${(closures['2025-11-19'].openingBalance || 0).toLocaleString()}\n` +
+                `Cierre: $${(closures['2025-11-19'].closingCount || 0).toLocaleString()}\n`
+                : '') +
+            `Pagos: ${nov19Payments.length} = $${calcTotal(nov19Payments).toLocaleString()}\n` +
+            `Gastos: ${nov19Expenses.length} = $${calcTotal(nov19Expenses).toLocaleString()}\n\n` +
+
+            '═══ NOV 20 (HOY) ═══\n' +
+            `Cierre guardado: ${closures['2025-11-20'] ? 'SÍ' : 'NO'}\n` +
+            (closures['2025-11-20'] ?
+                `Apertura: $${(closures['2025-11-20'].openingBalance || 0).toLocaleString()}\n` +
+                `Cierre: $${(closures['2025-11-20'].closingCount || 0).toLocaleString()}\n`
+                : '') +
+            `Pagos: ${nov20Payments.length} = $${calcTotal(nov20Payments).toLocaleString()}\n` +
+            `Gastos: ${nov20Expenses.length} = $${calcTotal(nov20Expenses).toLocaleString()}\n\n` +
+
+            'Revisa la consola para detalles completos.\n' +
+            'Ejecuta downloadBackup() para guardar estos datos.';
+
+        alert(summary);
+
+        // Store for backup
+        window.diagnosticData = {
+            timestamp: new Date().toISOString(),
+            closures: {
+                nov18: closures['2025-11-18'],
+                nov19: closures['2025-11-19'],
+                nov20: closures['2025-11-20']
+            },
+            payments: {
+                nov18: nov18Payments,
+                nov19: nov19Payments,
+                nov20: nov20Payments
+            },
+            expenses: {
+                nov18: nov18Expenses,
+                nov19: nov19Expenses,
+                nov20: nov20Expenses
+            }
+        };
+
+        console.log('✅ Diagnóstico completo. Datos guardados en window.diagnosticData');
+
+    } catch (error) {
+        console.error('❌ Error en diagnóstico:', error);
+        alert('❌ Error: ' + error.message);
+    }
+};
+
 window.loadHistoricalClosure = async function(date) {
     console.log('📜 Loading historical closure for date:', date);
 
