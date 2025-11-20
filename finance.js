@@ -2304,6 +2304,132 @@ window.restoreClosureFromBackup = async function(date) {
     }
 };
 
+/**
+ * Restore Nov 19 specifically with correct data
+ */
+window.restoreNov19 = async function() {
+    console.log('🔧 Restaurando Nov 19...');
+
+    const confirmRestore = confirm(
+        '¿Restaurar el cierre del 19 de noviembre?\n\n' +
+        'Datos a restaurar:\n' +
+        'Apertura: $100,000\n' +
+        'Cierre: $68,000\n' +
+        'Gastos: $92,300\n' +
+        'Estado: Abierto'
+    );
+
+    if (!confirmRestore) {
+        console.log('❌ Cancelado por usuario');
+        return;
+    }
+
+    try {
+        const db = window.firebaseModules.database;
+
+        // Create Nov 19 with correct data
+        const nov19Data = {
+            date: '2025-11-19',
+            openingBalance: 100000,
+            closingCount: 68000,
+            expenses: 92300,
+            isClosed: false,
+            notes: 'Restaurado desde backup',
+            openedAt: '2025-11-19T06:00:00.000Z', // Approximate opening time
+            registeredBy: window.FirebaseData.currentUser?.uid,
+            registeredByName: window.FirebaseData.currentUser?.email,
+            updatedAt: new Date().toISOString()
+        };
+
+        const nov19Ref = db.ref(window.FirebaseData.database, 'dailyReconciliations/2025-11-19');
+        console.log('💾 Guardando Nov 19 en Firebase...');
+        await db.set(nov19Ref, nov19Data);
+        console.log('✅ Nov 19 guardado exitosamente');
+
+        // Reload data from Firebase
+        console.log('🔄 Recargando datos...');
+        await window.FinanceManager.loadReconciliations();
+
+        // Reload historical view if open
+        if (document.getElementById('closureDetailsContainer')) {
+            console.log('🔄 Recargando vista...');
+            await window.loadFinanceTab('historial-cierres');
+        }
+
+        alert(
+            '✅ Nov 19 restaurado exitosamente!\n\n' +
+            'Apertura: $100,000\n' +
+            'Cierre: $68,000\n' +
+            'Gastos: $92,300'
+        );
+
+        console.log('✅ Restauración completada');
+
+    } catch (error) {
+        console.error('❌ Error restaurando Nov 19:', error);
+        alert('❌ Error: ' + error.message);
+    }
+};
+
+/**
+ * Verify and fix Nov 20 if needed
+ */
+window.verifyNov20 = async function() {
+    console.log('🔍 Verificando Nov 20...');
+
+    try {
+        const db = window.firebaseModules.database;
+        const nov20Ref = db.ref(window.FirebaseData.database, 'dailyReconciliations/2025-11-20');
+        const snapshot = await db.get(nov20Ref);
+
+        if (!snapshot.exists()) {
+            alert('❌ Nov 20 no existe en Firebase');
+            return;
+        }
+
+        const nov20Data = snapshot.val();
+
+        console.log('📊 Datos actuales de Nov 20:');
+        console.log('   Apertura:', nov20Data.openingBalance);
+        console.log('   Cierre:', nov20Data.closingCount);
+        console.log('   Gastos:', nov20Data.expenses);
+        console.log('   Estado:', nov20Data.isClosed ? 'Cerrado' : 'Abierto');
+
+        const expectedOpening = 68000; // Should match Nov 19's closing
+
+        if (nov20Data.openingBalance !== expectedOpening) {
+            const fix = confirm(
+                `⚠️ La apertura de Nov 20 no coincide con el cierre de Nov 19.\n\n` +
+                `Apertura actual: $${(nov20Data.openingBalance || 0).toLocaleString()}\n` +
+                `Apertura esperada: $${expectedOpening.toLocaleString()}\n\n` +
+                `¿Corregir apertura a $${expectedOpening.toLocaleString()}?`
+            );
+
+            if (fix) {
+                nov20Data.openingBalance = expectedOpening;
+                nov20Data.updatedAt = new Date().toISOString();
+                await db.set(nov20Ref, nov20Data);
+
+                console.log('✅ Apertura de Nov 20 corregida');
+                alert('✅ Apertura de Nov 20 corregida a $68,000');
+
+                // Reload
+                await window.FinanceManager.loadReconciliations();
+                if (document.getElementById('closureDetailsContainer')) {
+                    await window.loadFinanceTab('historial-cierres');
+                }
+            }
+        } else {
+            alert('✅ Nov 20 está correcto!\n\nApertura: $68,000\nCierre: $0 (abierto)');
+            console.log('✅ Nov 20 verificado - datos correctos');
+        }
+
+    } catch (error) {
+        console.error('❌ Error verificando Nov 20:', error);
+        alert('❌ Error: ' + error.message);
+    }
+};
+
 window.loadHistoricalClosure = async function(date) {
     console.log('📜 Loading historical closure for date:', date);
 
