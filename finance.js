@@ -1428,8 +1428,32 @@ async function renderHistoricalClosuresView() {
     console.log('📊 Total reconciliations loaded:', allReconciliations.length);
     console.log('📊 Dates found:', allReconciliations.map(r => r.date));
 
+    // Get today's date
+    const today = window.getTodayInColombia ? window.getTodayInColombia() : new Date().toISOString().split('T')[0];
+    console.log('📅 Today is:', today);
+
     // Get students map for payment details
     const students = window.StudentManager ? window.StudentManager.students : new Map();
+
+    // Auto-load today's closure if it exists
+    setTimeout(() => {
+        const selector = document.getElementById('historicalDateSelector');
+        if (selector) {
+            // Try to find today's date in the reconciliations
+            const todayRec = allReconciliations.find(r => r.date === today);
+            if (todayRec) {
+                selector.value = today;
+                loadHistoricalClosure(today);
+                console.log('✅ Auto-loaded today\'s closure:', today);
+            } else {
+                console.log('⚠️ Today\'s closure not found, showing first available');
+                if (allReconciliations.length > 0) {
+                    selector.value = allReconciliations[0].date;
+                    loadHistoricalClosure(allReconciliations[0].date);
+                }
+            }
+        }
+    }, 100);
 
     return `
         <div style="padding: 2rem; max-width: 1400px; margin: 0 auto;">
@@ -1438,6 +1462,7 @@ async function renderHistoricalClosuresView() {
                     <h1 style="margin: 0 0 0.5rem 0;">📜 Historial de Cierres de Caja</h1>
                     <p style="margin: 0; color: #6b7280;">
                         Consulta los cierres de caja de días anteriores. Total de cierres: <strong>${allReconciliations.length}</strong>
+                        ${today ? ` • Hoy: <strong>${today}</strong>` : ''}
                     </p>
                 </div>
                 <button onclick="loadFinanceTab('historial-cierres')" class="btn" style="background: #3b82f6; color: white; padding: 0.75rem 1.5rem;">
@@ -1462,7 +1487,8 @@ async function renderHistoricalClosuresView() {
                             day: 'numeric'
                         });
                         const status = rec.isClosed ? '🔒 Cerrado' : '🔓 Abierto';
-                        return `<option value="${rec.date}">${formattedDate} - ${status}</option>`;
+                        const isToday = rec.date === today;
+                        return `<option value="${rec.date}" ${isToday ? 'selected' : ''}>${formattedDate} - ${status}${isToday ? ' ← HOY' : ''}</option>`;
                     }).join('')}
                 </select>
             </div>
