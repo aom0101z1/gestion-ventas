@@ -2802,6 +2802,175 @@ window.fullDiagnosticNov18to20 = async function() {
     }
 };
 
+/**
+ * Correct Nov 19 and Nov 20 based on user specifications
+ */
+window.correctNov19And20 = async function() {
+    console.log('🔧 ========================================');
+    console.log('🔧 CORRECCIÓN ESPECÍFICA NOV 19 Y NOV 20');
+    console.log('🔧 ========================================');
+
+    try {
+        const db = window.firebaseModules.database;
+
+        // 1. Search for Jean Pierre payment
+        console.log('🔍 Buscando pago de Jean Pierre...');
+        const paymentsRef = db.ref(window.FirebaseData.database, 'payments');
+        const paymentsSnapshot = await db.get(paymentsRef);
+        const allPayments = paymentsSnapshot.exists() ? Object.entries(paymentsSnapshot.val()) : [];
+
+        const jeanPierrePayment = allPayments.find(([id, p]) =>
+            p.studentId && p.studentId.toLowerCase().includes('jean') && p.amount === 156000
+        );
+
+        if (jeanPierrePayment) {
+            console.log('✅ Pago de Jean Pierre encontrado:');
+            console.log('   ID:', jeanPierrePayment[0]);
+            console.log('   Monto:', jeanPierrePayment[1].amount);
+            console.log('   Método:', jeanPierrePayment[1].method);
+            console.log('   Fecha:', jeanPierrePayment[1].date);
+        } else {
+            console.log('⚠️ No se encontró pago de Jean Pierre por $156,000');
+        }
+
+        // 2. Search for $60,000 expense "Puerta entrada"
+        console.log('\n🔍 Buscando gasto de $60,000 Puerta entrada...');
+        const expensesRef = db.ref(window.FirebaseData.database, 'expenses');
+        const expensesSnapshot = await db.get(expensesRef);
+        const allExpenses = expensesSnapshot.exists() ? Object.entries(expensesSnapshot.val()) : [];
+
+        const puertaExpense = allExpenses.find(([id, e]) =>
+            e.amount === 60000 && e.description && e.description.toLowerCase().includes('puerta')
+        );
+
+        if (puertaExpense) {
+            console.log('✅ Gasto "Puerta entrada" encontrado:');
+            console.log('   ID:', puertaExpense[0]);
+            console.log('   Monto:', puertaExpense[1].amount);
+            console.log('   Descripción:', puertaExpense[1].description);
+            console.log('   Fecha:', puertaExpense[1].date);
+        } else {
+            console.log('⚠️ No se encontró gasto de $60,000 "Puerta entrada"');
+        }
+
+        // 3. Check for Nov 15 (sábado)
+        console.log('\n🔍 Verificando Nov 15 (sábado)...');
+        const nov15Ref = db.ref(window.FirebaseData.database, 'dailyReconciliations/2025-11-15');
+        const nov15Snapshot = await db.get(nov15Ref);
+
+        if (nov15Snapshot.exists()) {
+            console.log('✅ Nov 15 EXISTE:');
+            const nov15Data = nov15Snapshot.val();
+            console.log('   Apertura:', nov15Data.openingBalance);
+            console.log('   Cierre:', nov15Data.closingCount);
+            console.log('   Cerrado:', nov15Data.isClosed ? 'SÍ' : 'NO');
+        } else {
+            console.log('❌ Nov 15 NO EXISTE en Firebase');
+        }
+
+        // Show confirmation dialog
+        const confirmMessage =
+            '🔧 CORRECCIONES A REALIZAR:\n\n' +
+            '═══ NOV 20 (HOY) ═══\n' +
+            '✓ Abrir caja (cambiar de cerrado a abierto)\n' +
+            '✓ Apertura: $68,000\n' +
+            '✓ Pago Jean Pierre: $156,000 (Nequi)\n' +
+            '✓ Gastos: $0\n\n' +
+            '═══ NOV 19 (AYER) ═══\n' +
+            '✓ Apertura: $100,000\n' +
+            '✓ Gastos: $32,300 (Cafetería)\n' +
+            (puertaExpense ? '✓ ELIMINAR gasto $60,000 Puerta entrada\n' : '') +
+            '✓ Cierre: $67,700\n\n' +
+            (nov15Snapshot.exists() ? '✓ Nov 15 encontrado\n\n' : '⚠️ Nov 15 NO existe\n\n') +
+            '¿Continuar con las correcciones?';
+
+        const shouldFix = confirm(confirmMessage);
+
+        if (!shouldFix) {
+            console.log('❌ Corrección cancelada');
+            return;
+        }
+
+        // 4. Delete $60,000 expense if found
+        if (puertaExpense) {
+            console.log('🗑️ Eliminando gasto de $60,000 Puerta entrada...');
+            const expenseToDeleteRef = db.ref(window.FirebaseData.database, `expenses/${puertaExpense[0]}`);
+            await db.remove(expenseToDeleteRef);
+            console.log('✅ Gasto eliminado');
+        }
+
+        // 5. Fix Nov 19
+        console.log('💾 Corrigiendo Nov 19...');
+        const nov19Data = {
+            date: '2025-11-19',
+            openingBalance: 100000,
+            closingCount: 67700, // 100,000 - 32,300
+            expenses: 32300,
+            isClosed: true,
+            notes: 'Gastos: Cafetería - 1kg azúcar, 1lb café, 1 electrolite',
+            closedAt: new Date('2025-11-19T23:59:00').toISOString(),
+            closedBy: window.FirebaseData.currentUser?.uid,
+            closedByName: window.FirebaseData.currentUser?.email,
+            openedAt: '2025-11-19T06:00:00.000Z',
+            registeredBy: window.FirebaseData.currentUser?.uid,
+            registeredByName: window.FirebaseData.currentUser?.email,
+            updatedAt: new Date().toISOString()
+        };
+
+        const nov19Ref = db.ref(window.FirebaseData.database, 'dailyReconciliations/2025-11-19');
+        await db.set(nov19Ref, nov19Data);
+        console.log('✅ Nov 19 corregido');
+
+        // 6. Fix Nov 20 (open it)
+        console.log('💾 Corrigiendo Nov 20 (HOY)...');
+        const nov20Data = {
+            date: '2025-11-20',
+            openingBalance: 68000, // Changed from 67700 as user specified
+            closingCount: 0,
+            expenses: 0,
+            isClosed: false, // ← OPEN IT
+            notes: 'Pago Jean Pierre $156,000 Nequi',
+            openedAt: new Date().toISOString(),
+            registeredBy: window.FirebaseData.currentUser?.uid,
+            registeredByName: window.FirebaseData.currentUser?.email,
+            updatedAt: new Date().toISOString()
+        };
+
+        const nov20Ref = db.ref(window.FirebaseData.database, 'dailyReconciliations/2025-11-20');
+        await db.set(nov20Ref, nov20Data);
+        console.log('✅ Nov 20 abierto');
+
+        // 7. Reload data
+        console.log('🔄 Recargando datos...');
+        await window.FinanceManager.loadReconciliations();
+
+        // Reload expense list
+        await window.FinanceManager.loadExpenses();
+
+        alert(
+            '✅ CORRECCIONES COMPLETADAS\n\n' +
+            '═══ NOV 19 (AYER) ═══\n' +
+            'Apertura: $100,000\n' +
+            'Gastos: $32,300\n' +
+            'Cierre: $67,700 ✓\n' +
+            'Estado: CERRADO\n\n' +
+            '═══ NOV 20 (HOY) ═══\n' +
+            'Apertura: $68,000\n' +
+            'Pago: $156,000 (Jean Pierre)\n' +
+            'Gastos: $0\n' +
+            'Estado: ABIERTO ✓\n\n' +
+            (puertaExpense ? '✓ Gasto $60,000 eliminado\n' : '') +
+            '\nRecarga la página para ver todos los cambios.'
+        );
+
+        console.log('✅ Todas las correcciones completadas');
+
+    } catch (error) {
+        console.error('❌ Error en corrección:', error);
+        alert('❌ Error: ' + error.message);
+    }
+};
+
 window.loadHistoricalClosure = async function(date) {
     console.log('📜 Loading historical closure for date:', date);
 
