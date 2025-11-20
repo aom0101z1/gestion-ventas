@@ -3781,6 +3781,175 @@ window.downloadClosureDiagnosticReport = function() {
     console.log('✅ Report downloaded');
 };
 
+/**
+ * FIX ALL DATE MISMATCHES IN HISTORICAL CLOSURES
+ * Corrects openedAt and closedAt timestamps to match the closure date
+ * Preserves the time (HH:mm:ss) but fixes the date (YYYY-MM-DD)
+ */
+window.fixAllDateMismatches = async function() {
+    console.log('🔧 ========================================');
+    console.log('🔧 FIXING DATE MISMATCHES IN ALL CLOSURES');
+    console.log('🔧 ========================================');
+
+    try {
+        const db = window.firebaseModules.database;
+
+        // Get all closures from Firebase
+        const closuresRef = db.ref(window.FirebaseData.database, 'dailyReconciliations');
+        const snapshot = await db.get(closuresRef);
+
+        if (!snapshot.exists()) {
+            alert('❌ No closures found in Firebase');
+            return;
+        }
+
+        const closures = snapshot.val();
+        const closureDates = Object.keys(closures).sort();
+
+        console.log(`📊 Found ${closureDates.length} closures to analyze`);
+
+        const corrections = [];
+        let totalFixed = 0;
+
+        for (const date of closureDates) {
+            const closure = closures[date];
+            const changes = [];
+            let needsUpdate = false;
+
+            console.log(`\n📅 Checking ${date}...`);
+
+            // Check openedAt
+            if (closure.openedAt) {
+                const openedDate = closure.openedAt.split('T')[0];
+                const openedTime = closure.openedAt.split('T')[1];
+
+                if (openedDate !== date) {
+                    console.log(`   ⚠️  openedAt mismatch: ${openedDate} → ${date}`);
+
+                    // Create corrected timestamp with correct date but original time
+                    const correctedOpenedAt = `${date}T${openedTime}`;
+                    closure.openedAt = correctedOpenedAt;
+                    needsUpdate = true;
+
+                    changes.push({
+                        field: 'openedAt',
+                        before: `${openedDate}T${openedTime}`,
+                        after: correctedOpenedAt
+                    });
+                }
+            }
+
+            // Check closedAt
+            if (closure.closedAt) {
+                const closedDate = closure.closedAt.split('T')[0];
+                const closedTime = closure.closedAt.split('T')[1];
+
+                if (closedDate !== date) {
+                    console.log(`   ⚠️  closedAt mismatch: ${closedDate} → ${date}`);
+
+                    // Create corrected timestamp with correct date but original time
+                    const correctedClosedAt = `${date}T${closedTime}`;
+                    closure.closedAt = correctedClosedAt;
+                    needsUpdate = true;
+
+                    changes.push({
+                        field: 'closedAt',
+                        before: `${closedDate}T${closedTime}`,
+                        after: correctedClosedAt
+                    });
+                }
+            }
+
+            // Check reopenedAt (if exists)
+            if (closure.reopenedAt) {
+                const reopenedDate = closure.reopenedAt.split('T')[0];
+                const reopenedTime = closure.reopenedAt.split('T')[1];
+
+                if (reopenedDate !== date) {
+                    console.log(`   ⚠️  reopenedAt mismatch: ${reopenedDate} → ${date}`);
+
+                    const correctedReopenedAt = `${date}T${reopenedTime}`;
+                    closure.reopenedAt = correctedReopenedAt;
+                    needsUpdate = true;
+
+                    changes.push({
+                        field: 'reopenedAt',
+                        before: `${reopenedDate}T${reopenedTime}`,
+                        after: correctedReopenedAt
+                    });
+                }
+            }
+
+            // Update Firebase if needed
+            if (needsUpdate) {
+                console.log(`   🔧 Updating ${date} in Firebase...`);
+
+                const closureRef = db.ref(window.FirebaseData.database, `dailyReconciliations/${date}`);
+                await db.set(closureRef, closure);
+
+                totalFixed++;
+                corrections.push({
+                    date,
+                    changes
+                });
+
+                console.log(`   ✅ Fixed ${changes.length} timestamp(s) for ${date}`);
+            } else {
+                console.log(`   ✅ ${date} - No corrections needed`);
+            }
+        }
+
+        // Generate summary report
+        console.log('\n' + '='.repeat(80));
+        console.log('📋 CORRECTION SUMMARY');
+        console.log('='.repeat(80));
+        console.log(`Total closures analyzed: ${closureDates.length}`);
+        console.log(`Closures corrected: ${totalFixed}`);
+        console.log(`Total timestamps fixed: ${corrections.reduce((sum, c) => sum + c.changes.length, 0)}`);
+
+        if (corrections.length > 0) {
+            console.log('\n📝 DETAILED CORRECTIONS:');
+            corrections.forEach(correction => {
+                console.log(`\n   📅 ${correction.date}:`);
+                correction.changes.forEach(change => {
+                    console.log(`      • ${change.field}:`);
+                    console.log(`        Before: ${change.before}`);
+                    console.log(`        After:  ${change.after}`);
+                });
+            });
+        }
+
+        console.log('\n' + '='.repeat(80));
+
+        // Save corrections to window for reference
+        window.dateCorrections = {
+            totalAnalyzed: closureDates.length,
+            totalCorrected: totalFixed,
+            corrections: corrections
+        };
+
+        // Reload data
+        console.log('\n🔄 Reloading closure data...');
+        await window.FinanceManager.loadReconciliations();
+
+        // Show summary alert
+        alert(
+            `✅ DATE MISMATCH CORRECTION COMPLETE\n\n` +
+            `Total closures analyzed: ${closureDates.length}\n` +
+            `Closures corrected: ${totalFixed}\n` +
+            `Total timestamps fixed: ${corrections.reduce((sum, c) => sum + c.changes.length, 0)}\n\n` +
+            `Check console for detailed report.\n` +
+            `Data has been reloaded.`
+        );
+
+        return window.dateCorrections;
+
+    } catch (error) {
+        console.error('❌ Error fixing date mismatches:', error);
+        alert('❌ Error: ' + error.message);
+    }
+};
+
 window.loadHistoricalClosure = async function(date) {
     console.log('📜 Loading historical closure for date:', date);
     console.log('👤 Current user role:', window.userRole);
