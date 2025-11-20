@@ -3206,6 +3206,131 @@ window.moveNov19ToNov20 = async function() {
     }
 };
 
+/**
+ * Emergency function to check and fix the current mess
+ */
+window.emergencyCheckAndFix = async function() {
+    console.log('🚨 ========================================');
+    console.log('🚨 VERIFICACIÓN Y CORRECCIÓN DE EMERGENCIA');
+    console.log('🚨 ========================================');
+
+    try {
+        const db = window.firebaseModules.database;
+
+        // Get ALL closures from Firebase
+        const allRef = db.ref(window.FirebaseData.database, 'dailyReconciliations');
+        const allSnapshot = await db.get(allRef);
+
+        if (!allSnapshot.exists()) {
+            alert('❌ No hay datos en Firebase');
+            return;
+        }
+
+        const allData = allSnapshot.val();
+        const allDates = Object.keys(allData).sort();
+
+        console.log('📊 Total cierres en Firebase:', allDates.length);
+        console.log('📊 Fechas:', allDates);
+
+        // Check specific dates
+        const has19 = allData['2025-11-19'];
+        const has20 = allData['2025-11-20'];
+
+        console.log('\n🔍 Verificación:');
+        console.log('   Nov 19:', has19 ? 'EXISTE ✓' : 'NO EXISTE ✗');
+        console.log('   Nov 20:', has20 ? 'EXISTE ✓' : 'NO EXISTE ✗');
+
+        if (has19) {
+            console.log('\n📅 Datos en Nov 19:');
+            console.log(JSON.stringify(has19, null, 2));
+        }
+
+        if (has20) {
+            console.log('\n📅 Datos en Nov 20:');
+            console.log(JSON.stringify(has20, null, 2));
+        }
+
+        // Show alert
+        const message =
+            '🚨 ESTADO ACTUAL EN FIREBASE\n\n' +
+            `Total cierres: ${allDates.length}\n` +
+            `Primer cierre: ${allDates[0]}\n` +
+            `Último cierre: ${allDates[allDates.length - 1]}\n\n` +
+            `Nov 19: ${has19 ? 'EXISTE ✓' : 'NO EXISTE ✗'}\n` +
+            (has19 ? `  Apertura: $${(has19.openingBalance || 0).toLocaleString()}\n  Estado: ${has19.isClosed ? 'Cerrado' : 'Abierto'}\n\n` : '\n') +
+            `Nov 20: ${has20 ? 'EXISTE ✓' : 'NO EXISTE ✗'}\n` +
+            (has20 ? `  Apertura: $${(has20.openingBalance || 0).toLocaleString()}\n  Estado: ${has20.isClosed ? 'Cerrado' : 'Abierto'}\n\n` : '\n') +
+            '\n¿Quieres BORRAR Nov 19 (si existe) y asegurar que Nov 20 esté correcto?';
+
+        const shouldFix = confirm(message);
+
+        if (!shouldFix) {
+            console.log('❌ Cancelado');
+            return;
+        }
+
+        // Delete Nov 19 if it exists
+        if (has19) {
+            console.log('🗑️ Eliminando Nov 19...');
+            const nov19Ref = db.ref(window.FirebaseData.database, 'dailyReconciliations/2025-11-19');
+            await db.remove(nov19Ref);
+            console.log('✅ Nov 19 eliminado');
+        }
+
+        // Ensure Nov 20 exists with correct data
+        console.log('💾 Asegurando que Nov 20 esté correcto...');
+        const nov20Ref = db.ref(window.FirebaseData.database, 'dailyReconciliations/2025-11-20');
+
+        const correctNov20 = {
+            date: '2025-11-20',
+            openingBalance: 68000,
+            closingCount: 0,
+            expenses: 0,
+            isClosed: false,
+            notes: 'Cierre de hoy - Pago Jean Pierre $156,000 Nequi',
+            openedAt: has20?.openedAt || new Date().toISOString(),
+            registeredBy: window.FirebaseData.currentUser?.uid,
+            registeredByName: window.FirebaseData.currentUser?.email,
+            updatedAt: new Date().toISOString()
+        };
+
+        await db.set(nov20Ref, correctNov20);
+        console.log('✅ Nov 20 actualizado');
+
+        // Clear local cache
+        if (window.FinanceManager && window.FinanceManager.dailyReconciliations) {
+            window.FinanceManager.dailyReconciliations.clear();
+        }
+
+        // Force reload from Firebase
+        console.log('🔄 Recargando desde Firebase...');
+        await window.FinanceManager.loadReconciliations();
+
+        // Clear browser cache for this page
+        if ('caches' in window) {
+            caches.keys().then(names => {
+                names.forEach(name => caches.delete(name));
+            });
+        }
+
+        alert(
+            '✅ CORRECCIÓN COMPLETADA\n\n' +
+            'Se han realizado las siguientes acciones:\n' +
+            (has19 ? '• Nov 19 ELIMINADO\n' : '• Nov 19 ya no existía\n') +
+            '• Nov 20 ACTUALIZADO correctamente\n' +
+            '• Caché limpiado\n\n' +
+            'Ahora CIERRA COMPLETAMENTE EL NAVEGADOR\n' +
+            'y ábrelo de nuevo para ver los cambios.'
+        );
+
+        console.log('✅ Corrección de emergencia completada');
+
+    } catch (error) {
+        console.error('❌ Error:', error);
+        alert('❌ Error: ' + error.message);
+    }
+};
+
 window.loadHistoricalClosure = async function(date) {
     console.log('📜 Loading historical closure for date:', date);
 
