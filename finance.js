@@ -1866,7 +1866,12 @@ window.loadCustomExpenseCategories = async function() {
         const snapshot = await db.get(categoriesRef);
 
         if (snapshot.exists()) {
-            return snapshot.val();
+            const data = snapshot.val();
+            // Ensure both business and personal arrays exist
+            return {
+                business: Array.isArray(data.business) ? data.business : [],
+                personal: Array.isArray(data.personal) ? data.personal : []
+            };
         }
         return { business: [], personal: [] };
     } catch (error) {
@@ -1880,8 +1885,15 @@ window.saveCustomExpenseCategories = async function(categories) {
     try {
         const db = window.firebaseModules.database;
         const categoriesRef = db.ref(window.FirebaseData.database, 'system/customExpenseCategories');
-        await db.set(categoriesRef, categories);
-        console.log('✅ Custom categories saved');
+
+        // Ensure both arrays exist before saving
+        const dataToSave = {
+            business: Array.isArray(categories.business) ? categories.business : [],
+            personal: Array.isArray(categories.personal) ? categories.personal : []
+        };
+
+        await db.set(categoriesRef, dataToSave);
+        console.log('✅ Custom categories saved:', dataToSave);
         return true;
     } catch (error) {
         console.error('Error saving custom categories:', error);
