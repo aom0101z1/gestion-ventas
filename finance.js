@@ -1955,67 +1955,83 @@ window.moveClosureDate = async function(oldDate, newDate) {
         return;
     }
 
-    // Get the closure data from old date
-    const oldClosure = window.FinanceManager.getDailyReconciliation(oldDate);
-    if (!oldClosure) {
-        alert(`❌ No se encontró cierre para la fecha ${oldDate}`);
-        console.error('Closure not found for date:', oldDate);
-        return;
-    }
-
-    console.log('📊 Found closure to move:', oldClosure);
-
-    // Check if new date already has a closure
-    const newClosure = window.FinanceManager.getDailyReconciliation(newDate);
-    if (newClosure) {
-        const confirmOverwrite = confirm(
-            `⚠️ Ya existe un cierre para ${newDate}.\n\n` +
-            `Fecha antigua (${oldDate}):\n` +
-            `  Apertura: ${formatCurrency(oldClosure.openingBalance || 0)}\n` +
-            `  Cierre: ${formatCurrency(oldClosure.closingCount || 0)}\n\n` +
-            `Fecha nueva (${newDate}):\n` +
-            `  Apertura: ${formatCurrency(newClosure.openingBalance || 0)}\n` +
-            `  Cierre: ${formatCurrency(newClosure.closingCount || 0)}\n\n` +
-            `¿Desea sobrescribir el cierre de ${newDate}?`
-        );
-
-        if (!confirmOverwrite) {
-            console.log('❌ Usuario canceló la operación');
-            return;
-        }
-    } else {
-        const confirmMove = confirm(
-            `¿Mover el cierre de ${oldDate} a ${newDate}?\n\n` +
-            `Apertura: ${formatCurrency(oldClosure.openingBalance || 0)}\n` +
-            `Cierre: ${formatCurrency(oldClosure.closingCount || 0)}\n` +
-            `Estado: ${oldClosure.isClosed ? 'Cerrado' : 'Abierto'}`
-        );
-
-        if (!confirmMove) {
-            console.log('❌ Usuario canceló la operación');
-            return;
-        }
-    }
-
     try {
         const db = window.firebaseModules.database;
 
-        // 1. Save closure data to new date
-        const newDateRef = db.ref(window.FirebaseData.database, `dailyReconciliations/${newDate}`);
+        // Get the closure data from old date directly from Firebase
+        console.log('🔍 Checking Firebase for closure at', oldDate);
+        const oldDateRef = db.ref(window.FirebaseData.database, `dailyReconciliations/${oldDate}`);
+        const oldSnapshot = await db.get(oldDateRef);
 
+        if (!oldSnapshot.exists()) {
+            alert(`❌ No se encontró cierre para la fecha ${oldDate} en Firebase`);
+            console.error('Closure not found in Firebase for date:', oldDate);
+
+            // List all available dates to help user
+            const allRef = db.ref(window.FirebaseData.database, 'dailyReconciliations');
+            const allSnapshot = await db.get(allRef);
+            if (allSnapshot.exists()) {
+                const allDates = Object.keys(allSnapshot.val()).sort();
+                console.log('📅 Available dates in Firebase:', allDates);
+                alert(`Fechas disponibles en Firebase:\n${allDates.join('\n')}`);
+            }
+            return;
+        }
+
+        const oldClosure = oldSnapshot.val();
+        console.log('📊 Found closure to move:', oldClosure);
+
+        // Check if new date already has a closure
+        const newDateRef = db.ref(window.FirebaseData.database, `dailyReconciliations/${newDate}`);
+        const newSnapshot = await db.get(newDateRef);
+        const newClosure = newSnapshot.exists() ? newSnapshot.val() : null;
+
+        // Confirm with user
+        if (newClosure) {
+            const confirmOverwrite = confirm(
+                `⚠️ Ya existe un cierre para ${newDate}.\n\n` +
+                `Fecha antigua (${oldDate}):\n` +
+                `  Apertura: $${(oldClosure.openingBalance || 0).toLocaleString()}\n` +
+                `  Cierre: $${(oldClosure.closingCount || 0).toLocaleString()}\n\n` +
+                `Fecha nueva (${newDate}):\n` +
+                `  Apertura: $${(newClosure.openingBalance || 0).toLocaleString()}\n` +
+                `  Cierre: $${(newClosure.closingCount || 0).toLocaleString()}\n\n` +
+                `¿Desea sobrescribir el cierre de ${newDate}?`
+            );
+
+            if (!confirmOverwrite) {
+                console.log('❌ Usuario canceló la operación');
+                return;
+            }
+        } else {
+            const confirmMove = confirm(
+                `¿Mover el cierre de ${oldDate} a ${newDate}?\n\n` +
+                `Apertura: $${(oldClosure.openingBalance || 0).toLocaleString()}\n` +
+                `Cierre: $${(oldClosure.closingCount || 0).toLocaleString()}\n` +
+                `Estado: ${oldClosure.isClosed ? 'Cerrado' : 'Abierto'}`
+            );
+
+            if (!confirmMove) {
+                console.log('❌ Usuario canceló la operación');
+                return;
+            }
+        }
+
+        // 1. Save closure data to new date
         console.log('💾 Saving closure to new date:', newDate);
         await db.set(newDateRef, oldClosure);
         console.log('✅ Closure saved to new date');
 
         // 2. Delete old date entry
-        const oldDateRef = db.ref(window.FirebaseData.database, `dailyReconciliations/${oldDate}`);
         console.log('🗑️ Deleting closure from old date:', oldDate);
         await db.remove(oldDateRef);
         console.log('✅ Old closure deleted');
 
-        // 3. Update local memory
-        window.FinanceManager.dailyReconciliations.delete(oldDate);
-        window.FinanceManager.dailyReconciliations.set(newDate, oldClosure);
+        // 3. Update local memory if FinanceManager is available
+        if (window.FinanceManager && window.FinanceManager.dailyReconciliations) {
+            window.FinanceManager.dailyReconciliations.delete(oldDate);
+            window.FinanceManager.dailyReconciliations.set(newDate, oldClosure);
+        }
 
         // 4. Reload historical view if it's open
         if (document.getElementById('closureDetailsContainer')) {
