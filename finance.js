@@ -3503,6 +3503,7 @@ window.reopenNov20 = async function() {
 
 window.loadHistoricalClosure = async function(date) {
     console.log('📜 Loading historical closure for date:', date);
+    console.log('👤 Current user role:', window.userRole);
 
     const container = document.getElementById('closureDetailsContainer');
     if (!container) {
@@ -3776,7 +3777,7 @@ window.loadHistoricalClosure = async function(date) {
             ` : ''}
 
             <!-- Admin Controls: Reopen Closure Button -->
-            ${reconciliation.isClosed && window.userRole === 'admin' ? `
+            ${reconciliation.isClosed && (window.userRole === 'admin' || window.userRole === 'director') ? `
                 <div style="background: #fef3c7; border: 2px solid #fbbf24; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                     <div style="display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
                         <div>
@@ -3869,10 +3870,17 @@ window.reopenClosure = async function(date) {
     console.log('🔓 RE-OPENING CLOSURE FOR DATE:', date);
     console.log('🔓 ========================================');
 
-    // Verify admin permission
-    if (window.userRole !== 'admin') {
+    // Verify admin permission (both admin and director can reopen)
+    const isAdmin = window.userRole === 'admin' || window.userRole === 'director';
+
+    console.log('🔍 Permission check:', {
+        userRole: window.userRole,
+        isAdmin: isAdmin
+    });
+
+    if (!isAdmin) {
         alert('❌ Solo los administradores pueden re-abrir cierres cerrados.');
-        console.error('❌ Access denied: User is not admin');
+        console.error('❌ Access denied: User role is', window.userRole);
         return;
     }
 
