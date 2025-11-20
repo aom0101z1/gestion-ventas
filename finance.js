@@ -1429,7 +1429,7 @@ async function renderHistoricalClosuresView() {
     console.log('📊 Dates found:', allReconciliations.map(r => r.date));
 
     // Get students map for payment details
-    const students = window.Students ? window.Students.studentManager.students : new Map();
+    const students = window.StudentManager ? window.StudentManager.students : new Map();
 
     return `
         <div style="padding: 2rem; max-width: 1400px; margin: 0 auto;">
@@ -1936,6 +1936,102 @@ window.createRetroactiveClosure = async function(targetDate) {
     }
 };
 
+// ==================================================================================
+// MOVE CLOSURE TO CORRECT DATE (FIX TIMEZONE ISSUES)
+// ==================================================================================
+
+/**
+ * Moves a closure from one date to another in Firebase
+ * Useful for fixing timezone-related date errors
+ * Usage: moveClosureDate('2025-11-19', '2025-11-20')
+ */
+window.moveClosureDate = async function(oldDate, newDate) {
+    console.log('📅 Moving closure from', oldDate, 'to', newDate);
+
+    // Validate date formats
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(oldDate) || !dateRegex.test(newDate)) {
+        alert('⚠️ Formato de fecha inválido. Use YYYY-MM-DD (ej: 2025-11-19)');
+        return;
+    }
+
+    // Get the closure data from old date
+    const oldClosure = window.FinanceManager.getDailyReconciliation(oldDate);
+    if (!oldClosure) {
+        alert(`❌ No se encontró cierre para la fecha ${oldDate}`);
+        console.error('Closure not found for date:', oldDate);
+        return;
+    }
+
+    console.log('📊 Found closure to move:', oldClosure);
+
+    // Check if new date already has a closure
+    const newClosure = window.FinanceManager.getDailyReconciliation(newDate);
+    if (newClosure) {
+        const confirmOverwrite = confirm(
+            `⚠️ Ya existe un cierre para ${newDate}.\n\n` +
+            `Fecha antigua (${oldDate}):\n` +
+            `  Apertura: ${formatCurrency(oldClosure.openingBalance || 0)}\n` +
+            `  Cierre: ${formatCurrency(oldClosure.closingCount || 0)}\n\n` +
+            `Fecha nueva (${newDate}):\n` +
+            `  Apertura: ${formatCurrency(newClosure.openingBalance || 0)}\n` +
+            `  Cierre: ${formatCurrency(newClosure.closingCount || 0)}\n\n` +
+            `¿Desea sobrescribir el cierre de ${newDate}?`
+        );
+
+        if (!confirmOverwrite) {
+            console.log('❌ Usuario canceló la operación');
+            return;
+        }
+    } else {
+        const confirmMove = confirm(
+            `¿Mover el cierre de ${oldDate} a ${newDate}?\n\n` +
+            `Apertura: ${formatCurrency(oldClosure.openingBalance || 0)}\n` +
+            `Cierre: ${formatCurrency(oldClosure.closingCount || 0)}\n` +
+            `Estado: ${oldClosure.isClosed ? 'Cerrado' : 'Abierto'}`
+        );
+
+        if (!confirmMove) {
+            console.log('❌ Usuario canceló la operación');
+            return;
+        }
+    }
+
+    try {
+        const db = window.firebaseModules.database;
+
+        // 1. Save closure data to new date
+        const newDateRef = db.ref(window.FirebaseData.database, `dailyReconciliations/${newDate}`);
+
+        console.log('💾 Saving closure to new date:', newDate);
+        await db.set(newDateRef, oldClosure);
+        console.log('✅ Closure saved to new date');
+
+        // 2. Delete old date entry
+        const oldDateRef = db.ref(window.FirebaseData.database, `dailyReconciliations/${oldDate}`);
+        console.log('🗑️ Deleting closure from old date:', oldDate);
+        await db.remove(oldDateRef);
+        console.log('✅ Old closure deleted');
+
+        // 3. Update local memory
+        window.FinanceManager.dailyReconciliations.delete(oldDate);
+        window.FinanceManager.dailyReconciliations.set(newDate, oldClosure);
+
+        // 4. Reload historical view if it's open
+        if (document.getElementById('closureDetailsContainer')) {
+            console.log('🔄 Reloading historical closures view...');
+            await window.loadFinanceTab('historial-cierres');
+        }
+
+        alert(`✅ Cierre movido exitosamente de ${oldDate} a ${newDate}`);
+        console.log('✅ Closure move completed successfully');
+
+    } catch (error) {
+        console.error('❌ Error moving closure:', error);
+        alert('❌ Error al mover el cierre: ' + error.message);
+    }
+};
+
 window.loadHistoricalClosure = async function(date) {
     console.log('📜 Loading historical closure for date:', date);
 
@@ -1970,7 +2066,7 @@ window.loadHistoricalClosure = async function(date) {
     const totalExpenses = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
 
     // Get students map for payment details
-    const students = window.Students ? window.Students.studentManager.students : new Map();
+    const students = window.StudentManager ? window.StudentManager.students : new Map();
 
     // Calculate values
     const openingBalance = reconciliation.openingBalance || 0;
