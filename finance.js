@@ -3501,6 +3501,286 @@ window.reopenNov20 = async function() {
     await reopenClosure('2025-11-20');
 };
 
+/**
+ * COMPREHENSIVE DIAGNOSTIC: Analyze all historical closures for date mismatches
+ * Checks:
+ * - Date consistency between closure date and timestamps
+ * - Payment dates vs closure dates
+ * - Expense dates vs closure dates
+ * - Opening balance continuity (yesterday's closing = today's opening)
+ * - Missing or duplicate dates
+ */
+window.diagnosticHistoricalClosures = async function() {
+    console.log('🔍 ========================================');
+    console.log('🔍 COMPREHENSIVE CLOSURE DIAGNOSTIC');
+    console.log('🔍 ========================================');
+
+    try {
+        const db = window.firebaseModules.database;
+
+        // Get all data from Firebase
+        console.log('📥 Fetching all data from Firebase...');
+
+        const closuresRef = db.ref(window.FirebaseData.database, 'dailyReconciliations');
+        const paymentsRef = db.ref(window.FirebaseData.database, 'payments');
+        const expensesRef = db.ref(window.FirebaseData.database, 'expenses');
+        const salesRef = db.ref(window.FirebaseData.database, 'sales');
+
+        const [closuresSnap, paymentsSnap, expensesSnap, salesSnap] = await Promise.all([
+            db.get(closuresRef),
+            db.get(paymentsRef),
+            db.get(expensesRef),
+            db.get(salesRef)
+        ]);
+
+        const closures = closuresSnap.exists() ? closuresSnap.val() : {};
+        const allPayments = paymentsSnap.exists() ? Object.values(paymentsSnap.val()) : [];
+        const allExpenses = expensesSnap.exists() ? Object.values(expensesSnap.val()) : [];
+        const allSales = salesSnap.exists() ? Object.values(salesSnap.val()) : [];
+
+        console.log(`✅ Loaded: ${Object.keys(closures).length} closures, ${allPayments.length} payments, ${allExpenses.length} expenses, ${allSales.length} sales`);
+
+        // Sort closure dates
+        const closureDates = Object.keys(closures).sort();
+
+        const issues = [];
+        const report = [];
+
+        console.log('\n📊 ANALYZING EACH CLOSURE...\n');
+
+        closureDates.forEach((date, index) => {
+            const closure = closures[date];
+            const dateIssues = [];
+
+            report.push('\n' + '='.repeat(80));
+            report.push(`📅 CLOSURE: ${date} (${new Date(date).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })})`);
+            report.push(`   Status: ${closure.isClosed ? '🔒 CERRADO' : '🔓 ABIERTO'}`);
+            report.push('='.repeat(80));
+
+            // 1. Check timestamp consistency
+            if (closure.openedAt) {
+                const openedDate = closure.openedAt.split('T')[0];
+                if (openedDate !== date) {
+                    const issue = `❌ MISMATCH: openedAt timestamp (${openedDate}) doesn't match closure date (${date})`;
+                    dateIssues.push(issue);
+                    report.push(`   ${issue}`);
+                }
+            } else {
+                const issue = `⚠️  WARNING: No openedAt timestamp`;
+                dateIssues.push(issue);
+                report.push(`   ${issue}`);
+            }
+
+            if (closure.closedAt) {
+                const closedDate = closure.closedAt.split('T')[0];
+                if (closedDate !== date) {
+                    const issue = `❌ MISMATCH: closedAt timestamp (${closedDate}) doesn't match closure date (${date})`;
+                    dateIssues.push(issue);
+                    report.push(`   ${issue}`);
+                }
+            }
+
+            // 2. Check payments for this date
+            const datePayments = allPayments.filter(p => p.date && p.date.startsWith(date));
+            const paymentsInOtherDates = allPayments.filter(p => {
+                if (!p.date) return false;
+                const paymentDate = p.date.split('T')[0];
+                return paymentDate !== date && Math.abs(new Date(paymentDate) - new Date(date)) < 7 * 24 * 60 * 60 * 1000; // within 1 week
+            });
+
+            report.push(`\n   💰 PAYMENTS ON ${date}: ${datePayments.length} payments`);
+            if (datePayments.length > 0) {
+                const totalAmount = datePayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+                report.push(`      Total: $${totalAmount.toLocaleString()}`);
+                datePayments.forEach(p => {
+                    const student = window.StudentManager?.students?.get(p.studentId);
+                    report.push(`      • ${p.date.split('T')[1]?.substring(0,5) || 'N/A'} - ${student?.nombre || 'N/A'} - $${(p.amount || 0).toLocaleString()} (${p.method})`);
+                });
+            }
+
+            // Check for payments that might belong to this closure but have wrong date
+            if (paymentsInOtherDates.length > 0 && datePayments.length === 0) {
+                const issue = `⚠️  WARNING: No payments on ${date}, but found ${paymentsInOtherDates.length} payments in nearby dates`;
+                dateIssues.push(issue);
+                report.push(`   ${issue}`);
+            }
+
+            // 3. Check expenses for this date
+            const dateExpenses = allExpenses.filter(e => e.date && e.date.startsWith(date));
+
+            report.push(`\n   💸 EXPENSES ON ${date}: ${dateExpenses.length} expenses`);
+            if (dateExpenses.length > 0) {
+                const totalExpenses = dateExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+                report.push(`      Total: $${totalExpenses.toLocaleString()}`);
+                dateExpenses.forEach(e => {
+                    report.push(`      • ${e.category || 'N/A'} - $${(e.amount || 0).toLocaleString()} - ${e.description || 'Sin descripción'}`);
+                });
+
+                // Compare with closure.expenses
+                if (closure.expenses !== totalExpenses) {
+                    const issue = `⚠️  WARNING: Closure.expenses ($${(closure.expenses || 0).toLocaleString()}) doesn't match actual expenses ($${totalExpenses.toLocaleString()})`;
+                    dateIssues.push(issue);
+                    report.push(`   ${issue}`);
+                }
+            }
+
+            // 4. Check sales for this date
+            const dateSales = allSales.filter(s => s.date && s.date.startsWith(date));
+            if (dateSales.length > 0) {
+                const totalSales = dateSales.reduce((sum, s) => sum + (s.total || 0), 0);
+                report.push(`\n   🏪 TIENDA SALES ON ${date}: ${dateSales.length} sales, Total: $${totalSales.toLocaleString()}`);
+            }
+
+            // 5. Check opening balance continuity
+            if (index > 0) {
+                const previousDate = closureDates[index - 1];
+                const previousClosure = closures[previousDate];
+
+                if (previousClosure.isClosed && previousClosure.closingCount !== undefined) {
+                    if (closure.openingBalance !== previousClosure.closingCount) {
+                        const issue = `❌ MISMATCH: Opening balance ($${(closure.openingBalance || 0).toLocaleString()}) doesn't match previous day's closing ($${(previousClosure.closingCount || 0).toLocaleString()}) from ${previousDate}`;
+                        dateIssues.push(issue);
+                        report.push(`\n   ${issue}`);
+                    } else {
+                        report.push(`\n   ✅ Opening balance matches previous day's closing: $${(closure.openingBalance || 0).toLocaleString()}`);
+                    }
+                }
+            }
+
+            // 6. Financial summary
+            report.push(`\n   📊 FINANCIAL SUMMARY:`);
+            report.push(`      💵 Opening: $${(closure.openingBalance || 0).toLocaleString()}`);
+            report.push(`      💰 Cash received: (calculated from payments above)`);
+            report.push(`      💸 Expenses: $${(closure.expenses || 0).toLocaleString()}`);
+            report.push(`      ✅ Closing count: $${(closure.closingCount || 0).toLocaleString()}`);
+
+            // 7. Check for reopening
+            if (closure.reopenedAt) {
+                report.push(`\n   🔓 REOPENED: ${new Date(closure.reopenedAt).toLocaleString('es-ES')} by ${closure.reopenedByName || 'Unknown'}`);
+            }
+
+            if (dateIssues.length > 0) {
+                issues.push({ date, issues: dateIssues });
+                report.push(`\n   ⚠️  ${dateIssues.length} ISSUE(S) FOUND FOR THIS DATE`);
+            } else {
+                report.push(`\n   ✅ No issues found for this date`);
+            }
+        });
+
+        // Check for missing dates
+        report.push('\n\n' + '='.repeat(80));
+        report.push('🔍 CHECKING FOR MISSING DATES');
+        report.push('='.repeat(80));
+
+        if (closureDates.length > 1) {
+            const firstDate = new Date(closureDates[0]);
+            const lastDate = new Date(closureDates[closureDates.length - 1]);
+            const daysDiff = Math.floor((lastDate - firstDate) / (1000 * 60 * 60 * 24)) + 1;
+
+            report.push(`   First closure: ${closureDates[0]}`);
+            report.push(`   Last closure: ${closureDates[closureDates.length - 1]}`);
+            report.push(`   Total closures: ${closureDates.length}`);
+            report.push(`   Expected days: ${daysDiff}`);
+
+            if (closureDates.length < daysDiff) {
+                report.push(`   ⚠️  WARNING: ${daysDiff - closureDates.length} missing dates detected`);
+
+                // Find missing dates
+                const missingDates = [];
+                for (let i = 0; i < closureDates.length - 1; i++) {
+                    const current = new Date(closureDates[i]);
+                    const next = new Date(closureDates[i + 1]);
+                    const diff = Math.floor((next - current) / (1000 * 60 * 60 * 24));
+
+                    if (diff > 1) {
+                        for (let j = 1; j < diff; j++) {
+                            const missingDate = new Date(current);
+                            missingDate.setDate(missingDate.getDate() + j);
+                            missingDates.push(missingDate.toISOString().split('T')[0]);
+                        }
+                    }
+                }
+
+                if (missingDates.length > 0) {
+                    report.push(`\n   ❌ MISSING DATES:`);
+                    missingDates.forEach(md => {
+                        report.push(`      • ${md} (${new Date(md).toLocaleDateString('es-ES', { weekday: 'long' })})`);
+
+                        // Check if there are payments/expenses on missing dates
+                        const mdPayments = allPayments.filter(p => p.date && p.date.startsWith(md));
+                        const mdExpenses = allExpenses.filter(e => e.date && e.date.startsWith(md));
+
+                        if (mdPayments.length > 0 || mdExpenses.length > 0) {
+                            report.push(`        ⚠️  Has ${mdPayments.length} payments and ${mdExpenses.length} expenses - NEEDS CLOSURE!`);
+                        }
+                    });
+                }
+            }
+        }
+
+        // Summary
+        report.push('\n\n' + '='.repeat(80));
+        report.push('📋 DIAGNOSTIC SUMMARY');
+        report.push('='.repeat(80));
+        report.push(`Total closures analyzed: ${closureDates.length}`);
+        report.push(`Closures with issues: ${issues.length}`);
+        report.push(`Total issues found: ${issues.reduce((sum, i) => sum + i.issues.length, 0)}`);
+
+        // Print full report
+        console.log('\n' + report.join('\n'));
+
+        // Create downloadable report
+        const reportText = report.join('\n');
+        const blob = new Blob([reportText], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+
+        window.closureDiagnosticReport = {
+            text: reportText,
+            downloadUrl: url,
+            issues: issues,
+            closures: closures
+        };
+
+        console.log('\n📥 REPORT SAVED TO: window.closureDiagnosticReport');
+        console.log('📥 Download with: downloadClosureDiagnosticReport()');
+
+        // Show summary alert
+        alert(
+            `🔍 DIAGNOSTIC COMPLETE\n\n` +
+            `Total closures: ${closureDates.length}\n` +
+            `Closures with issues: ${issues.length}\n` +
+            `Total issues: ${issues.reduce((sum, i) => sum + i.issues.length, 0)}\n\n` +
+            `Check console for full report.\n` +
+            `Use downloadClosureDiagnosticReport() to download.`
+        );
+
+        return window.closureDiagnosticReport;
+
+    } catch (error) {
+        console.error('❌ Error in diagnostic:', error);
+        alert('❌ Error: ' + error.message);
+    }
+};
+
+/**
+ * Download the diagnostic report as a text file
+ */
+window.downloadClosureDiagnosticReport = function() {
+    if (!window.closureDiagnosticReport) {
+        alert('❌ No diagnostic report available. Run diagnosticHistoricalClosures() first.');
+        return;
+    }
+
+    const a = document.createElement('a');
+    a.href = window.closureDiagnosticReport.downloadUrl;
+    a.download = `closure-diagnostic-${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    console.log('✅ Report downloaded');
+};
+
 window.loadHistoricalClosure = async function(date) {
     console.log('📜 Loading historical closure for date:', date);
     console.log('👤 Current user role:', window.userRole);
