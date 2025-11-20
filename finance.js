@@ -438,11 +438,18 @@ class FinanceManager {
                 });
         }
 
+        // IMPORTANT: Only "Efectivo" is cash. Everything else (Transferencia, Nequi, Bancolombia, Consignación, etc.) is a transfer
         const cashPayments = payments.filter(p => p.method === 'Efectivo');
-        const transferPayments = payments.filter(p => p.method === 'Transferencia');
+        const transferPayments = payments.filter(p => p.method !== 'Efectivo'); // All non-cash methods
 
         const cashTotal = cashPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
         const transferTotal = transferPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+
+        console.log(`📊 Payment classification for ${date}:`);
+        console.log(`   💵 Cash payments: ${cashPayments.length} = ${formatCurrency(cashTotal)}`);
+        console.log(`   💳 Transfer payments: ${transferPayments.length} = ${formatCurrency(transferTotal)}`);
+        console.log(`   🔍 Cash methods found:`, [...new Set(cashPayments.map(p => p.method))]);
+        console.log(`   🔍 Transfer methods found:`, [...new Set(transferPayments.map(p => p.method))]);
 
         // Get tienda sales
         const salesRef = db.ref(window.FirebaseData.database, 'sales');
@@ -464,18 +471,25 @@ class FinanceManager {
                 });
 
             // Calculate tienda totals by payment method
+            // IMPORTANT: Only "Efectivo" is cash, everything else is transfer
             tiendaSales.forEach(sale => {
                 const amount = sale.total || 0;
                 if (sale.paymentMethod === 'Efectivo') {
                     tiendaCash += amount;
-                } else if (sale.paymentMethod === 'Nequi') {
-                    tiendaNequi += amount;
-                } else if (sale.paymentMethod === 'Bancolombia') {
-                    tiendaBancolombia += amount;
+                } else {
+                    // All non-cash methods count as transfers
+                    tiendaTransfers += amount;
+
+                    // Track specific methods for reporting
+                    if (sale.paymentMethod === 'Nequi') {
+                        tiendaNequi += amount;
+                    } else if (sale.paymentMethod === 'Bancolombia') {
+                        tiendaBancolombia += amount;
+                    }
                 }
             });
 
-            tiendaTransfers = tiendaNequi + tiendaBancolombia;
+            console.log(`   🏪 Tienda - Cash: ${formatCurrency(tiendaCash)}, Transfers: ${formatCurrency(tiendaTransfers)}`);
         }
 
         return {
@@ -1100,6 +1114,23 @@ async function renderDailyReconciliationView() {
                 `}
             </div>
 
+            <!-- Important Notice -->
+            <div style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
+                <div style="display: flex; align-items: start; gap: 0.75rem;">
+                    <div style="font-size: 1.5rem;">⚠️</div>
+                    <div>
+                        <div style="font-weight: 600; color: #92400e; margin-bottom: 0.25rem;">Clasificación de Pagos</div>
+                        <div style="font-size: 0.9rem; color: #78350f;">
+                            <strong>💵 EFECTIVO:</strong> Solo pagos registrados como "Efectivo"<br>
+                            <strong>💳 TRANSFERENCIAS:</strong> Todo lo demás (Transferencia, Nequi, Bancolombia, Consignación, etc.)
+                        </div>
+                        <div style="font-size: 0.85rem; color: #78350f; margin-top: 0.5rem; font-style: italic;">
+                            El cierre de caja solo cuenta el efectivo físico. Transferencias NO deben incluirse en el conteo.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Reconciliation Form -->
             <div style="background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 2rem;">
                 <h2 style="margin: 0 0 1.5rem 0;">Registro de Efectivo</h2>
@@ -1386,22 +1417,33 @@ async function renderDailyReconciliationView() {
 async function renderHistoricalClosuresView() {
     console.log('📜 Rendering Historical Closures View');
 
+    // Force reload reconciliations from Firebase to ensure we have latest data
+    await window.FinanceManager.loadReconciliations();
+
     // Get all reconciliations and sort by date (newest first)
     const allReconciliations = Array.from(window.FinanceManager.dailyReconciliations.entries())
         .map(([date, rec]) => ({ date, ...rec }))
         .sort((a, b) => new Date(b.date) - new Date(a.date));
 
-    console.log('📊 Total reconciliations:', allReconciliations.length);
+    console.log('📊 Total reconciliations loaded:', allReconciliations.length);
+    console.log('📊 Dates found:', allReconciliations.map(r => r.date));
 
     // Get students map for payment details
     const students = window.Students ? window.Students.studentManager.students : new Map();
 
     return `
         <div style="padding: 2rem; max-width: 1400px; margin: 0 auto;">
-            <h1 style="margin: 0 0 1.5rem 0;">📜 Historial de Cierres de Caja</h1>
-            <p style="margin: 0 0 2rem 0; color: #6b7280;">
-                Consulta los cierres de caja de días anteriores. Selecciona una fecha para ver los detalles completos.
-            </p>
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1.5rem;">
+                <div>
+                    <h1 style="margin: 0 0 0.5rem 0;">📜 Historial de Cierres de Caja</h1>
+                    <p style="margin: 0; color: #6b7280;">
+                        Consulta los cierres de caja de días anteriores. Total de cierres: <strong>${allReconciliations.length}</strong>
+                    </p>
+                </div>
+                <button onclick="loadFinanceTab('historial-cierres')" class="btn" style="background: #3b82f6; color: white; padding: 0.75rem 1.5rem;">
+                    🔄 Recargar Datos
+                </button>
+            </div>
 
             <!-- Date Selector -->
             <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 2rem;">
@@ -1728,6 +1770,20 @@ window.loadHistoricalClosure = async function(date) {
     // Render details
     container.innerHTML = `
         <div style="display: grid; gap: 1.5rem;">
+            <!-- Payment Classification Notice -->
+            <div style="background: #eff6ff; border-left: 4px solid #3b82f6; padding: 1rem; border-radius: 8px;">
+                <div style="display: flex; align-items: start; gap: 0.75rem;">
+                    <div style="font-size: 1.25rem;">ℹ️</div>
+                    <div>
+                        <div style="font-weight: 600; color: #1e40af; margin-bottom: 0.25rem;">Clasificación de Pagos</div>
+                        <div style="font-size: 0.85rem; color: #1e3a8a;">
+                            <strong>💵 Efectivo:</strong> Solo pagos marcados como "Efectivo" •
+                            <strong>💳 Transferencias:</strong> Transferencia, Nequi, Bancolombia, Consignación, etc.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Header with Status -->
             <div style="background: ${reconciliation.isClosed ? '#10b981' : '#fbbf24'}; color: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
