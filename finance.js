@@ -2372,60 +2372,143 @@ window.restoreNov19 = async function() {
 };
 
 /**
- * Verify and fix Nov 20 if needed
+ * Comprehensive diagnostic and fix for Nov 19 and Nov 20
  */
-window.verifyNov20 = async function() {
-    console.log('🔍 Verificando Nov 20...');
+window.diagnosAndFixNov19And20 = async function() {
+    console.log('🔍 ========================================');
+    console.log('🔍 DIAGNÓSTICO COMPLETO NOV 19 Y NOV 20');
+    console.log('🔍 ========================================');
 
     try {
         const db = window.firebaseModules.database;
-        const nov20Ref = db.ref(window.FirebaseData.database, 'dailyReconciliations/2025-11-20');
-        const snapshot = await db.get(nov20Ref);
 
-        if (!snapshot.exists()) {
-            alert('❌ Nov 20 no existe en Firebase');
+        // Get Nov 19 data
+        const nov19Ref = db.ref(window.FirebaseData.database, 'dailyReconciliations/2025-11-19');
+        const nov19Snapshot = await db.get(nov19Ref);
+        const nov19Data = nov19Snapshot.exists() ? nov19Snapshot.val() : null;
+
+        // Get Nov 20 data
+        const nov20Ref = db.ref(window.FirebaseData.database, 'dailyReconciliations/2025-11-20');
+        const nov20Snapshot = await db.get(nov20Ref);
+        const nov20Data = nov20Snapshot.exists() ? nov20Snapshot.val() : null;
+
+        // Get payments for both days
+        const paymentsRef = db.ref(window.FirebaseData.database, 'payments');
+        const paymentsSnapshot = await db.get(paymentsRef);
+        const allPayments = paymentsSnapshot.exists() ? Object.values(paymentsSnapshot.val()) : [];
+
+        const nov19Payments = allPayments.filter(p => p.date && p.date.startsWith('2025-11-19'));
+        const nov20Payments = allPayments.filter(p => p.date && p.date.startsWith('2025-11-20'));
+
+        console.log('📅 NOV 19 DATA:');
+        console.log('   Existe:', nov19Data ? 'SÍ' : 'NO');
+        if (nov19Data) {
+            console.log('   Apertura:', nov19Data.openingBalance);
+            console.log('   Cierre:', nov19Data.closingCount);
+            console.log('   Gastos:', nov19Data.expenses);
+        }
+        console.log('   Pagos encontrados:', nov19Payments.length);
+        nov19Payments.forEach(p => {
+            console.log(`      - $${p.amount} ${p.method} - ${p.studentId}`);
+        });
+
+        console.log('\n📅 NOV 20 DATA:');
+        console.log('   Existe:', nov20Data ? 'SÍ' : 'NO');
+        if (nov20Data) {
+            console.log('   Apertura:', nov20Data.openingBalance);
+            console.log('   Cierre:', nov20Data.closingCount);
+            console.log('   Gastos:', nov20Data.expenses);
+        }
+        console.log('   Pagos encontrados:', nov20Payments.length);
+        nov20Payments.forEach(p => {
+            console.log(`      - $${p.amount} ${p.method} - ${p.studentId}`);
+        });
+
+        // Show summary alert
+        const summary =
+            '📊 RESUMEN DE DATOS\n\n' +
+            '═══ NOV 19 ═══\n' +
+            (nov19Data ?
+                `Apertura: $${(nov19Data.openingBalance || 0).toLocaleString()}\n` +
+                `Cierre: $${(nov19Data.closingCount || 0).toLocaleString()}\n` +
+                `Gastos: $${(nov19Data.expenses || 0).toLocaleString()}\n`
+                : 'NO EXISTE\n') +
+            `Pagos: ${nov19Payments.length}\n\n` +
+            '═══ NOV 20 (HOY) ═══\n' +
+            (nov20Data ?
+                `Apertura: $${(nov20Data.openingBalance || 0).toLocaleString()}\n` +
+                `Cierre: $${(nov20Data.closingCount || 0).toLocaleString()}\n` +
+                `Gastos: $${(nov20Data.expenses || 0).toLocaleString()}\n`
+                : 'NO EXISTE\n') +
+            `Pagos: ${nov20Payments.length}\n\n` +
+            '¿Deseas corregir los datos según la información correcta?';
+
+        const shouldFix = confirm(summary);
+
+        if (!shouldFix) {
+            console.log('❌ Corrección cancelada');
             return;
         }
 
-        const nov20Data = snapshot.val();
+        // Fix Nov 19
+        const correctNov19 = {
+            date: '2025-11-19',
+            openingBalance: 100000,
+            closingCount: 68000,
+            expenses: 92300,
+            isClosed: false,
+            notes: 'Corregido - Pago transferencia $120,000 Juan Camilo Arias Mejía',
+            openedAt: '2025-11-19T06:00:00.000Z',
+            registeredBy: window.FirebaseData.currentUser?.uid,
+            registeredByName: window.FirebaseData.currentUser?.email,
+            updatedAt: new Date().toISOString()
+        };
 
-        console.log('📊 Datos actuales de Nov 20:');
-        console.log('   Apertura:', nov20Data.openingBalance);
-        console.log('   Cierre:', nov20Data.closingCount);
-        console.log('   Gastos:', nov20Data.expenses);
-        console.log('   Estado:', nov20Data.isClosed ? 'Cerrado' : 'Abierto');
+        console.log('💾 Corrigiendo Nov 19...');
+        await db.set(nov19Ref, correctNov19);
+        console.log('✅ Nov 19 corregido');
 
-        const expectedOpening = 68000; // Should match Nov 19's closing
+        // Fix Nov 20 - opening should be 68000 (yesterday's closing)
+        const correctNov20 = {
+            date: '2025-11-20',
+            openingBalance: 68000, // ← ESTE ES EL CAMBIO CLAVE
+            closingCount: nov20Data?.closingCount || 0,
+            expenses: nov20Data?.expenses || 0,
+            isClosed: false,
+            notes: 'Corregido - Apertura ajustada a sobrante de ayer ($68,000)',
+            openedAt: nov20Data?.openedAt || new Date().toISOString(),
+            registeredBy: window.FirebaseData.currentUser?.uid,
+            registeredByName: window.FirebaseData.currentUser?.email,
+            updatedAt: new Date().toISOString()
+        };
 
-        if (nov20Data.openingBalance !== expectedOpening) {
-            const fix = confirm(
-                `⚠️ La apertura de Nov 20 no coincide con el cierre de Nov 19.\n\n` +
-                `Apertura actual: $${(nov20Data.openingBalance || 0).toLocaleString()}\n` +
-                `Apertura esperada: $${expectedOpening.toLocaleString()}\n\n` +
-                `¿Corregir apertura a $${expectedOpening.toLocaleString()}?`
-            );
+        console.log('💾 Corrigiendo Nov 20...');
+        await db.set(nov20Ref, correctNov20);
+        console.log('✅ Nov 20 corregido');
 
-            if (fix) {
-                nov20Data.openingBalance = expectedOpening;
-                nov20Data.updatedAt = new Date().toISOString();
-                await db.set(nov20Ref, nov20Data);
-
-                console.log('✅ Apertura de Nov 20 corregida');
-                alert('✅ Apertura de Nov 20 corregida a $68,000');
-
-                // Reload
-                await window.FinanceManager.loadReconciliations();
-                if (document.getElementById('closureDetailsContainer')) {
-                    await window.loadFinanceTab('historial-cierres');
-                }
-            }
-        } else {
-            alert('✅ Nov 20 está correcto!\n\nApertura: $68,000\nCierre: $0 (abierto)');
-            console.log('✅ Nov 20 verificado - datos correctos');
+        // Reload
+        console.log('🔄 Recargando datos...');
+        await window.FinanceManager.loadReconciliations();
+        if (document.getElementById('closureDetailsContainer')) {
+            await window.loadFinanceTab('cierre');
         }
 
+        alert(
+            '✅ CORRECCIÓN COMPLETADA\n\n' +
+            '═══ NOV 19 ═══\n' +
+            'Apertura: $100,000\n' +
+            'Cierre: $68,000\n' +
+            'Gastos: $92,300\n\n' +
+            '═══ NOV 20 (HOY) ═══\n' +
+            'Apertura: $68,000 ✓\n' +
+            'Cierre: $0 (abierto)\n\n' +
+            'Recarga la página para ver los cambios.'
+        );
+
+        console.log('✅ Corrección completada exitosamente');
+
     } catch (error) {
-        console.error('❌ Error verificando Nov 20:', error);
+        console.error('❌ Error en diagnóstico:', error);
         alert('❌ Error: ' + error.message);
     }
 };
