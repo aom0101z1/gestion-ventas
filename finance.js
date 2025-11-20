@@ -3492,6 +3492,15 @@ window.recoverNov15to18 = async function() {
     }
 };
 
+/**
+ * Quick function to reopen Nov 20 closure
+ * Admin only - for console use
+ */
+window.reopenNov20 = async function() {
+    console.log('🔓 Quick reopen for Nov 20, 2025');
+    await reopenClosure('2025-11-20');
+};
+
 window.loadHistoricalClosure = async function(date) {
     console.log('📜 Loading historical closure for date:', date);
 
@@ -3765,6 +3774,26 @@ window.loadHistoricalClosure = async function(date) {
                     <p style="margin: 0; color: #6b7280; white-space: pre-wrap;">${reconciliation.notes}</p>
                 </div>
             ` : ''}
+
+            <!-- Admin Controls: Reopen Closure Button -->
+            ${reconciliation.isClosed && window.userRole === 'admin' ? `
+                <div style="background: #fef3c7; border: 2px solid #fbbf24; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
+                        <div>
+                            <h3 style="margin: 0 0 0.5rem 0;">🔓 Controles de Administrador</h3>
+                            <p style="margin: 0; color: #92400e; font-size: 0.9rem;">
+                                Solo tú como admin puedes re-abrir este cierre cerrado para hacer correcciones.
+                            </p>
+                        </div>
+                        <button onclick="reopenClosure('${date}')"
+                                style="padding: 0.75rem 1.5rem; background: #fbbf24; color: #78350f; border: 2px solid #f59e0b; border-radius: 8px; cursor: pointer; font-weight: 600; white-space: nowrap; transition: all 0.2s;"
+                                onmouseover="this.style.background='#f59e0b'; this.style.color='white';"
+                                onmouseout="this.style.background='#fbbf24'; this.style.color='#78350f';">
+                            🔓 Re-abrir Cierre
+                        </button>
+                    </div>
+                </div>
+            ` : ''}
         </div>
     `;
 
@@ -3828,6 +3857,104 @@ window.closeDayConfirm = async function(date) {
     } catch (error) {
         console.error('Error closing day:', error);
         window.showNotification('❌ Error al cerrar día: ' + error.message, 'error');
+    }
+};
+
+/**
+ * ADMIN ONLY: Reopen a closed cash register closure for corrections
+ * Only accessible to admin users
+ */
+window.reopenClosure = async function(date) {
+    console.log('🔓 ========================================');
+    console.log('🔓 RE-OPENING CLOSURE FOR DATE:', date);
+    console.log('🔓 ========================================');
+
+    // Verify admin permission
+    if (window.userRole !== 'admin') {
+        alert('❌ Solo los administradores pueden re-abrir cierres cerrados.');
+        console.error('❌ Access denied: User is not admin');
+        return;
+    }
+
+    // Confirm action
+    const confirmed = confirm(
+        `⚠️ ¿Estás seguro de re-abrir el cierre del ${new Date(date).toLocaleDateString('es-ES')}?\n\n` +
+        `Esto permitirá hacer correcciones en:\n` +
+        `• Apertura de caja\n` +
+        `• Cierre de caja\n` +
+        `• Notas del cierre\n\n` +
+        `El cierre quedará marcado como ABIERTO hasta que lo cierres nuevamente.`
+    );
+
+    if (!confirmed) {
+        console.log('🔓 Operation cancelled by user');
+        return;
+    }
+
+    try {
+        const db = window.firebaseModules.database;
+        const reconciliationRef = db.ref(window.FirebaseData.database, `dailyReconciliations/${date}`);
+
+        // Get current closure data
+        const snapshot = await db.get(reconciliationRef);
+
+        if (!snapshot.exists()) {
+            alert(`❌ No se encontró el cierre para la fecha ${date}`);
+            console.error('❌ Closure not found in Firebase');
+            return;
+        }
+
+        const closureData = snapshot.val();
+
+        if (!closureData.isClosed) {
+            alert(`ℹ️ Este cierre ya está abierto.`);
+            console.log('ℹ️ Closure is already open');
+            return;
+        }
+
+        // Reopen the closure
+        const reopenedData = {
+            ...closureData,
+            isClosed: false,
+            reopenedAt: new Date().toISOString(),
+            reopenedBy: window.FirebaseData.currentUser?.uid || 'admin',
+            reopenedByName: window.FirebaseData.currentUser?.displayName || 'Administrador',
+            // Clear closing timestamp
+            closedAt: null,
+            closedBy: null,
+            closedByName: null,
+            // Add note about reopening
+            notes: (closureData.notes || '') +
+                   `\n\n[RE-ABIERTO el ${new Date().toLocaleString('es-ES')} por ${window.FirebaseData.currentUser?.displayName || 'Admin'} para correcciones]`
+        };
+
+        // Save to Firebase
+        await db.set(reconciliationRef, reopenedData);
+
+        console.log('🔓 ✅ Closure reopened successfully');
+        console.log('🔓 Updated data:', reopenedData);
+
+        // Update local cache
+        window.FinanceManager.dailyReconciliations.set(date, reopenedData);
+
+        // Show success message
+        alert(
+            `✅ Cierre re-abierto exitosamente\n\n` +
+            `Fecha: ${new Date(date).toLocaleDateString('es-ES')}\n` +
+            `Estado: ABIERTO\n\n` +
+            `Ahora puedes hacer las correcciones necesarias.`
+        );
+
+        console.log('🔓 ========================================');
+
+        // Refresh the view
+        await window.FinanceManager.loadReconciliations();
+        await loadHistoricalClosure(date);
+
+    } catch (error) {
+        console.error('🔓 ❌ Error reopening closure:', error);
+        console.log('🔓 ========================================');
+        alert(`❌ Error al re-abrir el cierre: ${error.message}`);
     }
 };
 
