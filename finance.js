@@ -3128,6 +3128,84 @@ window.fixHistoricalDateShift = async function() {
     }
 };
 
+/**
+ * Simple direct fix - move Nov 19 closure to Nov 20
+ */
+window.moveNov19ToNov20 = async function() {
+    console.log('🔧 Moviendo cierre de Nov 19 → Nov 20...');
+
+    try {
+        const db = window.firebaseModules.database;
+
+        // 1. Get Nov 19 data
+        const nov19Ref = db.ref(window.FirebaseData.database, 'dailyReconciliations/2025-11-19');
+        const nov19Snapshot = await db.get(nov19Ref);
+
+        if (!nov19Snapshot.exists()) {
+            alert('❌ No existe cierre en Nov 19');
+            return;
+        }
+
+        const nov19Data = nov19Snapshot.val();
+
+        console.log('📊 Datos encontrados en Nov 19:');
+        console.log('   Apertura:', nov19Data.openingBalance);
+        console.log('   Cierre:', nov19Data.closingCount);
+        console.log('   Estado:', nov19Data.isClosed ? 'Cerrado' : 'Abierto');
+
+        const confirm = window.confirm(
+            '¿Mover el cierre de Nov 19 a Nov 20?\n\n' +
+            'Esto corregirá la fecha del cierre de HOY.\n\n' +
+            `Apertura: $${(nov19Data.openingBalance || 0).toLocaleString()}\n` +
+            `Cierre: $${(nov19Data.closingCount || 0).toLocaleString()}\n` +
+            `Estado: ${nov19Data.isClosed ? 'Cerrado' : 'Abierto'}`
+        );
+
+        if (!confirm) {
+            console.log('❌ Cancelado');
+            return;
+        }
+
+        // 2. Create Nov 20 with correct data
+        const nov20Data = {
+            ...nov19Data,
+            date: '2025-11-20',
+            updatedAt: new Date().toISOString()
+        };
+
+        // 3. Save to Nov 20
+        const nov20Ref = db.ref(window.FirebaseData.database, 'dailyReconciliations/2025-11-20');
+        console.log('💾 Guardando en Nov 20...');
+        await db.set(nov20Ref, nov20Data);
+        console.log('✅ Guardado en Nov 20');
+
+        // 4. Delete Nov 19
+        console.log('🗑️ Eliminando Nov 19...');
+        await db.remove(nov19Ref);
+        console.log('✅ Nov 19 eliminado');
+
+        // 5. Reload data
+        console.log('🔄 Recargando datos...');
+        await window.FinanceManager.loadReconciliations();
+
+        // Reload historical view
+        await window.loadFinanceTab('historial-cierres');
+
+        alert(
+            '✅ CIERRE MOVIDO EXITOSAMENTE\n\n' +
+            'El cierre ahora aparece como:\n' +
+            'jueves, 20 de noviembre de 2025 ← HOY\n\n' +
+            'Recarga la página si es necesario.'
+        );
+
+        console.log('✅ Corrección completada');
+
+    } catch (error) {
+        console.error('❌ Error:', error);
+        alert('❌ Error: ' + error.message);
+    }
+};
+
 window.loadHistoricalClosure = async function(date) {
     console.log('📜 Loading historical closure for date:', date);
 
