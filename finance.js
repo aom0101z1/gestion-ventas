@@ -1467,6 +1467,33 @@ async function renderHistoricalClosuresView() {
                 </select>
             </div>
 
+            <!-- Debug Info (Admin Only) -->
+            <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 2rem;">
+                <details>
+                    <summary style="cursor: pointer; font-weight: 600; color: #6b7280; user-select: none;">
+                        🔍 Información de Depuración (Click para expandir)
+                    </summary>
+                    <div style="margin-top: 1rem; padding: 1rem; background: #f9fafb; border-radius: 6px; font-family: monospace; font-size: 0.85rem;">
+                        <div style="margin-bottom: 0.5rem;"><strong>Fecha de hoy:</strong> ${window.getTodayInColombia ? window.getTodayInColombia() : 'N/A'}</div>
+                        <div style="margin-bottom: 0.5rem;"><strong>Total cierres cargados:</strong> ${allReconciliations.length}</div>
+                        <div style="margin-bottom: 0.5rem;"><strong>Fechas en memoria:</strong></div>
+                        <div style="max-height: 200px; overflow-y: auto; background: white; padding: 0.5rem; border-radius: 4px;">
+                            ${allReconciliations.map(r => `
+                                <div style="padding: 0.25rem 0; border-bottom: 1px solid #e5e7eb;">
+                                    📅 ${r.date} - ${r.isClosed ? '🔒 Cerrado' : '🔓 Abierto'} -
+                                    Apertura: $${(r.openingBalance || 0).toLocaleString()} -
+                                    Cierre: $${(r.closingCount || 0).toLocaleString()}
+                                </div>
+                            `).join('')}
+                        </div>
+                        <button onclick="verifyFirebaseData()" style="margin-top: 1rem; padding: 0.5rem 1rem; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                            🔄 Verificar Firebase Directamente
+                        </button>
+                        <div id="firebaseVerification" style="margin-top: 0.5rem;"></div>
+                    </div>
+                </details>
+            </div>
+
             <!-- Closure Details Container -->
             <div id="closureDetailsContainer" style="display: none;">
                 <!-- Details will be loaded here -->
@@ -1692,6 +1719,98 @@ window.toggleCashDetails = function() {
 // ==================================================================================
 // LOAD HISTORICAL CLOSURE DETAILS
 // ==================================================================================
+
+// ==================================================================================
+// VERIFY FIREBASE DATA (DIAGNOSTIC TOOL)
+// ==================================================================================
+
+window.verifyFirebaseData = async function() {
+    const resultDiv = document.getElementById('firebaseVerification');
+    resultDiv.innerHTML = '<div style="color: #3b82f6;">🔄 Consultando Firebase...</div>';
+
+    try {
+        const db = window.firebaseModules.database;
+        const ref = db.ref(window.FirebaseData.database, 'dailyReconciliations');
+        const snapshot = await db.get(ref);
+
+        if (!snapshot.exists()) {
+            resultDiv.innerHTML = '<div style="color: #ef4444;">❌ No hay datos de cierres en Firebase</div>';
+            return;
+        }
+
+        const data = snapshot.val();
+        const dates = Object.keys(data).sort((a, b) => new Date(b) - new Date(a));
+
+        console.log('🔍 FIREBASE VERIFICATION:');
+        console.log('Total records in Firebase:', dates.length);
+        console.log('Dates found:', dates);
+
+        // Check for date 2025-11-19 specifically
+        const nov19 = '2025-11-19';
+        const hasNov19 = dates.includes(nov19);
+
+        let html = `
+            <div style="background: white; padding: 1rem; border-radius: 6px; margin-top: 0.5rem;">
+                <div style="font-weight: 600; margin-bottom: 0.5rem; color: #10b981;">✅ Firebase consultado exitosamente</div>
+                <div style="margin-bottom: 0.5rem;"><strong>Total registros en Firebase:</strong> ${dates.length}</div>
+
+                <!-- Check for Nov 19 -->
+                <div style="padding: 0.75rem; background: ${hasNov19 ? '#d1fae5' : '#fee2e2'}; border-radius: 6px; margin: 0.5rem 0;">
+                    <strong>Verificación 19 de noviembre:</strong>
+                    ${hasNov19 ?
+                        `<div style="color: #10b981;">✅ SÍ existe en Firebase</div>
+                         <div style="font-size: 0.85rem; margin-top: 0.25rem;">
+                            Apertura: $${(data[nov19].openingBalance || 0).toLocaleString()}<br>
+                            Cierre: $${(data[nov19].closingCount || 0).toLocaleString()}<br>
+                            Estado: ${data[nov19].isClosed ? '🔒 Cerrado' : '🔓 Abierto'}
+                         </div>` :
+                        '<div style="color: #ef4444;">❌ NO existe en Firebase - No se guardó cierre para ese día</div>'
+                    }
+                </div>
+
+                <div style="margin-top: 0.5rem;"><strong>Últimos 10 cierres en Firebase:</strong></div>
+                <div style="max-height: 150px; overflow-y: auto; background: #f9fafb; padding: 0.5rem; border-radius: 4px; font-size: 0.8rem;">
+                    ${dates.slice(0, 10).map(date => {
+                        const rec = data[date];
+                        return `<div style="padding: 0.25rem 0; border-bottom: 1px solid #e5e7eb;">
+                            📅 ${date} - ${rec.isClosed ? '🔒' : '🔓'} -
+                            Apertura: $${(rec.openingBalance || 0).toLocaleString()} -
+                            Cierre: $${(rec.closingCount || 0).toLocaleString()}
+                        </div>`;
+                    }).join('')}
+                </div>
+
+                <!-- Comparison -->
+                <div style="margin-top: 1rem; padding: 0.75rem; background: #eff6ff; border-radius: 6px;">
+                    <strong>Comparación memoria vs Firebase:</strong><br>
+                    <div style="font-size: 0.85rem; margin-top: 0.25rem;">
+                        En memoria: ${window.FinanceManager.dailyReconciliations.size} registros<br>
+                        En Firebase: ${dates.length} registros
+                        ${window.FinanceManager.dailyReconciliations.size !== dates.length ?
+                            '<div style="color: #ef4444; margin-top: 0.25rem;">⚠️ Hay diferencia - recargando...</div>' :
+                            '<div style="color: #10b981; margin-top: 0.25rem;">✅ Coinciden</div>'
+                        }
+                    </div>
+                </div>
+            </div>
+        `;
+
+        resultDiv.innerHTML = html;
+
+        // If there's a mismatch, reload
+        if (window.FinanceManager.dailyReconciliations.size !== dates.length) {
+            console.log('🔄 Reloading reconciliations due to mismatch...');
+            await window.FinanceManager.loadReconciliations();
+            setTimeout(() => {
+                loadFinanceTab('historial-cierres');
+            }, 500);
+        }
+
+    } catch (error) {
+        console.error('❌ Error verifying Firebase:', error);
+        resultDiv.innerHTML = `<div style="color: #ef4444;">❌ Error: ${error.message}</div>`;
+    }
+};
 
 window.loadHistoricalClosure = async function(date) {
     console.log('📜 Loading historical closure for date:', date);
@@ -1977,24 +2096,42 @@ window.saveDailyReconciliation = async function(event) {
 
     const today = window.getTodayInColombia();
 
+    console.log('💾 ============================================');
+    console.log('💾 GUARDANDO CIERRE DE CAJA');
+    console.log('💾 ============================================');
+    console.log('💾 Fecha calculada (getTodayInColombia):', today);
+    console.log('💾 Fecha del navegador:', new Date().toLocaleString('es-CO'));
+    console.log('💾 Fecha ISO navegador:', new Date().toISOString());
+
     const data = {
         openingBalance: document.getElementById('openingBalance').value,
         closingCount: document.getElementById('closingCount').value,
         notes: document.getElementById('reconciliationNotes').value
     };
 
+    console.log('💾 Datos del formulario:', data);
+
     try {
         // Get expenses for today
         const todayExpenses = window.FinanceManager.getExpenses({ startDate: today, endDate: today });
         data.expenses = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
 
+        console.log('💾 Gastos del día:', data.expenses);
+        console.log('💾 Guardando en Firebase con fecha:', today);
+
         await window.FinanceManager.saveDailyReconciliation(today, data);
-        window.showNotification('✅ Cierre guardado exitosamente', 'success');
+
+        console.log('💾 ✅ Cierre guardado exitosamente para:', today);
+        console.log('💾 Ruta Firebase: dailyReconciliations/' + today);
+        console.log('💾 ============================================');
+
+        window.showNotification('✅ Cierre guardado exitosamente para ' + today, 'success');
 
         // Refresh view
         loadDailyReconciliationView();
     } catch (error) {
-        console.error('Error saving reconciliation:', error);
+        console.error('💾 ❌ Error saving reconciliation:', error);
+        console.log('💾 ============================================');
         window.showNotification('❌ Error al guardar cierre', 'error');
     }
 };
