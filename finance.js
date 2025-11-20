@@ -2971,6 +2971,137 @@ window.correctNov19And20 = async function() {
     }
 };
 
+/**
+ * Fix the date shift - ensure today's closure shows as Nov 20, not Nov 19
+ */
+window.fixHistoricalDateShift = async function() {
+    console.log('🔧 ========================================');
+    console.log('🔧 CORRIGIENDO FECHAS EN HISTORIAL');
+    console.log('🔧 ========================================');
+
+    try {
+        const db = window.firebaseModules.database;
+
+        // Get all closures
+        const closuresRef = db.ref(window.FirebaseData.database, 'dailyReconciliations');
+        const closuresSnapshot = await db.get(closuresRef);
+        const allClosures = closuresSnapshot.exists() ? closuresSnapshot.val() : {};
+
+        console.log('📊 Estado actual en Firebase:');
+        console.log('   Nov 18:', allClosures['2025-11-18'] ? 'EXISTE' : 'NO EXISTE');
+        console.log('   Nov 19:', allClosures['2025-11-19'] ? 'EXISTE' : 'NO EXISTE');
+        console.log('   Nov 20:', allClosures['2025-11-20'] ? 'EXISTE' : 'NO EXISTE');
+
+        // Show what we found
+        if (allClosures['2025-11-19']) {
+            console.log('\n📅 Datos en "2025-11-19":');
+            console.log('   Apertura:', allClosures['2025-11-19'].openingBalance);
+            console.log('   Cierre:', allClosures['2025-11-19'].closingCount);
+            console.log('   Cerrado:', allClosures['2025-11-19'].isClosed);
+        }
+
+        if (allClosures['2025-11-20']) {
+            console.log('\n📅 Datos en "2025-11-20":');
+            console.log('   Apertura:', allClosures['2025-11-20'].openingBalance);
+            console.log('   Cierre:', allClosures['2025-11-20'].closingCount);
+            console.log('   Cerrado:', allClosures['2025-11-20'].isClosed);
+        }
+
+        const confirmFix = confirm(
+            '🔧 CORRECCIÓN DE FECHAS\n\n' +
+            'El cierre de HOY (20 de noviembre) aparece como 19.\n\n' +
+            'Se corregirá:\n' +
+            '• Nov 19: Cerrado con $67,700\n' +
+            '• Nov 20 (HOY): Abierto con $68,000\n\n' +
+            '¿Continuar?'
+        );
+
+        if (!confirmFix) {
+            console.log('❌ Cancelado');
+            return;
+        }
+
+        // Create correct Nov 19 (yesterday - CLOSED)
+        const correctNov19 = {
+            date: '2025-11-19',
+            openingBalance: 100000,
+            closingCount: 67700,
+            expenses: 32300,
+            isClosed: true,
+            closedAt: new Date('2025-11-19T23:59:00').toISOString(),
+            closedBy: window.FirebaseData.currentUser?.uid,
+            closedByName: window.FirebaseData.currentUser?.email,
+            notes: 'Cafetería - 1kg azúcar, 1lb café, 1 electrolite',
+            openedAt: '2025-11-19T06:00:00.000Z',
+            registeredBy: window.FirebaseData.currentUser?.uid,
+            registeredByName: window.FirebaseData.currentUser?.email,
+            updatedAt: new Date().toISOString()
+        };
+
+        // Create correct Nov 20 (today - OPEN)
+        const correctNov20 = {
+            date: '2025-11-20',
+            openingBalance: 68000,
+            closingCount: 0,
+            expenses: 0,
+            isClosed: false,
+            notes: 'Pago Jean Pierre $156,000 Nequi',
+            openedAt: new Date().toISOString(),
+            registeredBy: window.FirebaseData.currentUser?.uid,
+            registeredByName: window.FirebaseData.currentUser?.email,
+            updatedAt: new Date().toISOString()
+        };
+
+        console.log('💾 Guardando Nov 19 (ayer)...');
+        const nov19Ref = db.ref(window.FirebaseData.database, 'dailyReconciliations/2025-11-19');
+        await db.set(nov19Ref, correctNov19);
+        console.log('✅ Nov 19 guardado');
+
+        console.log('💾 Guardando Nov 20 (HOY)...');
+        const nov20Ref = db.ref(window.FirebaseData.database, 'dailyReconciliations/2025-11-20');
+        await db.set(nov20Ref, correctNov20);
+        console.log('✅ Nov 20 guardado');
+
+        // Delete Nov 18 if it exists (shouldn't be there)
+        if (allClosures['2025-11-18']) {
+            console.log('🗑️ Eliminando Nov 18 (no debería existir)...');
+            const nov18Ref = db.ref(window.FirebaseData.database, 'dailyReconciliations/2025-11-18');
+            await db.remove(nov18Ref);
+            console.log('✅ Nov 18 eliminado');
+        }
+
+        // Reload everything
+        console.log('🔄 Recargando datos...');
+        await window.FinanceManager.loadReconciliations();
+
+        // Refresh the historical view if it's open
+        const histContainer = document.getElementById('closureDetailsContainer');
+        if (histContainer && histContainer.parentElement) {
+            console.log('🔄 Recargando vista de historial...');
+            await window.loadFinanceTab('historial-cierres');
+        }
+
+        alert(
+            '✅ FECHAS CORREGIDAS\n\n' +
+            'Historial de Cierres ahora muestra:\n\n' +
+            '📅 Nov 19 (Ayer)\n' +
+            '   Estado: CERRADO ✓\n' +
+            '   Apertura: $100,000\n' +
+            '   Cierre: $67,700\n\n' +
+            '📅 Nov 20 (HOY)\n' +
+            '   Estado: ABIERTO ✓\n' +
+            '   Apertura: $68,000\n\n' +
+            'Recarga la página si es necesario.'
+        );
+
+        console.log('✅ Corrección de fechas completada');
+
+    } catch (error) {
+        console.error('❌ Error:', error);
+        alert('❌ Error: ' + error.message);
+    }
+};
+
 window.loadHistoricalClosure = async function(date) {
     console.log('📜 Loading historical closure for date:', date);
 
