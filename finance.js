@@ -1812,6 +1812,130 @@ window.verifyFirebaseData = async function() {
     }
 };
 
+// ==================================================================================
+// CREATE RETROACTIVE CLOSURE (FOR MISSING DATES)
+// ==================================================================================
+
+window.createRetroactiveClosure = async function(targetDate) {
+    console.log('📝 Creating retroactive closure for:', targetDate);
+
+    if (!targetDate) {
+        alert('⚠️ Por favor proporciona una fecha válida (YYYY-MM-DD)');
+        return;
+    }
+
+    // Validate date format
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(targetDate)) {
+        alert('⚠️ Formato de fecha inválido. Use YYYY-MM-DD (ej: 2025-11-19)');
+        return;
+    }
+
+    // Check if closure already exists
+    const existing = window.FinanceManager.getDailyReconciliation(targetDate);
+    if (existing) {
+        if (!confirm(`Ya existe un cierre para ${targetDate}. ¿Desea sobrescribirlo?`)) {
+            return;
+        }
+    }
+
+    // Get revenue and expenses for that date
+    const dailyRevenue = await window.FinanceManager.calculateDailyRevenue(targetDate);
+    const expenses = window.FinanceManager.getExpenses({ startDate: targetDate, endDate: targetDate });
+    const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+
+    console.log(`📊 Data for ${targetDate}:`, {
+        cash: dailyRevenue.cash,
+        transfers: dailyRevenue.transfers,
+        expenses: totalExpenses
+    });
+
+    // Ask user for opening balance and closing count
+    const openingBalanceStr = prompt(
+        `Cierre Retroactivo para ${targetDate}\n\n` +
+        `Datos del día:\n` +
+        `💵 Efectivo recibido: $${dailyRevenue.cash.toLocaleString()}\n` +
+        `💳 Transferencias: $${dailyRevenue.transfers.toLocaleString()}\n` +
+        `💸 Gastos: $${totalExpenses.toLocaleString()}\n\n` +
+        `Ingrese el SALDO DE APERTURA (efectivo inicial):`
+    );
+
+    if (openingBalanceStr === null) {
+        console.log('❌ Cancelled by user');
+        return;
+    }
+
+    const openingBalance = parseCurrencyInput(openingBalanceStr);
+
+    const expectedClosing = openingBalance + dailyRevenue.cash - totalExpenses;
+
+    const closingCountStr = prompt(
+        `Cierre Retroactivo para ${targetDate}\n\n` +
+        `Saldo apertura: $${openingBalance.toLocaleString()}\n` +
+        `+ Efectivo recibido: $${dailyRevenue.cash.toLocaleString()}\n` +
+        `- Gastos: $${totalExpenses.toLocaleString()}\n` +
+        `= Cierre esperado: $${expectedClosing.toLocaleString()}\n\n` +
+        `Ingrese el CONTEO REAL de efectivo al cierre:`
+    );
+
+    if (closingCountStr === null) {
+        console.log('❌ Cancelled by user');
+        return;
+    }
+
+    const closingCount = parseCurrencyInput(closingCountStr);
+    const discrepancy = closingCount - expectedClosing;
+
+    const notes = prompt(
+        `Cierre Retroactivo para ${targetDate}\n\n` +
+        `Diferencia: $${discrepancy.toLocaleString()} ${discrepancy === 0 ? '✅ Cuadra perfecto' : discrepancy > 0 ? '⚠️ Sobrante' : '❌ Faltante'}\n\n` +
+        `Notas adicionales (opcional):`
+    );
+
+    // Confirm before saving
+    if (!confirm(
+        `¿Confirmar cierre retroactivo?\n\n` +
+        `Fecha: ${targetDate}\n` +
+        `Apertura: $${openingBalance.toLocaleString()}\n` +
+        `Cierre: $${closingCount.toLocaleString()}\n` +
+        `Diferencia: $${discrepancy.toLocaleString()}\n\n` +
+        `Este cierre se guardará como CERRADO.`
+    )) {
+        console.log('❌ Cancelled by user');
+        return;
+    }
+
+    try {
+        const closureData = {
+            openingBalance: openingBalance,
+            closingCount: closingCount,
+            expenses: totalExpenses,
+            notes: notes || `Cierre retroactivo creado el ${new Date().toLocaleDateString('es-CO')}`,
+            isClosed: true,
+            closedBy: window.FirebaseData.currentUser?.uid,
+            closedByName: window.FirebaseData.currentUser?.email,
+            closedAt: new Date().toISOString(),
+            openedAt: new Date(targetDate + 'T08:00:00').toISOString(), // Assume 8 AM opening
+        };
+
+        console.log('💾 Saving retroactive closure:', closureData);
+
+        await window.FinanceManager.saveDailyReconciliation(targetDate, closureData);
+
+        alert(`✅ Cierre retroactivo creado exitosamente para ${targetDate}\n\n` +
+              `Apertura: $${openingBalance.toLocaleString()}\n` +
+              `Cierre: $${closingCount.toLocaleString()}\n` +
+              `Diferencia: $${discrepancy.toLocaleString()}`);
+
+        // Reload historical view
+        loadFinanceTab('historial-cierres');
+
+    } catch (error) {
+        console.error('❌ Error creating retroactive closure:', error);
+        alert('❌ Error al crear cierre retroactivo: ' + error.message);
+    }
+};
+
 window.loadHistoricalClosure = async function(date) {
     console.log('📜 Loading historical closure for date:', date);
 
