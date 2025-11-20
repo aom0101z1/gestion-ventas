@@ -2134,6 +2134,176 @@ window.emergencyRestoreDates = async function() {
     }
 };
 
+// ==================================================================================
+// BACKUP AND DIAGNOSTIC TOOLS
+// ==================================================================================
+
+/**
+ * Comprehensive backup and diagnostic function
+ * Queries Firebase directly and shows all closure data
+ */
+window.backupAndDiagnoseClosures = async function() {
+    console.log('🔍 ========================================');
+    console.log('🔍 BACKUP Y DIAGNÓSTICO DE CIERRES');
+    console.log('🔍 ========================================');
+
+    try {
+        const db = window.firebaseModules.database;
+        const ref = db.ref(window.FirebaseData.database, 'dailyReconciliations');
+        const snapshot = await db.get(ref);
+
+        if (!snapshot.exists()) {
+            console.error('❌ No hay datos en Firebase');
+            alert('❌ No se encontraron datos de cierres en Firebase');
+            return null;
+        }
+
+        const allData = snapshot.val();
+        const dates = Object.keys(allData).sort();
+
+        console.log('📊 ========================================');
+        console.log('📊 TOTAL DE REGISTROS:', dates.length);
+        console.log('📊 ========================================');
+
+        // Display all dates with their data
+        console.table(
+            dates.map(date => ({
+                Fecha: date,
+                Apertura: `$${(allData[date].openingBalance || 0).toLocaleString()}`,
+                Cierre: `$${(allData[date].closingCount || 0).toLocaleString()}`,
+                Gastos: `$${(allData[date].expenses || 0).toLocaleString()}`,
+                Estado: allData[date].isClosed ? '🔒 Cerrado' : '🔓 Abierto',
+                OpenedAt: allData[date].openedAt || 'N/A'
+            }))
+        );
+
+        // Check specifically for Nov 19 and Nov 20
+        console.log('🔍 ========================================');
+        console.log('🔍 VERIFICACIÓN NOV 19 Y NOV 20');
+        console.log('🔍 ========================================');
+
+        const nov19 = allData['2025-11-19'];
+        const nov20 = allData['2025-11-20'];
+
+        console.log('📅 Nov 19:', nov19 ? 'EXISTE' : '❌ NO EXISTE');
+        if (nov19) {
+            console.log('   Apertura:', nov19.openingBalance);
+            console.log('   Cierre:', nov19.closingCount);
+            console.log('   Gastos:', nov19.expenses);
+            console.log('   Datos completos:', nov19);
+        }
+
+        console.log('📅 Nov 20:', nov20 ? 'EXISTE' : '❌ NO EXISTE');
+        if (nov20) {
+            console.log('   Apertura:', nov20.openingBalance);
+            console.log('   Cierre:', nov20.closingCount);
+            console.log('   Gastos:', nov20.expenses);
+            console.log('   Datos completos:', nov20);
+        }
+
+        // Create downloadable backup
+        const backupData = {
+            timestamp: new Date().toISOString(),
+            totalRecords: dates.length,
+            data: allData
+        };
+
+        console.log('💾 ========================================');
+        console.log('💾 BACKUP CREADO');
+        console.log('💾 Para descargar backup, ejecuta:');
+        console.log('💾 downloadBackup()');
+        console.log('💾 ========================================');
+
+        // Store backup in window for download
+        window.closuresBackup = backupData;
+
+        // Summary alert
+        alert(
+            `✅ DIAGNÓSTICO COMPLETO\n\n` +
+            `Total registros: ${dates.length}\n` +
+            `Primer cierre: ${dates[0]}\n` +
+            `Último cierre: ${dates[dates.length - 1]}\n\n` +
+            `Nov 19: ${nov19 ? 'EXISTE ✓' : 'NO EXISTE ✗'}\n` +
+            `Nov 20: ${nov20 ? 'EXISTE ✓' : 'NO EXISTE ✗'}\n\n` +
+            `Revisa la consola para detalles completos.\n` +
+            `Ejecuta downloadBackup() para descargar backup.`
+        );
+
+        return backupData;
+
+    } catch (error) {
+        console.error('❌ Error en diagnóstico:', error);
+        alert('❌ Error: ' + error.message);
+        return null;
+    }
+};
+
+/**
+ * Download backup as JSON file
+ */
+window.downloadBackup = function() {
+    if (!window.closuresBackup) {
+        alert('❌ Primero ejecuta: backupAndDiagnoseClosures()');
+        return;
+    }
+
+    const dataStr = JSON.stringify(window.closuresBackup, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `cierres-backup-${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+
+    console.log('✅ Backup descargado');
+    alert('✅ Backup descargado exitosamente');
+};
+
+/**
+ * Restore specific closure from Firebase data
+ */
+window.restoreClosureFromBackup = async function(date) {
+    if (!window.closuresBackup || !window.closuresBackup.data) {
+        alert('❌ Primero ejecuta: backupAndDiagnoseClosures()');
+        return;
+    }
+
+    const closureData = window.closuresBackup.data[date];
+    if (!closureData) {
+        alert(`❌ No hay datos para ${date} en el backup`);
+        return;
+    }
+
+    const confirm = window.confirm(
+        `¿Restaurar cierre para ${date}?\n\n` +
+        `Apertura: $${(closureData.openingBalance || 0).toLocaleString()}\n` +
+        `Cierre: $${(closureData.closingCount || 0).toLocaleString()}\n` +
+        `Gastos: $${(closureData.expenses || 0).toLocaleString()}`
+    );
+
+    if (!confirm) return;
+
+    try {
+        const db = window.firebaseModules.database;
+        const ref = db.ref(window.FirebaseData.database, `dailyReconciliations/${date}`);
+        await db.set(ref, closureData);
+
+        console.log(`✅ Cierre ${date} restaurado`);
+        alert(`✅ Cierre ${date} restaurado exitosamente`);
+
+        // Reload data
+        await window.FinanceManager.loadReconciliations();
+        if (document.getElementById('closureDetailsContainer')) {
+            await window.loadFinanceTab('historial-cierres');
+        }
+
+    } catch (error) {
+        console.error('❌ Error restaurando:', error);
+        alert('❌ Error: ' + error.message);
+    }
+};
+
 window.loadHistoricalClosure = async function(date) {
     console.log('📜 Loading historical closure for date:', date);
 
