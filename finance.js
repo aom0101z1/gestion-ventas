@@ -2048,6 +2048,92 @@ window.moveClosureDate = async function(oldDate, newDate) {
     }
 };
 
+// ==================================================================================
+// EMERGENCY FIX - RESTORE CORRECT DATES
+// ==================================================================================
+
+/**
+ * Emergency function to restore Nov 19 and Nov 20 to correct state
+ * Run this to undo the moveClosureDate mistake
+ */
+window.emergencyRestoreDates = async function() {
+    console.log('🚨 EMERGENCY RESTORE - Fixing Nov 19 and Nov 20 dates');
+
+    const confirmFix = confirm(
+        '🚨 EMERGENCY FIX\n\n' +
+        'This will restore the correct dates:\n\n' +
+        'Nov 19:\n' +
+        '  Opening: $100,000\n' +
+        '  Closing: $68,000\n\n' +
+        'Nov 20 (today):\n' +
+        '  Opening: $68,000\n' +
+        '  Closing: $0 (still open)\n\n' +
+        '¿Continuar?'
+    );
+
+    if (!confirmFix) {
+        console.log('❌ Usuario canceló');
+        return;
+    }
+
+    try {
+        const db = window.firebaseModules.database;
+
+        // 1. Restore Nov 19 with correct data
+        const nov19Data = {
+            date: '2025-11-19',
+            openingBalance: 100000,
+            closingCount: 68000,
+            expenses: 92300,
+            isClosed: false,
+            notes: '',
+            openedAt: null,
+            registeredBy: window.FirebaseData.currentUser?.uid,
+            registeredByName: window.FirebaseData.currentUser?.email,
+            updatedAt: new Date().toISOString()
+        };
+
+        const nov19Ref = db.ref(window.FirebaseData.database, 'dailyReconciliations/2025-11-19');
+        console.log('💾 Restoring Nov 19...');
+        await db.set(nov19Ref, nov19Data);
+        console.log('✅ Nov 19 restored');
+
+        // 2. Restore Nov 20 (today) with correct data
+        const nov20Data = {
+            date: '2025-11-20',
+            openingBalance: 68000, // This is Nov 19's closing
+            closingCount: 0,
+            expenses: 0,
+            isClosed: false,
+            notes: '',
+            openedAt: new Date().toISOString(), // Today's opening time
+            registeredBy: window.FirebaseData.currentUser?.uid,
+            registeredByName: window.FirebaseData.currentUser?.email,
+            updatedAt: new Date().toISOString()
+        };
+
+        const nov20Ref = db.ref(window.FirebaseData.database, 'dailyReconciliations/2025-11-20');
+        console.log('💾 Restoring Nov 20...');
+        await db.set(nov20Ref, nov20Data);
+        console.log('✅ Nov 20 restored');
+
+        // 3. Reload data
+        await window.FinanceManager.loadReconciliations();
+
+        // 4. Reload view
+        if (document.getElementById('closureDetailsContainer')) {
+            await window.loadFinanceTab('historial-cierres');
+        }
+
+        alert('✅ Fechas restauradas correctamente!\n\nNov 19: $100,000 → $68,000\nNov 20: $68,000 → $0 (abierto)');
+        console.log('✅ Emergency restore completed');
+
+    } catch (error) {
+        console.error('❌ Error in emergency restore:', error);
+        alert('❌ Error: ' + error.message);
+    }
+};
+
 window.loadHistoricalClosure = async function(date) {
     console.log('📜 Loading historical closure for date:', date);
 
