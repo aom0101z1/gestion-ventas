@@ -313,6 +313,10 @@ class FinanceManager {
         try {
             console.log('💾 Saving reconciliation - RAW data received:', data);
 
+            // Check if this is a new reconciliation (to set openedAt)
+            const existingReconciliation = this.dailyReconciliations.get(date);
+            const isNewReconciliation = !existingReconciliation;
+
             const reconciliation = {
                 date,
                 openingBalance: parseCurrencyInput(data.openingBalance),
@@ -322,6 +326,7 @@ class FinanceManager {
                 isClosed: data.isClosed || false,
                 closedBy: data.closedBy || null,
                 closedAt: data.closedAt || null,
+                openedAt: data.openedAt || existingReconciliation?.openedAt || (isNewReconciliation ? new Date().toISOString() : null),
                 registeredBy: window.FirebaseData.currentUser?.uid,
                 registeredByName: window.FirebaseData.currentUser?.email,
                 updatedAt: new Date().toISOString()
@@ -1375,6 +1380,68 @@ async function renderDailyReconciliationView() {
 }
 
 // ==================================================================================
+// RENDER HISTORICAL CLOSURES VIEW
+// ==================================================================================
+
+async function renderHistoricalClosuresView() {
+    console.log('📜 Rendering Historical Closures View');
+
+    // Get all reconciliations and sort by date (newest first)
+    const allReconciliations = Array.from(window.FinanceManager.dailyReconciliations.entries())
+        .map(([date, rec]) => ({ date, ...rec }))
+        .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    console.log('📊 Total reconciliations:', allReconciliations.length);
+
+    // Get students map for payment details
+    const students = window.Students ? window.Students.studentManager.students : new Map();
+
+    return `
+        <div style="padding: 2rem; max-width: 1400px; margin: 0 auto;">
+            <h1 style="margin: 0 0 1.5rem 0;">📜 Historial de Cierres de Caja</h1>
+            <p style="margin: 0 0 2rem 0; color: #6b7280;">
+                Consulta los cierres de caja de días anteriores. Selecciona una fecha para ver los detalles completos.
+            </p>
+
+            <!-- Date Selector -->
+            <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 2rem;">
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">
+                    📅 Seleccionar Fecha
+                </label>
+                <select id="historicalDateSelector" onchange="loadHistoricalClosure(this.value)"
+                    style="width: 100%; padding: 0.75rem; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 1rem;">
+                    <option value="">-- Selecciona una fecha --</option>
+                    ${allReconciliations.map(rec => {
+                        const dateObj = new Date(rec.date);
+                        const formattedDate = dateObj.toLocaleDateString('es-ES', {
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                        });
+                        const status = rec.isClosed ? '🔒 Cerrado' : '🔓 Abierto';
+                        return `<option value="${rec.date}">${formattedDate} - ${status}</option>`;
+                    }).join('')}
+                </select>
+            </div>
+
+            <!-- Closure Details Container -->
+            <div id="closureDetailsContainer" style="display: none;">
+                <!-- Details will be loaded here -->
+            </div>
+
+            ${allReconciliations.length === 0 ? `
+                <div style="background: white; padding: 3rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center;">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">📋</div>
+                    <h3 style="margin: 0 0 0.5rem 0; color: #374151;">No hay cierres registrados</h3>
+                    <p style="margin: 0; color: #6b7280;">Los cierres de caja aparecerán aquí una vez registrados.</p>
+                </div>
+            ` : ''}
+        </div>
+    `;
+}
+
+// ==================================================================================
 // SECTION 4: WINDOW FUNCTIONS
 // ==================================================================================
 
@@ -1433,6 +1500,9 @@ window.loadFinanceTab = async function(activeTab = 'dashboard') {
                     <button onclick="loadFinanceTab('cierre')" class="finance-tab ${activeTab === 'cierre' ? 'active' : ''}" style="padding: 0.75rem 1.5rem; border: none; background: ${activeTab === 'cierre' ? '#3b82f6' : 'transparent'}; color: ${activeTab === 'cierre' ? 'white' : '#6b7280'}; border-radius: 8px 8px 0 0; cursor: pointer; font-weight: 500; white-space: nowrap;">
                         📋 Cierre Diario
                     </button>
+                    <button onclick="loadFinanceTab('historial-cierres')" class="finance-tab ${activeTab === 'historial-cierres' ? 'active' : ''}" style="padding: 0.75rem 1.5rem; border: none; background: ${activeTab === 'historial-cierres' ? '#3b82f6' : 'transparent'}; color: ${activeTab === 'historial-cierres' ? 'white' : '#6b7280'}; border-radius: 8px 8px 0 0; cursor: pointer; font-weight: 500; white-space: nowrap;">
+                        📜 Historial de Cierres
+                    </button>
                     ` : ''}
                     ${canViewAdvanced ? `
                         <button onclick="loadFinanceTab('otros-ingresos')" class="finance-tab ${activeTab === 'otros-ingresos' ? 'active' : ''}" style="padding: 0.75rem 1.5rem; border: none; background: ${activeTab === 'otros-ingresos' ? '#3b82f6' : 'transparent'}; color: ${activeTab === 'otros-ingresos' ? 'white' : '#6b7280'}; border-radius: 8px 8px 0 0; cursor: pointer; font-weight: 500; white-space: nowrap;">
@@ -1458,6 +1528,9 @@ window.loadFinanceTab = async function(activeTab = 'dashboard') {
             break;
         case 'cierre':
             content = await renderDailyReconciliationView();
+            break;
+        case 'historial-cierres':
+            content = await renderHistoricalClosuresView();
             break;
         case 'otros-ingresos':
             if (canViewAdvanced) {
@@ -1503,7 +1576,7 @@ window.changeFinancialContext = function(context) {
 
 // Helper function to get current active tab
 function getCurrentActiveTab() {
-    const tabs = ['dashboard', 'cierre', 'otros-ingresos', 'gastos', 'reportes'];
+    const tabs = ['dashboard', 'cierre', 'historial-cierres', 'otros-ingresos', 'gastos', 'reportes'];
 
     // Try to detect from URL hash if available
     if (window.location.hash) {
@@ -1572,6 +1645,275 @@ window.toggleCashDetails = function() {
             icon.textContent = '▼';
         }
     }
+};
+
+// ==================================================================================
+// LOAD HISTORICAL CLOSURE DETAILS
+// ==================================================================================
+
+window.loadHistoricalClosure = async function(date) {
+    console.log('📜 Loading historical closure for date:', date);
+
+    const container = document.getElementById('closureDetailsContainer');
+    if (!container) {
+        console.error('❌ Closure details container not found');
+        return;
+    }
+
+    if (!date) {
+        container.style.display = 'none';
+        return;
+    }
+
+    // Get reconciliation data
+    const reconciliation = window.FinanceManager.getDailyReconciliation(date);
+    if (!reconciliation) {
+        container.innerHTML = `
+            <div style="background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center;">
+                <h3 style="color: #ef4444;">❌ No se encontró el cierre para esta fecha</h3>
+            </div>
+        `;
+        container.style.display = 'block';
+        return;
+    }
+
+    console.log('📊 Reconciliation data:', reconciliation);
+
+    // Get daily revenue and payments for this date
+    const dailyRevenue = await window.FinanceManager.calculateDailyRevenue(date);
+    const todayExpenses = window.FinanceManager.getExpenses({ startDate: date, endDate: date });
+    const totalExpenses = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+    // Get students map for payment details
+    const students = window.Students ? window.Students.studentManager.students : new Map();
+
+    // Calculate values
+    const openingBalance = reconciliation.openingBalance || 0;
+    const closingCount = reconciliation.closingCount || 0;
+    const expectedClosing = openingBalance + dailyRevenue.cash - totalExpenses;
+    const discrepancy = closingCount - expectedClosing;
+
+    // Format times
+    const openedAtTime = reconciliation.openedAt ?
+        new Date(reconciliation.openedAt).toLocaleString('es-ES', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+        }) : 'No registrada';
+
+    const closedAtTime = reconciliation.closedAt ?
+        new Date(reconciliation.closedAt).toLocaleString('es-ES', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+        }) : 'No cerrada';
+
+    // Calculate work duration if both times exist
+    let workDuration = '';
+    if (reconciliation.openedAt && reconciliation.closedAt) {
+        const openTime = new Date(reconciliation.openedAt);
+        const closeTime = new Date(reconciliation.closedAt);
+        const durationMs = closeTime - openTime;
+        const hours = Math.floor(durationMs / (1000 * 60 * 60));
+        const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+        workDuration = `${hours}h ${minutes}m`;
+    }
+
+    // Render details
+    container.innerHTML = `
+        <div style="display: grid; gap: 1.5rem;">
+            <!-- Header with Status -->
+            <div style="background: ${reconciliation.isClosed ? '#10b981' : '#fbbf24'}; color: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h2 style="margin: 0 0 0.5rem 0;">${reconciliation.isClosed ? '🔒' : '🔓'} Cierre de Caja - ${new Date(date).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h2>
+                        <p style="margin: 0; opacity: 0.9; font-size: 0.95rem;">
+                            Estado: <strong>${reconciliation.isClosed ? 'CERRADO' : 'ABIERTO'}</strong>
+                            ${reconciliation.isClosed ? ` por ${reconciliation.closedByName || 'Usuario'}` : ''}
+                        </p>
+                    </div>
+                    ${reconciliation.isClosed && workDuration ? `
+                        <div style="text-align: right;">
+                            <div style="font-size: 0.9rem; opacity: 0.9;">Duración de jornada</div>
+                            <div style="font-size: 2rem; font-weight: bold;">${workDuration}</div>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+
+            <!-- Times Section -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
+                <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <div style="font-size: 0.9rem; color: #6b7280; margin-bottom: 0.5rem;">⏰ Hora de Apertura</div>
+                    <div style="font-size: 1.5rem; font-weight: bold; color: #10b981;">${openedAtTime}</div>
+                    ${reconciliation.registeredByName ? `
+                        <div style="font-size: 0.8rem; color: #6b7280; margin-top: 0.5rem;">Por: ${reconciliation.registeredByName}</div>
+                    ` : ''}
+                </div>
+
+                ${reconciliation.isClosed ? `
+                    <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                        <div style="font-size: 0.9rem; color: #6b7280; margin-bottom: 0.5rem;">🔒 Hora de Cierre</div>
+                        <div style="font-size: 1.5rem; font-weight: bold; color: #ef4444;">${closedAtTime}</div>
+                        ${reconciliation.closedByName ? `
+                            <div style="font-size: 0.8rem; color: #6b7280; margin-top: 0.5rem;">Por: ${reconciliation.closedByName}</div>
+                        ` : ''}
+                    </div>
+                ` : ''}
+            </div>
+
+            <!-- Financial Summary -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <div style="font-size: 0.9rem; color: #6b7280; margin-bottom: 0.5rem;">💵 Apertura de Caja</div>
+                    <div style="font-size: 1.8rem; font-weight: bold;">${formatCurrency(openingBalance)}</div>
+                </div>
+
+                <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <div style="font-size: 0.9rem; color: #6b7280; margin-bottom: 0.5rem;">💰 Ventas en Efectivo</div>
+                    <div style="font-size: 1.8rem; font-weight: bold; color: #10b981;">+${formatCurrency(dailyRevenue.cash)}</div>
+                    <div style="font-size: 0.8rem; color: #6b7280; margin-top: 0.5rem;">${dailyRevenue.cashCount} pagos</div>
+                </div>
+
+                <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <div style="font-size: 0.9rem; color: #6b7280; margin-bottom: 0.5rem;">💸 Gastos del Día</div>
+                    <div style="font-size: 1.8rem; font-weight: bold; color: #ef4444;">-${formatCurrency(totalExpenses)}</div>
+                    <div style="font-size: 0.8rem; color: #6b7280; margin-top: 0.5rem;">${todayExpenses.length} gastos</div>
+                </div>
+
+                <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <div style="font-size: 0.9rem; color: #6b7280; margin-bottom: 0.5rem;">🧮 Cierre Esperado</div>
+                    <div style="font-size: 1.8rem; font-weight: bold;">${formatCurrency(expectedClosing)}</div>
+                    <div style="font-size: 0.8rem; color: #6b7280; margin-top: 0.5rem;">Teórico</div>
+                </div>
+
+                <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <div style="font-size: 0.9rem; color: #6b7280; margin-bottom: 0.5rem;">✅ Cierre Real</div>
+                    <div style="font-size: 1.8rem; font-weight: bold;">${formatCurrency(closingCount)}</div>
+                    <div style="font-size: 0.8rem; color: #6b7280; margin-top: 0.5rem;">Conteo físico</div>
+                </div>
+
+                <div style="background: ${discrepancy === 0 ? '#d1fae5' : discrepancy > 0 ? '#fef3c7' : '#fee2e2'}; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <div style="font-size: 0.9rem; color: #6b7280; margin-bottom: 0.5rem;">📊 Diferencia</div>
+                    <div style="font-size: 1.8rem; font-weight: bold; color: ${discrepancy === 0 ? '#10b981' : discrepancy > 0 ? '#fbbf24' : '#ef4444'};">
+                        ${discrepancy === 0 ? '✓ $0' : (discrepancy > 0 ? '+' : '') + formatCurrency(discrepancy)}
+                    </div>
+                    <div style="font-size: 0.8rem; color: #6b7280; margin-top: 0.5rem;">
+                        ${discrepancy === 0 ? 'Cuadra perfecto' : discrepancy > 0 ? 'Sobrante' : 'Faltante'}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Payments and Transfers Summary -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem;">
+                <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <h3 style="margin: 0 0 1rem 0;">💳 Consignaciones / Transferencias</h3>
+                    <div style="font-size: 2rem; font-weight: bold; color: #3b82f6; margin-bottom: 0.5rem;">
+                        ${formatCurrency(dailyRevenue.transfers)}
+                    </div>
+                    <div style="font-size: 0.9rem; color: #6b7280;">${dailyRevenue.transferCount} transferencias</div>
+                </div>
+
+                <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <h3 style="margin: 0 0 1rem 0;">💰 Total del Día</h3>
+                    <div style="font-size: 2rem; font-weight: bold; color: #8b5cf6; margin-bottom: 0.5rem;">
+                        ${formatCurrency(dailyRevenue.total)}
+                    </div>
+                    <div style="font-size: 0.9rem; color: #6b7280;">${dailyRevenue.payments.length} pagos totales</div>
+                </div>
+            </div>
+
+            <!-- Payment Details Table -->
+            ${dailyRevenue.payments.length > 0 ? `
+                <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <h3 style="margin: 0 0 1rem 0;">📋 Detalle de Pagos</h3>
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead style="background: #f3f4f6;">
+                                <tr>
+                                    <th style="padding: 0.75rem; text-align: left;">Hora</th>
+                                    <th style="padding: 0.75rem; text-align: left;">Estudiante</th>
+                                    <th style="padding: 0.75rem; text-align: left;">Método</th>
+                                    <th style="padding: 0.75rem; text-align: right;">Monto</th>
+                                    <th style="padding: 0.75rem; text-align: left;">Registrado por</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${dailyRevenue.payments.map(payment => {
+                                    const student = students.get(payment.studentId);
+                                    const time = payment.date ? new Date(payment.date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '-';
+                                    return `
+                                        <tr style="border-top: 1px solid #e5e7eb;">
+                                            <td style="padding: 0.75rem;">${time}</td>
+                                            <td style="padding: 0.75rem;">${student?.nombre || 'N/A'}</td>
+                                            <td style="padding: 0.75rem;">
+                                                <span style="background: ${payment.method === 'Efectivo' ? '#10b981' : '#3b82f6'}; color: white; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.85rem;">
+                                                    ${payment.method} ${payment.bank ? '- ' + payment.bank : ''}
+                                                </span>
+                                            </td>
+                                            <td style="padding: 0.75rem; text-align: right; font-weight: 600;">${formatCurrency(payment.amount)}</td>
+                                            <td style="padding: 0.75rem; font-size: 0.85rem; color: #6b7280;">${payment.registeredByName || 'Sistema'}</td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            ` : ''}
+
+            <!-- Expenses Table -->
+            ${todayExpenses.length > 0 ? `
+                <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <h3 style="margin: 0 0 1rem 0;">💸 Gastos del Día</h3>
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead style="background: #f3f4f6;">
+                                <tr>
+                                    <th style="padding: 0.75rem; text-align: left;">Fecha</th>
+                                    <th style="padding: 0.75rem; text-align: left;">Categoría</th>
+                                    <th style="padding: 0.75rem; text-align: left;">Descripción</th>
+                                    <th style="padding: 0.75rem; text-align: right;">Monto</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${todayExpenses.map(expense => `
+                                    <tr style="border-top: 1px solid #e5e7eb;">
+                                        <td style="padding: 0.75rem;">${new Date(expense.date).toLocaleDateString('es-ES')}</td>
+                                        <td style="padding: 0.75rem;">${expense.category || 'N/A'}</td>
+                                        <td style="padding: 0.75rem;">${expense.description || '-'}</td>
+                                        <td style="padding: 0.75rem; text-align: right; font-weight: 600; color: #ef4444;">${formatCurrency(expense.amount)}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                            <tfoot style="background: #f3f4f6; font-weight: bold;">
+                                <tr>
+                                    <td colspan="3" style="padding: 0.75rem; text-align: right;">Total:</td>
+                                    <td style="padding: 0.75rem; text-align: right; color: #ef4444;">${formatCurrency(totalExpenses)}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            ` : ''}
+
+            <!-- Notes Section -->
+            ${reconciliation.notes ? `
+                <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <h3 style="margin: 0 0 0.5rem 0;">📝 Notas del Cierre</h3>
+                    <p style="margin: 0; color: #6b7280; white-space: pre-wrap;">${reconciliation.notes}</p>
+                </div>
+            ` : ''}
+        </div>
+    `;
+
+    container.style.display = 'block';
 };
 
 window.saveDailyReconciliation = async function(event) {
