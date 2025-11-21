@@ -663,9 +663,9 @@ function renderStudentTable(students) {
                                             aria-label="Pagos" title="Ver Pagos">
                                         💰
                                     </button>
-                                    <button onclick="openPaymentNotes('${s.id}')" class="btn btn-sm"
+                                    <button onclick="openStudentNotes('${s.id}')" class="btn btn-sm"
                                             style="background: #8b5cf6; color: white; padding: 0.5rem 0.75rem; font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif; font-size: 1.2rem; min-width: 42px; height: 36px; line-height: 1;"
-                                            aria-label="Notas" title="Notas de Pago">
+                                            aria-label="Notas" title="Notas del Estudiante">
                                         📝
                                     </button>
                                     <button onclick="deleteStudent('${s.id}')" class="btn btn-sm"
@@ -961,6 +961,165 @@ window.closePaymentNotesModal = function() {
     const modal = document.getElementById('paymentNotesModal');
     if (modal) modal.remove();
 };
+
+// ============================================
+// STUDENT NOTES SYSTEM - Historial de Notas
+// ============================================
+
+window.openStudentNotes = function(studentId) {
+    const student = window.StudentManager.students.get(studentId);
+    if (!student) return;
+
+    const container = document.getElementById('studentsContainer');
+    const existingModal = document.getElementById('studentNotesModal');
+    if (existingModal) existingModal.remove();
+
+    // Get notes array (create if doesn't exist)
+    const notes = student.notes || [];
+
+    const modal = `
+        <div id="studentNotesModal" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+             background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;">
+            <div style="background: white; border-radius: 12px; max-width: 700px; width: 90%; max-height: 80vh; display: flex; flex-direction: column;">
+
+                <!-- Header -->
+                <div style="padding: 1.5rem; border-bottom: 2px solid #e5e7eb; background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%); color: white; border-radius: 12px 12px 0 0;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h3 style="margin: 0; font-size: 1.25rem;">📝 Notas de ${student.nombre}</h3>
+                        <button onclick="closeStudentNotesModal()" style="background: rgba(255,255,255,0.2); border: none; color: white; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 1.2rem;">
+                            ✖
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Notes History -->
+                <div id="notesHistoryContainer" style="flex: 1; overflow-y: auto; padding: 1.5rem; background: #f9fafb;">
+                    ${notes.length === 0 ? `
+                        <div style="text-align: center; padding: 3rem; color: #9ca3af;">
+                            <div style="font-size: 3rem; margin-bottom: 1rem;">📝</div>
+                            <p style="margin: 0; font-size: 1.1rem;">No hay notas registradas</p>
+                            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Agrega la primera nota abajo</p>
+                        </div>
+                    ` : notes.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map(note => `
+                        <div style="background: white; padding: 1rem; margin-bottom: 1rem; border-radius: 8px; border-left: 4px solid #8b5cf6; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <span style="background: #8b5cf6; color: white; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
+                                        ${note.createdByName || 'Usuario'}
+                                    </span>
+                                </div>
+                                <div style="text-align: right; font-size: 0.75rem; color: #6b7280;">
+                                    <div>${formatDateTime(note.createdAt)}</div>
+                                </div>
+                            </div>
+                            <div style="white-space: pre-wrap; color: #374151; line-height: 1.6;">
+                                ${note.text}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+
+                <!-- Add New Note -->
+                <div style="padding: 1.5rem; border-top: 2px solid #e5e7eb; background: white; border-radius: 0 0 12px 12px;">
+                    <form id="addNoteForm" onsubmit="return false;">
+                        <div style="margin-bottom: 1rem;">
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">
+                                ➕ Nueva Nota
+                            </label>
+                            <textarea id="newNoteText"
+                                      placeholder="Escribe una nota sobre el estudiante..."
+                                      style="width: 100%; min-height: 80px; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px; font-family: inherit; resize: vertical;"
+                                      required></textarea>
+                        </div>
+                        <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
+                            <button type="button" onclick="closeStudentNotesModal()"
+                                    style="padding: 0.75rem 1.5rem; background: #e5e7eb; color: #374151; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">
+                                Cancelar
+                            </button>
+                            <button type="submit" onclick="saveStudentNote('${studentId}')"
+                                    style="padding: 0.75rem 1.5rem; background: #8b5cf6; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">
+                                💾 Guardar Nota
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+            </div>
+        </div>
+    `;
+
+    container.insertAdjacentHTML('beforeend', modal);
+};
+
+window.saveStudentNote = async function(studentId) {
+    const noteText = document.getElementById('newNoteText').value.trim();
+
+    if (!noteText) {
+        window.showNotification('⚠️ Por favor escribe una nota', 'warning');
+        return;
+    }
+
+    try {
+        const student = window.StudentManager.students.get(studentId);
+        if (!student) {
+            window.showNotification('❌ Estudiante no encontrado', 'error');
+            return;
+        }
+
+        // Get current user info
+        const currentUser = window.FirebaseData?.currentUser;
+        const userEmail = currentUser?.email || 'Sistema';
+        const userName = currentUser?.displayName || userEmail.split('@')[0];
+
+        // Create new note
+        const newNote = {
+            id: `NOTE-${Date.now()}`,
+            text: noteText,
+            createdBy: userEmail,
+            createdByName: userName,
+            createdAt: window.getLocalDateTime ? window.getLocalDateTime() : new Date().toISOString()
+        };
+
+        // Get existing notes or create new array
+        const notes = student.notes || [];
+        notes.push(newNote);
+
+        // Update student with new notes
+        await window.StudentManager.updateStudent(studentId, { notes });
+
+        window.showNotification('✅ Nota guardada exitosamente', 'success');
+
+        // Refresh the modal
+        closeStudentNotesModal();
+        openStudentNotes(studentId);
+    } catch (error) {
+        console.error('❌ Error saving note:', error);
+        window.showNotification('❌ Error al guardar nota', 'error');
+    }
+};
+
+window.closeStudentNotesModal = function() {
+    const modal = document.getElementById('studentNotesModal');
+    if (modal) modal.remove();
+};
+
+// Helper function to format datetime
+function formatDateTime(dateStr) {
+    if (!dateStr) return '-';
+
+    const date = new Date(dateStr);
+    const dateOptions = {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+    };
+    const timeOptions = {
+        hour: '2-digit',
+        minute: '2-digit'
+    };
+
+    return `${date.toLocaleDateString('es-ES', dateOptions)} • ${date.toLocaleTimeString('es-ES', timeOptions)}`;
+}
 // ============================================
 // SECTION 8: FORM SAVE FUNCTION
 // ============================================
