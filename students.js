@@ -1202,9 +1202,146 @@ async function saveStudentForm(studentId) {
 // SECTION 9: PAYMENT VIEW FUNCTION
 // ============================================
 
-window.viewStudentPayments = function(id) {
-    // This will be handled by payments module
-    window.showNotification('💰 Ver pagos - Próximamente', 'info');
+window.viewStudentPayments = function(studentId) {
+    const student = window.StudentManager.students.get(studentId);
+    if (!student) {
+        window.showNotification('❌ Estudiante no encontrado', 'error');
+        return;
+    }
+
+    // Get all payments for this student from global collection
+    let payments = [];
+    if (window.PaymentManager && window.PaymentManager.payments) {
+        payments = Array.from(window.PaymentManager.payments.values())
+            .filter(p => p.studentId === studentId)
+            .sort((a, b) => new Date(b.date) - new Date(a.date));
+    }
+
+    const container = document.getElementById('studentsContainer');
+    const existingModal = document.getElementById('studentPaymentsModal');
+    if (existingModal) existingModal.remove();
+
+    // Calculate totals
+    const totalPaid = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+    const paymentsByYear = {};
+    payments.forEach(p => {
+        const year = p.year || new Date(p.date).getFullYear();
+        if (!paymentsByYear[year]) paymentsByYear[year] = [];
+        paymentsByYear[year].push(p);
+    });
+
+    const modal = `
+        <div id="studentPaymentsModal" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+             background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;">
+            <div style="background: white; border-radius: 12px; max-width: 800px; width: 90%; max-height: 85vh; display: flex; flex-direction: column;">
+
+                <!-- Header -->
+                <div style="padding: 1.5rem; border-bottom: 2px solid #e5e7eb; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border-radius: 12px 12px 0 0;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <h3 style="margin: 0 0 0.5rem 0; font-size: 1.25rem;">💰 Pagos de ${student.nombre}</h3>
+                            <div style="font-size: 0.9rem; opacity: 0.9;">
+                                Mensualidad: $${(student.valor || 0).toLocaleString('es-CO')} •
+                                Total pagado: $${totalPaid.toLocaleString('es-CO')}
+                            </div>
+                        </div>
+                        <button onclick="closeStudentPaymentsModal()" style="background: rgba(255,255,255,0.2); border: none; color: white; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 1.2rem;">
+                            ✖
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Payments List -->
+                <div style="flex: 1; overflow-y: auto; padding: 1.5rem; background: #f9fafb;">
+                    ${payments.length === 0 ? `
+                        <div style="text-align: center; padding: 3rem; color: #9ca3af;">
+                            <div style="font-size: 3rem; margin-bottom: 1rem;">💰</div>
+                            <p style="margin: 0; font-size: 1.1rem;">No hay pagos registrados</p>
+                            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">Los pagos aparecerán aquí cuando se registren</p>
+                        </div>
+                    ` : Object.keys(paymentsByYear).sort((a, b) => b - a).map(year => `
+                        <div style="margin-bottom: 2rem;">
+                            <h4 style="color: #374151; margin: 0 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid #e5e7eb; font-size: 1.1rem;">
+                                📅 ${year}
+                            </h4>
+                            ${paymentsByYear[year].map(payment => {
+                                const date = new Date(payment.date);
+                                const dateStr = date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+                                const timeStr = date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+                                const monthLabel = payment.month === 'matrícula' ? '🎓 Matrícula' : `📆 ${payment.month.charAt(0).toUpperCase() + payment.month.slice(1)}`;
+
+                                let methodColor = '#3b82f6';
+                                if (payment.method === 'Efectivo') methodColor = '#10b981';
+                                else if (payment.method === 'Transferencia') methodColor = '#6366f1';
+                                else if (payment.bank === 'Nequi') methodColor = '#ec4899';
+                                else if (payment.bank === 'Bancolombia') methodColor = '#f59e0b';
+
+                                return `
+                                <div style="background: white; padding: 1rem; margin-bottom: 0.75rem; border-radius: 8px; border-left: 4px solid ${methodColor}; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                                        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                                            <div style="font-weight: 600; color: #111827; font-size: 1.1rem;">
+                                                $${(payment.amount || 0).toLocaleString('es-CO')}
+                                            </div>
+                                            <div style="font-size: 0.9rem; color: #6b7280;">
+                                                ${monthLabel}
+                                            </div>
+                                        </div>
+                                        <div style="text-align: right;">
+                                            <div style="background: ${methodColor}; color: white; padding: 0.25rem 0.75rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; margin-bottom: 0.25rem;">
+                                                ${payment.method}${payment.bank ? ' - ' + payment.bank : ''}
+                                            </div>
+                                            <div style="font-size: 0.75rem; color: #6b7280;">
+                                                ${dateStr} • ${timeStr}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    ${payment.notes ? `
+                                        <div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid #e5e7eb; font-size: 0.85rem; color: #6b7280;">
+                                            💬 ${payment.notes}
+                                        </div>
+                                    ` : ''}
+                                </div>
+                                `;
+                            }).join('')}
+                            <div style="text-align: right; font-weight: 600; color: #059669; margin-top: 0.5rem; padding: 0.5rem; background: #d1fae5; border-radius: 6px;">
+                                Subtotal ${year}: $${paymentsByYear[year].reduce((sum, p) => sum + (p.amount || 0), 0).toLocaleString('es-CO')}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+
+                <!-- Footer with Summary -->
+                <div style="padding: 1.5rem; border-top: 2px solid #e5e7eb; background: white; border-radius: 0 0 12px 12px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="font-size: 0.9rem; color: #6b7280; margin-bottom: 0.25rem;">Total de pagos</div>
+                            <div style="font-size: 1.5rem; font-weight: 700; color: #059669;">
+                                $${totalPaid.toLocaleString('es-CO')}
+                            </div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-size: 0.9rem; color: #6b7280; margin-bottom: 0.25rem;">Cantidad de pagos</div>
+                            <div style="font-size: 1.5rem; font-weight: 700; color: #374151;">
+                                ${payments.length}
+                            </div>
+                        </div>
+                        <button onclick="closeStudentPaymentsModal()" style="padding: 0.75rem 1.5rem; background: #10b981; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">
+                            Cerrar
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    `;
+
+    container.insertAdjacentHTML('beforeend', modal);
+};
+
+window.closeStudentPaymentsModal = function() {
+    const modal = document.getElementById('studentPaymentsModal');
+    if (modal) modal.remove();
 };
 
 // ============================================
