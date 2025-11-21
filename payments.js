@@ -1818,6 +1818,12 @@ function renderPaymentTable(students) {
                                         title="Enviar Recordatorio">
                                     R
                                 </button>
+                                <button onclick="openStudentNotes('${s.id}')"
+                                        class="btn btn-sm"
+                                        style="background: #8b5cf6; color: white; padding: 0.4rem 0.6rem; font-size: 13px; font-weight: bold; margin-right: 0.3rem; border-radius: 4px; border: none; cursor: pointer;"
+                                        title="Notas del Estudiante">
+                                    📝
+                                </button>
                                 ${status.status === 'Pagado' ? `
                                 <button onclick="generatePazYSalvo('${s.id}')"
                                         class="btn btn-sm"

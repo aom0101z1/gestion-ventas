@@ -984,7 +984,10 @@ window.openStudentNotes = function(studentId) {
     const student = window.StudentManager.students.get(studentId);
     if (!student) return;
 
-    const container = document.getElementById('studentsContainer');
+    // Try to find the appropriate container (works from both Students and Payments modules)
+    const container = document.getElementById('studentsContainer') ||
+                      document.getElementById('paymentsContainer') ||
+                      document.body;
     const existingModal = document.getElementById('studentNotesModal');
     if (existingModal) existingModal.remove();
 
