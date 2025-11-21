@@ -3229,6 +3229,10 @@ window.diagnosticPaymentDates = function() {
     students.forEach(student => {
         if (student.pagos) {
             Object.values(student.pagos).forEach(payment => {
+                if (!payment.date) {
+                    console.warn('⚠️ Payment without date for student:', student.nombre, payment);
+                    return;
+                }
                 const date = payment.date.split('T')[0];
                 if (!paymentDates[date]) {
                     paymentDates[date] = { count: 0, students: [], totalAmount: 0 };
