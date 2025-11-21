@@ -4066,9 +4066,10 @@ window.loadHistoricalClosure = async function(date) {
     const expectedClosing = openingBalance + dailyRevenue.cash - totalExpenses;
     const discrepancy = closingCount - expectedClosing;
 
-    // Format times
+    // Format times - Use Colombia timezone explicitly
     const openedAtTime = reconciliation.openedAt ?
         new Date(reconciliation.openedAt).toLocaleString('es-ES', {
+            timeZone: 'America/Bogota',
             hour: '2-digit',
             minute: '2-digit',
             second: '2-digit',
@@ -4079,6 +4080,7 @@ window.loadHistoricalClosure = async function(date) {
 
     const closedAtTime = reconciliation.closedAt ?
         new Date(reconciliation.closedAt).toLocaleString('es-ES', {
+            timeZone: 'America/Bogota',
             hour: '2-digit',
             minute: '2-digit',
             second: '2-digit',
@@ -4119,7 +4121,11 @@ window.loadHistoricalClosure = async function(date) {
             <div style="background: ${reconciliation.isClosed ? '#10b981' : '#fbbf24'}; color: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <div>
-                        <h2 style="margin: 0 0 0.5rem 0;">${reconciliation.isClosed ? '🔒' : '🔓'} Cierre de Caja - ${new Date(date).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h2>
+                        <h2 style="margin: 0 0 0.5rem 0;">${reconciliation.isClosed ? '🔒' : '🔓'} Cierre de Caja - ${(() => {
+                            const [year, month, day] = date.split('-').map(Number);
+                            const dateObj = new Date(year, month - 1, day);
+                            return dateObj.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                        })()}</h2>
                         <p style="margin: 0; opacity: 0.9; font-size: 0.95rem;">
                             Estado: <strong>${reconciliation.isClosed ? 'CERRADO' : 'ABIERTO'}</strong>
                             ${reconciliation.isClosed ? ` por ${reconciliation.closedByName || 'Usuario'}` : ''}
