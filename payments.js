@@ -3762,92 +3762,92 @@ function getPazYSalvoHTML(data) {
         <div class="paz-y-salvo-print" style="width: 500px; padding: 25px; border: 3px double #000; font-family: 'Georgia', serif; position: relative; background: white; margin: 0 auto;">
             <!-- Header with Logo -->
             <div style="text-align: center; margin-bottom: 20px;">
-                <img src="images/logo.png" alt="Logo Ciudad Bilingüe" style="width: 100px; height: auto; margin: 0 auto 10px; display: block;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                <img src="images/logo.png" alt="Logo Ciudad Bilingüe" style="width: 100px; height: auto; margin: 0 auto 10px; display: block; filter: grayscale(100%);" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
                 <div style="width: 60px; height: 60px; margin: 0 auto 10px; display: none;">
                     <svg width="60" height="60" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-                        <circle cx="50" cy="50" r="48" fill="#E53E3E" stroke="none"/>
+                        <circle cx="50" cy="50" r="48" fill="#000" stroke="none"/>
                         <path d="M30 45 L40 35 L50 45 L60 35 L70 45" stroke="white" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
                         <rect x="28" y="48" width="44" height="28" fill="white" stroke="none"/>
-                        <rect x="35" y="55" width="8" height="10" fill="#E53E3E"/>
-                        <rect x="46" y="55" width="8" height="10" fill="#E53E3E"/>
-                        <rect x="57" y="55" width="8" height="10" fill="#E53E3E"/>
-                        <rect x="40" y="68" width="20" height="8" fill="#E53E3E"/>
+                        <rect x="35" y="55" width="8" height="10" fill="#000"/>
+                        <rect x="46" y="55" width="8" height="10" fill="#000"/>
+                        <rect x="57" y="55" width="8" height="10" fill="#000"/>
+                        <rect x="40" y="68" width="20" height="8" fill="#000"/>
                     </svg>
                 </div>
-                <h1 style="margin: 0; font-size: 20px; font-weight: bold; color: #1a202c;">CIUDAD BILINGÜE</h1>
-                <p style="margin: 4px 0 0 0; font-size: 11px; color: #4a5568;">Centro de Idiomas y Capacitación</p>
-                <p style="margin: 2px 0 0 0; font-size: 10px; color: #718096;">NIT: 900.123.456-7</p>
+                <h1 style="margin: 0; font-size: 20px; font-weight: bold; color: #000;">CIUDAD BILINGÜE</h1>
+                <p style="margin: 4px 0 0 0; font-size: 11px; color: #333;">Centro de Idiomas y Capacitación</p>
+                <p style="margin: 2px 0 0 0; font-size: 10px; color: #666;">NIT: 900.123.456-7</p>
             </div>
 
             <!-- Certificate Title -->
-            <div style="text-align: center; margin: 20px 0; padding: 12px; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-radius: 6px; border: 2px solid #0ea5e9;">
-                <h2 style="margin: 0; font-size: 24px; font-weight: bold; color: #0c4a6e; letter-spacing: 1.5px;">PAZ Y SALVO</h2>
-                <p style="margin: 4px 0 0 0; font-size: 11px; color: #075985; font-style: italic;">Certificado de Pagos al Día</p>
+            <div style="text-align: center; margin: 20px 0; padding: 12px; background: #f5f5f5; border-radius: 6px; border: 2px solid #000;">
+                <h2 style="margin: 0; font-size: 24px; font-weight: bold; color: #000; letter-spacing: 1.5px;">PAZ Y SALVO</h2>
+                <p style="margin: 4px 0 0 0; font-size: 11px; color: #333; font-style: italic;">Certificado de Pagos al Día</p>
             </div>
 
             <!-- Certificate Body -->
-            <div style="margin: 20px 0; padding: 18px; background: #fafafa; border-left: 3px solid #10b981; border-radius: 4px;">
-                <p style="font-size: 12px; line-height: 1.6; color: #1f2937; text-align: justify; margin: 0;">
+            <div style="margin: 20px 0; padding: 18px; background: #fafafa; border-left: 3px solid #000; border-radius: 4px;">
+                <p style="font-size: 12px; line-height: 1.6; color: #000; text-align: justify; margin: 0;">
                     La <strong>CIUDAD BILINGÜE</strong>, Centro de Idiomas y Capacitación, hace constar que el(la) estudiante:
                 </p>
 
-                <div style="margin: 15px 0; padding: 12px; background: white; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                    <p style="margin: 6px 0; font-size: 13px; color: #1f2937;">
-                        <strong style="color: #059669;">Nombre:</strong> <span style="font-size: 15px; color: #0c4a6e; font-weight: bold;">${data.studentName}</span>
+                <div style="margin: 15px 0; padding: 12px; background: white; border-radius: 4px; border: 1px solid #ccc;">
+                    <p style="margin: 6px 0; font-size: 13px; color: #000;">
+                        <strong>Nombre:</strong> <span style="font-size: 15px; color: #000; font-weight: bold;">${data.studentName}</span>
                     </p>
-                    <p style="margin: 6px 0; font-size: 12px; color: #4b5563;">
-                        <strong style="color: #059669;">Identificación:</strong> ${data.studentId}
+                    <p style="margin: 6px 0; font-size: 12px; color: #333;">
+                        <strong>Identificación:</strong> ${data.studentId}
                     </p>
                 </div>
 
-                <p style="font-size: 12px; line-height: 1.6; color: #1f2937; text-align: justify; margin: 15px 0 0 0;">
-                    Se encuentra <strong style="color: #059669;">AL DÍA</strong> con sus obligaciones financieras correspondientes al mes actual,
+                <p style="font-size: 12px; line-height: 1.6; color: #000; text-align: justify; margin: 15px 0 0 0;">
+                    Se encuentra <strong>AL DÍA</strong> con sus obligaciones financieras correspondientes al mes actual,
                     habiendo cumplido satisfactoriamente con todos los pagos requeridos por el programa académico en el cual
                     se encuentra inscrito(a).
                 </p>
 
-                <p style="font-size: 12px; line-height: 1.6; color: #1f2937; text-align: justify; margin: 12px 0 0 0;">
+                <p style="font-size: 12px; line-height: 1.6; color: #000; text-align: justify; margin: 12px 0 0 0;">
                     Este certificado se expide a solicitud del interesado para los fines que estime convenientes.
                 </p>
             </div>
 
             <!-- Status Badge -->
             <div style="text-align: center; margin: 18px 0;">
-                <div style="display: inline-block; padding: 10px 25px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 40px; box-shadow: 0 3px 5px rgba(5, 150, 105, 0.3);">
+                <div style="display: inline-block; padding: 10px 25px; background: #000; border-radius: 40px; border: 2px solid #000;">
                     <span style="color: white; font-size: 13px; font-weight: bold; letter-spacing: 0.8px;">✓ ESTADO: AL DÍA CON PAGOS</span>
                 </div>
             </div>
 
             <!-- Footer with Date and Signature -->
             <div style="margin-top: 25px;">
-                <p style="font-size: 11px; color: #4b5563; text-align: center; margin-bottom: 20px;">
+                <p style="font-size: 11px; color: #333; text-align: center; margin-bottom: 20px;">
                     Expedido en Medellín, a los <strong>${data.date}</strong>
                 </p>
 
                 <div style="margin-top: 35px; text-align: center;">
                     <!-- Signature Image -->
-                    <img src="images/firma.png" alt="Firma" style="height: 50px; width: auto; margin: 0 auto 5px; display: block;" onerror="this.style.display='none';">
+                    <img src="images/firma.png" alt="Firma" style="height: 50px; width: auto; margin: 0 auto 5px; display: block; filter: grayscale(100%);" onerror="this.style.display='none';">
 
                     <div style="display: inline-block; border-top: 2px solid #000; padding-top: 6px; min-width: 250px;">
-                        <p style="margin: 0; font-size: 12px; font-weight: bold; color: #1f2937;">CIUDAD BILINGÜE</p>
-                        <p style="margin: 2px 0 0 0; font-size: 10px; color: #6b7280;">Dirección Académica y Administrativa</p>
+                        <p style="margin: 0; font-size: 12px; font-weight: bold; color: #000;">CIUDAD BILINGÜE</p>
+                        <p style="margin: 2px 0 0 0; font-size: 10px; color: #666;">Dirección Académica y Administrativa</p>
                     </div>
                 </div>
             </div>
 
             <!-- Certificate Metadata -->
-            <div style="margin-top: 25px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
-                <p style="font-size: 9px; color: #9ca3af; text-align: center; margin: 0;">
+            <div style="margin-top: 25px; padding-top: 15px; border-top: 1px solid #ccc;">
+                <p style="font-size: 9px; color: #999; text-align: center; margin: 0;">
                     Certificado expedido electrónicamente el ${data.dateISO} por ${data.operator}
                 </p>
-                <p style="font-size: 9px; color: #9ca3af; text-align: center; margin: 4px 0 0 0;">
+                <p style="font-size: 9px; color: #999; text-align: center; margin: 4px 0 0 0;">
                     Este documento es válido sin firma autógrafa de conformidad con el Decreto 2150 de 1995
                 </p>
             </div>
 
             <!-- Watermark -->
-            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); opacity: 0.05; pointer-events: none; z-index: 0;">
-                <p style="font-size: 100px; font-weight: bold; color: #10b981; margin: 0; white-space: nowrap;">PAZ Y SALVO</p>
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); opacity: 0.03; pointer-events: none; z-index: 0;">
+                <p style="font-size: 100px; font-weight: bold; color: #000; margin: 0; white-space: nowrap;">PAZ Y SALVO</p>
             </div>
         </div>
     `;
