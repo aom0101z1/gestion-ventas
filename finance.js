@@ -4240,7 +4240,18 @@ window.loadHistoricalClosure = async function(date) {
     const totalExpenses = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
 
     // Get students map for payment details
-    const students = window.StudentManager ? window.StudentManager.students : new Map();
+    // Try multiple sources to ensure we find student names
+    let students = new Map();
+
+    if (window.StudentManager?.students) {
+        students = window.StudentManager.students;
+    } else if (window.StudentManager?.getStudents) {
+        // If students Map not available, try getStudents() method
+        const studentsList = window.StudentManager.getStudents();
+        studentsList.forEach(s => students.set(s.id, s));
+    }
+
+    console.log('📚 Students available for name lookup:', students.size);
 
     // Calculate values
     const openingBalance = reconciliation.openingBalance || 0;
@@ -4422,6 +4433,18 @@ window.loadHistoricalClosure = async function(date) {
                             <tbody>
                                 ${dailyRevenue.payments.map(payment => {
                                     const student = students.get(payment.studentId);
+
+                                    // Debug if student not found
+                                    if (!student && payment.studentId) {
+                                        console.warn('⚠️ Student not found for payment:', {
+                                            paymentId: payment.id,
+                                            studentId: payment.studentId,
+                                            amount: payment.amount,
+                                            availableStudents: students.size,
+                                            sampleIds: Array.from(students.keys()).slice(0, 5)
+                                        });
+                                    }
+
                                     const time = payment.date ? new Date(payment.date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '-';
                                     return `
                                         <tr style="border-top: 1px solid #e5e7eb;">
