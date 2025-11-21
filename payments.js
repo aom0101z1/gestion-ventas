@@ -2695,6 +2695,20 @@ window.loadPaymentsTab = async function() {
                                 </select>
                             </div>
 
+                            <!-- Modalidad Filter -->
+                            <div>
+                                <label style="display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.25rem; color: #374151;">
+                                    📚 Modalidad
+                                </label>
+                                <select id="modalidadFilter" onchange="filterPayments()" style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                                    <option value="">Todas las modalidades</option>
+                                    <option value="Presencial">Presencial</option>
+                                    <option value="Compañia">Compañía</option>
+                                    <option value="Escuela">Escuela</option>
+                                    <option value="Online">Online</option>
+                                </select>
+                            </div>
+
                             <!-- Month/Year Filter -->
                             <div>
                                 <label style="display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.25rem; color: #374151;">
@@ -2822,6 +2836,7 @@ window.filterPayments = function() {
     const statusFilter = document.getElementById('paymentFilter')?.value || '';
     const methodFilter = document.getElementById('methodFilter')?.value || '';
     const bankFilter = document.getElementById('bankFilter')?.value || '';
+    const modalidadFilter = document.getElementById('modalidadFilter')?.value || '';
     const monthFilter = document.getElementById('monthFilter')?.value || '';
     const yearFilter = document.getElementById('yearFilter')?.value || '';
 
@@ -2891,6 +2906,11 @@ window.filterPayments = function() {
             const doc = (s.documento || '').toLowerCase();
             return name.includes(searchName) || phone.includes(searchName) || doc.includes(searchName);
         });
+    }
+
+    // Apply modalidad filter
+    if (modalidadFilter) {
+        students = students.filter(s => s.modalidad === modalidadFilter);
     }
 
     // Apply status filter
