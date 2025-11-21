@@ -3221,6 +3221,48 @@ window.setDateRangePreset = function(preset) {
     applyDateRangeFilter();
 };
 
+// DIAGNOSTIC: Show all payment dates in the system
+window.diagnosticPaymentDates = function() {
+    const students = window.StudentManager.getStudents();
+    const paymentDates = {};
+
+    students.forEach(student => {
+        if (student.pagos) {
+            Object.values(student.pagos).forEach(payment => {
+                const date = payment.date.split('T')[0];
+                if (!paymentDates[date]) {
+                    paymentDates[date] = { count: 0, students: [], totalAmount: 0 };
+                }
+                paymentDates[date].count++;
+                paymentDates[date].students.push(student.nombre);
+                paymentDates[date].totalAmount += payment.amount || 0;
+            });
+        }
+    });
+
+    // Sort by date
+    const sortedDates = Object.keys(paymentDates).sort();
+
+    console.log('📅 PAYMENT DATES IN SYSTEM:');
+    console.log('================================');
+    sortedDates.forEach(date => {
+        const data = paymentDates[date];
+        console.log(`📆 ${date}: ${data.count} payments, $${data.totalAmount.toLocaleString('es-CO')}`);
+    });
+    console.log('================================');
+    console.log(`Total dates with payments: ${sortedDates.length}`);
+    console.log('Recent dates (last 10):');
+    console.table(
+        sortedDates.slice(-10).map(date => ({
+            Date: date,
+            Payments: paymentDates[date].count,
+            Total: `$${paymentDates[date].totalAmount.toLocaleString('es-CO')}`
+        }))
+    );
+
+    return paymentDates;
+};
+
 window.exportPaymentReport = async function() {
     console.log('🔄 CSV Export v2.0 - Starting export...');
     try {
