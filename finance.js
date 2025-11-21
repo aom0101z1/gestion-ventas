@@ -4486,7 +4486,7 @@ window.loadHistoricalClosure = async function(date) {
                 </div>
             ` : ''}
 
-            <!-- Admin Controls: Reopen Closure Button -->
+            <!-- Admin Controls: Reopen/Close Closure Buttons -->
             ${reconciliation.isClosed && (window.userRole === 'admin' || window.userRole === 'director') ? `
                 <div style="background: #fef3c7; border: 2px solid #fbbf24; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                     <div style="display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
@@ -4505,10 +4505,189 @@ window.loadHistoricalClosure = async function(date) {
                     </div>
                 </div>
             ` : ''}
+
+            <!-- Admin Controls: Close Open Closure Button -->
+            ${!reconciliation.isClosed && (window.userRole === 'admin' || window.userRole === 'director') ? `
+                <div style="background: #dcfce7; border: 2px solid #10b981; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
+                        <div>
+                            <h3 style="margin: 0 0 0.5rem 0;">🔒 Cerrar Caja desde Historial</h3>
+                            <p style="margin: 0; color: #065f46; font-size: 0.9rem;">
+                                Este cierre está abierto. Puedes cerrarlo desde aquí ingresando el conteo de caja.
+                            </p>
+                        </div>
+                        <button onclick="closeHistoricalClosure('${date}')"
+                                style="padding: 0.75rem 1.5rem; background: #10b981; color: white; border: 2px solid #059669; border-radius: 8px; cursor: pointer; font-weight: 600; white-space: nowrap; transition: all 0.2s;"
+                                onmouseover="this.style.background='#059669';"
+                                onmouseout="this.style.background='#10b981';">
+                            🔒 Cerrar Caja
+                        </button>
+                    </div>
+                </div>
+            ` : ''}
         </div>
     `;
 
     container.style.display = 'block';
+};
+
+/**
+ * Close an open closure from historical view
+ * Prompts for closing count and closes the day
+ */
+window.closeHistoricalClosure = async function(date) {
+    console.log('🔒 Closing historical closure for:', date);
+
+    try {
+        const reconciliation = window.FinanceManager.getDailyReconciliation(date);
+        if (!reconciliation) {
+            alert('❌ No se encontró el cierre para esta fecha');
+            return;
+        }
+
+        if (reconciliation.isClosed) {
+            alert('ℹ️ Este cierre ya está cerrado.');
+            return;
+        }
+
+        // Get daily revenue
+        const dailyRevenue = await window.FinanceManager.calculateDailyRevenue(date);
+        const todayExpenses = window.FinanceManager.getExpenses({ startDate: date, endDate: date });
+        const totalExpenses = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+        const openingBalance = reconciliation.openingBalance || 0;
+        const expectedClosing = openingBalance + dailyRevenue.cash - totalExpenses;
+
+        // Prompt for closing count
+        const closingCountInput = prompt(
+            `💰 Cierre de Caja - ${new Date(date.split('-').map(Number)).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}\n\n` +
+            `📊 RESUMEN:\n` +
+            `Apertura: $${openingBalance.toLocaleString()}\n` +
+            `Efectivo recibido: $${dailyRevenue.cash.toLocaleString()}\n` +
+            `Gastos: $${totalExpenses.toLocaleString()}\n` +
+            `Cierre esperado: $${expectedClosing.toLocaleString()}\n\n` +
+            `💵 Ingresa el CONTEO REAL de efectivo en caja:`
+        );
+
+        if (closingCountInput === null) {
+            console.log('❌ Cancelled by user');
+            return;
+        }
+
+        // Parse closing count
+        const closingCount = parseCurrencyInput(closingCountInput);
+
+        if (isNaN(closingCount) || closingCount < 0) {
+            alert('❌ Valor inválido. Debe ser un número positivo.');
+            return;
+        }
+
+        const discrepancy = closingCount - expectedClosing;
+
+        // Confirm closure
+        const confirmClose = confirm(
+            `⚠️ ¿Confirmar cierre de caja?\n\n` +
+            `Cierre esperado: $${expectedClosing.toLocaleString()}\n` +
+            `Conteo real: $${closingCount.toLocaleString()}\n` +
+            `Diferencia: ${discrepancy === 0 ? '✅ $0 (Cuadra perfecto)' : (discrepancy > 0 ? `⚠️ +$${discrepancy.toLocaleString()} (Sobrante)` : `❌ -$${Math.abs(discrepancy).toLocaleString()} (Faltante)`)}\n\n` +
+            `Esta acción marcará el día como CERRADO.`
+        );
+
+        if (!confirmClose) {
+            console.log('❌ Cancelled by user');
+            return;
+        }
+
+        // Close the day
+        await window.FinanceManager.closeDay(date);
+
+        console.log('✅ Closure closed successfully');
+
+        alert(
+            `✅ Caja cerrada exitosamente\n\n` +
+            `Fecha: ${new Date(date.split('-').map(Number)).toLocaleDateString('es-ES')}\n` +
+            `Cierre: $${closingCount.toLocaleString()}\n` +
+            `Diferencia: ${discrepancy === 0 ? '$0' : (discrepancy > 0 ? `+$${discrepancy.toLocaleString()}` : `-$${Math.abs(discrepancy).toLocaleString()}`)}`
+        );
+
+        // Reload the historical view
+        await loadHistoricalClosure(date);
+
+    } catch (error) {
+        console.error('❌ Error closing historical closure:', error);
+        alert('❌ Error al cerrar: ' + error.message);
+    }
+};
+
+/**
+ * Parse currency input (handles commas, dots, etc.)
+ */
+function parseCurrencyInput(input) {
+    if (!input) return 0;
+    // Remove everything except numbers
+    return parseInt(input.toString().replace(/[^\d]/g, '')) || 0;
+}
+
+/**
+ * Debug: Find payment and check student data
+ */
+window.debugPayment120k = async function() {
+    console.log('🔍 Looking for $120,000 payment on Nov 19...');
+
+    try {
+        const db = window.firebaseModules.database;
+        const paymentsRef = db.ref(window.FirebaseData.database, 'payments');
+        const snapshot = await db.get(paymentsRef);
+
+        if (!snapshot.exists()) {
+            console.log('❌ No payments found');
+            return;
+        }
+
+        const allPayments = Object.values(snapshot.val());
+        const nov19Payments = allPayments.filter(p => p.date && p.date.startsWith('2025-11-19'));
+        const payment120k = nov19Payments.find(p => p.amount === 120000);
+
+        if (!payment120k) {
+            console.log('❌ $120,000 payment not found on Nov 19');
+            console.log('Payments found:', nov19Payments);
+            return;
+        }
+
+        console.log('\n✅ PAYMENT FOUND:');
+        console.log(payment120k);
+
+        console.log('\n🔍 Checking student data...');
+        console.log('StudentManager exists?', !!window.StudentManager);
+        console.log('Students map exists?', !!window.StudentManager?.students);
+        console.log('Students map size:', window.StudentManager?.students?.size || 0);
+
+        if (payment120k.studentId) {
+            console.log('\nStudent ID in payment:', payment120k.studentId);
+
+            if (window.StudentManager?.students) {
+                const student = window.StudentManager.students.get(payment120k.studentId);
+
+                if (student) {
+                    console.log('✅ STUDENT FOUND:');
+                    console.log('  Name:', student.nombre);
+                    console.log('  ID:', student.id);
+                } else {
+                    console.log('❌ Student NOT FOUND in StudentManager');
+                    console.log('Available student IDs:', Array.from(window.StudentManager.students.keys()).slice(0, 10));
+                }
+            } else {
+                console.log('❌ StudentManager.students not available');
+            }
+        } else {
+            console.log('⚠️ Payment has no studentId');
+        }
+
+        return payment120k;
+
+    } catch (error) {
+        console.error('❌ Error:', error);
+    }
 };
 
 window.saveDailyReconciliation = async function(event) {
