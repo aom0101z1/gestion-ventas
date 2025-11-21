@@ -4240,15 +4240,25 @@ window.loadHistoricalClosure = async function(date) {
     const totalExpenses = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
 
     // Get students map for payment details
-    // Try multiple sources to ensure we find student names
+    // IMPORTANT: Ensure students are loaded from Firebase
     let students = new Map();
 
-    if (window.StudentManager?.students) {
-        students = window.StudentManager.students;
-    } else if (window.StudentManager?.getStudents) {
-        // If students Map not available, try getStudents() method
-        const studentsList = window.StudentManager.getStudents();
-        studentsList.forEach(s => students.set(s.id, s));
+    if (window.StudentManager) {
+        // Check if students are already loaded
+        if (window.StudentManager.students && window.StudentManager.students.size > 0) {
+            students = window.StudentManager.students;
+            console.log('✅ Using cached students:', students.size);
+        } else {
+            // Students not in memory - load from Firebase
+            console.log('⏳ Students not in memory, loading from Firebase...');
+            try {
+                await window.StudentManager.loadStudents();
+                students = window.StudentManager.students;
+                console.log('✅ Loaded students from Firebase:', students.size);
+            } catch (error) {
+                console.error('❌ Error loading students:', error);
+            }
+        }
     }
 
     console.log('📚 Students available for name lookup:', students.size);
