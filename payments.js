@@ -2818,30 +2818,48 @@ window.filterPayments = function() {
         });
 
         const beforeFilter = students.length;
-        students = students.filter(student => {
-            if (!student.pagos) return false;
 
-            // Check if student has any payment in the date range
-            const hasPaymentInRange = Object.values(student.pagos).some(payment => {
-                if (!payment.date) return false;
-                const paymentDate = payment.date.split('T')[0];
-                const inRange = paymentDate >= window.activeDateRangeFilter.startDate &&
-                                paymentDate <= window.activeDateRangeFilter.endDate;
+        // Create a Set to track students with payments in date range
+        const studentsWithPayments = new Set();
 
-                if (inRange) {
-                    console.log('✅ Found payment in range:', {
+        students.forEach(student => {
+            // Check student.pagos (old student-level payment records)
+            if (student.pagos) {
+                const hasPaymentInRange = Object.values(student.pagos).some(payment => {
+                    if (!payment.date) return false;
+                    const paymentDate = payment.date.split('T')[0];
+                    return paymentDate >= window.activeDateRangeFilter.startDate &&
+                           paymentDate <= window.activeDateRangeFilter.endDate;
+                });
+
+                if (hasPaymentInRange) {
+                    studentsWithPayments.add(student.id);
+                }
+            }
+
+            // ALSO check global payments collection (used by Finance module)
+            if (window.PaymentManager && window.PaymentManager.payments) {
+                const globalPayments = Array.from(window.PaymentManager.payments.values());
+                const hasGlobalPayment = globalPayments.some(payment => {
+                    if (!payment.date || !payment.studentId) return false;
+                    const paymentDate = payment.date.split('T')[0];
+                    const inRange = paymentDate >= window.activeDateRangeFilter.startDate &&
+                                   paymentDate <= window.activeDateRangeFilter.endDate;
+                    return inRange && payment.studentId === student.id;
+                });
+
+                if (hasGlobalPayment) {
+                    studentsWithPayments.add(student.id);
+                    console.log('✅ Found payment in global collection:', {
                         student: student.nombre,
-                        paymentDate: paymentDate,
-                        amount: payment.amount,
-                        method: payment.method
+                        studentId: student.id
                     });
                 }
-
-                return inRange;
-            });
-
-            return hasPaymentInRange;
+            }
         });
+
+        // Filter to only students with payments in range
+        students = students.filter(student => studentsWithPayments.has(student.id));
 
         console.log(`📊 Date filter results: ${beforeFilter} → ${students.length} students`);
     }
