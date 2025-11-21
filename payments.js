@@ -3000,18 +3000,24 @@ window.filterPayments = function() {
     if (filteredCountEl) filteredCountEl.textContent = filteredCount;
     if (totalCountEl) totalCountEl.textContent = totalCount;
 
-    // Always recalculate summary when filters are active
-    const hasActiveFilters = monthFilter || yearFilter || window.activeDateRangeFilter.startDate || statusFilter || methodFilter || bankFilter;
+    // Only recalculate summary when filters OTHER than date range are active
+    // Date range filter already calculated the summary correctly in applyDateRangeFilter()
+    const hasDateRangeFilter = window.activeDateRangeFilter.startDate && window.activeDateRangeFilter.endDate;
+    const hasOtherFilters = monthFilter || yearFilter || statusFilter || methodFilter || bankFilter;
 
-    if (hasActiveFilters) {
-        // Calculate summary from filtered students
+    if (hasOtherFilters && !hasDateRangeFilter) {
+        // Only recalculate if using month/year filters without date range
         const filteredSummary = calculateFilteredSummary(students, monthFilter, yearFilter);
         updatePaymentSummaryDisplay(filteredSummary);
-    } else {
-        // No filters - show all data
+        console.log('📊 Updated summary from month/year filter:', filteredSummary);
+    } else if (!hasDateRangeFilter && !hasOtherFilters) {
+        // No filters at all - show all data
         window.PaymentManager.getPaymentSummary().then(summary => {
             updatePaymentSummaryDisplay(summary);
         });
+    } else {
+        // Date range is active - summary was already calculated correctly, DON'T overwrite it
+        console.log('✅ Keeping date range summary (not recalculating)');
     }
 
     // Update table
