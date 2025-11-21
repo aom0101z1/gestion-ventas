@@ -1803,20 +1803,22 @@ function renderPaymentTable(students) {
                             <td style="padding: 0.75rem; text-align: center;">
                                 <button onclick="showPaymentModal('${s.id}')"
                                         class="btn btn-sm"
-                                        style="background: #10b981; color: white; margin-right: 0.5rem;">
-                                    ➕ Registrar
+                                        style="background: #10b981; color: white; padding: 0.4rem 0.6rem; font-size: 13px; font-weight: bold; margin-right: 0.3rem; border-radius: 4px; border: none; cursor: pointer;"
+                                        title="Registrar Pago">
+                                    +
                                 </button>
                                 <button onclick="sendPaymentReminder('${s.id}')"
                                         class="btn btn-sm"
-                                        style="background: #3b82f6; color: white; margin-right: 0.5rem;">
-                                    📱 Recordar
+                                        style="background: #3b82f6; color: white; padding: 0.4rem 0.6rem; font-size: 13px; font-weight: bold; margin-right: 0.3rem; border-radius: 4px; border: none; cursor: pointer;"
+                                        title="Enviar Recordatorio">
+                                    R
                                 </button>
                                 ${status.status === 'Pagado' ? `
                                 <button onclick="generatePazYSalvo('${s.id}')"
                                         class="btn btn-sm"
-                                        style="background: #059669; color: white;"
+                                        style="background: #059669; color: white; padding: 0.4rem 0.6rem; font-size: 13px; font-weight: bold; border-radius: 4px; border: none; cursor: pointer;"
                                         title="Generar Paz y Salvo">
-                                    📄 Paz y Salvo
+                                    PZ
                                 </button>
                                 ` : ''}
                             </td>
