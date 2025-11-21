@@ -229,6 +229,12 @@ class FinanceManager {
     }
 
     async deleteExpense(id) {
+        // Check if user is admin
+        if (window.userRole !== 'admin') {
+            window.showNotification('🚫 Comunícate con administración - no tienes permitido borrar datos de esta plataforma', 'error');
+            return false;
+        }
+
         try {
             const expense = this.expenses.get(id);
 
@@ -4989,9 +4995,11 @@ window.loadExpensesView = function() {
                                         ${expense.registeredByName || 'Sistema'}
                                     </td>
                                     <td style="padding: 0.75rem; text-align: center;">
+                                        ${window.userRole === 'admin' ? `
                                         <button onclick="deleteExpenseConfirm('${expense.id}')" class="btn btn-sm" style="background: #ef4444; color: white; padding: 0.25rem 0.5rem;">
                                             🗑️
                                         </button>
+                                        ` : '<span style="color: #9ca3af; font-size: 0.85rem;">-</span>'}
                                     </td>
                                 </tr>
                             `).join('')}
@@ -5403,6 +5411,12 @@ window.saveExpense = async function(event) {
 };
 
 window.deleteExpenseConfirm = async function(id) {
+    // Check if user is admin
+    if (window.userRole !== 'admin') {
+        window.showNotification('🚫 Comunícate con administración - no tienes permitido borrar datos de esta plataforma', 'error');
+        return;
+    }
+
     if (!confirm('¿Está seguro de eliminar este gasto?')) return;
 
     try {
@@ -6425,6 +6439,12 @@ window.saveOtroIngreso = async function() {
 };
 
 window.deleteOtroIngreso = async function(id) {
+    // Check if user is admin
+    if (window.userRole !== 'admin') {
+        window.showNotification('🚫 Comunícate con administración - no tienes permitido borrar datos de esta plataforma', 'error');
+        return;
+    }
+
     if (!confirm('¿Está seguro de eliminar este ingreso?')) return;
 
     try {
@@ -6576,9 +6596,11 @@ async function renderExpensesViewEnhanced() {
                                         ${expense.registeredByName || 'Sistema'}
                                     </td>
                                     <td style="padding: 0.75rem; text-align: center;">
+                                        ${window.userRole === 'admin' ? `
                                         <button onclick="deleteExpenseConfirm('${expense.id}')" class="btn btn-sm" style="background: #ef4444; color: white; padding: 0.25rem 0.5rem;">
                                             🗑️
                                         </button>
+                                        ` : '<span style="color: #9ca3af; font-size: 0.85rem;">-</span>'}
                                     </td>
                                 </tr>
                             `}).join('')}

@@ -224,6 +224,12 @@ class StudentManager {
 
     // Delete student
     async deleteStudent(id) {
+        // Check if user is admin
+        if (window.userRole !== 'admin') {
+            window.showNotification('🚫 Comunícate con administración - no tienes permitido borrar datos de esta plataforma', 'error');
+            return false;
+        }
+
         if (!confirm('¿Eliminar este estudiante?')) return false;
 
         const student = this.students.get(id);
@@ -668,11 +674,13 @@ function renderStudentTable(students) {
                                             aria-label="Notas" title="Notas del Estudiante">
                                         📝
                                     </button>
+                                    ${window.userRole === 'admin' ? `
                                     <button onclick="deleteStudent('${s.id}')" class="btn btn-sm"
                                             style="background: #ef4444; color: white; padding: 0.5rem 0.75rem; font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif; font-size: 1.2rem; min-width: 42px; height: 36px; line-height: 1;"
                                             aria-label="Eliminar" title="Eliminar">
                                         🗑️
                                     </button>
+                                    ` : ''}
                                 </div>
                             </td>
                         </tr>
@@ -865,6 +873,12 @@ window.editStudent = function(id) {
 };
 
 window.deleteStudent = async function(id) {
+    // Double-check user role for security
+    if (window.userRole !== 'admin') {
+        window.showNotification('🚫 Comunícate con administración - no tienes permitido borrar datos de esta plataforma', 'error');
+        return;
+    }
+
     if (await window.StudentManager.deleteStudent(id)) {
         loadStudentsTab();
         window.showNotification('✅ Estudiante eliminado', 'success');
