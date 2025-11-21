@@ -3505,6 +3505,183 @@ window.reopenNov20 = async function() {
 };
 
 /**
+ * Create closure for Nov 19, 2025
+ * Search for $120,000 payment and create closure
+ */
+window.createNov19Closure = async function() {
+    console.log('📝 ========================================');
+    console.log('📝 CREATING NOV 19 CLOSURE');
+    console.log('📝 ========================================');
+
+    try {
+        const db = window.firebaseModules.database;
+        const targetDate = '2025-11-19';
+
+        // Check if closure already exists
+        const closureRef = db.ref(window.FirebaseData.database, `dailyReconciliations/${targetDate}`);
+        const existingSnapshot = await db.get(closureRef);
+
+        if (existingSnapshot.exists()) {
+            const response = confirm(
+                `⚠️ El cierre del 19 de noviembre YA EXISTE.\n\n` +
+                `¿Quieres sobrescribirlo?`
+            );
+            if (!response) {
+                console.log('❌ Operation cancelled');
+                return;
+            }
+        }
+
+        // Search for payments on Nov 19
+        console.log('\n🔍 Searching for payments on Nov 19...');
+        const paymentsRef = db.ref(window.FirebaseData.database, 'payments');
+        const paymentsSnapshot = await db.get(paymentsRef);
+
+        let nov19Payments = [];
+        if (paymentsSnapshot.exists()) {
+            const allPayments = Object.values(paymentsSnapshot.val());
+            nov19Payments = allPayments.filter(p => p.date && p.date.startsWith(targetDate));
+        }
+
+        console.log(`✅ Found ${nov19Payments.length} payment(s) on Nov 19`);
+
+        if (nov19Payments.length > 0) {
+            console.log('\n💰 PAYMENTS FOUND:');
+            nov19Payments.forEach(p => {
+                const student = window.StudentManager?.students?.get(p.studentId);
+                console.log(`   • ${p.date} - ${student?.nombre || 'N/A'} - $${(p.amount || 0).toLocaleString()} (${p.method})`);
+            });
+        }
+
+        // Search for the specific $120,000 payment
+        const payment120k = nov19Payments.find(p => p.amount === 120000);
+
+        if (payment120k) {
+            const student = window.StudentManager?.students?.get(payment120k.studentId);
+            console.log(`\n✅ FOUND $120,000 PAYMENT:`);
+            console.log(`   Student: ${student?.nombre || payment120k.studentId}`);
+            console.log(`   Method: ${payment120k.method}`);
+            console.log(`   Bank: ${payment120k.bank || 'N/A'}`);
+            console.log(`   Date: ${payment120k.date}`);
+        } else {
+            console.log(`\n⚠️ WARNING: No payment of exactly $120,000 found on Nov 19`);
+            console.log(`   Total payments found: ${nov19Payments.length}`);
+            console.log(`   Total amount: $${nov19Payments.reduce((sum, p) => sum + (p.amount || 0), 0).toLocaleString()}`);
+        }
+
+        // Search for expenses on Nov 19
+        console.log('\n🔍 Searching for expenses on Nov 19...');
+        const expensesRef = db.ref(window.FirebaseData.database, 'expenses');
+        const expensesSnapshot = await db.get(expensesRef);
+
+        let nov19Expenses = [];
+        if (expensesSnapshot.exists()) {
+            const allExpenses = Object.values(expensesSnapshot.val());
+            nov19Expenses = allExpenses.filter(e => e.date && e.date.startsWith(targetDate));
+        }
+
+        console.log(`✅ Found ${nov19Expenses.length} expense(s) on Nov 19`);
+
+        if (nov19Expenses.length > 0) {
+            console.log('\n💸 EXPENSES FOUND:');
+            nov19Expenses.forEach(e => {
+                console.log(`   • ${e.category} - $${(e.amount || 0).toLocaleString()} - ${e.description || 'N/A'}`);
+            });
+        }
+
+        const totalExpenses = nov19Expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+
+        // Get Nov 18 closing balance for opening balance
+        const nov18Ref = db.ref(window.FirebaseData.database, 'dailyReconciliations/2025-11-18');
+        const nov18Snapshot = await db.get(nov18Ref);
+
+        let openingBalance = 100000; // Default as specified
+        if (nov18Snapshot.exists()) {
+            const nov18Data = nov18Snapshot.val();
+            if (nov18Data.closingCount !== undefined && nov18Data.closingCount !== 0) {
+                console.log(`\nℹ️ Nov 18 closing: $${nov18Data.closingCount.toLocaleString()}`);
+                const useNov18Closing = confirm(
+                    `Nov 18 cerró con $${nov18Data.closingCount.toLocaleString()}.\n\n` +
+                    `¿Usar este valor como apertura del 19?\n` +
+                    `(Cancelar = usar $100,000 como especificaste)`
+                );
+                if (useNov18Closing) {
+                    openingBalance = nov18Data.closingCount;
+                }
+            }
+        }
+
+        // Create closure data
+        const closureData = {
+            date: targetDate,
+            openingBalance: openingBalance,
+            closingCount: 0, // Will be updated when closed
+            expenses: totalExpenses,
+            isClosed: false, // LEFT OPEN as requested
+            notes: `Creado manualmente - ${nov19Payments.length} pago(s), ${nov19Expenses.length} gasto(s)\n` +
+                   `Usuario puede agregar gastos y cerrar.`,
+            openedAt: `${targetDate}T08:00:00.000Z`, // 8 AM Colombia time
+            openedBy: window.FirebaseData.currentUser?.uid || 'admin',
+            registeredByName: window.FirebaseData.currentUser?.displayName || 'Administrador',
+            createdAt: new Date().toISOString()
+        };
+
+        console.log('\n📊 CLOSURE DATA TO BE CREATED:');
+        console.log(`   Date: ${targetDate}`);
+        console.log(`   Opening: $${openingBalance.toLocaleString()}`);
+        console.log(`   Payments: ${nov19Payments.length} = $${nov19Payments.reduce((sum, p) => sum + (p.amount || 0), 0).toLocaleString()}`);
+        console.log(`   Expenses: ${nov19Expenses.length} = $${totalExpenses.toLocaleString()}`);
+        console.log(`   Status: ABIERTO (para que agregues gastos y cierres)`);
+
+        const confirmCreate = window.confirm(
+            `¿Crear cierre para Nov 19 con estos datos?\n\n` +
+            `Apertura: $${openingBalance.toLocaleString()}\n` +
+            `Pagos: ${nov19Payments.length}\n` +
+            `Gastos: ${nov19Expenses.length}\n` +
+            `Estado: ABIERTO\n\n` +
+            `Podrás agregar gastos y cerrar después.`
+        );
+
+        if (!confirmCreate) {
+            console.log('❌ Cancelled by user');
+            return;
+        }
+
+        // Save to Firebase
+        await db.set(closureRef, closureData);
+
+        console.log('\n✅ CIERRE CREADO EXITOSAMENTE');
+        console.log('✅ Estado: ABIERTO - Puedes agregar gastos y cerrar');
+
+        // Reload data
+        await window.FinanceManager.loadReconciliations();
+
+        alert(
+            `✅ Cierre del 19 de noviembre creado\n\n` +
+            `Apertura: $${openingBalance.toLocaleString()}\n` +
+            `Pagos encontrados: ${nov19Payments.length}\n` +
+            `${payment120k ? `✅ Pago de $120,000 encontrado` : `⚠️ Pago de $120,000 NO encontrado`}\n` +
+            `Gastos: ${nov19Expenses.length}\n\n` +
+            `Estado: ABIERTO\n` +
+            `Ahora puedes agregar gastos y cerrar.`
+        );
+
+        return {
+            created: true,
+            date: targetDate,
+            openingBalance,
+            payments: nov19Payments,
+            expenses: nov19Expenses,
+            payment120kFound: !!payment120k
+        };
+
+    } catch (error) {
+        console.error('❌ Error creating Nov 19 closure:', error);
+        alert('❌ Error: ' + error.message);
+    }
+};
+
+/**
  * COMPREHENSIVE DIAGNOSTIC: Analyze all historical closures for date mismatches
  * Checks:
  * - Date consistency between closure date and timestamps
