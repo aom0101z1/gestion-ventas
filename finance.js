@@ -5230,9 +5230,11 @@ window.showManageCategoriesModal = async function() {
                         customCategories.business.map((cat, index) => `
                             <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; background: #f3f4f6; border-radius: 6px;">
                                 <span>${cat}</span>
+                                ${window.userRole === 'admin' ? `
                                 <button onclick="deleteCategory('business', ${index})" style="padding: 0.25rem 0.5rem; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.875rem;">
                                     🗑️ Eliminar
                                 </button>
+                                ` : '<span style="color: #9ca3af; font-size: 0.85rem;">Solo admin</span>'}
                             </div>
                         `).join('')
                     }
@@ -5247,9 +5249,11 @@ window.showManageCategoriesModal = async function() {
                         customCategories.personal.map((cat, index) => `
                             <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; background: #fce7f3; border-radius: 6px;">
                                 <span>${cat}</span>
+                                ${window.userRole === 'admin' ? `
                                 <button onclick="deleteCategory('personal', ${index})" style="padding: 0.25rem 0.5rem; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.875rem;">
                                     🗑️ Eliminar
                                 </button>
+                                ` : '<span style="color: #9ca3af; font-size: 0.85rem;">Solo admin</span>'}
                             </div>
                         `).join('')
                     }
@@ -5309,6 +5313,12 @@ window.addNewCategory = async function() {
 };
 
 window.deleteCategory = async function(type, categoryIndex) {
+    // Check if user is admin
+    if (window.userRole !== 'admin') {
+        window.showNotification('🚫 Comunícate con administración - no tienes permitido borrar datos de esta plataforma', 'error');
+        return;
+    }
+
     // Load current categories
     const customCategories = await window.loadCustomExpenseCategories();
 

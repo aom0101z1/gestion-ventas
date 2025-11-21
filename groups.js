@@ -320,10 +320,12 @@ function renderGroupCard(group) {
                             style="background: #10b981; color: white;">
                         👥 Asignar Estudiantes
                     </button>
+                    ${window.userRole === 'admin' ? `
                     <button onclick="deleteGroup('${group.id}')" class="btn btn-sm"
                             style="background: #ef4444; color: white;">
                         🗑️ Eliminar
                     </button>
+                    ` : ''}
                 </div>
             </div>
         </div>
@@ -846,8 +848,14 @@ window.removeFromGroup = async function(studentId, groupId) {
 };
 
 window.deleteGroup = async function(groupId) {
+    // Check if user is admin
+    if (window.userRole !== 'admin') {
+        window.showNotification('🚫 Comunícate con administración - no tienes permitido borrar datos de esta plataforma', 'error');
+        return;
+    }
+
     if (!confirm('¿Eliminar este grupo? Los estudiantes quedarán sin grupo asignado.')) return;
-    
+
     try {
         const db = window.firebaseModules.database;
         const ref = db.ref(window.FirebaseData.database, `groups/${groupId}`);

@@ -130,6 +130,12 @@ class ProductManager {
     }
 
     async deleteProduct(productId) {
+        // Check if user is admin
+        if (window.userRole !== 'admin') {
+            window.showNotification('🚫 Comunícate con administración - no tienes permitido borrar datos de esta plataforma', 'error');
+            return false;
+        }
+
         try {
             const product = this.products.get(productId);
 
@@ -662,9 +668,11 @@ function renderProductsTable(products) {
                                     <button onclick="editProduct('${p.id}')" class="btn btn-sm" style="background: #3b82f6; color: white; margin-right: 4px;">
                                         ✏️ Editar
                                     </button>
+                                    ${window.userRole === 'admin' ? `
                                     <button onclick="deleteProduct('${p.id}')" class="btn btn-sm" style="background: #ef4444; color: white;">
                                         🗑️
                                     </button>
+                                    ` : '<span style="color: #9ca3af; font-size: 0.85rem;">-</span>'}
                                 </td>
                             </tr>
                         `;
@@ -1423,6 +1431,12 @@ window.editProduct = function(productId) {
 };
 
 window.deleteProduct = async function(productId) {
+    // Check if user is admin
+    if (window.userRole !== 'admin') {
+        window.showNotification('🚫 Comunícate con administración - no tienes permitido borrar datos de esta plataforma', 'error');
+        return;
+    }
+
     const product = window.ProductManager.products.get(productId);
     if (!confirm(`¿Está seguro de eliminar el producto "${product.name}"?`)) return;
 
