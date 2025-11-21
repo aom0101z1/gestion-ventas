@@ -1216,19 +1216,52 @@ async function saveStudentForm(studentId) {
 // SECTION 9: PAYMENT VIEW FUNCTION
 // ============================================
 
-window.viewStudentPayments = function(studentId) {
+window.viewStudentPayments = async function(studentId) {
     const student = window.StudentManager.students.get(studentId);
     if (!student) {
         window.showNotification('❌ Estudiante no encontrado', 'error');
         return;
     }
 
-    // Get all payments for this student from global collection
+    console.log('🔍 Loading payments for student:', {
+        studentId,
+        studentName: student.nombre,
+        hasPaymentManager: !!window.PaymentManager,
+        paymentsInManager: window.PaymentManager?.payments?.size || 0
+    });
+
+    // Get all payments for this student - load directly from Firebase
     let payments = [];
-    if (window.PaymentManager && window.PaymentManager.payments) {
-        payments = Array.from(window.PaymentManager.payments.values())
-            .filter(p => p.studentId === studentId)
-            .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    try {
+        // Try PaymentManager first (if available and initialized)
+        if (window.PaymentManager && window.PaymentManager.payments && window.PaymentManager.payments.size > 0) {
+            payments = Array.from(window.PaymentManager.payments.values())
+                .filter(p => p.studentId === studentId)
+                .sort((a, b) => new Date(b.date) - new Date(a.date));
+            console.log('✅ Loaded payments from PaymentManager:', payments.length);
+        } else {
+            // Load directly from Firebase if PaymentManager not available
+            console.log('⚠️ PaymentManager not available, loading from Firebase...');
+            const db = window.firebaseModules.database;
+            const paymentsRef = db.ref(window.FirebaseData.database, 'payments');
+            const snapshot = await db.get(paymentsRef);
+
+            if (snapshot.exists()) {
+                const allPayments = snapshot.val();
+                payments = Object.entries(allPayments)
+                    .map(([id, payment]) => ({ id, ...payment }))
+                    .filter(p => p.studentId === studentId)
+                    .sort((a, b) => new Date(b.date) - new Date(a.date));
+                console.log('✅ Loaded payments from Firebase:', payments.length);
+            } else {
+                console.log('⚠️ No payments found in Firebase');
+            }
+        }
+    } catch (error) {
+        console.error('❌ Error loading payments:', error);
+        window.showNotification('❌ Error al cargar pagos', 'error');
+        return;
     }
 
     const container = document.getElementById('studentsContainer');
