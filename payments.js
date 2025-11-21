@@ -1690,6 +1690,8 @@ function renderPaymentDashboard() {
             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; padding-top: 0.5rem; border-top: 1px solid #bfdbfe;">
                 <span style="font-size: 0.75rem; color: #6b7280; align-self: center;">Accesos rápidos:</span>
                 <button onclick="setDateRangePreset('today')" class="btn btn-sm" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; padding: 0.25rem 0.75rem; font-size: 0.75rem;">Hoy</button>
+                <button onclick="setDateRangePreset('yesterday')" class="btn btn-sm" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; padding: 0.25rem 0.75rem; font-size: 0.75rem;">Ayer</button>
+                <button onclick="setDateRangePreset('last7days')" class="btn btn-sm" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; padding: 0.25rem 0.75rem; font-size: 0.75rem;">Últimos 7 Días</button>
                 <button onclick="setDateRangePreset('thisWeek')" class="btn btn-sm" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; padding: 0.25rem 0.75rem; font-size: 0.75rem;">Esta Semana</button>
                 <button onclick="setDateRangePreset('thisMonth')" class="btn btn-sm" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; padding: 0.25rem 0.75rem; font-size: 0.75rem;">Este Mes</button>
                 <button onclick="setDateRangePreset('lastMonth')" class="btn btn-sm" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; padding: 0.25rem 0.75rem; font-size: 0.75rem;">Mes Anterior</button>
@@ -3098,7 +3100,13 @@ function updatePaymentSummaryDisplay(summary) {
 
 // Set date range preset
 window.setDateRangePreset = function(preset) {
-    const today = new Date();
+    // Get today's date in Colombia timezone (YYYY-MM-DD)
+    const todayStr = window.getTodayInColombia ? window.getTodayInColombia() : new Date().toISOString().split('T')[0];
+    const [year, month, day] = todayStr.split('-').map(Number);
+
+    // Create date object without timezone issues
+    const today = new Date(year, month - 1, day);
+
     let startDate, endDate;
 
     switch (preset) {
@@ -3106,32 +3114,41 @@ window.setDateRangePreset = function(preset) {
             startDate = endDate = today;
             break;
 
+        case 'yesterday':
+            startDate = endDate = new Date(year, month - 1, day - 1);
+            break;
+
         case 'thisWeek':
             const dayOfWeek = today.getDay();
-            const monday = new Date(today);
-            monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+            const monday = new Date(year, month - 1, day);
+            monday.setDate(day - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
             startDate = monday;
             endDate = today;
             break;
 
         case 'thisMonth':
-            startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+            startDate = new Date(year, month - 1, 1);
             endDate = today;
             break;
 
         case 'lastMonth':
-            startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-            endDate = new Date(today.getFullYear(), today.getMonth(), 0);
+            const lastMonthDate = new Date(year, month - 2, 1); // month - 2 because month is already 1-indexed
+            startDate = lastMonthDate;
+            endDate = new Date(year, month - 1, 0); // Last day of previous month
             break;
 
         case 'thisYear':
-            startDate = new Date(today.getFullYear(), 0, 1);
+            startDate = new Date(year, 0, 1);
             endDate = today;
             break;
 
         case 'last30days':
-            startDate = new Date(today);
-            startDate.setDate(today.getDate() - 30);
+            startDate = new Date(year, month - 1, day - 30);
+            endDate = today;
+            break;
+
+        case 'last7days':
+            startDate = new Date(year, month - 1, day - 7);
             endDate = today;
             break;
 
@@ -3141,14 +3158,23 @@ window.setDateRangePreset = function(preset) {
 
     // Format dates as YYYY-MM-DD for input fields
     const formatDate = (date) => {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
     };
 
-    document.getElementById('paymentStartDate').value = formatDate(startDate);
-    document.getElementById('paymentEndDate').value = formatDate(endDate);
+    const startDateStr = formatDate(startDate);
+    const endDateStr = formatDate(endDate);
+
+    console.log(`📅 Date filter preset "${preset}":`, {
+        todayInColombia: todayStr,
+        startDate: startDateStr,
+        endDate: endDateStr
+    });
+
+    document.getElementById('paymentStartDate').value = startDateStr;
+    document.getElementById('paymentEndDate').value = endDateStr;
 
     // Automatically apply the filter
     applyDateRangeFilter();
