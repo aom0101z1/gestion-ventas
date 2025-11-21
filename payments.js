@@ -2811,17 +2811,39 @@ window.filterPayments = function() {
 
     // Apply date range filter first if active
     if (window.activeDateRangeFilter.startDate && window.activeDateRangeFilter.endDate) {
+        console.log('📅 Filtering by date range:', {
+            startDate: window.activeDateRangeFilter.startDate,
+            endDate: window.activeDateRangeFilter.endDate,
+            totalStudents: students.length
+        });
+
+        const beforeFilter = students.length;
         students = students.filter(student => {
             if (!student.pagos) return false;
 
             // Check if student has any payment in the date range
-            return Object.values(student.pagos).some(payment => {
+            const hasPaymentInRange = Object.values(student.pagos).some(payment => {
                 if (!payment.date) return false;
                 const paymentDate = payment.date.split('T')[0];
-                return paymentDate >= window.activeDateRangeFilter.startDate &&
-                       paymentDate <= window.activeDateRangeFilter.endDate;
+                const inRange = paymentDate >= window.activeDateRangeFilter.startDate &&
+                                paymentDate <= window.activeDateRangeFilter.endDate;
+
+                if (inRange) {
+                    console.log('✅ Found payment in range:', {
+                        student: student.nombre,
+                        paymentDate: paymentDate,
+                        amount: payment.amount,
+                        method: payment.method
+                    });
+                }
+
+                return inRange;
             });
+
+            return hasPaymentInRange;
         });
+
+        console.log(`📊 Date filter results: ${beforeFilter} → ${students.length} students`);
     }
 
     // Apply name search filter
@@ -3040,13 +3062,17 @@ window.applyDateRangeFilter = async function() {
         // Update the student table to show only students with payments in range
         filterPayments();
 
-        // Update date range info display
-        const startDateFormatted = new Date(startDate).toLocaleDateString('es-CO', {
-            year: 'numeric', month: 'long', day: 'numeric'
-        });
-        const endDateFormatted = new Date(endDate).toLocaleDateString('es-CO', {
-            year: 'numeric', month: 'long', day: 'numeric'
-        });
+        // Update date range info display - FIX timezone issue
+        const formatDateWithoutTimezone = (dateStr) => {
+            const [year, month, day] = dateStr.split('-').map(Number);
+            const date = new Date(year, month - 1, day);
+            return date.toLocaleDateString('es-CO', {
+                year: 'numeric', month: 'long', day: 'numeric'
+            });
+        };
+
+        const startDateFormatted = formatDateWithoutTimezone(startDate);
+        const endDateFormatted = formatDateWithoutTimezone(endDate);
 
         const infoElement = document.getElementById('dateRangeInfo');
         if (infoElement) {
