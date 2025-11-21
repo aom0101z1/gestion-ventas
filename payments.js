@@ -3762,7 +3762,8 @@ function getPazYSalvoHTML(data) {
         <div class="paz-y-salvo-print" style="width: 500px; padding: 25px; border: 3px double #000; font-family: 'Georgia', serif; position: relative; background: white; margin: 0 auto;">
             <!-- Header with Logo -->
             <div style="text-align: center; margin-bottom: 20px;">
-                <div style="width: 60px; height: 60px; margin: 0 auto 10px;">
+                <img src="images/logo.png" alt="Logo Ciudad Bilingüe" style="width: 100px; height: auto; margin: 0 auto 10px; display: block;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                <div style="width: 60px; height: 60px; margin: 0 auto 10px; display: none;">
                     <svg width="60" height="60" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
                         <circle cx="50" cy="50" r="48" fill="#E53E3E" stroke="none"/>
                         <path d="M30 45 L40 35 L50 45 L60 35 L70 45" stroke="white" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
@@ -3824,6 +3825,9 @@ function getPazYSalvoHTML(data) {
                 </p>
 
                 <div style="margin-top: 35px; text-align: center;">
+                    <!-- Signature Image -->
+                    <img src="images/firma.png" alt="Firma" style="height: 50px; width: auto; margin: 0 auto 5px; display: block;" onerror="this.style.display='none';">
+
                     <div style="display: inline-block; border-top: 2px solid #000; padding-top: 6px; min-width: 250px;">
                         <p style="margin: 0; font-size: 12px; font-weight: bold; color: #1f2937;">CIUDAD BILINGÜE</p>
                         <p style="margin: 2px 0 0 0; font-size: 10px; color: #6b7280;">Dirección Académica y Administrativa</p>
