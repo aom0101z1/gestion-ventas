@@ -3647,8 +3647,13 @@ window.createNov19Closure = async function() {
             return;
         }
 
-        // Save to Firebase
-        await db.set(closureRef, closureData);
+        // Save to Firebase using FinanceManager (has proper permissions)
+        console.log('\n💾 Saving to Firebase...');
+        await window.FinanceManager.saveDailyReconciliation(targetDate, {
+            openingBalance: openingBalance,
+            closingCount: 0,
+            notes: closureData.notes
+        });
 
         console.log('\n✅ CIERRE CREADO EXITOSAMENTE');
         console.log('✅ Estado: ABIERTO - Puedes agregar gastos y cerrar');
