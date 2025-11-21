@@ -1722,6 +1722,7 @@ function renderPaymentTable(students) {
                     <th style="padding: 0.75rem; text-align: center;">Estado</th>
                     <th style="padding: 0.75rem; text-align: left;">Estudiante</th>
                     <th style="padding: 0.75rem; text-align: left;">Grupo</th>
+                    <th style="padding: 0.75rem; text-align: left;">Modalidad</th>
                     <th style="padding: 0.75rem; text-align: right;">Valor</th>
                     <th style="padding: 0.75rem; text-align: center;">Día Pago</th>
                     <th style="padding: 0.75rem; text-align: center;">Acciones</th>
@@ -1794,6 +1795,10 @@ function renderPaymentTable(students) {
                                 <small style="color: #6b7280;">${s.telefono || '-'}</small>
                             </td>
                             <td style="padding: 0.75rem;">${s.grupo || 'Sin grupo'}</td>
+                            <td style="padding: 0.75rem;">
+                                ${s.modalidad || '-'}
+                                ${s.modalidadDetalle ? `<br><small style="color: #6b7280;">${s.modalidadDetalle}</small>` : ''}
+                            </td>
                             <td style="padding: 0.75rem; text-align: right;">
                                 <strong>$${(s.valor || 0).toLocaleString()}</strong>
                             </td>
@@ -1828,7 +1833,7 @@ function renderPaymentTable(students) {
                     // Hidden history row (will be populated on expand)
                     let historyRow = `
                         <tr id="history-${s.id}" class="payment-history-row" style="display: none;">
-                            <td colspan="9" style="padding: 20px; background: #f9fafb; text-align: center;">
+                            <td colspan="10" style="padding: 20px; background: #f9fafb; text-align: center;">
                                 <div style="color: #6b7280;">Cargando historial...</div>
                             </td>
                         </tr>
