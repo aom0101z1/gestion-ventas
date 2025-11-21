@@ -3065,14 +3065,25 @@ window.applyDateRangeFilter = async function() {
         // Update date range info display - FIX timezone issue
         const formatDateWithoutTimezone = (dateStr) => {
             const [year, month, day] = dateStr.split('-').map(Number);
-            const date = new Date(year, month - 1, day);
-            return date.toLocaleDateString('es-CO', {
-                year: 'numeric', month: 'long', day: 'numeric'
-            });
+
+            // Manual formatting to avoid timezone issues
+            const monthNames = [
+                'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+                'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
+            ];
+
+            return `${day} de ${monthNames[month - 1]} de ${year}`;
         };
 
         const startDateFormatted = formatDateWithoutTimezone(startDate);
         const endDateFormatted = formatDateWithoutTimezone(endDate);
+
+        console.log('📅 Date formatting:', {
+            startDate,
+            startDateFormatted,
+            endDate,
+            endDateFormatted
+        });
 
         const infoElement = document.getElementById('dateRangeInfo');
         if (infoElement) {
