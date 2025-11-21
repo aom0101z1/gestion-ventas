@@ -522,10 +522,20 @@ function renderStudentForm(student = null) {
                     </div>
                     
                     <div class="form-group">
-                        <label>Valor ($)</label>
-                        <input type="number" id="stuValor" value="${student?.valor || ''}" min="0">
+                        <label>Valor Mensualidad ($)</label>
+                        <input type="number" id="stuValor" value="${student?.valor || ''}" min="0" placeholder="Valor mensual">
                     </div>
-                    
+
+                    ${!isEdit ? `
+                    <div class="form-group">
+                        <label>Matrícula ($)</label>
+                        <input type="number" id="stuMatricula" value="" min="0" placeholder="Valor de matrícula">
+                        <small style="color: #6b7280; font-size: 0.85rem; margin-top: 0.25rem; display: block;">
+                            Solo para estudiantes nuevos. Se registrará como pago único.
+                        </small>
+                    </div>
+                    ` : ''}
+
                     <div class="form-group">
                         <label>Día de Pago</label>
                         <input type="number" id="stuDiaPago" value="${student?.diaPago || '1'}" min="1" max="31">
@@ -960,10 +970,48 @@ async function saveStudentForm(studentId) {
             diaPago: parseInt(document.getElementById('stuDiaPago').value) || 1
         };
 
+        let savedStudent;
         if (studentId) {
             await window.StudentManager.updateStudent(studentId, studentData);
+            savedStudent = studentData;
         } else {
-            await window.StudentManager.saveStudent(studentData);
+            savedStudent = await window.StudentManager.saveStudent(studentData);
+
+            // If it's a new student and has enrollment fee, register it as a payment
+            const matriculaInput = document.getElementById('stuMatricula');
+            const matriculaValue = matriculaInput ? parseInt(matriculaInput.value) || 0 : 0;
+
+            if (matriculaValue > 0 && window.PaymentManager) {
+                try {
+                    console.log('💰 Registering enrollment fee:', matriculaValue);
+
+                    const enrollmentPayment = {
+                        id: `PAY-MATRICULA-${Date.now()}`,
+                        studentId: savedStudent.id,
+                        amount: matriculaValue,
+                        method: 'Efectivo', // Default to cash, can be changed later
+                        bank: '',
+                        month: 'matrícula',
+                        year: new Date().getFullYear(),
+                        date: window.getColombiaDateTime ? window.getColombiaDateTime() : new Date().toISOString(),
+                        registeredBy: window.FirebaseData?.currentUser?.uid || 'Sistema',
+                        notes: 'Matrícula - Pago de inscripción'
+                    };
+
+                    // Save to Firebase
+                    const db = window.firebaseModules.database;
+                    const ref = db.ref(window.FirebaseData.database, `payments/${enrollmentPayment.id}`);
+                    await db.set(ref, enrollmentPayment);
+
+                    // Add to PaymentManager cache
+                    window.PaymentManager.payments.set(enrollmentPayment.id, enrollmentPayment);
+
+                    console.log('✅ Enrollment fee registered:', enrollmentPayment.id);
+                } catch (error) {
+                    console.error('❌ Error registering enrollment fee:', error);
+                    window.showNotification('⚠️ Estudiante guardado pero error al registrar matrícula', 'warning');
+                }
+            }
         }
 
         window.showNotification('✅ Estudiante guardado', 'success');
