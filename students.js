@@ -126,12 +126,20 @@ class StudentManager {
         }
         
         if (filters.search) {
-            const search = filters.search.toLowerCase();
-            students = students.filter(s =>
-                s.nombre?.toLowerCase().includes(search) ||
-                s.numDoc?.includes(search) ||
-                s.telefono?.includes(search)
-            );
+            const search = filters.search.toLowerCase().trim();
+            console.log('🔍 Search filter active:', search, 'Total students before filter:', students.length);
+
+            students = students.filter(s => {
+                const nombre = (s.nombre || '').toLowerCase();
+                const numDoc = String(s.numDoc || '').toLowerCase();
+                const telefono = String(s.telefono || '').toLowerCase();
+
+                return nombre.includes(search) ||
+                       numDoc.includes(search) ||
+                       telefono.includes(search);
+            });
+
+            console.log('✅ Search results:', students.length, 'students found');
         }
 
         // Filter by date range
