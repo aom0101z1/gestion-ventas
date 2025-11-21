@@ -1808,9 +1808,17 @@ function renderPaymentTable(students) {
                                 </button>
                                 <button onclick="sendPaymentReminder('${s.id}')"
                                         class="btn btn-sm"
-                                        style="background: #3b82f6; color: white;">
+                                        style="background: #3b82f6; color: white; margin-right: 0.5rem;">
                                     📱 Recordar
                                 </button>
+                                ${status.status === 'Pagado' ? `
+                                <button onclick="generatePazYSalvo('${s.id}')"
+                                        class="btn btn-sm"
+                                        style="background: #059669; color: white;"
+                                        title="Generar Paz y Salvo">
+                                    📄 Paz y Salvo
+                                </button>
+                                ` : ''}
                             </td>
                         </tr>
                     `;
@@ -3627,6 +3635,269 @@ if (!document.getElementById('invoicePrintStyles')) {
     `;
     document.head.appendChild(style);
 }
+
+// ==================================================================================
+// PAZ Y SALVO CERTIFICATE GENERATOR
+// ==================================================================================
+
+window.generatePazYSalvo = async function(studentId) {
+    console.log('📄 Generating Paz y Salvo for student:', studentId);
+
+    try {
+        // Get student data
+        const student = window.StudentManager?.students?.get(studentId);
+        if (!student) {
+            window.showNotification('❌ Estudiante no encontrado', 'error');
+            return;
+        }
+
+        // Get payment status
+        const status = window.PaymentManager?.getPaymentStatus(student);
+
+        // Verify student is current with payments
+        if (status?.status !== 'Pagado') {
+            window.showNotification('⚠️ Este estudiante no está al día con sus pagos', 'warning');
+            return;
+        }
+
+        // Get today's date in Colombia timezone
+        const todayStr = window.getTodayInColombia ? window.getTodayInColombia() : new Date().toISOString().split('T')[0];
+        const [year, month, day] = todayStr.split('-').map(Number);
+
+        // Format date for display
+        const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+                       'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+        const formattedDate = `${day} de ${months[month - 1]} de ${year}`;
+
+        // Get current operator
+        const operatorEmail = window.FirebaseData.auth?.currentUser?.email || 'Sistema';
+
+        // Create certificate data
+        const certificateData = {
+            studentName: student.nombre || 'N/A',
+            studentId: student.cedula || student.id,
+            date: formattedDate,
+            dateISO: todayStr,
+            operator: operatorEmail,
+            status: status
+        };
+
+        // Show modal with certificate
+        showPazYSalvoModal(certificateData);
+
+        // Log audit trail
+        if (typeof window.logAudit === 'function') {
+            await window.logAudit(
+                'Paz y Salvo generado',
+                'certificate',
+                student.id,
+                `Paz y Salvo emitido para ${student.nombre}`,
+                {
+                    after: {
+                        estudiante: student.nombre,
+                        cedula: student.cedula,
+                        fecha: todayStr,
+                        operador: operatorEmail
+                    }
+                }
+            );
+        }
+
+    } catch (error) {
+        console.error('❌ Error generating Paz y Salvo:', error);
+        window.showNotification('❌ Error al generar Paz y Salvo', 'error');
+    }
+};
+
+function showPazYSalvoModal(data) {
+    // Remove existing modal if any
+    const existingModal = document.getElementById('pazYSalvoModal');
+    if (existingModal) existingModal.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'pazYSalvoModal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 99999;
+        animation: fadeIn 0.3s ease-in;
+    `;
+
+    modal.innerHTML = `
+        <div style="background: white; padding: 20px; max-width: 700px; max-height: 90vh; overflow-y: auto; position: relative; margin: 20px; border-radius: 8px; box-shadow: 0 10px 50px rgba(0,0,0,0.3); animation: slideIn 0.3s ease-out;">
+            <button type="button" onclick="document.getElementById('pazYSalvoModal').remove();"
+                    style="position: absolute; right: 10px; top: 10px; background: red; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 4px; z-index: 100000;">✖</button>
+
+            <div id="pazYSalvoContent">
+                ${getPazYSalvoHTML(data)}
+            </div>
+
+            <div style="margin-top: 20px; text-align: center; padding-top: 20px; border-top: 2px solid #e5e7eb;">
+                <button type="button" onclick="printPazYSalvo()"
+                        style="background: #3b82f6; color: white; padding: 12px 24px; margin: 0 10px; border: none; cursor: pointer; border-radius: 4px; font-size: 14px;">
+                    🖨️ Imprimir
+                </button>
+                <button type="button" onclick="savePazYSalvoAsPDF('${data.studentId}')"
+                        style="background: #10b981; color: white; padding: 12px 24px; margin: 0 10px; border: none; cursor: pointer; border-radius: 4px; font-size: 14px;">
+                    💾 Guardar como PDF
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+}
+
+function getPazYSalvoHTML(data) {
+    return `
+        <div class="paz-y-salvo-print" style="width: 600px; padding: 40px; border: 4px double #000; font-family: 'Georgia', serif; position: relative; background: white; margin: 0 auto;">
+            <!-- Header with Logo -->
+            <div style="text-align: center; margin-bottom: 30px;">
+                <div style="width: 80px; height: 80px; margin: 0 auto 15px;">
+                    <svg width="80" height="80" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="50" cy="50" r="48" fill="#E53E3E" stroke="none"/>
+                        <path d="M30 45 L40 35 L50 45 L60 35 L70 45" stroke="white" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                        <rect x="28" y="48" width="44" height="28" fill="white" stroke="none"/>
+                        <rect x="35" y="55" width="8" height="10" fill="#E53E3E"/>
+                        <rect x="46" y="55" width="8" height="10" fill="#E53E3E"/>
+                        <rect x="57" y="55" width="8" height="10" fill="#E53E3E"/>
+                        <rect x="40" y="68" width="20" height="8" fill="#E53E3E"/>
+                    </svg>
+                </div>
+                <h1 style="margin: 0; font-size: 24px; font-weight: bold; color: #1a202c;">CIUDAD BILINGÜE</h1>
+                <p style="margin: 5px 0 0 0; font-size: 12px; color: #4a5568;">Centro de Idiomas y Capacitación</p>
+                <p style="margin: 2px 0 0 0; font-size: 11px; color: #718096;">NIT: 900.123.456-7</p>
+            </div>
+
+            <!-- Certificate Title -->
+            <div style="text-align: center; margin: 30px 0; padding: 15px; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-radius: 8px; border: 2px solid #0ea5e9;">
+                <h2 style="margin: 0; font-size: 28px; font-weight: bold; color: #0c4a6e; letter-spacing: 2px;">PAZ Y SALVO</h2>
+                <p style="margin: 5px 0 0 0; font-size: 13px; color: #075985; font-style: italic;">Certificado de Pagos al Día</p>
+            </div>
+
+            <!-- Certificate Body -->
+            <div style="margin: 30px 0; padding: 25px; background: #fafafa; border-left: 4px solid #10b981; border-radius: 4px;">
+                <p style="font-size: 14px; line-height: 1.8; color: #1f2937; text-align: justify; margin: 0;">
+                    La <strong>CIUDAD BILINGÜE</strong>, Centro de Idiomas y Capacitación, hace constar que el(la) estudiante:
+                </p>
+
+                <div style="margin: 20px 0; padding: 15px; background: white; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <p style="margin: 8px 0; font-size: 16px; color: #1f2937;">
+                        <strong style="color: #059669;">Nombre:</strong> <span style="font-size: 18px; color: #0c4a6e; font-weight: bold;">${data.studentName}</span>
+                    </p>
+                    <p style="margin: 8px 0; font-size: 14px; color: #4b5563;">
+                        <strong style="color: #059669;">Identificación:</strong> ${data.studentId}
+                    </p>
+                </div>
+
+                <p style="font-size: 14px; line-height: 1.8; color: #1f2937; text-align: justify; margin: 20px 0 0 0;">
+                    Se encuentra <strong style="color: #059669;">AL DÍA</strong> con sus obligaciones financieras correspondientes al mes actual,
+                    habiendo cumplido satisfactoriamente con todos los pagos requeridos por el programa académico en el cual
+                    se encuentra inscrito(a).
+                </p>
+
+                <p style="font-size: 14px; line-height: 1.8; color: #1f2937; text-align: justify; margin: 15px 0 0 0;">
+                    Este certificado se expide a solicitud del interesado para los fines que estime convenientes.
+                </p>
+            </div>
+
+            <!-- Status Badge -->
+            <div style="text-align: center; margin: 25px 0;">
+                <div style="display: inline-block; padding: 12px 30px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50px; box-shadow: 0 4px 6px rgba(5, 150, 105, 0.3);">
+                    <span style="color: white; font-size: 16px; font-weight: bold; letter-spacing: 1px;">✓ ESTADO: AL DÍA CON PAGOS</span>
+                </div>
+            </div>
+
+            <!-- Footer with Date and Signature -->
+            <div style="margin-top: 40px;">
+                <p style="font-size: 13px; color: #4b5563; text-align: center; margin-bottom: 30px;">
+                    Expedido en Medellín, a los <strong>${data.date}</strong>
+                </p>
+
+                <div style="margin-top: 50px; text-align: center;">
+                    <div style="display: inline-block; border-top: 2px solid #000; padding-top: 8px; min-width: 300px;">
+                        <p style="margin: 0; font-size: 13px; font-weight: bold; color: #1f2937;">CIUDAD BILINGÜE</p>
+                        <p style="margin: 3px 0 0 0; font-size: 12px; color: #6b7280;">Dirección Académica y Administrativa</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Certificate Metadata -->
+            <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                <p style="font-size: 10px; color: #9ca3af; text-align: center; margin: 0;">
+                    Certificado expedido electrónicamente el ${data.dateISO} por ${data.operator}
+                </p>
+                <p style="font-size: 10px; color: #9ca3af; text-align: center; margin: 5px 0 0 0;">
+                    Este documento es válido sin firma autógrafa de conformidad con el Decreto 2150 de 1995
+                </p>
+            </div>
+
+            <!-- Watermark -->
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); opacity: 0.05; pointer-events: none; z-index: 0;">
+                <p style="font-size: 120px; font-weight: bold; color: #10b981; margin: 0; white-space: nowrap;">PAZ Y SALVO</p>
+            </div>
+        </div>
+    `;
+}
+
+// Print function for Paz y Salvo
+window.printPazYSalvo = function() {
+    const printContent = document.getElementById('pazYSalvoContent').innerHTML;
+    const printWindow = window.open('', '_blank', 'width=800,height=900');
+
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>Paz y Salvo - Ciudad Bilingüe</title>
+            <style>
+                body {
+                    margin: 0;
+                    padding: 20px;
+                    font-family: 'Georgia', serif;
+                }
+                @media print {
+                    body {
+                        padding: 0;
+                    }
+                    @page {
+                        margin: 1cm;
+                    }
+                }
+            </style>
+        </head>
+        <body>
+            ${printContent}
+            <script>
+                window.onload = function() {
+                    window.print();
+                    setTimeout(function() {
+                        window.close();
+                    }, 100);
+                };
+            </script>
+        </body>
+        </html>
+    `);
+
+    printWindow.document.close();
+};
+
+// Save as PDF function for Paz y Salvo
+window.savePazYSalvoAsPDF = function(studentId) {
+    window.showNotification('💾 Para guardar como PDF, use la función de imprimir y seleccione "Guardar como PDF"', 'info');
+    setTimeout(() => {
+        window.printPazYSalvo();
+    }, 1000);
+};
 
 // Function mappings for backward compatibility
 window.registerPayment = window.showPaymentModal;
