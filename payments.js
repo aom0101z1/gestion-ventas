@@ -3137,6 +3137,8 @@ function updatePaymentSummaryDisplay(summary) {
 
 // Set date range preset
 window.setDateRangePreset = function(preset) {
+    console.log('🎯 setDateRangePreset called with preset:', preset);
+
     // Get today's date in Colombia timezone (YYYY-MM-DD)
     const todayStr = window.getTodayInColombia ? window.getTodayInColombia() : new Date().toISOString().split('T')[0];
     const [year, month, day] = todayStr.split('-').map(Number);
@@ -3206,8 +3208,10 @@ window.setDateRangePreset = function(preset) {
 
     console.log(`📅 Date filter preset "${preset}":`, {
         todayInColombia: todayStr,
-        startDate: startDateStr,
-        endDate: endDateStr
+        calculatedStartDate: startDateStr,
+        calculatedEndDate: endDateStr,
+        startDateObject: startDate,
+        endDateObject: endDate
     });
 
     document.getElementById('paymentStartDate').value = startDateStr;
