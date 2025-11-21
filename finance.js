@@ -1479,7 +1479,10 @@ async function renderHistoricalClosuresView() {
                     style="width: 100%; padding: 0.75rem; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 1rem;">
                     <option value="">-- Selecciona una fecha --</option>
                     ${allReconciliations.map(rec => {
-                        const dateObj = new Date(rec.date);
+                        // Parse date without timezone offset issues
+                        // rec.date is in format "YYYY-MM-DD", we need to parse it correctly
+                        const [year, month, day] = rec.date.split('-').map(Number);
+                        const dateObj = new Date(year, month - 1, day); // month is 0-indexed
                         const formattedDate = dateObj.toLocaleDateString('es-ES', {
                             weekday: 'long',
                             year: 'numeric',
@@ -3947,6 +3950,76 @@ window.fixAllDateMismatches = async function() {
     } catch (error) {
         console.error('❌ Error fixing date mismatches:', error);
         alert('❌ Error: ' + error.message);
+    }
+};
+
+/**
+ * Debug function: Show exact timestamps for specific closures
+ */
+window.debugClosureTimestamps = async function(dates = null) {
+    console.log('🔍 ========================================');
+    console.log('🔍 DEBUG: CLOSURE TIMESTAMPS');
+    console.log('🔍 ========================================');
+
+    try {
+        const db = window.firebaseModules.database;
+        const closuresRef = db.ref(window.FirebaseData.database, 'dailyReconciliations');
+        const snapshot = await db.get(closuresRef);
+
+        if (!snapshot.exists()) {
+            console.log('❌ No closures found');
+            return;
+        }
+
+        const closures = snapshot.val();
+        const datesToCheck = dates || Object.keys(closures).sort();
+
+        datesToCheck.forEach(date => {
+            const closure = closures[date];
+            if (!closure) {
+                console.log(`\n❌ ${date}: NOT FOUND`);
+                return;
+            }
+
+            console.log(`\n📅 CLOSURE: ${date}`);
+            console.log(`   Status: ${closure.isClosed ? '🔒 CLOSED' : '🔓 OPEN'}`);
+
+            if (closure.openedAt) {
+                const openedDate = closure.openedAt.split('T')[0];
+                const openedTime = closure.openedAt.split('T')[1];
+                const match = openedDate === date ? '✅' : '❌';
+                console.log(`   ${match} openedAt: ${closure.openedAt}`);
+                console.log(`      Date: ${openedDate} ${openedDate === date ? '(matches)' : `(SHOULD BE ${date})`}`);
+                console.log(`      Time: ${openedTime}`);
+            } else {
+                console.log(`   ⚠️  openedAt: NOT SET`);
+            }
+
+            if (closure.closedAt) {
+                const closedDate = closure.closedAt.split('T')[0];
+                const closedTime = closure.closedAt.split('T')[1];
+                const match = closedDate === date ? '✅' : '❌';
+                console.log(`   ${match} closedAt: ${closure.closedAt}`);
+                console.log(`      Date: ${closedDate} ${closedDate === date ? '(matches)' : `(SHOULD BE ${date})`}`);
+                console.log(`      Time: ${closedTime}`);
+            } else if (closure.isClosed) {
+                console.log(`   ⚠️  closedAt: NOT SET (but marked as closed!)`);
+            }
+
+            if (closure.reopenedAt) {
+                const reopenedDate = closure.reopenedAt.split('T')[0];
+                const reopenedTime = closure.reopenedAt.split('T')[1];
+                const match = reopenedDate === date ? '✅' : '❌';
+                console.log(`   ${match} reopenedAt: ${closure.reopenedAt}`);
+                console.log(`      Date: ${reopenedDate} ${reopenedDate === date ? '(matches)' : `(SHOULD BE ${date})`}`);
+                console.log(`      Time: ${reopenedTime}`);
+            }
+        });
+
+        console.log('\n' + '='.repeat(80));
+
+    } catch (error) {
+        console.error('❌ Error:', error);
     }
 };
 
