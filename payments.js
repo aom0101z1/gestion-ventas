@@ -536,13 +536,28 @@ async recordPayment(studentId, paymentData) {
                 current.setMonth(current.getMonth() + 1);
             }
 
-            console.log('📅 Filtering by date range:', { startDate, endDate, monthsInRange });
+            console.log('📅 Filtering by date range:', {
+                startDate,
+                endDate,
+                monthsInRange,
+                totalPayments: this.payments.size,
+                totalStudents: students.length
+            });
+
+            // Debug: Show sample of available payments
+            const samplePayments = Array.from(this.payments.values()).slice(0, 3);
+            console.log('🔍 Sample payments in database:', samplePayments.map(p => ({
+                id: p.id,
+                studentId: p.studentId,
+                month: p.month,
+                year: p.year,
+                amount: p.amount
+            })));
 
             const studentsWithStatusInRange = new Set();
+            let paymentsFound = 0;
 
             students.forEach(student => {
-                if (!student.diaPago) return;
-
                 let studentHasPaidMonth = false;
                 let studentHasPartialMonth = false;
                 let studentHasOverdueMonth = false;
@@ -556,6 +571,18 @@ async recordPayment(studentId, paymentData) {
                         p.month?.toLowerCase() === month.toLowerCase() &&
                         p.year === year
                     );
+
+                    if (payment) {
+                        paymentsFound++;
+                        console.log('💰 Payment found:', {
+                            student: student.nombre,
+                            month,
+                            year,
+                            amount: payment.amount,
+                            paymentMonth: payment.month,
+                            paymentYear: payment.year
+                        });
+                    }
 
                     const expectedAmount = Number(student.valor) || 0;
 
@@ -572,17 +599,20 @@ async recordPayment(studentId, paymentData) {
                             studentHasPaidMonth = true;
                         }
                     } else {
-                        // No payment for this month - check if overdue or upcoming
-                        const payDay = parseInt(student.diaPago) || 1;
-                        const payDate = new Date(year, monthNames.indexOf(month), payDay);
-                        const today = new Date();
+                        // No payment for this month
+                        // Only check overdue/upcoming if student has diaPago configured
+                        if (student.diaPago) {
+                            const payDay = parseInt(student.diaPago) || 1;
+                            const payDate = new Date(year, monthNames.indexOf(month), payDay);
+                            const today = new Date();
 
-                        if (payDate < today) {
-                            // Overdue
-                            studentHasOverdueMonth = true;
-                        } else {
-                            // Upcoming
-                            studentHasUpcomingMonth = true;
+                            if (payDate < today) {
+                                // Overdue
+                                studentHasOverdueMonth = true;
+                            } else {
+                                // Upcoming
+                                studentHasUpcomingMonth = true;
+                            }
                         }
                     }
                 });
@@ -607,7 +637,12 @@ async recordPayment(studentId, paymentData) {
             // Update total to reflect students with status in range
             summary.total = studentsWithStatusInRange.size;
 
-            console.log('📊 Summary for date range:', summary);
+            console.log('📊 Summary for date range:', {
+                ...summary,
+                paymentsFound,
+                studentsEvaluated: students.length,
+                studentsWithStatus: studentsWithStatusInRange.size
+            });
         } else {
             // No date filter - use original logic (current month only)
             students.forEach(student => {
