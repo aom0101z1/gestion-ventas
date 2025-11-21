@@ -229,8 +229,8 @@ class FinanceManager {
     }
 
     async deleteExpense(id) {
-        // Check if user is admin
-        if (window.userRole !== 'admin') {
+        // Check if user is admin or director
+        if (window.userRole !== 'admin' && window.userRole !== 'director') {
             window.showNotification('🚫 Comunícate con administración - no tienes permitido borrar datos de esta plataforma', 'error');
             return false;
         }
@@ -4995,7 +4995,7 @@ window.loadExpensesView = function() {
                                         ${expense.registeredByName || 'Sistema'}
                                     </td>
                                     <td style="padding: 0.75rem; text-align: center;">
-                                        ${window.userRole === 'admin' ? `
+                                        ${(window.userRole === 'admin' || window.userRole === 'director') ? `
                                         <button onclick="deleteExpenseConfirm('${expense.id}')" class="btn btn-sm" style="background: #ef4444; color: white; padding: 0.25rem 0.5rem;">
                                             🗑️
                                         </button>
@@ -5230,7 +5230,7 @@ window.showManageCategoriesModal = async function() {
                         customCategories.business.map((cat, index) => `
                             <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; background: #f3f4f6; border-radius: 6px;">
                                 <span>${cat}</span>
-                                ${window.userRole === 'admin' ? `
+                                ${(window.userRole === 'admin' || window.userRole === 'director') ? `
                                 <button onclick="deleteCategory('business', ${index})" style="padding: 0.25rem 0.5rem; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.875rem;">
                                     🗑️ Eliminar
                                 </button>
@@ -5249,7 +5249,7 @@ window.showManageCategoriesModal = async function() {
                         customCategories.personal.map((cat, index) => `
                             <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; background: #fce7f3; border-radius: 6px;">
                                 <span>${cat}</span>
-                                ${window.userRole === 'admin' ? `
+                                ${(window.userRole === 'admin' || window.userRole === 'director') ? `
                                 <button onclick="deleteCategory('personal', ${index})" style="padding: 0.25rem 0.5rem; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.875rem;">
                                     🗑️ Eliminar
                                 </button>
@@ -5313,8 +5313,8 @@ window.addNewCategory = async function() {
 };
 
 window.deleteCategory = async function(type, categoryIndex) {
-    // Check if user is admin
-    if (window.userRole !== 'admin') {
+    // Check if user is admin or director
+    if (window.userRole !== 'admin' && window.userRole !== 'director') {
         window.showNotification('🚫 Comunícate con administración - no tienes permitido borrar datos de esta plataforma', 'error');
         return;
     }
@@ -5421,8 +5421,8 @@ window.saveExpense = async function(event) {
 };
 
 window.deleteExpenseConfirm = async function(id) {
-    // Check if user is admin
-    if (window.userRole !== 'admin') {
+    // Check if user is admin or director
+    if (window.userRole !== 'admin' && window.userRole !== 'director') {
         window.showNotification('🚫 Comunícate con administración - no tienes permitido borrar datos de esta plataforma', 'error');
         return;
     }
@@ -6241,9 +6241,11 @@ async function renderOtrosIngresosView() {
                                 <td style="padding: 1rem;">${ingreso.metodoPago}</td>
                                 <td style="padding: 1rem; font-size: 0.875rem; color: #6b7280;">${ingreso.registradoPor || 'N/A'}</td>
                                 <td style="padding: 1rem; text-align: center;">
+                                    ${(window.userRole === 'admin' || window.userRole === 'director') ? `
                                     <button onclick="deleteOtroIngreso('${ingreso.id}')" class="btn btn-sm" style="background: #ef4444; color: white; padding: 0.25rem 0.75rem;">
                                         🗑️ Eliminar
                                     </button>
+                                    ` : '<span style="color: #9ca3af; font-size: 0.85rem;">-</span>'}
                                 </td>
                             </tr>
                         `}).join('')}
@@ -6449,8 +6451,8 @@ window.saveOtroIngreso = async function() {
 };
 
 window.deleteOtroIngreso = async function(id) {
-    // Check if user is admin
-    if (window.userRole !== 'admin') {
+    // Check if user is admin or director
+    if (window.userRole !== 'admin' && window.userRole !== 'director') {
         window.showNotification('🚫 Comunícate con administración - no tienes permitido borrar datos de esta plataforma', 'error');
         return;
     }
@@ -6606,7 +6608,7 @@ async function renderExpensesViewEnhanced() {
                                         ${expense.registeredByName || 'Sistema'}
                                     </td>
                                     <td style="padding: 0.75rem; text-align: center;">
-                                        ${window.userRole === 'admin' ? `
+                                        ${(window.userRole === 'admin' || window.userRole === 'director') ? `
                                         <button onclick="deleteExpenseConfirm('${expense.id}')" class="btn btn-sm" style="background: #ef4444; color: white; padding: 0.25rem 0.5rem;">
                                             🗑️
                                         </button>

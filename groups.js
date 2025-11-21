@@ -320,7 +320,7 @@ function renderGroupCard(group) {
                             style="background: #10b981; color: white;">
                         👥 Asignar Estudiantes
                     </button>
-                    ${window.userRole === 'admin' ? `
+                    ${(window.userRole === 'admin' || window.userRole === 'director') ? `
                     <button onclick="deleteGroup('${group.id}')" class="btn btn-sm"
                             style="background: #ef4444; color: white;">
                         🗑️ Eliminar
@@ -848,8 +848,8 @@ window.removeFromGroup = async function(studentId, groupId) {
 };
 
 window.deleteGroup = async function(groupId) {
-    // Check if user is admin
-    if (window.userRole !== 'admin') {
+    // Check if user is admin or director
+    if (window.userRole !== 'admin' && window.userRole !== 'director') {
         window.showNotification('🚫 Comunícate con administración - no tienes permitido borrar datos de esta plataforma', 'error');
         return;
     }
