@@ -517,131 +517,65 @@ async recordPayment(studentId, paymentData) {
             dateRange: startDate && endDate ? { startDate, endDate } : null
         };
 
-        // If date range is specified, count based on payment status for months in that range
+        // If date range is specified, filter by REGISTRATION DATE (payment.date)
         if (startDate && endDate) {
-            const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-                              'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-
-            // Get all months that fall within the date range
-            const start = new Date(startDate);
-            const end = new Date(endDate);
-            const monthsInRange = [];
-
-            let current = new Date(start.getFullYear(), start.getMonth(), 1);
-            while (current <= end) {
-                monthsInRange.push({
-                    month: monthNames[current.getMonth()],
-                    year: current.getFullYear()
-                });
-                current.setMonth(current.getMonth() + 1);
-            }
-
             console.log('📅 Filtering by date range:', {
                 startDate,
                 endDate,
-                monthsInRange,
                 totalPayments: this.payments.size,
                 totalStudents: students.length
             });
 
-            // Debug: Show sample of available payments
-            const samplePayments = Array.from(this.payments.values()).slice(0, 3);
-            console.log('🔍 Sample payments in database:', samplePayments.map(p => ({
-                id: p.id,
-                studentId: p.studentId,
-                month: p.month,
-                year: p.year,
-                amount: p.amount
-            })));
+            // Get all payments REGISTERED in the date range
+            const paymentsInRange = Array.from(this.payments.values()).filter(p => {
+                if (!p.date) return false;
+                const paymentDate = p.date.split('T')[0]; // Get YYYY-MM-DD
+                return paymentDate >= startDate && paymentDate <= endDate;
+            });
 
-            const studentsWithStatusInRange = new Set();
-            let paymentsFound = 0;
+            console.log('💰 Payments registered in range:', {
+                count: paymentsInRange.length,
+                totalAmount: paymentsInRange.reduce((sum, p) => sum + (p.amount || 0), 0)
+            });
 
-            students.forEach(student => {
-                let studentHasPaidMonth = false;
-                let studentHasPartialMonth = false;
-                let studentHasOverdueMonth = false;
-                let studentHasUpcomingMonth = false;
+            // Calculate total collected in this range
+            summary.collectedAmount = paymentsInRange.reduce((sum, p) => sum + (p.amount || 0), 0);
 
-                // Check payment status for each month in range
-                monthsInRange.forEach(({ month, year }) => {
-                    // Find payment for this specific month/year
-                    const payment = Array.from(this.payments.values()).find(p =>
-                        p.studentId === student.id &&
-                        p.month?.toLowerCase() === month.toLowerCase() &&
-                        p.year === year
-                    );
-
-                    if (payment) {
-                        paymentsFound++;
-                        console.log('💰 Payment found:', {
-                            student: student.nombre,
-                            month,
-                            year,
-                            amount: payment.amount,
-                            paymentMonth: payment.month,
-                            paymentYear: payment.year
-                        });
-                    }
-
-                    const expectedAmount = Number(student.valor) || 0;
-
-                    if (payment) {
-                        const paidAmount = Number(payment.amount) || 0;
-                        summary.collectedAmount += paidAmount;
-
-                        if (paidAmount < expectedAmount) {
-                            // Partial payment
-                            studentHasPartialMonth = true;
-                            summary.partialAmount += (expectedAmount - paidAmount);
-                        } else {
-                            // Full payment
-                            studentHasPaidMonth = true;
-                        }
-                    } else {
-                        // No payment for this month
-                        // Only check overdue/upcoming if student has diaPago configured
-                        if (student.diaPago) {
-                            const payDay = parseInt(student.diaPago) || 1;
-                            const payDate = new Date(year, monthNames.indexOf(month), payDay);
-                            const today = new Date();
-
-                            if (payDate < today) {
-                                // Overdue
-                                studentHasOverdueMonth = true;
-                            } else {
-                                // Upcoming
-                                studentHasUpcomingMonth = true;
-                            }
-                        }
-                    }
-                });
-
-                // Categorize student based on worst status found in range
-                // Priority: Overdue > Partial > Upcoming > Paid
-                if (studentHasOverdueMonth || studentHasPartialMonth || studentHasUpcomingMonth || studentHasPaidMonth) {
-                    studentsWithStatusInRange.add(student.id);
-
-                    if (studentHasOverdueMonth) {
-                        summary.overdue++;
-                    } else if (studentHasPartialMonth) {
-                        summary.partial++;
-                    } else if (studentHasUpcomingMonth) {
-                        summary.upcoming++;
-                    } else if (studentHasPaidMonth) {
-                        summary.paid++;
-                    }
+            // Get unique students who made payments in this range
+            const studentsWithPaymentsInRange = new Set();
+            paymentsInRange.forEach(p => {
+                if (p.studentId) {
+                    studentsWithPaymentsInRange.add(p.studentId);
                 }
             });
 
-            // Update total to reflect students with status in range
-            summary.total = studentsWithStatusInRange.size;
+            // Count students by payment status (using current month status)
+            students.forEach(student => {
+                // Only count students who have payments in the date range
+                if (!studentsWithPaymentsInRange.has(student.id)) return;
+
+                const status = this.getPaymentStatus(student);
+
+                if (status.partial) {
+                    summary.partial++;
+                } else if (status.status === 'Pagado') {
+                    summary.paid++;
+                } else if (status.color === '#ef4444') {
+                    summary.overdue++;
+                } else if (status.color === '#fbbf24' || status.color === '#f59e0b') {
+                    summary.upcoming++;
+                } else {
+                    summary.pending++;
+                }
+            });
+
+            // Update total to reflect students with payments in range
+            summary.total = studentsWithPaymentsInRange.size;
 
             console.log('📊 Summary for date range:', {
                 ...summary,
-                paymentsFound,
-                studentsEvaluated: students.length,
-                studentsWithStatus: studentsWithStatusInRange.size
+                paymentsInRange: paymentsInRange.length,
+                studentsWithPayments: studentsWithPaymentsInRange.size
             });
         } else {
             // No date filter - use original logic (current month only)
