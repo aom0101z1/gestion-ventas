@@ -3216,11 +3216,42 @@ window.clearDateRangeFilter = async function() {
 
 // Helper function to update summary display
 function updatePaymentSummaryDisplay(summary) {
-    document.getElementById('paidCount').textContent = summary.paid;
-    document.getElementById('partialCount').textContent = summary.partial;
-    document.getElementById('upcomingCount').textContent = summary.upcoming;
-    document.getElementById('overdueCount').textContent = summary.overdue;
-    document.getElementById('collectedAmount').textContent = `$${summary.collectedAmount.toLocaleString('es-CO')}`;
+    console.log('🎨 Updating payment summary display with:', {
+        paid: summary.paid,
+        partial: summary.partial,
+        upcoming: summary.upcoming,
+        overdue: summary.overdue,
+        collectedAmount: summary.collectedAmount,
+        formatted: `$${summary.collectedAmount.toLocaleString('es-CO')}`
+    });
+
+    const paidEl = document.getElementById('paidCount');
+    const partialEl = document.getElementById('partialCount');
+    const upcomingEl = document.getElementById('upcomingCount');
+    const overdueEl = document.getElementById('overdueCount');
+    const collectedEl = document.getElementById('collectedAmount');
+
+    console.log('🔍 DOM elements found:', {
+        paidEl: !!paidEl,
+        partialEl: !!partialEl,
+        upcomingEl: !!upcomingEl,
+        overdueEl: !!overdueEl,
+        collectedEl: !!collectedEl
+    });
+
+    if (paidEl) paidEl.textContent = summary.paid;
+    if (partialEl) partialEl.textContent = summary.partial;
+    if (upcomingEl) upcomingEl.textContent = summary.upcoming;
+    if (overdueEl) overdueEl.textContent = summary.overdue;
+    if (collectedEl) collectedEl.textContent = `$${summary.collectedAmount.toLocaleString('es-CO')}`;
+
+    console.log('✅ Display updated. Current values in DOM:', {
+        paid: paidEl?.textContent,
+        partial: partialEl?.textContent,
+        upcoming: upcomingEl?.textContent,
+        overdue: overdueEl?.textContent,
+        collected: collectedEl?.textContent
+    });
 }
 
 // Set date range preset
