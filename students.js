@@ -74,8 +74,8 @@ class StudentManager {
                 status: studentData.status || 'active',
                 statusHistory: studentData.statusHistory || [],
                 paymentHistory: studentData.paymentHistory || [],
-                updatedAt: new Date().toISOString(),
-                createdAt: studentData.createdAt || new Date().toISOString()
+                updatedAt: window.getLocalDateTime ? window.getLocalDateTime() : new Date().toISOString(),
+                createdAt: studentData.createdAt || (window.getLocalDateTime ? window.getLocalDateTime() : new Date().toISOString())
             };
 
             const db = window.firebaseModules.database;
@@ -144,18 +144,26 @@ class StudentManager {
 
         // Filter by date range
         if (filters.startDate || filters.endDate) {
+            console.log('📅 Date range filter:', {
+                startDate: filters.startDate,
+                endDate: filters.endDate,
+                totalStudents: students.length
+            });
+
             students = students.filter(s => {
                 if (!s.createdAt) return false;
 
-                const studentDate = new Date(s.createdAt);
-                const startDate = filters.startDate ? new Date(filters.startDate) : null;
-                const endDate = filters.endDate ? new Date(filters.endDate + 'T23:59:59') : null;
+                // Extract date part only (YYYY-MM-DD) to avoid timezone issues
+                const studentDateStr = s.createdAt.split('T')[0];
 
-                if (startDate && studentDate < startDate) return false;
-                if (endDate && studentDate > endDate) return false;
+                // Compare dates as strings (YYYY-MM-DD format)
+                if (filters.startDate && studentDateStr < filters.startDate) return false;
+                if (filters.endDate && studentDateStr > filters.endDate) return false;
 
                 return true;
             });
+
+            console.log('✅ Date filter results:', students.length, 'students found');
         }
 
         return students.sort((a, b) =>
@@ -1045,36 +1053,55 @@ window.viewStudentPayments = function(id) {
 // ============================================
 
 window.applyQuickDateFilter = function(filterType) {
-    const today = new Date();
+    // Get today's date in Colombia timezone (YYYY-MM-DD)
+    const todayStr = window.getTodayInColombia ? window.getTodayInColombia() : new Date().toISOString().split('T')[0];
+    const [year, month, day] = todayStr.split('-').map(Number);
+
+    // Create date object without timezone issues
+    const today = new Date(year, month - 1, day);
+
     let startDate, endDate;
+
+    // Helper function to format date as YYYY-MM-DD
+    const formatDate = (date) => {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    };
 
     switch(filterType) {
         case 'today':
-            startDate = endDate = today.toISOString().split('T')[0];
+            startDate = endDate = todayStr;
             break;
         case 'week':
-            const weekStart = new Date(today);
-            weekStart.setDate(today.getDate() - today.getDay());
-            startDate = weekStart.toISOString().split('T')[0];
-            endDate = today.toISOString().split('T')[0];
+            const weekStart = new Date(year, month - 1, day);
+            weekStart.setDate(day - today.getDay());
+            startDate = formatDate(weekStart);
+            endDate = todayStr;
             break;
         case 'month':
-            const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-            startDate = monthStart.toISOString().split('T')[0];
-            endDate = today.toISOString().split('T')[0];
+            const monthStart = new Date(year, month - 1, 1);
+            startDate = formatDate(monthStart);
+            endDate = todayStr;
             break;
         case 'last30':
-            const last30 = new Date(today);
-            last30.setDate(today.getDate() - 30);
-            startDate = last30.toISOString().split('T')[0];
-            endDate = today.toISOString().split('T')[0];
+            const last30 = new Date(year, month - 1, day - 30);
+            startDate = formatDate(last30);
+            endDate = todayStr;
             break;
         case 'year':
-            const yearStart = new Date(today.getFullYear(), 0, 1);
-            startDate = yearStart.toISOString().split('T')[0];
-            endDate = today.toISOString().split('T')[0];
+            const yearStart = new Date(year, 0, 1);
+            startDate = formatDate(yearStart);
+            endDate = todayStr;
             break;
     }
+
+    console.log(`📅 Quick filter "${filterType}":`, {
+        todayInColombia: todayStr,
+        startDate,
+        endDate
+    });
 
     document.getElementById('studentStartDate').value = startDate;
     document.getElementById('studentEndDate').value = endDate;
