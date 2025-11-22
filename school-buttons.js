@@ -3,11 +3,14 @@ console.log('🏫 Adding school buttons...');
 
 // Create a simple button bar
 function addSchoolButtons() {
-    // Check if buttons already exist
-    if (document.getElementById('schoolButtonBar')) {
-        console.log('✅ School buttons already exist');
-        return;
+    // Remove existing buttons first (to allow refresh with updated role)
+    const existingBar = document.getElementById('schoolButtonBar');
+    if (existingBar) {
+        console.log('🔄 Removing existing school buttons to refresh with role');
+        existingBar.remove();
     }
+
+    console.log('🏫 Creating school buttons for role:', window.userRole || 'not set');
     
     // Create button bar
     const buttonBar = document.createElement('div');

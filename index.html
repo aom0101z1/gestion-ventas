@@ -1498,9 +1498,16 @@ onAuthStateChanged(auth, async (user) => {
                 document.getElementById('mainApp').classList.remove('hidden');
                 
                 const profile = await window.FirebaseData.loadUserProfile();
-                
+
                 updateUserInterface(profile);
                 configureRoleBasedAccess(profile.role);
+
+                // Refresh school buttons with correct role
+                if (typeof addSchoolButtons === 'function') {
+                    console.log('🔄 Refreshing school buttons with role:', profile.role);
+                    addSchoolButtons();
+                }
+
                 await loadInitialData();
                 
                 isInitialized = true;
