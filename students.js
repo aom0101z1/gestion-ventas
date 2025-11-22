@@ -670,8 +670,8 @@ function renderStudentTable(students) {
                                         💰
                                     </button>
                                     <button onclick="openStudentNotes('${s.id}')" class="btn btn-sm"
-                                            style="background: #8b5cf6; color: white; padding: 0.5rem 0.75rem; font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif; font-size: 1.2rem; min-width: 42px; height: 36px; line-height: 1;"
-                                            aria-label="Notas" title="Notas del Estudiante">
+                                            style="background: ${s.notes && s.notes.length > 0 ? '#f59e0b' : '#8b5cf6'}; color: white; padding: 0.5rem 0.75rem; font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif; font-size: 1.2rem; min-width: 42px; height: 36px; line-height: 1;"
+                                            aria-label="Notas" title="${s.notes && s.notes.length > 0 ? 'Ver Notas (' + s.notes.length + ')' : 'Notas del Estudiante'}">
                                         📝
                                     </button>
                                     ${(window.userRole === 'admin' || window.userRole === 'director') ? `
