@@ -1560,14 +1560,19 @@ onAuthStateChanged(auth, async (user) => {
             const directorConfig = document.getElementById('directorConfig');
             const leadsFilters = document.getElementById('leadsFilters');
             
-            if (role === 'director') {
+            if (role === 'director' || role === 'admin') {
                 if (monitoringTab) monitoringTab.style.display = 'block';
                 if (configTab) configTab.style.display = 'block';
                 if (adminTab) adminTab.style.display = 'block';
                 const auditLogTab = document.getElementById('auditLogTab');
                 if (auditLogTab) auditLogTab.style.display = 'block';
                 const grupos2Tab = document.getElementById('grupos2Tab');
-                if (grupos2Tab) grupos2Tab.style.display = 'block';
+                if (grupos2Tab) {
+                    console.log('✅ Showing Grupos2 tab for role:', role);
+                    grupos2Tab.style.display = 'block';
+                } else {
+                    console.error('❌ grupos2Tab element not found!');
+                }
                 if (directorConfig) directorConfig.classList.remove('hidden');
                 if (leadsFilters) leadsFilters.style.display = 'flex';
 
