@@ -582,6 +582,7 @@
                 <button class="tab" onclick="switchTab('auditLog')" id="auditLogTab" style="display: none;">📋 Registro</button>
                 <button class="tab" onclick="switchTab('config')" id="configTab" style="display: none;">⚙️ Config</button>
                 <button class="tab" onclick="switchTab('admin')" id="adminTab" style="display: none;">🔐 Admin</button>
+                <button class="tab" onclick="switchTab('grupos2')" id="grupos2Tab" style="display: none;">🎓 Grupos 2.0</button>
                 <button class="tab" onclick="switchTab('socialMedia')" id="socialMediaTab">💬 Social Media</button>
             </div>
 
@@ -1189,6 +1190,11 @@
                 <!-- El contenido se carga dinámicamente desde auditlog.js -->
             </div>
 
+            <!-- ========== SECTION 15.1: TAB CONTENT - GRUPOS 2.0 (ADMIN ONLY) ========== -->
+            <div id="grupos2Container" class="tab-content" style="display: none;">
+                <!-- El contenido se carga dinámicamente desde grupos2.js -->
+            </div>
+
         </div> <!-- End of container -->
     </div> <!-- End of mainApp -->
 
@@ -1560,6 +1566,8 @@ onAuthStateChanged(auth, async (user) => {
                 if (adminTab) adminTab.style.display = 'block';
                 const auditLogTab = document.getElementById('auditLogTab');
                 if (auditLogTab) auditLogTab.style.display = 'block';
+                const grupos2Tab = document.getElementById('grupos2Tab');
+                if (grupos2Tab) grupos2Tab.style.display = 'block';
                 if (directorConfig) directorConfig.classList.remove('hidden');
                 if (leadsFilters) leadsFilters.style.display = 'flex';
 
@@ -1581,6 +1589,8 @@ onAuthStateChanged(auth, async (user) => {
                 if (adminTab) adminTab.style.display = 'none';
                 const auditLogTab = document.getElementById('auditLogTab');
                 if (auditLogTab) auditLogTab.style.display = 'none';
+                const grupos2Tab = document.getElementById('grupos2Tab');
+                if (grupos2Tab) grupos2Tab.style.display = 'none';
                 if (directorConfig) directorConfig.classList.add('hidden');
                 if (leadsFilters) leadsFilters.style.display = 'none';
             }
@@ -1946,6 +1956,10 @@ onAuthStateChanged(auth, async (user) => {
                 } else if (tabName === 'auditLog') {
                     if (typeof loadAuditLogTab === 'function') {
                         loadAuditLogTab();
+                    }
+                } else if (tabName === 'grupos2') {
+                    if (typeof loadGrupos2Tab === 'function') {
+                        loadGrupos2Tab();
                     }
                 }
                 
@@ -3390,6 +3404,7 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
     <script src="payments.js"></script>
     <script src="tienda.js"></script>
     <script src="groups.js"></script>
+    <script src="grupos2.js"></script>
     <script src="teachers.js"></script>
     <script src="attendance.js"></script>
     <script src="school-buttons.js"></script>
