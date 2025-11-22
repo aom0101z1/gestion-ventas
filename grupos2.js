@@ -258,10 +258,16 @@ window.loadGrupos2Tab = async function() {
     }
 
     try {
-        container.innerHTML = renderGrupos2View();
+        console.log('📝 Rendering view...');
+        const viewHTML = renderGrupos2View();
+        console.log('📝 View HTML length:', viewHTML.length);
+        container.innerHTML = viewHTML;
+        console.log('📝 Container updated');
+
         await window.GroupsManager2.init();
         await refreshGrupos2Grid();
         console.log('✅ Grupos2 tab loaded successfully');
+        console.log('✅ showGrupo2Form available?:', typeof showGrupo2Form);
     } catch (error) {
         console.error('❌ Error loading Grupos2 tab:', error);
         container.innerHTML = `
