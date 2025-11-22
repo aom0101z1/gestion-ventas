@@ -41,6 +41,7 @@ function addSchoolButtons() {
         { name: 'Finanzas', icon: '💵', color: '#6366f1', func: 'Finance', directorOnly: true },
         { name: 'Nómina', icon: '💼', color: '#0ea5e9', func: 'Payroll', directorOnly: true },
         { name: 'Grupos', icon: '📚', color: '#8b5cf6', func: 'Groups' },
+        { name: 'Grupos 2.0', icon: '🎓', color: '#667eea', func: 'Grupos2', directorOnly: true },
         { name: 'Profesores', icon: '👩‍🏫', color: '#f59e0b', func: 'Teachers' },
         { name: 'Asistencia', icon: '📋', color: '#ef4444', func: 'Attendance' }
     ];
@@ -48,8 +49,11 @@ function addSchoolButtons() {
     modules.forEach(module => {
         // Skip director-only modules if user is not director
         if (module.directorOnly) {
-            // Check if user is director (will show for all for now, can add role check later)
-            // TODO: Add role check: if (currentUserRole !== 'director') return;
+            const userRole = window.userRole || '';
+            if (userRole !== 'director' && userRole !== 'admin') {
+                console.log(`⚠️ Skipping ${module.name} - director only`);
+                return; // Skip this module
+            }
         }
 
         const btn = document.createElement('button');

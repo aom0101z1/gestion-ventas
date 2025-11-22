@@ -582,7 +582,6 @@
                 <button class="tab" onclick="switchTab('auditLog')" id="auditLogTab" style="display: none;">📋 Registro</button>
                 <button class="tab" onclick="switchTab('config')" id="configTab" style="display: none;">⚙️ Config</button>
                 <button class="tab" onclick="switchTab('admin')" id="adminTab" style="display: none;">🔐 Admin</button>
-                <button class="tab" onclick="switchTab('grupos2')" id="grupos2Tab">🎓 Grupos 2.0</button>
                 <button class="tab" onclick="switchTab('socialMedia')" id="socialMediaTab">💬 Social Media</button>
             </div>
 
@@ -1566,13 +1565,6 @@ onAuthStateChanged(auth, async (user) => {
                 if (adminTab) adminTab.style.display = 'block';
                 const auditLogTab = document.getElementById('auditLogTab');
                 if (auditLogTab) auditLogTab.style.display = 'block';
-                const grupos2Tab = document.getElementById('grupos2Tab');
-                if (grupos2Tab) {
-                    console.log('✅ Showing Grupos2 tab for role:', role);
-                    grupos2Tab.style.display = 'block';
-                } else {
-                    console.error('❌ grupos2Tab element not found!');
-                }
                 if (directorConfig) directorConfig.classList.remove('hidden');
                 if (leadsFilters) leadsFilters.style.display = 'flex';
 
@@ -1594,8 +1586,6 @@ onAuthStateChanged(auth, async (user) => {
                 if (adminTab) adminTab.style.display = 'none';
                 const auditLogTab = document.getElementById('auditLogTab');
                 if (auditLogTab) auditLogTab.style.display = 'none';
-                const grupos2Tab = document.getElementById('grupos2Tab');
-                if (grupos2Tab) grupos2Tab.style.display = 'none';
                 if (directorConfig) directorConfig.classList.add('hidden');
                 if (leadsFilters) leadsFilters.style.display = 'none';
             }
@@ -1961,10 +1951,6 @@ onAuthStateChanged(auth, async (user) => {
                 } else if (tabName === 'auditLog') {
                     if (typeof loadAuditLogTab === 'function') {
                         loadAuditLogTab();
-                    }
-                } else if (tabName === 'grupos2') {
-                    if (typeof loadGrupos2Tab === 'function') {
-                        loadGrupos2Tab();
                     }
                 }
                 
