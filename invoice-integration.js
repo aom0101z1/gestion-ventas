@@ -67,7 +67,7 @@ const InvoiceSystem = {
       studentId: paymentRow.dataset.studentId || paymentRow.getAttribute('data-student-id'),
       amount: paymentRow.dataset.amount || paymentRow.querySelector('.amount')?.textContent,
       concept: paymentRow.dataset.concept || 'Mensualidad',
-      date: new Date()
+      date: paymentRow.dataset.date ? new Date(paymentRow.dataset.date) : new Date()
     };
 
     // Get student data
@@ -83,7 +83,7 @@ const InvoiceSystem = {
     // Create invoice data
     const invoiceData = {
       number: invoiceNumber,
-      date: new Date(),
+      date: paymentData.date,
       student: {
         name: studentData.name || studentData.studentName || '',
         nit: studentData.nit || studentData.documentNumber || '',

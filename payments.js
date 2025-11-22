@@ -1147,11 +1147,11 @@ const InvoiceGenerator = {
     // Generate invoice from payment - ENHANCED WITH STORAGE
     async generateInvoice(payment, student) {
         const invoiceNumber = await this.generateInvoiceNumber(student.id);
-        
+
         const invoiceData = {
             number: invoiceNumber,
             paymentId: payment.id,
-            date: new Date(),
+            date: payment.date,
             student: {
                 name: student.nombre || '',
                 nit: student.numDoc || '',
@@ -1235,7 +1235,7 @@ const InvoiceGenerator = {
         const invoiceData = {
             number: invoiceNumber,
             masterPaymentId: paymentResult.masterPaymentId,
-            date: new Date(),
+            date: paymentResult.payments[0].date,
             student: {
                 name: student.nombre || '',
                 nit: student.numDoc || '',
