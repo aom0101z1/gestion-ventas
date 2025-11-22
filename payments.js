@@ -2324,7 +2324,23 @@ window.viewPaymentInvoice = async function(paymentId) {
 
             if (snapshot.exists()) {
                 console.log('✅ Invoice found in database');
-                InvoiceGenerator.showInvoiceModal(snapshot.val());
+                const invoiceData = snapshot.val();
+
+                // CRITICAL FIX: If invoice doesn't have date (old invoices), get it from payment
+                if (!invoiceData.date) {
+                    console.warn('⚠️ Invoice missing date, using payment date:', payment.date);
+                    invoiceData.date = payment.date;
+
+                    // Update the invoice in Firebase to add the missing date
+                    try {
+                        await db.set(invoiceRef, invoiceData);
+                        console.log('✅ Updated invoice with payment date');
+                    } catch (error) {
+                        console.error('❌ Error updating invoice date:', error);
+                    }
+                }
+
+                InvoiceGenerator.showInvoiceModal(invoiceData);
                 window.showNotification('✅ Factura cargada', 'success');
             } else {
                 // Regenerate if not found in database (shouldn't normally happen)
