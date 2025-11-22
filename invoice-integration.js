@@ -81,9 +81,15 @@ const InvoiceSystem = {
     const invoiceNumber = await this.generateInvoiceNumber(paymentData.studentId);
 
     // Create invoice data
+    // Ensure date is ISO string
+    const invoiceDate = paymentData.date instanceof Date ?
+      paymentData.date.toISOString() :
+      paymentData.date;
+    console.log('📄 [invoice-integration] Creating invoice with date:', invoiceDate);
+
     const invoiceData = {
       number: invoiceNumber,
-      date: paymentData.date,
+      date: invoiceDate,
       student: {
         name: studentData.name || studentData.studentName || '',
         nit: studentData.nit || studentData.documentNumber || '',
@@ -163,12 +169,34 @@ const InvoiceSystem = {
   // Get invoice HTML template
   getInvoiceHTML(data) {
     const formatDate = (date) => {
-      const d = new Date(date);
-      return {
-        day: d.getDate().toString().padStart(2, '0'),
-        month: (d.getMonth() + 1).toString().padStart(2, '0'),
-        year: d.getFullYear()
-      };
+      try {
+        console.log('📅 [invoice-integration] Formatting date:', date, 'Type:', typeof date);
+        const d = new Date(date);
+
+        if (isNaN(d.getTime())) {
+          console.error('❌ [invoice-integration] Invalid date:', date);
+          return {
+            day: 'XX',
+            month: 'XX',
+            year: 'ERROR'
+          };
+        }
+
+        const result = {
+          day: d.getDate().toString().padStart(2, '0'),
+          month: (d.getMonth() + 1).toString().padStart(2, '0'),
+          year: d.getFullYear()
+        };
+        console.log('✅ [invoice-integration] Date formatted:', result);
+        return result;
+      } catch (error) {
+        console.error('❌ [invoice-integration] Error formatting date:', error);
+        return {
+          day: 'XX',
+          month: 'XX',
+          year: 'ERROR'
+        };
+      }
     };
 
     const dateInfo = formatDate(data.date);
@@ -335,12 +363,18 @@ const InvoiceSystem = {
     try {
       const db = window.firebaseModules.database;
       const invoiceRef = db.ref(window.FirebaseData.database, `invoices/${invoiceData.number}`);
-      await db.set(invoiceRef, {
+
+      // Ensure date is ISO string
+      const dataToSave = {
         ...invoiceData,
+        date: invoiceData.date instanceof Date ? invoiceData.date.toISOString() : invoiceData.date,
         studentId: studentId,
         createdAt: new Date().toISOString(),
         createdBy: window.FirebaseData.auth.currentUser?.email || 'unknown'
-      });
+      };
+      console.log('💾 [invoice-integration] Saving invoice with date:', dataToSave.date);
+
+      await db.set(invoiceRef, dataToSave);
 
       // Also save reference in student's invoices
       const studentInvoiceRef = db.ref(window.FirebaseData.database, `students/${studentId}/invoices/${invoiceData.number}`);

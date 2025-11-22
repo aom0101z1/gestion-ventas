@@ -1148,10 +1148,14 @@ const InvoiceGenerator = {
     async generateInvoice(payment, student) {
         const invoiceNumber = await this.generateInvoiceNumber(student.id);
 
+        // Ensure date is ISO string
+        const invoiceDate = payment.date instanceof Date ? payment.date.toISOString() : payment.date;
+        console.log('📄 Generating invoice with date:', invoiceDate, 'from payment.date:', payment.date);
+
         const invoiceData = {
             number: invoiceNumber,
             paymentId: payment.id,
-            date: payment.date,
+            date: invoiceDate,
             student: {
                 name: student.nombre || '',
                 nit: student.numDoc || '',
@@ -1232,10 +1236,16 @@ const InvoiceGenerator = {
             description = `Pago ${monthCount} meses - ${paymentResult.paymentPeriod}`;
         }
         
+        // Ensure date is ISO string
+        const invoiceDate = paymentResult.payments[0].date instanceof Date ?
+            paymentResult.payments[0].date.toISOString() :
+            paymentResult.payments[0].date;
+        console.log('📄 Generating multi-month invoice with date:', invoiceDate);
+
         const invoiceData = {
             number: invoiceNumber,
             masterPaymentId: paymentResult.masterPaymentId,
-            date: paymentResult.payments[0].date,
+            date: invoiceDate,
             student: {
                 name: student.nombre || '',
                 nit: student.numDoc || '',
@@ -1313,12 +1323,18 @@ const InvoiceGenerator = {
         try {
             const db = window.firebaseModules.database;
             const invoiceRef = db.ref(window.FirebaseData.database, `invoices/${invoiceData.number}`);
-            await db.set(invoiceRef, {
+
+            // Ensure date is stored as ISO string for consistent parsing
+            const dataToSave = {
                 ...invoiceData,
+                date: invoiceData.date instanceof Date ? invoiceData.date.toISOString() : invoiceData.date,
                 studentId: studentId,
                 createdAt: new Date().toISOString(),
                 createdBy: window.FirebaseData.auth?.currentUser?.email || 'unknown'
-            });
+            };
+
+            console.log('💾 Saving invoice with date:', dataToSave.date);
+            await db.set(invoiceRef, dataToSave);
 
             // Link to student
             const studentInvoiceRef = db.ref(window.FirebaseData.database, `students/${studentId}/invoices/${invoiceData.number}`);
@@ -1428,29 +1444,37 @@ const InvoiceGenerator = {
     getInvoiceHTML(data) {
         const formatDate = (date) => {
             try {
+                // Log the date being processed for debugging
+                console.log('📅 Formatting invoice date:', date, 'Type:', typeof date);
+
                 const d = new Date(date);
+
                 // Check if date is valid
                 if (isNaN(d.getTime())) {
-                    // If invalid, try to use current date
-                    const now = new Date();
+                    console.error('❌ Invalid date in invoice:', date);
+                    // DO NOT use current date as fallback - use a clear error indicator
                     return {
-                        day: now.getDate().toString().padStart(2, '0'),
-                        month: (now.getMonth() + 1).toString().padStart(2, '0'),
-                        year: now.getFullYear()
+                        day: 'XX',
+                        month: 'XX',
+                        year: 'ERROR'
                     };
                 }
-                return {
+
+                const result = {
                     day: d.getDate().toString().padStart(2, '0'),
                     month: (d.getMonth() + 1).toString().padStart(2, '0'),
                     year: d.getFullYear()
                 };
+
+                console.log('✅ Date formatted successfully:', result);
+                return result;
             } catch (error) {
-                // Fallback to current date if any error
-                const now = new Date();
+                console.error('❌ Error formatting date:', error, 'Date value:', date);
+                // DO NOT use current date as fallback
                 return {
-                    day: now.getDate().toString().padStart(2, '0'),
-                    month: (now.getMonth() + 1).toString().padStart(2, '0'),
-                    year: now.getFullYear()
+                    day: 'XX',
+                    month: 'XX',
+                    year: 'ERROR'
                 };
             }
         };
