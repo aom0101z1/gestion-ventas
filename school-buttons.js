@@ -159,12 +159,12 @@ function openModule(moduleName) {
     container.innerHTML = `
         <div style="background: #f3f4f6; padding: 1rem; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
             <h2 style="margin: 0;">📚 ${moduleName} Module</h2>
-            <button onclick="document.getElementById('schoolModuleView').style.display='none'" 
+            <button onclick="document.getElementById('schoolModuleView').style.display='none'"
                     style="padding: 0.5rem 1rem; background: #dc2626; color: white; border: none; border-radius: 4px; cursor: pointer;">
                 ✖️ Cerrar
             </button>
         </div>
-        <div id="${moduleName.toLowerCase()}Container" style="padding: 1rem;">
+        <div id="${moduleName.charAt(0).toLowerCase() + moduleName.slice(1)}Container" style="padding: 1rem;">
             <div style="text-align: center; padding: 3rem;">
                 <div class="loading-spinner"></div>
                 <p>Cargando módulo...</p>
@@ -181,7 +181,8 @@ function openModule(moduleName) {
             loadFunction();
         }, 100);
     } else {
-        document.getElementById(`${moduleName.toLowerCase()}Container`).innerHTML = `
+        const containerId = moduleName.charAt(0).toLowerCase() + moduleName.slice(1) + 'Container';
+        document.getElementById(containerId).innerHTML = `
             <div style="text-align: center; padding: 3rem;">
                 <h3>⚠️ Módulo no encontrado</h3>
                 <p>La función load${moduleName}Tab no está disponible</p>
