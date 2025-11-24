@@ -18,6 +18,8 @@ class GroupsManager2 {
 
         // Available rooms for CB
         this.cbRooms = [
+            'Sydney', 'London', 'Colombia', 'New York', 'Washington',
+            'Moscow', 'Rome', 'Cinema', 'DanceRoom', 'Paris',
             'Sala 101', 'Sala 102', 'Sala 103', 'Sala 104', 'Sala 105',
             'Sala 106', 'Sala 107', 'Sala 108', 'Sala 109', 'Sala 110'
         ];
