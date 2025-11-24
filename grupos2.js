@@ -251,11 +251,20 @@ window.GroupsManager2 = new GroupsManager2();
 window.loadGrupos2Tab = async function() {
     console.log('📚 Loading Grupos2 tab');
 
-    const container = document.getElementById('grupos2Container');
+    // First try to find container inside schoolModuleView (from floating panel)
+    let container = document.querySelector('#schoolModuleView #grupos2Container');
+
+    // If not found, try the main tab container
+    if (!container) {
+        container = document.getElementById('grupos2Container');
+    }
+
     if (!container) {
         console.error('❌ grupos2Container not found!');
         return;
     }
+
+    console.log('📦 Using container:', container.parentElement?.id || 'main page');
 
     try {
         console.log('📝 Rendering view...');
