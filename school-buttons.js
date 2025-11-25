@@ -41,7 +41,7 @@ function addSchoolButtons() {
         { name: 'Estudiantes', icon: '👥', color: '#3b82f6', func: 'Students' },
         { name: 'Pagos', icon: '💰', color: '#10b981', func: 'Payments' },
         { name: 'Tienda', icon: '🏪', color: '#ec4899', func: 'Tienda' },
-        { name: 'Finanzas', icon: '💵', color: '#6366f1', func: 'Finance', directorOnly: true },
+        { name: 'Finanzas', icon: '💵', color: '#6366f1', func: 'Finance' },
         { name: 'Nómina', icon: '💼', color: '#0ea5e9', func: 'Payroll', directorOnly: true },
         { name: 'Grupos', icon: '📚', color: '#8b5cf6', func: 'Groups' },
         { name: 'Grupos 2.0', icon: '🎓', color: '#667eea', func: 'Grupos2', directorOnly: true },
