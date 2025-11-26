@@ -573,12 +573,19 @@ class FinanceManager {
         const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
         const endDate = `${year}-${String(month).padStart(2, '0')}-31`;
 
-        const payments = Array.from(window.PaymentManager.payments.values()).filter(p => {
-            const paymentDate = p.date ? p.date.split('T')[0] : null;
-            return paymentDate >= startDate && paymentDate <= endDate;
-        });
+        let payments = [];
+        let tuitionRevenue = 0;
 
-        const tuitionRevenue = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+        // Check if PaymentManager is available
+        if (window.PaymentManager && window.PaymentManager.payments) {
+            payments = Array.from(window.PaymentManager.payments.values()).filter(p => {
+                const paymentDate = p.date ? p.date.split('T')[0] : null;
+                return paymentDate >= startDate && paymentDate <= endDate;
+            });
+            tuitionRevenue = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+        } else {
+            console.warn('⚠️ PaymentManager not available, tuition revenue will be 0');
+        }
 
         // Get tienda sales for the month
         const db = window.firebaseModules.database;
@@ -1558,6 +1565,12 @@ window.loadFinanceTab = async function(activeTab = 'dashboard') {
     if (!container) {
         console.error('❌ Finance container not found');
         return;
+    }
+
+    // Initialize PaymentManager if not already initialized
+    if (window.PaymentManager && !window.PaymentManager.initialized) {
+        console.log('🔄 Initializing PaymentManager for Finance...');
+        await window.PaymentManager.init();
     }
 
     await window.FinanceManager.init();
