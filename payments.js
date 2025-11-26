@@ -3691,7 +3691,7 @@ async function processPayment(studentId) {
         
         // Record payment(s)
         let result;
-        const student = window.StudentManager.students.get(studentId);
+        // student already declared at line 3581, no need to redeclare
         
         if (selectedMonths.length === 1 && paymentType === 'monthly') {
             // Single month payment (existing logic)
