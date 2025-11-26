@@ -1950,7 +1950,11 @@ onAuthStateChanged(auth, async (user) => {
                 } else if (tabName === 'reports') {
                     loadReportsData();
                 } else if (tabName === 'tasks') {
-                    loadTasksData();
+                    if (typeof loadTasksTabEnhanced === 'function') {
+                        loadTasksTabEnhanced();
+                    } else {
+                        console.error('❌ loadTasksTabEnhanced not loaded');
+                    }
                 } else if (tabName === 'admin') {
                     if (typeof loadAdminTab === 'function') {
                         loadAdminTab();
@@ -3386,8 +3390,12 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
         }
 
         // ========== SECTION 16.20: PLACEHOLDER FOR TASKS FUNCTION ==========
+        // Placeholder function - actual implementation loaded from tasks-enhanced.js
         function loadTasksData() {
-            console.log('📋 Loading tasks data - function will be loaded from simple-tasks.js');
+            console.log('📋 Loading enhanced tasks data - function will be loaded from tasks-enhanced.js');
+            if (typeof loadTasksTabEnhanced === 'function') {
+                loadTasksTabEnhanced();
+            }
         }
     </script>
 
@@ -3397,7 +3405,7 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
     <script src="fixes.js"></script>
     <script src="social.js"></script>
     <script src="pipeline.js"></script>
-    <script src="simple-tasks.js"></script>
+    <script src="tasks-enhanced.js"></script>
     <script src="students.js"></script>
     <script src="payments.js"></script>
     <script src="tienda.js"></script>
