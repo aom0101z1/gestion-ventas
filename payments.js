@@ -127,8 +127,13 @@ async loadPayments() {
     // Get payment status with color
 // Get payment status with color
 getPaymentStatus(student) {
+    // Skip payment status for hourly students - they don't have regular payment dates
+    if (student.tipoPago === 'POR_HORAS') {
+        return { color: '#6b7280', status: 'Por horas', icon: '⏱️' };
+    }
+
     if (!student.diaPago) return { color: '#6b7280', status: 'Sin fecha', icon: '❓' };
-    
+
     const today = new Date();
     const currentMonth = today.getMonth();
     const currentDay = today.getDate();
