@@ -2086,18 +2086,48 @@ function renderPaymentModal(student) {
                 <h3>💵 Registrar Pago - ${student.nombre}</h3>
                 
                 <form id="paymentForm" style="margin-top: 1rem;">
-                    <!-- Payment Type Selection -->
-                    <div class="form-group">
-                        <label>Tipo de Pago</label>
-                        <select id="paymentType" required onchange="handlePaymentTypeChange()">
-                            <option value="monthly">Mensual</option>
-                            <option value="trimester">Trimestre (3 meses)</option>
-                            <option value="semester">Semestre (6 meses)</option>
-                            <option value="academicSemester">Semestre Académico (Fechas fijas)</option>
-                            <option value="annual">Anual (12 meses)</option>
-                            <option value="twoSemesters">2 Semestres Académicos</option>
-                        </select>
-                    </div>
+                    <!-- Hourly Payment Section - Only for POR_HORAS students -->
+                    ${student.tipoPago === 'POR_HORAS' ? `
+                        <div style="background: #f0f9ff; border: 2px solid #0ea5e9; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem;">
+                            <h4 style="margin: 0 0 1rem 0; color: #0369a1;">⏱️ Pago por Horas</h4>
+
+                            <div class="form-group">
+                                <label>Valor por Hora</label>
+                                <input type="number" id="hourlyRate" value="${student.valorHora || 0}" min="0" step="0.01" readonly
+                                       style="background: #e0f2fe; font-weight: 600;"
+                                       onchange="calculateHourlyTotal()">
+                                <small style="color: #6b7280;">Tarifa configurada para este estudiante</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Número de Horas Pagadas</label>
+                                <input type="number" id="hoursCount" value="0" min="0" step="0.5" required
+                                       oninput="calculateHourlyTotal()"
+                                       style="font-size: 16px; padding: 0.75rem;">
+                                <small style="color: #6b7280;">Ingrese el total de horas a pagar</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Total a Pagar</label>
+                                <input type="number" id="payAmount" value="0" readonly required
+                                       style="background: #dcfce7; font-size: 18px; font-weight: 700; color: #166534; padding: 0.75rem;">
+                                <small style="color: #6b7280;">Calculado automáticamente: <span id="hourlyCalculation">$0 x 0 horas</span></small>
+                            </div>
+                        </div>
+                    ` : `
+                        <!-- Payment Type Selection - Only for regular students -->
+                        <div class="form-group">
+                            <label>Tipo de Pago</label>
+                            <select id="paymentType" required onchange="handlePaymentTypeChange()">
+                                <option value="monthly">Mensual</option>
+                                <option value="trimester">Trimestre (3 meses)</option>
+                                <option value="semester">Semestre (6 meses)</option>
+                                <option value="academicSemester">Semestre Académico (Fechas fijas)</option>
+                                <option value="annual">Anual (12 meses)</option>
+                                <option value="twoSemesters">2 Semestres Académicos</option>
+                            </select>
+                        </div>
+                    `}
                     
                     <!-- Academic Semester Selection (hidden by default) -->
                     <div class="form-group" id="academicSemesterGroup" style="display: none;">
@@ -2111,8 +2141,8 @@ function renderPaymentModal(student) {
                         </select>
                     </div>
                     
-                    <!-- Month Selection Grid -->
-                    <div class="form-group" id="monthSelectionGroup">
+                    <!-- Month Selection Grid - Hidden for hourly students -->
+                    <div class="form-group" id="monthSelectionGroup" style="display: ${student.tipoPago === 'POR_HORAS' ? 'none' : 'block'};">
                         <label>Seleccionar Meses <span id="monthCounter">(0 seleccionados)</span></label>
                         <div style="border: 1px solid #ddd; padding: 10px; border-radius: 5px; max-height: 300px; overflow-y: auto;">
                             <!-- Current Year -->
@@ -2169,14 +2199,16 @@ function renderPaymentModal(student) {
                         </select>
                     </div>
                     
-                    <!-- Amount Section -->
-                    <div class="form-group">
-                        <label>Monto Total ($)</label>
-                        <input type="number" id="payAmount" value="${student.valor || ''}" required min="0" onchange="updateInstallmentAmounts()">
-                        <small id="amountHelp" style="color: #6b7280; display: block; margin-top: 5px;">
-                            Valor mensual: $${(student.valor || 0).toLocaleString()}
-                        </small>
-                    </div>
+                    <!-- Amount Section - Only for regular students -->
+                    ${student.tipoPago !== 'POR_HORAS' ? `
+                        <div class="form-group">
+                            <label>Monto Total ($)</label>
+                            <input type="number" id="payAmount" value="${student.valor || ''}" required min="0" onchange="updateInstallmentAmounts()">
+                            <small id="amountHelp" style="color: #6b7280; display: block; margin-top: 5px;">
+                                Valor mensual: $${(student.valor || 0).toLocaleString()}
+                            </small>
+                        </div>
+                    ` : ''}
                     
                     <!-- Installment Details (hidden by default) -->
                     <div id="installmentDetails" style="display: none; background: #f9fafb; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
@@ -2557,25 +2589,44 @@ window.updateMonthSelection = function() {
     updateInstallmentAmounts();
 };
 
+// Calculate hourly payment total
+window.calculateHourlyTotal = function() {
+    const hourlyRate = parseFloat(document.getElementById('hourlyRate')?.value) || 0;
+    const hoursCount = parseFloat(document.getElementById('hoursCount')?.value) || 0;
+    const total = hourlyRate * hoursCount;
+
+    // Update the total amount field
+    const payAmountField = document.getElementById('payAmount');
+    if (payAmountField) {
+        payAmountField.value = total.toFixed(2);
+    }
+
+    // Update the calculation display
+    const calculationDisplay = document.getElementById('hourlyCalculation');
+    if (calculationDisplay) {
+        calculationDisplay.textContent = `$${hourlyRate.toLocaleString('es-CO')} x ${hoursCount} horas = $${total.toLocaleString('es-CO')}`;
+    }
+};
+
 // Select academic semester months
 window.selectAcademicSemester = function() {
     const selection = document.getElementById('academicSemesterSelect').value;
     if (!selection) return;
-    
+
     const [year, semesterNum] = selection.split('-');
     const semesterKey = `semester${semesterNum}`;
     const semesterData = PaymentConfig.semesters[year]?.[semesterKey];
-    
+
     if (semesterData) {
         // Clear all checkboxes first
         document.querySelectorAll('.month-checkbox').forEach(cb => cb.checked = false);
-        
+
         // Select semester months
         semesterData.months.forEach(month => {
             const checkbox = document.querySelector(`.month-checkbox[data-month="${month}"][data-year="${year}"]`);
             if (checkbox) checkbox.checked = true;
         });
-        
+
         updateMonthSelection();
     }
 };
@@ -3526,24 +3577,43 @@ async function processPayment(studentId) {
             return;
         }
 
-        // Get payment type
-        const paymentType = document.getElementById('paymentType')?.value;
-        if (!paymentType) {
-            window.showNotification('❌ Por favor seleccione un tipo de pago', 'error');
-            return;
-        }
+        // Get student to check payment type
+        const student = window.StudentManager.students.get(studentId);
+        const isHourlyPayment = student?.tipoPago === 'POR_HORAS';
 
-        // Validate selected months
-        const selectedMonths = Array.from(document.querySelectorAll('.month-checkbox:checked'))
-            .map(cb => ({
-                month: cb.dataset.month,
-                year: parseInt(cb.dataset.year),
-                monthIndex: parseInt(cb.dataset.monthIndex)
-            }));
+        // Get payment type (skip for hourly students)
+        let paymentType = 'hourly';
+        let selectedMonths = [];
 
-        if (selectedMonths.length === 0) {
-            window.showNotification('❌ Por favor seleccione al menos un mes', 'error');
-            return;
+        if (!isHourlyPayment) {
+            paymentType = document.getElementById('paymentType')?.value;
+            if (!paymentType) {
+                window.showNotification('❌ Por favor seleccione un tipo de pago', 'error');
+                return;
+            }
+
+            // Validate selected months
+            selectedMonths = Array.from(document.querySelectorAll('.month-checkbox:checked'))
+                .map(cb => ({
+                    month: cb.dataset.month,
+                    year: parseInt(cb.dataset.year),
+                    monthIndex: parseInt(cb.dataset.monthIndex)
+                }));
+
+            if (selectedMonths.length === 0) {
+                window.showNotification('❌ Por favor seleccione al menos un mes', 'error');
+                return;
+            }
+        } else {
+            // For hourly payments, use current month
+            const now = new Date();
+            const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+                              'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+            selectedMonths = [{
+                month: monthNames[now.getMonth()],
+                year: now.getFullYear(),
+                monthIndex: now.getMonth()
+            }];
         }
 
         // Validate payment amount
@@ -3611,6 +3681,13 @@ async function processPayment(studentId) {
             installment: installmentOption > 1 ? `${currentInstallment}/${installmentOption}` : '1/1',
             totalInstallments: installmentOption
         };
+
+        // Add hourly payment data if applicable
+        if (isHourlyPayment) {
+            paymentData.hourlyRate = parseFloat(document.getElementById('hourlyRate')?.value) || 0;
+            paymentData.hoursCount = parseFloat(document.getElementById('hoursCount')?.value) || 0;
+            paymentData.notes = `${paymentData.hoursCount} horas x $${paymentData.hourlyRate.toLocaleString('es-CO')} ${paymentData.notes ? '| ' + paymentData.notes : ''}`;
+        }
         
         // Record payment(s)
         let result;
