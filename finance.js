@@ -1567,10 +1567,29 @@ window.loadFinanceTab = async function(activeTab = 'dashboard') {
         return;
     }
 
-    // Initialize PaymentManager if not already initialized
-    if (window.PaymentManager && !window.PaymentManager.initialized) {
-        console.log('🔄 Initializing PaymentManager for Finance...');
-        await window.PaymentManager.init();
+    // Initialize PaymentManager if available and not already initialized
+    if (window.PaymentManager) {
+        console.log('✅ PaymentManager exists:', typeof window.PaymentManager);
+        console.log('✅ PaymentManager.init type:', typeof window.PaymentManager.init);
+        console.log('✅ PaymentManager properties:', Object.keys(window.PaymentManager));
+
+        if (typeof window.PaymentManager.init === 'function') {
+            if (!window.PaymentManager.initialized) {
+                console.log('🔄 Initializing PaymentManager for Finance...');
+                try {
+                    await window.PaymentManager.init();
+                } catch (error) {
+                    console.warn('⚠️ Failed to initialize PaymentManager:', error);
+                }
+            } else {
+                console.log('✅ PaymentManager already initialized');
+            }
+        } else {
+            console.warn('⚠️ PaymentManager.init is not a function - Type is:', typeof window.PaymentManager.init);
+            console.warn('⚠️ PaymentManager value:', window.PaymentManager);
+        }
+    } else {
+        console.warn('⚠️ PaymentManager not available on window object');
     }
 
     await window.FinanceManager.init();
