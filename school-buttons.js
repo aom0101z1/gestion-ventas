@@ -45,6 +45,7 @@ function addSchoolButtons() {
         { name: 'Nómina', icon: '💼', color: '#0ea5e9', func: 'Payroll', directorOnly: true },
         { name: 'Grupos', icon: '📚', color: '#8b5cf6', func: 'Groups' },
         { name: 'Grupos 2.0', icon: '🎓', color: '#667eea', func: 'Grupos2', directorOnly: true },
+        { name: 'Empleados', icon: '👔', color: '#14b8a6', func: 'Employees', directorOnly: true },
         { name: 'Profesores', icon: '👩‍🏫', color: '#f59e0b', func: 'Teachers' },
         { name: 'Asistencia', icon: '📋', color: '#ef4444', func: 'Attendance' }
     ];

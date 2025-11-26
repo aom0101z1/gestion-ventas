@@ -28,6 +28,12 @@ class TaskManager {
             this.currentUserName = window.FirebaseData.currentUser.email.split('@')[0];
         }
 
+        // Initialize EmployeeManager first (needed for task assignment)
+        if (window.EmployeeManager && !window.EmployeeManager.initialized) {
+            console.log('🔄 Initializing Employee Manager for tasks...');
+            await window.EmployeeManager.init();
+        }
+
         // Request notification permission
         await this.requestNotificationPermission();
 
@@ -191,6 +197,7 @@ class TaskManager {
                 status: 'pending',
                 priority: taskData.priority || 'medium',
                 assignedTo: taskData.assignedTo,
+                assignedToName: taskData.assignedToName || taskData.assignedTo,
                 assignedBy: this.currentUserEmail,
                 type: taskData.type || 'admin',
                 dueDate: taskData.dueDate || this.getNextWorkDay(),
@@ -207,7 +214,7 @@ class TaskManager {
                         timestamp: now,
                         user: this.currentUserEmail,
                         userName: this.currentUserName,
-                        details: `Task created and assigned to ${taskData.assignedTo}`
+                        details: `Task created and assigned to ${taskData.assignedToName || taskData.assignedTo}`
                     }
                 ]
             };
@@ -667,7 +674,7 @@ function renderTaskCardEnhanced(task, today) {
 
             <!-- Assignee -->
             <div style="font-size: 0.85rem; color: #6b7280; margin-bottom: 0.5rem;">
-                👤 ${task.assignedTo}
+                👤 ${task.assignedToName || task.assignedTo}
                 ${isAssignedToMe ? '<span style="color: #3b82f6; font-weight: 600;">(Tú)</span>' : ''}
             </div>
 
@@ -734,9 +741,17 @@ function renderNewTaskFormEnhanced() {
             </div>
 
             <div style="margin-bottom: 1rem;">
-                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Asignado a (Email) *</label>
-                <input type="email" id="newTaskAssigneeEnhanced" placeholder="email@example.com" style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px;" required>
-                <small style="color: #6b7280; font-size: 0.85rem;">Debe ser el email registrado del usuario</small>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Asignado a *</label>
+                <select id="newTaskAssigneeEnhanced" style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px;" required>
+                    <option value="">Seleccionar empleado...</option>
+                    ${window.EmployeeManager ?
+                        window.EmployeeManager.getActiveEmployees()
+                            .sort((a, b) => a.name.localeCompare(b.name))
+                            .map(emp => `<option value="${emp.email}" data-name="${emp.name}" data-position="${emp.position}">${emp.name} (${emp.position} - ${emp.department})</option>`).join('') :
+                        '<option value="">Cargando empleados...</option>'
+                    }
+                </select>
+                <small style="color: #6b7280; font-size: 0.85rem;">Selecciona el empleado responsable de esta tarea</small>
             </div>
 
             <div style="margin-bottom: 1.5rem;">
@@ -812,8 +827,13 @@ window.saveTaskEnhanced = async function(event) {
     const description = document.getElementById('newTaskDescEnhanced').value.trim();
     const priority = document.getElementById('newTaskPriorityEnhanced').value;
     const type = document.getElementById('newTaskTypeEnhanced').value;
-    const assignedTo = document.getElementById('newTaskAssigneeEnhanced').value.trim().toLowerCase();
+    const assigneeSelect = document.getElementById('newTaskAssigneeEnhanced');
+    const assignedTo = assigneeSelect.value.trim().toLowerCase();
     const dueDate = document.getElementById('newTaskDueDateEnhanced').value;
+
+    // Get employee name from selected option
+    const selectedOption = assigneeSelect.options[assigneeSelect.selectedIndex];
+    const assignedToName = selectedOption.getAttribute('data-name') || assignedTo;
 
     if (!title || !description || !assignedTo) {
         alert('⚠️ Por favor completa todos los campos obligatorios');
@@ -827,6 +847,7 @@ window.saveTaskEnhanced = async function(event) {
             priority,
             type,
             assignedTo,
+            assignedToName, // Add employee name for better display
             dueDate: dueDate || window.TaskManagerEnhanced.getNextWorkDay()
         });
 
@@ -970,7 +991,7 @@ window.openTaskDetailEnhanced = async function(taskId) {
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
                     <div>
                         <strong style="color: #374151;">Asignado a:</strong>
-                        <p style="margin: 0.25rem 0 0 0; color: #6b7280;">👤 ${task.assignedTo}</p>
+                        <p style="margin: 0.25rem 0 0 0; color: #6b7280;">👤 ${task.assignedToName || task.assignedTo}</p>
                     </div>
                     <div>
                         <strong style="color: #374151;">Creado por:</strong>
