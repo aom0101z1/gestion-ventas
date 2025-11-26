@@ -17,8 +17,10 @@ const studentFields = {
     paymentHistory: [], // History of payment value changes
     lastModified: null,
     // NEW FIELD for student categorization
-    modalidad: '', // Main category: Presencial, Compañia, Escuela, Online
-    modalidadDetalle: '' // Subcategory: For Compañia (COATS, OTRA) or Escuela (Hogar Nazareth, Remigio, otro)
+    modalidad: '', // Main category: Presencial, Compañia, Escuela, Online, Privadas
+    modalidadDetalle: '', // Subcategory: For Compañia (COATS, OTRA) or Escuela (Hogar Nazareth, Remigio, otro)
+    // NEW FIELD for hourly payment
+    valorHora: '' // Hourly rate for "Por horas" payment type
 };
 
 // ============================================
@@ -515,6 +517,7 @@ function renderStudentForm(student = null) {
                             <option value="Compañia" ${student?.modalidad === 'Compañia' ? 'selected' : ''}>Compañía</option>
                             <option value="Escuela" ${student?.modalidad === 'Escuela' ? 'selected' : ''}>Escuela</option>
                             <option value="Online" ${student?.modalidad === 'Online' ? 'selected' : ''}>Online</option>
+                            <option value="Privadas" ${student?.modalidad === 'Privadas' ? 'selected' : ''}>Privadas</option>
                         </select>
                     </div>
 
@@ -537,15 +540,21 @@ function renderStudentForm(student = null) {
 
                     <div class="form-group">
                         <label>Tipo Pago</label>
-                        <select id="stuTipoPago">
+                        <select id="stuTipoPago" onchange="handleTipoPagoChange()">
                             <option value="MENSUAL" ${student?.tipoPago === 'MENSUAL' ? 'selected' : ''}>Mensual</option>
                             <option value="SEMESTRAL" ${student?.tipoPago === 'SEMESTRAL' ? 'selected' : ''}>Semestral</option>
+                            <option value="POR_HORAS" ${student?.tipoPago === 'POR_HORAS' ? 'selected' : ''}>Por horas</option>
                         </select>
                     </div>
-                    
-                    <div class="form-group">
+
+                    <div class="form-group" id="valorMensualGroup" style="display: ${!student || student?.tipoPago !== 'POR_HORAS' ? 'block' : 'none'};">
                         <label>Valor Mensualidad ($)</label>
                         <input type="number" id="stuValor" value="${student?.valor || ''}" min="0" placeholder="Valor mensual">
+                    </div>
+
+                    <div class="form-group" id="valorHoraGroup" style="display: ${student?.tipoPago === 'POR_HORAS' ? 'block' : 'none'};">
+                        <label>Valor / Hora ($)</label>
+                        <input type="number" id="stuValorHora" value="${student?.valorHora || ''}" min="0" placeholder="Valor por hora" step="0.01">
                     </div>
 
                     ${!isEdit ? `
@@ -643,8 +652,11 @@ function renderStudentTable(students) {
                                 ${s.modalidadDetalle ? `<br><small style="color: #6b7280;">${s.modalidadDetalle}</small>` : ''}
                             </td>
                             <td style="padding: 0.75rem;">
-                                ${s.tipoPago || '-'}<br>
-                                <small>$${(s.valor || 0).toLocaleString()}</small>
+                                ${s.tipoPago === 'POR_HORAS' ? 'Por horas' : s.tipoPago || '-'}<br>
+                                <small>${s.tipoPago === 'POR_HORAS' ?
+                                    `$${(s.valorHora || 0).toLocaleString()}/hora` :
+                                    `$${(s.valor || 0).toLocaleString()}`
+                                }</small>
                             </td>
                             <td style="padding: 0.75rem; text-align: center;">
                                 <span style="color: #6b7280; font-size: 0.9rem;">
@@ -775,6 +787,7 @@ window.loadStudentsTab = async function() {
                     <option value="Compañia" ${currentModalidadFilter === 'Compañia' ? 'selected' : ''}>Compañía</option>
                     <option value="Escuela" ${currentModalidadFilter === 'Escuela' ? 'selected' : ''}>Escuela</option>
                     <option value="Online" ${currentModalidadFilter === 'Online' ? 'selected' : ''}>Online</option>
+                    <option value="Privadas" ${currentModalidadFilter === 'Privadas' ? 'selected' : ''}>Privadas</option>
                 </select>
                 <input type="text" id="studentSearch" placeholder="Buscar por nombre, documento o teléfono..."
                        style="padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 4px; flex: 1; min-width: 200px;">
@@ -865,6 +878,25 @@ window.handleModalidadChange = function() {
     } else {
         detalleGroup.style.display = 'none';
         detalleSelect.value = '';
+    }
+};
+
+// Handle payment type change to show/hide hourly rate field
+window.handleTipoPagoChange = function() {
+    const tipoPago = document.getElementById('stuTipoPago').value;
+    const valorMensualGroup = document.getElementById('valorMensualGroup');
+    const valorHoraGroup = document.getElementById('valorHoraGroup');
+
+    if (tipoPago === 'POR_HORAS') {
+        valorMensualGroup.style.display = 'none';
+        valorHoraGroup.style.display = 'block';
+        // Clear monthly value when switching to hourly
+        document.getElementById('stuValor').value = '';
+    } else {
+        valorMensualGroup.style.display = 'block';
+        valorHoraGroup.style.display = 'none';
+        // Clear hourly value when switching to monthly/semester
+        document.getElementById('stuValorHora').value = '';
     }
 };
 
@@ -1143,6 +1175,8 @@ function formatDateTime(dateStr) {
 
 async function saveStudentForm(studentId) {
     try {
+        const tipoPago = document.getElementById('stuTipoPago').value;
+
         const studentData = {
             id: studentId,
             nombre: document.getElementById('stuNombre').value,
@@ -1157,8 +1191,9 @@ async function saveStudentForm(studentId) {
             grupo: document.getElementById('stuGrupo').value,
             modalidad: document.getElementById('stuModalidad').value,
             modalidadDetalle: document.getElementById('stuModalidadDetalle').value,
-            tipoPago: document.getElementById('stuTipoPago').value,
-            valor: parseInt(document.getElementById('stuValor').value) || 0,
+            tipoPago: tipoPago,
+            valor: tipoPago === 'POR_HORAS' ? 0 : (parseInt(document.getElementById('stuValor').value) || 0),
+            valorHora: tipoPago === 'POR_HORAS' ? (parseFloat(document.getElementById('stuValorHora').value) || 0) : 0,
             diaPago: parseInt(document.getElementById('stuDiaPago').value) || 1
         };
 
