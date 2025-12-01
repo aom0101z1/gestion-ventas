@@ -857,6 +857,7 @@ window.handleModalidadChange = function() {
     const detalleGroup = document.getElementById('modalidadDetalleGroup');
     const detalleSelect = document.getElementById('stuModalidadDetalle');
     const detalleLabel = document.getElementById('modalidadDetalleLabel');
+    const tipoPagoSelect = document.getElementById('stuTipoPago');
 
     if (modalidad === 'Compañia') {
         detalleGroup.style.display = 'block';
@@ -878,6 +879,12 @@ window.handleModalidadChange = function() {
     } else {
         detalleGroup.style.display = 'none';
         detalleSelect.value = '';
+    }
+
+    // When "Privadas" is selected, automatically set payment type to "POR_HORAS"
+    if (modalidad === 'Privadas') {
+        tipoPagoSelect.value = 'POR_HORAS';
+        handleTipoPagoChange(); // Trigger the payment type change to show hourly fields
     }
 };
 

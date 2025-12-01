@@ -233,7 +233,7 @@ function renderTeacherForm(teacher = null) {
     `;
 }
 
-function renderTeacherCard(teacher) {
+function renderTeacherInfoCard(teacher) {
     const groups = Array.from(window.GroupsManager?.groups.values() || [])
         .filter(g => g.teacherId === teacher.id);
     
@@ -332,8 +332,8 @@ window.loadTeachersTab = async function() {
             <div id="teacherFormContainer"></div>
             
             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem;">
-                ${teachers.length ? 
-                    teachers.map(teacher => renderTeacherCard(teacher)).join('') :
+                ${teachers.length ?
+                    teachers.map(teacher => renderTeacherInfoCard(teacher)).join('') :
                     '<div style="text-align: center; padding: 2rem; color: #666;">No hay profesores registrados</div>'
                 }
             </div>

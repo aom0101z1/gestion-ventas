@@ -329,11 +329,20 @@ window.EmployeeManager = new EmployeeManager();
 window.loadEmployeesTab = async function() {
     console.log('👥 Loading Employees tab');
 
-    const container = document.getElementById('employeesContainer');
+    // Try to find container inside schoolModuleView first (from floating panel)
+    let container = document.querySelector('#schoolModuleView #employeesContainer');
+
+    // If not found, try the main container
+    if (!container) {
+        container = document.getElementById('employeesContainer');
+    }
+
     if (!container) {
         console.error('❌ employeesContainer not found!');
         return;
     }
+
+    console.log('📦 Found container:', container);
 
     try {
         // Initialize if not already
@@ -342,7 +351,9 @@ window.loadEmployeesTab = async function() {
         }
 
         // Render view
-        container.innerHTML = await renderEmployeesView();
+        const html = await renderEmployeesView();
+        console.log('📝 Generated HTML length:', html.length);
+        container.innerHTML = html;
         console.log('✅ Employees tab loaded successfully');
 
     } catch (error) {

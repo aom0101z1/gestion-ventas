@@ -491,7 +491,9 @@ async function renderTeachersTab() {
 }
 
 function renderTeacherCard(teacher, payroll, year, month) {
-    const totalHours = (payroll.hours.cb || 0) + (payroll.hours.coats || 0) + (payroll.hours.nazaret || 0);
+    // Ensure hours object exists with defaults
+    const hours = payroll.hours || {cb: 0, coats: 0, nazaret: 0};
+    const totalHours = (hours.cb || 0) + (hours.coats || 0) + (hours.nazaret || 0);
     const totalAdvances = (payroll.advances || []).reduce((sum, adv) => sum + adv.amount, 0);
 
     return `
@@ -519,18 +521,18 @@ function renderTeacherCard(teacher, payroll, year, month) {
             <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1rem;">
                 <div style="text-align: center; padding: 1rem; background: #eff6ff; border-radius: 6px;">
                     <div style="font-size: 0.75rem; color: #6b7280; margin-bottom: 0.25rem;">CB</div>
-                    <div style="font-weight: bold; color: #3b82f6;">${payroll.hours.cb || 0}h</div>
-                    <div style="font-size: 0.75rem; color: #6b7280;">${formatCurrency((payroll.hours.cb || 0) * (teacher.rates.cb || 0))}</div>
+                    <div style="font-weight: bold; color: #3b82f6;">${hours.cb || 0}h</div>
+                    <div style="font-size: 0.75rem; color: #6b7280;">${formatCurrency((hours.cb || 0) * (teacher.rates?.cb || 0))}</div>
                 </div>
                 <div style="text-align: center; padding: 1rem; background: #fef3c7; border-radius: 6px;">
                     <div style="font-size: 0.75rem; color: #6b7280; margin-bottom: 0.25rem;">COATS</div>
-                    <div style="font-weight: bold; color: #f59e0b;">${payroll.hours.coats || 0}h</div>
-                    <div style="font-size: 0.75rem; color: #6b7280;">${formatCurrency((payroll.hours.coats || 0) * (teacher.rates.coats || 0))}</div>
+                    <div style="font-weight: bold; color: #f59e0b;">${hours.coats || 0}h</div>
+                    <div style="font-size: 0.75rem; color: #6b7280;">${formatCurrency((hours.coats || 0) * (teacher.rates?.coats || 0))}</div>
                 </div>
                 <div style="text-align: center; padding: 1rem; background: #f0fdf4; border-radius: 6px;">
                     <div style="font-size: 0.75rem; color: #6b7280; margin-bottom: 0.25rem;">Nazaret</div>
-                    <div style="font-weight: bold; color: #10b981;">${payroll.hours.nazaret || 0}h</div>
-                    <div style="font-size: 0.75rem; color: #6b7280;">${formatCurrency((payroll.hours.nazaret || 0) * (teacher.rates.nazaret || 0))}</div>
+                    <div style="font-weight: bold; color: #10b981;">${hours.nazaret || 0}h</div>
+                    <div style="font-size: 0.75rem; color: #6b7280;">${formatCurrency((hours.nazaret || 0) * (teacher.rates?.nazaret || 0))}</div>
                 </div>
                 <div style="text-align: center; padding: 1rem; background: #f3f4f6; border-radius: 6px;">
                     <div style="font-size: 0.75rem; color: #6b7280; margin-bottom: 0.25rem;">Total Horas</div>

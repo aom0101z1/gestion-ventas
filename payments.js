@@ -2086,8 +2086,8 @@ function renderPaymentModal(student) {
                 <h3>💵 Registrar Pago - ${student.nombre}</h3>
                 
                 <form id="paymentForm" style="margin-top: 1rem;">
-                    <!-- Hourly Payment Section - Only for POR_HORAS students -->
-                    ${student.tipoPago === 'POR_HORAS' ? `
+                    <!-- Hourly Payment Section - For POR_HORAS students OR Privadas modalidad -->
+                    ${(student.tipoPago === 'POR_HORAS' || student.modalidad === 'Privadas') ? `
                         <div style="background: #f0f9ff; border: 2px solid #0ea5e9; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem;">
                             <h4 style="margin: 0 0 1rem 0; color: #0369a1;">⏱️ Pago por Horas</h4>
 
@@ -2141,8 +2141,8 @@ function renderPaymentModal(student) {
                         </select>
                     </div>
                     
-                    <!-- Month Selection Grid - Hidden for hourly students -->
-                    <div class="form-group" id="monthSelectionGroup" style="display: ${student.tipoPago === 'POR_HORAS' ? 'none' : 'block'};">
+                    <!-- Month Selection Grid - Hidden for hourly/Privadas students -->
+                    <div class="form-group" id="monthSelectionGroup" style="display: ${(student.tipoPago === 'POR_HORAS' || student.modalidad === 'Privadas') ? 'none' : 'block'};">
                         <label>Seleccionar Meses <span id="monthCounter">(0 seleccionados)</span></label>
                         <div style="border: 1px solid #ddd; padding: 10px; border-radius: 5px; max-height: 300px; overflow-y: auto;">
                             <!-- Current Year -->
@@ -2199,8 +2199,8 @@ function renderPaymentModal(student) {
                         </select>
                     </div>
                     
-                    <!-- Amount Section - Only for regular students -->
-                    ${student.tipoPago !== 'POR_HORAS' ? `
+                    <!-- Amount Section - Only for regular students (not hourly/Privadas) -->
+                    ${(student.tipoPago !== 'POR_HORAS' && student.modalidad !== 'Privadas') ? `
                         <div class="form-group">
                             <label>Monto Total ($)</label>
                             <input type="number" id="payAmount" value="${student.valor || ''}" required min="0" onchange="updateInstallmentAmounts()">

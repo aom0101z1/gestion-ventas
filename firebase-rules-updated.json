@@ -35,6 +35,10 @@
       ".read": "auth != null",
       ".write": "auth != null"
     },
+    "grupos2": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
     "teachers": {
       ".read": "auth != null",
       ".write": "auth != null"
