@@ -87,6 +87,7 @@ class CoatsReportsManager {
                 insight3: 'Tasa de retención del programa: 85%',
                 advancedBooksNote: 'Nota: Los libros 7-12 son considerablemente más extensos que los libros 1-6, requiriendo más horas de estudio por libro.',
                 advancedBooksNoteShort: 'Libros avanzados (7-12) son más extensos',
+                lateStartNote: 'Inició',
                 generatedOn: 'Generado el',
                 confidential: 'Documento Confidencial - Solo para uso interno de COATS'
             },
@@ -150,6 +151,7 @@ class CoatsReportsManager {
                 insight3: 'Program retention rate: 85%',
                 advancedBooksNote: 'Note: Books 7-12 are considerably more extensive than books 1-6, requiring more study hours per book.',
                 advancedBooksNoteShort: 'Advanced books (7-12) are more extensive',
+                lateStartNote: 'Started',
                 generatedOn: 'Generated on',
                 confidential: 'Confidential Document - For COATS Internal Use Only'
             }
@@ -758,10 +760,21 @@ class CoatsReportsManager {
         const attendanceClass = student.attendancePct >= 70 ? 'high' :
                                student.attendancePct >= 50 ? 'medium' : 'low';
 
+        // Check for late start note
+        let lateStartBadge = '';
+        if (student.lateStart) {
+            const startDate = new Date(student.lateStart);
+            const monthNames = this.language === 'es'
+                ? ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+                : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const formattedDate = `${startDate.getDate()} ${monthNames[startDate.getMonth()]}`;
+            lateStartBadge = `<span class="late-start-badge" title="${this.t('lateStartNote')} ${formattedDate}">(${this.t('lateStartNote')} ${formattedDate})</span>`;
+        }
+
         return `
         <tr class="attendance-${attendanceClass}">
             <td>${rank}</td>
-            <td class="student-name">${this.formatName(student.name)}</td>
+            <td class="student-name">${this.formatName(student.name)} ${lateStartBadge}</td>
             <td>${student.group.split('(')[0].trim()}</td>
             <td><strong>${student.total}</strong> ${this.t('hours')}</td>
             <td>
@@ -1614,6 +1627,14 @@ class CoatsReportsManager {
         .attendance-badge.low {
             background: #fee2e2;
             color: #991b1b;
+        }
+
+        .late-start-badge {
+            font-size: 0.75rem;
+            color: #6366f1;
+            font-weight: 500;
+            font-style: italic;
+            margin-left: 5px;
         }
 
         .mini-progress-bar {
