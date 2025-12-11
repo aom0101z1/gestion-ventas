@@ -210,11 +210,20 @@
         }
 
         /* ===== COATS REPORT FIX ===== */
-        #coatsReports.tab-content {
-            background: transparent !important;
+        #coatsReports,
+        #coatsReports.tab-content,
+        div#coatsReports {
+            background: none !important;
+            background-color: transparent !important;
             padding: 0 !important;
             box-shadow: none !important;
             border-radius: 0 !important;
+            border: none !important;
+            margin: 0 !important;
+        }
+
+        #coatsReportContainer {
+            width: 100%;
         }
 
         /* ===== AUDIT LOG FIX ===== */
@@ -1209,15 +1218,8 @@
             </div>
 
             <!-- ========== SECTION 15.2: TAB CONTENT - COATS REPORTS ========== -->
-            <div id="coatsReports" class="tab-content hidden" style="background: transparent !important; padding: 0 !important; box-shadow: none !important;">
-                <div id="coatsReportContainer" style="width: 100%;">
-                    <!-- El contenido se carga dinámicamente desde coats-reports.js -->
-                    <div style="text-align: center; padding: 50px; background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); border-radius: 20px;">
-                        <div style="font-size: 48px; margin-bottom: 20px;">📊</div>
-                        <h2 style="color: #1e3a5f;">COATS Cadena - Corporate English Training</h2>
-                        <p style="color: #64748b;">Loading report / Cargando reporte...</p>
-                    </div>
-                </div>
+            <div id="coatsReports" class="tab-content hidden">
+                <div id="coatsReportContainer"></div>
             </div>
 
         </div> <!-- End of container -->
