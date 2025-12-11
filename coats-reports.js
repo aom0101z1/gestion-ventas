@@ -47,6 +47,11 @@ class CoatsReportsManager {
                 booksCompleted: 'Libros Completados',
                 activeGroups: 'Grupos Activos',
                 completionRate: 'Tasa de Finalización',
+                programStructure: 'Estructura del Programa',
+                programBooks: 'Libros del Programa',
+                cefrLevel: 'Nivel CEFR',
+                preA1toB2: 'PreA1 → B2',
+                cefrFramework: 'Marco Común Europeo de Referencia',
                 hours: 'horas',
                 attendance: 'Asistencia',
                 progress: 'Progreso',
@@ -114,6 +119,11 @@ class CoatsReportsManager {
                 booksCompleted: 'Books Completed',
                 activeGroups: 'Active Groups',
                 completionRate: 'Completion Rate',
+                programStructure: 'Program Structure',
+                programBooks: 'Program Books',
+                cefrLevel: 'CEFR Level',
+                preA1toB2: 'PreA1 → B2',
+                cefrFramework: 'Common European Framework of Reference',
                 hours: 'hours',
                 attendance: 'Attendance',
                 progress: 'Progress',
@@ -516,6 +526,51 @@ class CoatsReportsManager {
                         <div class="stat-icon">🏆</div>
                         <div class="stat-value">${stats.totalBooksCompleted}</div>
                         <div class="stat-label">${this.t('groupCompleted')}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Program Structure -->
+            <div class="coats-section coats-program-structure">
+                <h3><span class="section-icon">🌐</span> ${this.t('programStructure')} - Ciudad Bilingüe</h3>
+                <div class="program-structure-container">
+                    <div class="program-structure-card">
+                        <div class="program-card-header">
+                            <span class="program-icon">📚</span>
+                            <span class="program-title">${this.t('programBooks')}</span>
+                        </div>
+                        <div class="program-books-display">
+                            <span class="books-number">12</span>
+                            <span class="books-label">${this.language === 'es' ? 'Libros' : 'Books'}</span>
+                        </div>
+                        <div class="books-visual">
+                            ${[1,2,3,4,5,6,7,8,9,10,11,12].map(i => `<span class="book-dot ${i <= 6 ? 'basic' : 'advanced'}" title="${this.language === 'es' ? 'Libro' : 'Book'} ${i}">${i}</span>`).join('')}
+                        </div>
+                        <div class="books-legend">
+                            <span class="legend-item"><span class="legend-dot basic"></span> ${this.language === 'es' ? 'Básico (1-6)' : 'Basic (1-6)'}</span>
+                            <span class="legend-item"><span class="legend-dot advanced"></span> ${this.language === 'es' ? 'Avanzado (7-12)' : 'Advanced (7-12)'}</span>
+                        </div>
+                    </div>
+                    <div class="program-structure-card cefr-card">
+                        <div class="program-card-header">
+                            <span class="program-icon">🎯</span>
+                            <span class="program-title">${this.t('cefrLevel')}</span>
+                        </div>
+                        <div class="cefr-display">
+                            <div class="cefr-journey">
+                                <span class="cefr-start">PreA1</span>
+                                <span class="cefr-arrow">→</span>
+                                <span class="cefr-end">B2</span>
+                            </div>
+                        </div>
+                        <div class="cefr-framework-label">${this.t('cefrFramework')}</div>
+                        <div class="cefr-levels-visual">
+                            <div class="cefr-level-box prea1">PreA1</div>
+                            <div class="cefr-level-box a1">A1</div>
+                            <div class="cefr-level-box a2">A2</div>
+                            <div class="cefr-level-box b1">B1</div>
+                            <div class="cefr-level-box b2">B2</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1338,6 +1393,173 @@ class CoatsReportsManager {
         .insight-icon {
             font-size: 24px;
         }
+
+        /* Program Structure */
+        .program-structure-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+        }
+
+        .program-structure-card {
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            border: 2px solid #e2e8f0;
+            border-radius: 16px;
+            padding: 25px;
+            text-align: center;
+        }
+
+        .program-structure-card.cefr-card {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border-color: #f59e0b;
+        }
+
+        .program-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .program-icon {
+            font-size: 28px;
+        }
+
+        .program-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #1e3a5f;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .program-books-display {
+            display: flex;
+            align-items: baseline;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .books-number {
+            font-size: 64px;
+            font-weight: 800;
+            color: #1e3a5f;
+            line-height: 1;
+        }
+
+        .books-label {
+            font-size: 24px;
+            color: #64748b;
+            font-weight: 600;
+        }
+
+        .books-visual {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+
+        .book-dot {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 12px;
+            color: white;
+            cursor: default;
+        }
+
+        .book-dot.basic {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        }
+
+        .book-dot.advanced {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+        }
+
+        .books-legend {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            font-size: 13px;
+            color: #64748b;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
+
+        .legend-dot.basic {
+            background: #3b82f6;
+        }
+
+        .legend-dot.advanced {
+            background: #8b5cf6;
+        }
+
+        .cefr-display {
+            margin-bottom: 10px;
+        }
+
+        .cefr-journey {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .cefr-start, .cefr-end {
+            font-size: 32px;
+            font-weight: 800;
+            color: #1e3a5f;
+        }
+
+        .cefr-arrow {
+            font-size: 36px;
+            color: #f59e0b;
+        }
+
+        .cefr-framework-label {
+            font-size: 12px;
+            color: #92400e;
+            margin-bottom: 20px;
+            font-style: italic;
+        }
+
+        .cefr-levels-visual {
+            display: flex;
+            justify-content: center;
+            gap: 5px;
+        }
+
+        .cefr-level-box {
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 11px;
+            color: white;
+        }
+
+        .cefr-level-box.prea1 { background: #94a3b8; }
+        .cefr-level-box.a1 { background: #22c55e; }
+        .cefr-level-box.a2 { background: #3b82f6; }
+        .cefr-level-box.b1 { background: #8b5cf6; }
+        .cefr-level-box.b2 { background: #f59e0b; }
 
         /* Hours Breakdown */
         .hours-breakdown-container {
