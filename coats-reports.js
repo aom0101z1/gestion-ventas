@@ -153,9 +153,9 @@ class CoatsReportsManager {
     initializeGroupsData() {
         return [
             {
-                id: 'grupo-libros-3-4-5-6',
-                name: 'Grupo Libros 3-4-5-6',
-                nameEn: 'Group Books 3-4-5-6',
+                id: 'grupo-1',
+                name: 'Grupo 1 - Libros 3-4-5-6',
+                nameEn: 'Group 1 - Books 3-4-5-6',
                 schedule: 'Lunes y Miércoles 7-9 AM',
                 scheduleEn: 'Monday & Wednesday 7-9 AM',
                 startDate: '2025-06-11',
@@ -178,9 +178,9 @@ class CoatsReportsManager {
                 totalGroupHours: 612
             },
             {
-                id: 'grupo-4-nivel-3',
-                name: 'Grupo 4 Nivel 3 (Libros 2-3-4)',
-                nameEn: 'Group 4 Level 3 (Books 2-3-4)',
+                id: 'grupo-2',
+                name: 'Grupo 2 - Nivel 3 (Libros 2-3-4)',
+                nameEn: 'Group 2 - Level 3 (Books 2-3-4)',
                 schedule: 'Lunes y Miércoles 7-9 AM',
                 scheduleEn: 'Monday & Wednesday 7-9 AM',
                 startDate: '2025-06-18',
@@ -205,9 +205,9 @@ class CoatsReportsManager {
                 totalGroupHours: 585
             },
             {
-                id: 'grupo-2-nivel-4',
-                name: 'Grupo 2 Nivel 4 (Libros 4-5-6)',
-                nameEn: 'Group 2 Level 4 (Books 4-5-6)',
+                id: 'grupo-3',
+                name: 'Grupo 3 - Nivel 4 (Libros 4-5-6)',
+                nameEn: 'Group 3 - Level 4 (Books 4-5-6)',
                 schedule: 'Martes y Miércoles 7-9 AM',
                 scheduleEn: 'Tuesday & Wednesday 7-9 AM',
                 startDate: '2025-06-11',
@@ -231,9 +231,9 @@ class CoatsReportsManager {
                 totalGroupHours: 592
             },
             {
-                id: 'grupo-1-nivel-6',
-                name: 'Grupo 1 Nivel 6 (Libros 6-7)',
-                nameEn: 'Group 1 Level 6 (Books 6-7)',
+                id: 'grupo-4',
+                name: 'Grupo 4 - Nivel 6 (Libros 6-7)',
+                nameEn: 'Group 4 - Level 6 (Books 6-7)',
                 schedule: 'Jueves y Viernes 7-9 AM',
                 scheduleEn: 'Thursday & Friday 7-9 AM',
                 startDate: '2025-06-12',
@@ -290,33 +290,46 @@ class CoatsReportsManager {
         const groups = this.programData.groups;
         let totalStudents = 0;
         let activeStudents = 0;
+        let transferredStudents = 0;
+        let inactiveStudents = 0;
         let totalHours = 0;
         let totalAttendanceSum = 0;
         const allStudents = [];
+        const allStudentsIncludingInactive = [];
 
         groups.forEach(group => {
             totalHours += group.totalGroupHours;
             group.students.forEach(student => {
                 totalStudents++;
+                const attendancePct = (student.total / this.programData.maxPossibleHours) * 100;
+
+                const studentData = {
+                    ...student,
+                    group: group.name,
+                    groupId: group.id,
+                    attendancePct,
+                    booksStart: group.startBook,
+                    booksCurrent: group.currentBook,
+                    booksAdvanced: group.currentBook - group.startBook
+                };
+
+                allStudentsIncludingInactive.push(studentData);
+
                 if (student.status === 'active') {
                     activeStudents++;
-                    const attendancePct = (student.total / this.programData.maxPossibleHours) * 100;
                     totalAttendanceSum += attendancePct;
-                    allStudents.push({
-                        ...student,
-                        group: group.name,
-                        groupId: group.id,
-                        attendancePct,
-                        booksStart: group.startBook,
-                        booksCurrent: group.currentBook,
-                        booksAdvanced: group.currentBook - group.startBook
-                    });
+                    allStudents.push(studentData);
+                } else if (student.status === 'transferred') {
+                    transferredStudents++;
+                } else if (student.status === 'inactive') {
+                    inactiveStudents++;
                 }
             });
         });
 
         // Sort by attendance
         allStudents.sort((a, b) => b.attendancePct - a.attendancePct);
+        allStudentsIncludingInactive.sort((a, b) => b.attendancePct - a.attendancePct);
 
         // Calculate completion stats
         const completedGroups = groups.filter(g => g.completed).length;
@@ -327,12 +340,15 @@ class CoatsReportsManager {
         return {
             totalStudents,
             activeStudents,
+            transferredStudents,
+            inactiveStudents,
             totalHours,
             avgAttendance: activeStudents > 0 ? totalAttendanceSum / activeStudents : 0,
             groups: groups.length,
             completedGroups,
             avgBookCompletion,
             allStudents,
+            allStudentsIncludingInactive,
             topPerformers: allStudents.slice(0, 10),
             highAttendance: allStudents.filter(s => s.attendancePct >= 70),
             mediumAttendance: allStudents.filter(s => s.attendancePct >= 50 && s.attendancePct < 70),
@@ -448,8 +464,9 @@ class CoatsReportsManager {
                 <div class="coats-summary-grid">
                     <div class="coats-stat-card coats-stat-highlight">
                         <div class="stat-icon">👥</div>
-                        <div class="stat-value">${stats.activeStudents}</div>
+                        <div class="stat-value">${stats.totalStudents}</div>
                         <div class="stat-label">${this.t('totalStudents')}</div>
+                        <div class="stat-sub">${stats.activeStudents} ${this.language === 'es' ? 'activos' : 'active'}</div>
                     </div>
                     <div class="coats-stat-card">
                         <div class="stat-icon">⏱️</div>
@@ -839,7 +856,7 @@ class CoatsReportsManager {
                         .reduce((sum, s) => sum + (s.hours[month] || 0), 0);
                 });
                 return {
-                    label: group.name.split('(')[0].trim(),
+                    label: group.name.split('-')[0].trim(),
                     data: monthlyTotals,
                     borderWidth: 2,
                     tension: 0.3,
@@ -1011,6 +1028,17 @@ class CoatsReportsManager {
 
     getReportStyles() {
         return `
+        /* Override parent container styles */
+        #coatsReports.tab-content {
+            background: transparent !important;
+            padding: 0 !important;
+            box-shadow: none !important;
+        }
+
+        #coatsReportContainer {
+            width: 100%;
+        }
+
         .coats-report {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             max-width: 1200px;
@@ -1127,6 +1155,16 @@ class CoatsReportsManager {
 
         .coats-stat-highlight .stat-label {
             color: #cbd5e1;
+        }
+
+        .coats-stat-highlight .stat-sub {
+            color: #94a3b8;
+        }
+
+        .stat-sub {
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 4px;
         }
 
         .stat-icon {
