@@ -92,7 +92,7 @@ class CoatsReportsManager {
                 keyInsights: 'Hallazgos Clave',
                 insight1: 'Los estudiantes con >70% asistencia avanzan 40% más rápido',
                 insight2: 'Grupo 4 completó el Libro 7 - Los libros 7-12 son significativamente más extensos',
-                insight3: 'Tasa de retención del programa: 85%',
+                insight3: 'Tasa de retención del programa: 94% (solo 2 retiros)',
                 advancedBooksNote: 'Nota: Los libros 7-12 son considerablemente más extensos que los libros 1-6, requiriendo más horas de estudio por libro.',
                 advancedBooksNoteShort: 'Libros avanzados (7-12) son más extensos',
                 lateStartNote: 'Inició',
@@ -164,7 +164,7 @@ class CoatsReportsManager {
                 keyInsights: 'Key Insights',
                 insight1: 'Students with >70% attendance progress 40% faster',
                 insight2: 'Group 4 completed Book 7 - Books 7-12 are significantly more extensive',
-                insight3: 'Program retention rate: 85%',
+                insight3: 'Program retention rate: 94% (only 2 dropouts)',
                 advancedBooksNote: 'Note: Books 7-12 are considerably more extensive than books 1-6, requiring more study hours per book.',
                 advancedBooksNoteShort: 'Advanced books (7-12) are more extensive',
                 lateStartNote: 'Started',
@@ -197,7 +197,7 @@ class CoatsReportsManager {
                     { name: 'MARTIN VERA', hours: { jun: 0, jul: 18, ago: 8, sep: 14, oct: 12, nov: 4, dic: 12 }, total: 68, status: 'active' },
                     { name: 'MARCELA LÓPEZ', hours: { jun: 6, jul: 16, ago: 4, sep: 10, oct: 12, nov: 8, dic: 10 }, total: 66, status: 'active' },
                     { name: 'ALEXANDRA LONDOÑO', hours: { jun: 4, jul: 14, ago: 8, sep: 16, oct: 8, nov: 4, dic: 4 }, total: 58, status: 'active' },
-                    { name: 'ANDREA CATALINA VALENCIA', hours: { jun: 8, jul: 6, ago: 0, sep: 0, oct: 0, nov: 0, dic: 0 }, total: 14, status: 'inactive', note: 'Did not return' }
+                    { name: 'ANDREA CATALINA VALENCIA', hours: { jun: 8, jul: 6, ago: 0, sep: 0, oct: 0, nov: 0, dic: 0 }, total: 14, status: 'transferred', note: 'Transferred to Group 3' }
                 ],
                 totalGroupHours: 612
             },
