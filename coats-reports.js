@@ -1044,17 +1044,6 @@ class CoatsReportsManager {
 
     getReportStyles() {
         return `
-        /* Override parent container styles */
-        #coatsReports.tab-content {
-            background: transparent !important;
-            padding: 0 !important;
-            box-shadow: none !important;
-        }
-
-        #coatsReportContainer {
-            width: 100%;
-        }
-
         .coats-report {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             max-width: 1200px;
