@@ -223,18 +223,18 @@ class CoatsReportsManager {
                 totalPages: 136,
                 teachers: ['Anderson Bedoya', 'César Grisales', 'Alexander Osorio'],
                 students: [
-                    { name: 'DANIELA GARCÍA FLOREZ', hours: { jun: 10, jul: 12, ago: 2, sep: 12, oct: 14, nov: 16, dic: 4 }, total: 70, status: 'active' },
-                    { name: 'JUAN PABLO BERMUDEZ', hours: { jun: 12, jul: 8, ago: 2, sep: 12, oct: 14, nov: 16, dic: 4 }, total: 68, status: 'active' },
-                    { name: 'ANDREA CATALINA VALENCIA', hours: { jun: 10, jul: 14, ago: 4, sep: 12, oct: 14, nov: 10, dic: 4 }, total: 68, status: 'active', note: 'Transferred to this group' },
-                    { name: 'PAULA CARDONA', hours: { jun: 12, jul: 12, ago: 4, sep: 12, oct: 12, nov: 10, dic: 4 }, total: 66, status: 'active' },
-                    { name: 'MARIANA OBANDO', hours: { jun: 12, jul: 12, ago: 4, sep: 12, oct: 10, nov: 10, dic: 4 }, total: 64, status: 'active' },
-                    { name: 'LUIS MAFLA', hours: { jun: 10, jul: 14, ago: 4, sep: 10, oct: 10, nov: 12, dic: 4 }, total: 64, status: 'active' },
-                    { name: 'VIVIANA URIBE', hours: { jun: 12, jul: 14, ago: 0, sep: 12, oct: 10, nov: 10, dic: 4 }, total: 62, status: 'active' },
-                    { name: 'GISELA ARCILA', hours: { jun: 12, jul: 10, ago: 0, sep: 10, oct: 6, nov: 10, dic: 4 }, total: 52, status: 'active' },
+                    { name: 'DANIELA GARCÍA FLOREZ', hours: { jun: 10, jul: 12, ago: 2, sep: 12, oct: 14, nov: 16, dic: 8 }, total: 74, status: 'active' },
+                    { name: 'JUAN PABLO BERMUDEZ', hours: { jun: 12, jul: 8, ago: 2, sep: 12, oct: 14, nov: 16, dic: 8 }, total: 72, status: 'active' },
+                    { name: 'ANDREA CATALINA VALENCIA', hours: { jun: 10, jul: 14, ago: 4, sep: 12, oct: 14, nov: 10, dic: 8 }, total: 72, status: 'active', note: 'Transferred to this group' },
+                    { name: 'PAULA CARDONA', hours: { jun: 12, jul: 12, ago: 4, sep: 12, oct: 12, nov: 10, dic: 8 }, total: 70, status: 'active' },
+                    { name: 'LUIS MAFLA', hours: { jun: 10, jul: 14, ago: 4, sep: 10, oct: 10, nov: 12, dic: 8 }, total: 68, status: 'active' },
+                    { name: 'MARIANA OBANDO', hours: { jun: 12, jul: 12, ago: 4, sep: 12, oct: 10, nov: 10, dic: 6 }, total: 66, status: 'active' },
+                    { name: 'VIVIANA URIBE', hours: { jun: 12, jul: 14, ago: 0, sep: 12, oct: 10, nov: 10, dic: 6 }, total: 64, status: 'active' },
+                    { name: 'GISELA ARCILA', hours: { jun: 12, jul: 10, ago: 0, sep: 10, oct: 6, nov: 10, dic: 8 }, total: 56, status: 'active' },
                     { name: 'EDITH ALEJANDRA GIL', hours: { jun: 12, jul: 12, ago: 4, sep: 10, oct: 8, nov: 0, dic: 0 }, total: 46, status: 'inactive', note: 'Did not return since Oct 28' },
-                    { name: 'LUZ MARÍA HURTADO', hours: { jun: 10, jul: 0, ago: 0, sep: 0, oct: 4, nov: 14, dic: 4 }, total: 32, status: 'active' }
+                    { name: 'LUZ MARÍA HURTADO', hours: { jun: 0, jul: 0, ago: 0, sep: 0, oct: 4, nov: 14, dic: 8 }, total: 26, status: 'active', note: 'Started Oct 28', lateStart: '2025-10-28' }
                 ],
-                totalGroupHours: 592
+                totalGroupHours: 624
             },
             {
                 id: 'grupo-4',
