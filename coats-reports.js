@@ -39,7 +39,10 @@ class CoatsReportsManager {
                 attendanceVsProgress: 'Asistencia vs Progreso',
                 monthlyTrend: 'Tendencia Mensual',
                 totalStudents: 'Total Estudiantes',
-                totalHours: 'Total Horas Impartidas',
+                totalHours: 'Total Horas-Estudiante',
+                classHoursDelivered: 'Horas de Clase Impartidas',
+                studentHoursExplanation: 'Suma de horas asistidas por cada estudiante',
+                classHoursExplanation: 'Horas de clase por grupo (4 grupos × horas/mes)',
                 avgAttendance: 'Asistencia Promedio',
                 booksCompleted: 'Libros Completados',
                 activeGroups: 'Grupos Activos',
@@ -103,7 +106,10 @@ class CoatsReportsManager {
                 attendanceVsProgress: 'Attendance vs Progress',
                 monthlyTrend: 'Monthly Trend',
                 totalStudents: 'Total Students',
-                totalHours: 'Total Hours Delivered',
+                totalHours: 'Total Student-Hours',
+                classHoursDelivered: 'Class Hours Delivered',
+                studentHoursExplanation: 'Sum of hours attended by each student',
+                classHoursExplanation: 'Class hours per group (4 groups × hours/month)',
                 avgAttendance: 'Average Attendance',
                 booksCompleted: 'Books Completed',
                 activeGroups: 'Active Groups',
@@ -345,12 +351,20 @@ class CoatsReportsManager {
             return sum + (g.currentPage / g.totalPages) * 100;
         }, 0) / groups.length;
 
+        // Calculate class hours delivered (hours per group, not student-hours)
+        // 4 groups × hours per month = total class hours delivered
+        const monthlyHours = this.programData.monthlyMaxHours;
+        const totalClassHoursPerGroup = Object.values(monthlyHours).reduce((a, b) => a + b, 0); // 110 hours per group
+        const totalClassHoursDelivered = totalClassHoursPerGroup * groups.length; // 110 × 4 = 440 hours
+
         return {
             totalStudents,
             activeStudents,
             transferredStudents,
             inactiveStudents,
-            totalHours,
+            totalHours, // Student-hours (sum of all student attendance)
+            totalClassHoursDelivered, // Class hours delivered (per group basis)
+            totalClassHoursPerGroup,
             avgAttendance: activeStudents > 0 ? totalAttendanceSum / activeStudents : 0,
             groups: groups.length,
             totalBooksCompleted,
@@ -476,10 +490,17 @@ class CoatsReportsManager {
                         <div class="stat-label">${this.t('totalStudents')}</div>
                         <div class="stat-sub">${stats.activeStudents} ${this.language === 'es' ? 'activos' : 'active'}</div>
                     </div>
+                    <div class="coats-stat-card coats-stat-primary">
+                        <div class="stat-icon">🎓</div>
+                        <div class="stat-value">${stats.totalClassHoursDelivered}</div>
+                        <div class="stat-label">${this.t('classHoursDelivered')}</div>
+                        <div class="stat-sub">${stats.groups} ${this.language === 'es' ? 'grupos' : 'groups'} × ${stats.totalClassHoursPerGroup} hrs</div>
+                    </div>
                     <div class="coats-stat-card">
                         <div class="stat-icon">⏱️</div>
                         <div class="stat-value">${stats.totalHours.toLocaleString()}</div>
                         <div class="stat-label">${this.t('totalHours')}</div>
+                        <div class="stat-sub">${this.t('studentHoursExplanation')}</div>
                     </div>
                     <div class="coats-stat-card">
                         <div class="stat-icon">📊</div>
@@ -496,10 +517,68 @@ class CoatsReportsManager {
                         <div class="stat-value">${stats.totalBooksCompleted}</div>
                         <div class="stat-label">${this.t('groupCompleted')}</div>
                     </div>
-                    <div class="coats-stat-card">
-                        <div class="stat-icon">📖</div>
-                        <div class="stat-value">${stats.groups}</div>
-                        <div class="stat-label">${this.t('activeGroups')}</div>
+                </div>
+            </div>
+
+            <!-- Hours Breakdown -->
+            <div class="coats-section coats-hours-breakdown">
+                <h3><span class="section-icon">⏰</span> ${this.language === 'es' ? 'Desglose de Horas' : 'Hours Breakdown'}</h3>
+                <div class="hours-breakdown-container">
+                    <div class="hours-breakdown-card primary">
+                        <div class="hours-card-header">
+                            <span class="hours-icon">🎓</span>
+                            <span class="hours-title">${this.t('classHoursDelivered')}</span>
+                        </div>
+                        <div class="hours-card-value">${stats.totalClassHoursDelivered} ${this.t('hours')}</div>
+                        <div class="hours-card-explanation">${this.t('classHoursExplanation')}</div>
+                        <table class="hours-detail-table">
+                            <thead>
+                                <tr>
+                                    <th>${this.language === 'es' ? 'Grupo' : 'Group'}</th>
+                                    <th>${this.language === 'es' ? 'Horas' : 'Hours'}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${this.programData.groups.map(g => `
+                                    <tr>
+                                        <td>${g.name.split(' - ')[0]}</td>
+                                        <td><strong>${stats.totalClassHoursPerGroup}</strong> hrs</td>
+                                    </tr>
+                                `).join('')}
+                                <tr class="total-row">
+                                    <td><strong>TOTAL</strong></td>
+                                    <td><strong>${stats.totalClassHoursDelivered}</strong> hrs</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="hours-breakdown-card secondary">
+                        <div class="hours-card-header">
+                            <span class="hours-icon">⏱️</span>
+                            <span class="hours-title">${this.t('totalHours')}</span>
+                        </div>
+                        <div class="hours-card-value">${stats.totalHours.toLocaleString()} ${this.t('hours')}</div>
+                        <div class="hours-card-explanation">${this.t('studentHoursExplanation')}</div>
+                        <table class="hours-detail-table">
+                            <thead>
+                                <tr>
+                                    <th>${this.language === 'es' ? 'Grupo' : 'Group'}</th>
+                                    <th>${this.language === 'es' ? 'Horas-Estudiante' : 'Student-Hours'}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${this.programData.groups.map(g => `
+                                    <tr>
+                                        <td>${g.name.split(' - ')[0]}</td>
+                                        <td><strong>${g.totalGroupHours}</strong> hrs</td>
+                                    </tr>
+                                `).join('')}
+                                <tr class="total-row">
+                                    <td><strong>TOTAL</strong></td>
+                                    <td><strong>${stats.totalHours.toLocaleString()}</strong> hrs</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -1179,6 +1258,23 @@ class CoatsReportsManager {
             color: #94a3b8;
         }
 
+        .coats-stat-primary {
+            background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+            color: white;
+        }
+
+        .coats-stat-primary .stat-value {
+            color: white;
+        }
+
+        .coats-stat-primary .stat-label {
+            color: #d1fae5;
+        }
+
+        .coats-stat-primary .stat-sub {
+            color: #a7f3d0;
+        }
+
         .stat-sub {
             font-size: 12px;
             color: #64748b;
@@ -1241,6 +1337,104 @@ class CoatsReportsManager {
 
         .insight-icon {
             font-size: 24px;
+        }
+
+        /* Hours Breakdown */
+        .hours-breakdown-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 25px;
+        }
+
+        .hours-breakdown-card {
+            background: white;
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            border: 2px solid #e2e8f0;
+        }
+
+        .hours-breakdown-card.primary {
+            border-color: #10b981;
+            background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+        }
+
+        .hours-breakdown-card.secondary {
+            border-color: #3b82f6;
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+        }
+
+        .hours-card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+
+        .hours-icon {
+            font-size: 28px;
+        }
+
+        .hours-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #1e3a5f;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .hours-card-value {
+            font-size: 42px;
+            font-weight: 800;
+            color: #1e3a5f;
+            margin-bottom: 5px;
+        }
+
+        .hours-breakdown-card.primary .hours-card-value {
+            color: #059669;
+        }
+
+        .hours-breakdown-card.secondary .hours-card-value {
+            color: #2563eb;
+        }
+
+        .hours-card-explanation {
+            font-size: 13px;
+            color: #64748b;
+            margin-bottom: 20px;
+            font-style: italic;
+        }
+
+        .hours-detail-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .hours-detail-table th,
+        .hours-detail-table td {
+            padding: 10px 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+        }
+
+        .hours-detail-table th {
+            background: rgba(0, 0, 0, 0.03);
+            font-weight: 600;
+            color: #475569;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.5px;
+        }
+
+        .hours-detail-table .total-row {
+            background: rgba(0, 0, 0, 0.05);
+            font-weight: 700;
+        }
+
+        .hours-detail-table .total-row td {
+            border-bottom: none;
+            color: #1e3a5f;
         }
 
         /* Group Cards */
