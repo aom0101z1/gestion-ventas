@@ -227,7 +227,8 @@
         }
 
         /* ===== AUDIT LOG FIX ===== */
-        #auditLogContainer.tab-content {
+        /* Only apply these styles when audit log is NOT hidden */
+        #auditLogContainer.tab-content:not(.hidden) {
             display: block !important;
             visibility: visible !important;
             opacity: 1 !important;
@@ -237,7 +238,7 @@
             background: #f9fafb !important;
         }
 
-        #auditLogContainer * {
+        #auditLogContainer:not(.hidden) * {
             visibility: visible !important;
         }
 
