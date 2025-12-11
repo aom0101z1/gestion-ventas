@@ -191,9 +191,9 @@ class CoatsReportsManager {
                 students: [
                     { name: 'BEATRIZ VALENCIA', hours: { jun: 8, jul: 22, ago: 12, sep: 14, oct: 12, nov: 10, dic: 12 }, total: 90, status: 'active' },
                     { name: 'CATALINA VALENCIA QUINTERO', hours: { jun: 8, jul: 22, ago: 10, sep: 12, oct: 14, nov: 10, dic: 12 }, total: 88, status: 'active' },
-                    { name: 'MARIA ALEJANDRA OCAMPO', hours: { jun: 0, jul: 18, ago: 10, sep: 16, oct: 20, nov: 4, dic: 12 }, total: 80, status: 'transferred', note: 'Transferred to advanced group' },
+                    { name: 'MARIA ALEJANDRA OCAMPO', hours: { jun: 0, jul: 18, ago: 10, sep: 16, oct: 20, nov: 4, dic: 12 }, total: 80, status: 'active', note: 'Transferred from Group 2' },
                     { name: 'FRANCINET HERRERA', hours: { jun: 4, jul: 18, ago: 10, sep: 8, oct: 18, nov: 10, dic: 10 }, total: 78, status: 'active' },
-                    { name: 'VALERIA GIRALDO PULGARÍN', hours: { jun: 0, jul: 18, ago: 10, sep: 12, oct: 12, nov: 6, dic: 12 }, total: 70, status: 'transferred', note: 'Transferred to advanced group' },
+                    { name: 'VALERIA GIRALDO PULGARÍN', hours: { jun: 0, jul: 18, ago: 10, sep: 12, oct: 12, nov: 6, dic: 12 }, total: 70, status: 'active', note: 'Transferred from Group 2' },
                     { name: 'MARTIN VERA', hours: { jun: 0, jul: 18, ago: 8, sep: 14, oct: 12, nov: 4, dic: 12 }, total: 68, status: 'active' },
                     { name: 'MARCELA LÓPEZ', hours: { jun: 6, jul: 16, ago: 4, sep: 10, oct: 12, nov: 8, dic: 10 }, total: 66, status: 'active' },
                     { name: 'ALEXANDRA LONDOÑO', hours: { jun: 4, jul: 14, ago: 8, sep: 16, oct: 8, nov: 4, dic: 4 }, total: 58, status: 'active' },
