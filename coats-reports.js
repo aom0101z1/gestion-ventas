@@ -190,21 +190,21 @@ class CoatsReportsManager {
                 teachers: ['David Bedoya', 'Juanita Echavarría', 'Anderson Bedoya'],
                 students: [
                     { name: 'BEATRIZ VALENCIA', hours: { jun: 8, jul: 22, ago: 12, sep: 14, oct: 12, nov: 10, dic: 12 }, total: 90, status: 'active' },
+                    { name: 'MARIA ALEJANDRA OCAMPO', hours: { jun: 6, jul: 22, ago: 10, sep: 16, oct: 20, nov: 4, dic: 12 }, total: 90, status: 'active', note: 'Transferred to this group' },
                     { name: 'CATALINA VALENCIA QUINTERO', hours: { jun: 8, jul: 22, ago: 10, sep: 12, oct: 14, nov: 10, dic: 12 }, total: 88, status: 'active' },
-                    { name: 'MARIA ALEJANDRA OCAMPO', hours: { jun: 0, jul: 18, ago: 10, sep: 16, oct: 20, nov: 4, dic: 12 }, total: 80, status: 'active', note: 'Transferred from Group 2' },
                     { name: 'FRANCINET HERRERA', hours: { jun: 4, jul: 18, ago: 10, sep: 8, oct: 18, nov: 10, dic: 10 }, total: 78, status: 'active' },
-                    { name: 'VALERIA GIRALDO PULGARÍN', hours: { jun: 0, jul: 18, ago: 10, sep: 12, oct: 12, nov: 6, dic: 12 }, total: 70, status: 'active', note: 'Transferred from Group 2' },
+                    { name: 'VALERIA GIRALDO PULGARÍN', hours: { jun: 4, jul: 22, ago: 10, sep: 12, oct: 12, nov: 6, dic: 12 }, total: 78, status: 'active', note: 'Transferred to this group' },
                     { name: 'MARTIN VERA', hours: { jun: 0, jul: 18, ago: 8, sep: 14, oct: 12, nov: 4, dic: 12 }, total: 68, status: 'active' },
                     { name: 'MARCELA LÓPEZ', hours: { jun: 6, jul: 16, ago: 4, sep: 10, oct: 12, nov: 8, dic: 10 }, total: 66, status: 'active' },
                     { name: 'ALEXANDRA LONDOÑO', hours: { jun: 4, jul: 14, ago: 8, sep: 16, oct: 8, nov: 4, dic: 4 }, total: 58, status: 'active' },
-                    { name: 'ANDREA CATALINA VALENCIA', hours: { jun: 8, jul: 6, ago: 0, sep: 0, oct: 0, nov: 0, dic: 0 }, total: 14, status: 'transferred', note: 'Transferred to Group 3' }
+                    { name: 'ANDREA CATALINA VALENCIA', hours: { jun: 8, jul: 6, ago: 0, sep: 0, oct: 0, nov: 0, dic: 0 }, total: 14, status: 'transferred', note: 'Transferred to Group 2' }
                 ],
-                totalGroupHours: 612
+                totalGroupHours: 630
             },
             {
                 id: 'grupo-2',
-                name: 'Grupo 2 - Nivel 3 (Libros 2-3-4)',
-                nameEn: 'Group 2 - Level 3 (Books 2-3-4)',
+                name: 'Grupo 2 - Libros 2-3-4',
+                nameEn: 'Group 2 - Books 2-3-4',
                 schedule: 'Lunes y Miércoles 7-9 AM',
                 scheduleEn: 'Monday & Wednesday 7-9 AM',
                 startDate: '2025-06-18',
@@ -214,24 +214,24 @@ class CoatsReportsManager {
                 totalPages: 239,
                 teachers: ['Juan Pablo Bedoya'],
                 students: [
-                    { name: 'MAURICIO SEPÚLVEDA HENAO', hours: { jun: 6, jul: 20, ago: 8, sep: 16, oct: 8, nov: 14, dic: 6 }, total: 78, status: 'active' },
-                    { name: 'GERSAÍN BEDOYA P.', hours: { jun: 4, jul: 18, ago: 8, sep: 18, oct: 12, nov: 14, dic: 4 }, total: 78, status: 'active' },
-                    { name: 'CATALINA DUQUE OSORIO', hours: { jun: 6, jul: 16, ago: 8, sep: 14, oct: 14, nov: 14, dic: 4 }, total: 76, status: 'active' },
-                    { name: 'CARLOS EMANUEL ZAPATA', hours: { jun: 4, jul: 20, ago: 0, sep: 18, oct: 14, nov: 14, dic: 6 }, total: 76, status: 'active' },
-                    { name: 'CARLOS ARTURO ORTIZ C.', hours: { jun: 4, jul: 18, ago: 8, sep: 14, oct: 9, nov: 12, dic: 2 }, total: 67, status: 'active' },
-                    { name: 'JOSHEPLEEN DUQUE NATAL', hours: { jun: 4, jul: 18, ago: 8, sep: 14, oct: 8, nov: 10, dic: 4 }, total: 66, status: 'active' },
-                    { name: 'LEONARDO CUERVO BUITRAGO', hours: { jun: 6, jul: 16, ago: 6, sep: 10, oct: 14, nov: 10, dic: 2 }, total: 64, status: 'active' },
-                    { name: 'CARLOS ANDRES MEJÍA', hours: { jun: 2, jul: 12, ago: 4, sep: 10, oct: 8, nov: 2, dic: 0 }, total: 38, status: 'active' },
-                    { name: 'ANDRES FELIPE CALVO OSPINA', hours: { jun: 4, jul: 16, ago: 4, sep: 0, oct: 0, nov: 0, dic: 0 }, total: 24, status: 'inactive', note: 'Did not return since September' },
-                    { name: 'VALERIA GIRALDO PULGARÍN', hours: { jun: 4, jul: 4, ago: 0, sep: 0, oct: 0, nov: 0, dic: 0 }, total: 8, status: 'transferred' },
-                    { name: 'MARIA ALEJANDRA OCAMPO HOLGUÍN', hours: { jun: 6, jul: 4, ago: 0, sep: 0, oct: 0, nov: 0, dic: 0 }, total: 10, status: 'transferred' }
+                    { name: 'MAURICIO SEPÚLVEDA HENAO', hours: { jun: 6, jul: 20, ago: 18, sep: 16, oct: 8, nov: 14, dic: 6 }, total: 88, status: 'active' },
+                    { name: 'CARLOS EMANUEL ZAPATA', hours: { jun: 4, jul: 20, ago: 12, sep: 18, oct: 14, nov: 14, dic: 6 }, total: 88, status: 'active' },
+                    { name: 'GERSAÍN BEDOYA P.', hours: { jun: 4, jul: 18, ago: 16, sep: 18, oct: 12, nov: 14, dic: 4 }, total: 86, status: 'active' },
+                    { name: 'CATALINA DUQUE OSORIO', hours: { jun: 6, jul: 16, ago: 10, sep: 14, oct: 14, nov: 14, dic: 4 }, total: 78, status: 'active' },
+                    { name: 'CARLOS ARTURO ORTIZ C.', hours: { jun: 4, jul: 18, ago: 18, sep: 14, oct: 9, nov: 12, dic: 2 }, total: 77, status: 'active' },
+                    { name: 'LEONARDO CUERVO BUITRAGO', hours: { jun: 6, jul: 16, ago: 16, sep: 10, oct: 14, nov: 10, dic: 2 }, total: 74, status: 'active' },
+                    { name: 'JOSHEPLEEN DUQUE NATAL', hours: { jun: 4, jul: 18, ago: 12, sep: 14, oct: 8, nov: 10, dic: 4 }, total: 70, status: 'active' },
+                    { name: 'CARLOS ANDRES MEJÍA', hours: { jun: 2, jul: 12, ago: 12, sep: 10, oct: 8, nov: 2, dic: 0 }, total: 46, status: 'active' },
+                    { name: 'ANDRES FELIPE CALVO OSPINA', hours: { jun: 4, jul: 16, ago: 10, sep: 0, oct: 0, nov: 0, dic: 0 }, total: 30, status: 'inactive', note: 'Did not return since September' },
+                    { name: 'VALERIA GIRALDO PULGARÍN', hours: { jun: 0, jul: 0, ago: 0, sep: 0, oct: 0, nov: 0, dic: 0 }, total: 0, status: 'transferred', note: 'Transferred to Group 1' },
+                    { name: 'MARIA ALEJANDRA OCAMPO HOLGUÍN', hours: { jun: 0, jul: 0, ago: 0, sep: 0, oct: 0, nov: 0, dic: 0 }, total: 0, status: 'transferred', note: 'Transferred to Group 1' }
                 ],
-                totalGroupHours: 585
+                totalGroupHours: 637
             },
             {
                 id: 'grupo-3',
-                name: 'Grupo 3 - Nivel 4 (Libros 4-5-6)',
-                nameEn: 'Group 3 - Level 4 (Books 4-5-6)',
+                name: 'Grupo 3 - Libros 4-5-6',
+                nameEn: 'Group 3 - Books 4-5-6',
                 schedule: 'Martes y Miércoles 7-9 AM',
                 scheduleEn: 'Tuesday & Wednesday 7-9 AM',
                 startDate: '2025-06-11',
@@ -241,23 +241,23 @@ class CoatsReportsManager {
                 totalPages: 136,
                 teachers: ['Anderson Bedoya', 'César Grisales', 'Alexander Osorio'],
                 students: [
-                    { name: 'DANIELA GARCÍA FLOREZ', hours: { jun: 10, jul: 12, ago: 2, sep: 12, oct: 14, nov: 16, dic: 8 }, total: 74, status: 'active' },
-                    { name: 'JUAN PABLO BERMUDEZ', hours: { jun: 12, jul: 8, ago: 2, sep: 12, oct: 14, nov: 16, dic: 8 }, total: 72, status: 'active' },
-                    { name: 'ANDREA CATALINA VALENCIA', hours: { jun: 10, jul: 14, ago: 4, sep: 12, oct: 14, nov: 10, dic: 8 }, total: 72, status: 'active', note: 'Transferred to this group' },
-                    { name: 'PAULA CARDONA', hours: { jun: 12, jul: 12, ago: 4, sep: 12, oct: 12, nov: 10, dic: 8 }, total: 70, status: 'active' },
-                    { name: 'LUIS MAFLA', hours: { jun: 10, jul: 14, ago: 4, sep: 10, oct: 10, nov: 12, dic: 8 }, total: 68, status: 'active' },
-                    { name: 'MARIANA OBANDO', hours: { jun: 12, jul: 12, ago: 4, sep: 12, oct: 10, nov: 10, dic: 6 }, total: 66, status: 'active' },
-                    { name: 'VIVIANA URIBE', hours: { jun: 12, jul: 14, ago: 0, sep: 12, oct: 10, nov: 10, dic: 6 }, total: 64, status: 'active' },
-                    { name: 'GISELA ARCILA', hours: { jun: 12, jul: 10, ago: 0, sep: 10, oct: 6, nov: 10, dic: 8 }, total: 56, status: 'active' },
-                    { name: 'EDITH ALEJANDRA GIL', hours: { jun: 12, jul: 12, ago: 4, sep: 10, oct: 8, nov: 0, dic: 0 }, total: 46, status: 'inactive', note: 'Did not return since Oct 28' },
+                    { name: 'DANIELA GARCÍA FLOREZ', hours: { jun: 10, jul: 12, ago: 14, sep: 12, oct: 14, nov: 16, dic: 8 }, total: 86, status: 'active' },
+                    { name: 'JUAN PABLO BERMUDEZ', hours: { jun: 12, jul: 8, ago: 12, sep: 12, oct: 14, nov: 16, dic: 8 }, total: 82, status: 'active' },
+                    { name: 'ANDREA CATALINA VALENCIA', hours: { jun: 12, jul: 14, ago: 12, sep: 12, oct: 14, nov: 10, dic: 8 }, total: 82, status: 'active', note: 'Transferred from Group 1' },
+                    { name: 'LUIS MAFLA', hours: { jun: 10, jul: 14, ago: 12, sep: 10, oct: 10, nov: 12, dic: 8 }, total: 76, status: 'active' },
+                    { name: 'VIVIANA URIBE', hours: { jun: 12, jul: 14, ago: 12, sep: 12, oct: 10, nov: 10, dic: 6 }, total: 76, status: 'active' },
+                    { name: 'PAULA CARDONA', hours: { jun: 12, jul: 12, ago: 10, sep: 12, oct: 12, nov: 10, dic: 8 }, total: 76, status: 'active' },
+                    { name: 'MARIANA OBANDO', hours: { jun: 12, jul: 12, ago: 12, sep: 12, oct: 10, nov: 10, dic: 6 }, total: 74, status: 'active' },
+                    { name: 'GISELA ARCILA', hours: { jun: 12, jul: 10, ago: 10, sep: 10, oct: 6, nov: 10, dic: 8 }, total: 66, status: 'active' },
+                    { name: 'EDITH ALEJANDRA GIL', hours: { jun: 12, jul: 12, ago: 10, sep: 10, oct: 8, nov: 0, dic: 0 }, total: 52, status: 'inactive', note: 'Did not return since Oct 28' },
                     { name: 'LUZ MARÍA HURTADO', hours: { jun: 0, jul: 0, ago: 0, sep: 0, oct: 4, nov: 14, dic: 8 }, total: 26, status: 'active', note: 'Started Oct 28', lateStart: '2025-10-28' }
                 ],
-                totalGroupHours: 624
+                totalGroupHours: 696
             },
             {
                 id: 'grupo-4',
-                name: 'Grupo 4 - Nivel 6 (Libros 6-7)',
-                nameEn: 'Group 4 - Level 6 (Books 6-7)',
+                name: 'Grupo 4 - Libros 6-7',
+                nameEn: 'Group 4 - Books 6-7',
                 schedule: 'Jueves y Viernes 7-9 AM',
                 scheduleEn: 'Thursday & Friday 7-9 AM',
                 startDate: '2025-06-12',
@@ -265,17 +265,17 @@ class CoatsReportsManager {
                 currentBook: 7,
                 currentPage: 244,
                 totalPages: 244,
-                bookCompleted: true, // Current book completed, not the program
+                bookCompleted: true,
                 teachers: ['Juan Pablo Bedoya', 'César Grisales', 'Anderson Bedoya'],
                 students: [
-                    { name: 'JULIANA ÁLVAREZ', hours: { jun: 12, jul: 10, ago: 10, sep: 18, oct: 12, nov: 14, dic: 4 }, total: 80, status: 'active' },
-                    { name: 'JUAN CAMILO ARANGO', hours: { jun: 12, jul: 12, ago: 10, sep: 18, oct: 16, nov: 8, dic: 4 }, total: 80, status: 'active' },
+                    { name: 'JULIANA ÁLVAREZ', hours: { jun: 12, jul: 14, ago: 10, sep: 18, oct: 12, nov: 14, dic: 4 }, total: 84, status: 'active' },
+                    { name: 'JUAN CAMILO ARANGO', hours: { jun: 12, jul: 14, ago: 10, sep: 18, oct: 16, nov: 8, dic: 4 }, total: 82, status: 'active' },
+                    { name: 'WILSON GONZÁLEZ', hours: { jun: 12, jul: 14, ago: 10, sep: 18, oct: 10, nov: 12, dic: 4 }, total: 80, status: 'active' },
                     { name: 'VIVIANA VARGAS', hours: { jun: 10, jul: 12, ago: 10, sep: 18, oct: 18, nov: 10, dic: 0 }, total: 78, status: 'active' },
-                    { name: 'WILSON GONZÁLEZ', hours: { jun: 12, jul: 12, ago: 10, sep: 18, oct: 10, nov: 12, dic: 4 }, total: 78, status: 'active' },
-                    { name: 'CAROLINA AGUDELO', hours: { jun: 10, jul: 10, ago: 10, sep: 18, oct: 16, nov: 4, dic: 4 }, total: 72, status: 'active' },
-                    { name: 'ANGELA ARANZAZU', hours: { jun: 12, jul: 10, ago: 10, sep: 0, oct: 16, nov: 4, dic: 4 }, total: 56, status: 'active' }
+                    { name: 'CAROLINA AGUDELO', hours: { jun: 10, jul: 12, ago: 10, sep: 18, oct: 16, nov: 4, dic: 4 }, total: 74, status: 'active' },
+                    { name: 'ANGELA ARANZAZU', hours: { jun: 12, jul: 12, ago: 10, sep: 0, oct: 16, nov: 4, dic: 4 }, total: 58, status: 'active' }
                 ],
-                totalGroupHours: 444
+                totalGroupHours: 456
             }
         ];
     }
