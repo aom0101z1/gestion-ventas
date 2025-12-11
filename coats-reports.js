@@ -76,14 +76,17 @@ class CoatsReportsManager {
                 jan: 'Ene', feb: 'Feb', mar: 'Mar', apr: 'Abr', may: 'May', jun: 'Jun',
                 jul: 'Jul', aug: 'Ago', sep: 'Sep', oct: 'Oct', nov: 'Nov', dec: 'Dic',
                 programCompleted: '¡PROGRAMA COMPLETADO!',
+                bookCompleted: '¡LIBRO COMPLETADO!',
                 inProgress: 'En Progreso',
-                groupCompleted: 'Grupo Completó el Programa',
+                groupCompleted: 'Libros Completados',
                 bookProgress: 'Progreso del Libro Actual',
                 overallProgress: 'Progreso General del Programa',
                 keyInsights: 'Hallazgos Clave',
                 insight1: 'Los estudiantes con >70% asistencia avanzan 40% más rápido',
-                insight2: 'El Grupo 1 Nivel 6 completó exitosamente el programa',
+                insight2: 'Grupo 4 completó el Libro 7 - Los libros 7-12 son significativamente más extensos',
                 insight3: 'Tasa de retención del programa: 85%',
+                advancedBooksNote: 'Nota: Los libros 7-12 son considerablemente más extensos que los libros 1-6, requiriendo más horas de estudio por libro.',
+                advancedBooksNoteShort: 'Libros avanzados (7-12) son más extensos',
                 generatedOn: 'Generado el',
                 confidential: 'Documento Confidencial - Solo para uso interno de COATS'
             },
@@ -136,14 +139,17 @@ class CoatsReportsManager {
                 jan: 'Jan', feb: 'Feb', mar: 'Mar', apr: 'Apr', may: 'May', jun: 'Jun',
                 jul: 'Jul', aug: 'Aug', sep: 'Sep', oct: 'Oct', nov: 'Nov', dec: 'Dec',
                 programCompleted: 'PROGRAM COMPLETED!',
+                bookCompleted: 'BOOK COMPLETED!',
                 inProgress: 'In Progress',
-                groupCompleted: 'Group Completed Program',
+                groupCompleted: 'Books Completed',
                 bookProgress: 'Current Book Progress',
                 overallProgress: 'Overall Program Progress',
                 keyInsights: 'Key Insights',
                 insight1: 'Students with >70% attendance progress 40% faster',
-                insight2: 'Group 1 Level 6 successfully completed the program',
+                insight2: 'Group 4 completed Book 7 - Books 7-12 are significantly more extensive',
                 insight3: 'Program retention rate: 85%',
+                advancedBooksNote: 'Note: Books 7-12 are considerably more extensive than books 1-6, requiring more study hours per book.',
+                advancedBooksNoteShort: 'Advanced books (7-12) are more extensive',
                 generatedOn: 'Generated on',
                 confidential: 'Confidential Document - For COATS Internal Use Only'
             }
@@ -241,7 +247,7 @@ class CoatsReportsManager {
                 currentBook: 7,
                 currentPage: 244,
                 totalPages: 244,
-                completed: true,
+                bookCompleted: true, // Current book completed, not the program
                 teachers: ['Juan Pablo Bedoya', 'César Grisales', 'Anderson Bedoya'],
                 students: [
                     { name: 'JULIANA ÁLVAREZ', hours: { jun: 12, jul: 10, ago: 10, sep: 18, oct: 12, nov: 14, dic: 4 }, total: 80, status: 'active' },
@@ -331,8 +337,8 @@ class CoatsReportsManager {
         allStudents.sort((a, b) => b.attendancePct - a.attendancePct);
         allStudentsIncludingInactive.sort((a, b) => b.attendancePct - a.attendancePct);
 
-        // Calculate completion stats
-        const completedGroups = groups.filter(g => g.completed).length;
+        // Calculate completion stats - count total books completed across all groups
+        const totalBooksCompleted = groups.reduce((sum, g) => sum + (g.currentBook - g.startBook), 0);
         const avgBookCompletion = groups.reduce((sum, g) => {
             return sum + (g.currentPage / g.totalPages) * 100;
         }, 0) / groups.length;
@@ -345,7 +351,7 @@ class CoatsReportsManager {
             totalHours,
             avgAttendance: activeStudents > 0 ? totalAttendanceSum / activeStudents : 0,
             groups: groups.length,
-            completedGroups,
+            totalBooksCompleted,
             avgBookCompletion,
             allStudents,
             allStudentsIncludingInactive,
@@ -485,7 +491,7 @@ class CoatsReportsManager {
                     </div>
                     <div class="coats-stat-card">
                         <div class="stat-icon">🏆</div>
-                        <div class="stat-value">${stats.completedGroups}</div>
+                        <div class="stat-value">${stats.totalBooksCompleted}</div>
                         <div class="stat-label">${this.t('groupCompleted')}</div>
                     </div>
                     <div class="coats-stat-card">
@@ -677,9 +683,12 @@ class CoatsReportsManager {
         const overallProgress = ((group.currentBook - 1) / this.programData.totalBooks) * 100;
         const booksAdvanced = group.currentBook - group.startBook;
 
+        // Check if this is an advanced group (book 7+) to show note
+        const isAdvancedLevel = group.currentBook >= 7;
+
         return `
-        <div class="coats-group-card ${group.completed ? 'completed' : ''}">
-            ${group.completed ? `<div class="completed-badge">${this.t('programCompleted')}</div>` : ''}
+        <div class="coats-group-card ${group.bookCompleted ? 'book-completed' : ''}">
+            ${group.bookCompleted ? `<div class="completed-badge book-badge">${this.t('bookCompleted')}</div>` : ''}
             <div class="group-header">
                 <h4>${this.language === 'es' ? group.name : group.nameEn}</h4>
                 <span class="group-schedule">${this.language === 'es' ? group.schedule : group.scheduleEn}</span>
@@ -723,6 +732,13 @@ class CoatsReportsManager {
                 <span class="teachers-label">${this.t('teachers')}:</span>
                 <span class="teachers-names">${group.teachers.join(', ')}</span>
             </div>
+
+            ${isAdvancedLevel ? `
+            <div class="advanced-books-note">
+                <span class="note-icon">📘</span>
+                <span class="note-text">${this.t('advancedBooksNoteShort')}</span>
+            </div>
+            ` : ''}
         </div>
         `;
     }
@@ -1246,9 +1262,9 @@ class CoatsReportsManager {
             box-shadow: 0 10px 30px -10px rgba(59, 130, 246, 0.3);
         }
 
-        .coats-group-card.completed {
-            border-color: #22c55e;
-            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+        .coats-group-card.book-completed {
+            border-color: #3b82f6;
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
         }
 
         .completed-badge {
@@ -1262,6 +1278,31 @@ class CoatsReportsManager {
             font-size: 12px;
             font-weight: 700;
             box-shadow: 0 4px 10px rgba(34, 197, 94, 0.4);
+        }
+
+        .completed-badge.book-badge {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            box-shadow: 0 4px 10px rgba(59, 130, 246, 0.4);
+        }
+
+        .advanced-books-note {
+            margin-top: 12px;
+            padding: 8px 12px;
+            background: #fef3c7;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+            color: #92400e;
+        }
+
+        .advanced-books-note .note-icon {
+            font-size: 14px;
+        }
+
+        .advanced-books-note .note-text {
+            flex: 1;
         }
 
         .group-header h4 {
