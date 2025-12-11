@@ -507,12 +507,6 @@ class CoatsReportsManager {
                         <div class="stat-sub">${stats.groups} ${this.language === 'es' ? 'grupos' : 'groups'} × ${stats.totalClassHoursPerGroup} hrs</div>
                     </div>
                     <div class="coats-stat-card">
-                        <div class="stat-icon">⏱️</div>
-                        <div class="stat-value">${stats.totalHours.toLocaleString()}</div>
-                        <div class="stat-label">${this.t('totalHours')}</div>
-                        <div class="stat-sub">${this.t('studentHoursExplanation')}</div>
-                    </div>
-                    <div class="coats-stat-card">
                         <div class="stat-icon">📊</div>
                         <div class="stat-value">${stats.avgAttendance.toFixed(1)}%</div>
                         <div class="stat-label">${this.t('avgAttendance')}</div>
@@ -577,15 +571,15 @@ class CoatsReportsManager {
 
             <!-- Hours Breakdown -->
             <div class="coats-section coats-hours-breakdown">
-                <h3><span class="section-icon">⏰</span> ${this.language === 'es' ? 'Desglose de Horas' : 'Hours Breakdown'}</h3>
-                <div class="hours-breakdown-container">
+                <h3><span class="section-icon">⏰</span> ${this.language === 'es' ? 'Horas de Clase Impartidas por Grupo' : 'Class Hours Delivered by Group'}</h3>
+                <div class="hours-breakdown-container single">
                     <div class="hours-breakdown-card primary">
                         <div class="hours-card-header">
                             <span class="hours-icon">🎓</span>
                             <span class="hours-title">${this.t('classHoursDelivered')}</span>
                         </div>
                         <div class="hours-card-value">${stats.totalClassHoursDelivered} ${this.t('hours')}</div>
-                        <div class="hours-card-explanation">${this.t('classHoursExplanation')}</div>
+                        <div class="hours-card-explanation">${this.language === 'es' ? 'Junio - Diciembre 2025' : 'June - December 2025'}</div>
                         <table class="hours-detail-table">
                             <thead>
                                 <tr>
@@ -603,34 +597,6 @@ class CoatsReportsManager {
                                 <tr class="total-row">
                                     <td><strong>TOTAL</strong></td>
                                     <td><strong>${stats.totalClassHoursDelivered}</strong> hrs</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="hours-breakdown-card secondary">
-                        <div class="hours-card-header">
-                            <span class="hours-icon">⏱️</span>
-                            <span class="hours-title">${this.t('totalHours')}</span>
-                        </div>
-                        <div class="hours-card-value">${stats.totalHours.toLocaleString()} ${this.t('hours')}</div>
-                        <div class="hours-card-explanation">${this.t('studentHoursExplanation')}</div>
-                        <table class="hours-detail-table">
-                            <thead>
-                                <tr>
-                                    <th>${this.language === 'es' ? 'Grupo' : 'Group'}</th>
-                                    <th>${this.language === 'es' ? 'Horas-Estudiante' : 'Student-Hours'}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${this.programData.groups.map(g => `
-                                    <tr>
-                                        <td>${g.name.split(' - ')[0]}</td>
-                                        <td><strong>${g.totalGroupHours}</strong> hrs</td>
-                                    </tr>
-                                `).join('')}
-                                <tr class="total-row">
-                                    <td><strong>TOTAL</strong></td>
-                                    <td><strong>${stats.totalHours.toLocaleString()}</strong> hrs</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -1584,6 +1550,16 @@ class CoatsReportsManager {
         .hours-breakdown-card.secondary {
             border-color: #3b82f6;
             background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+        }
+
+        .hours-breakdown-container.single {
+            display: flex;
+            justify-content: center;
+        }
+
+        .hours-breakdown-container.single .hours-breakdown-card {
+            max-width: 400px;
+            width: 100%;
         }
 
         .hours-card-header {
