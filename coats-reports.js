@@ -288,6 +288,37 @@ class CoatsReportsManager {
         return this.translations[this.language][key] || key;
     }
 
+    // Calculate available hours since a specific date
+    calculateAvailableHoursSince(startDate) {
+        const start = new Date(startDate);
+        const startMonth = start.getMonth(); // 0-indexed (0=Jan, 9=Oct, etc.)
+        const startDay = start.getDate();
+
+        const monthlyHours = this.programData.monthlyMaxHours;
+        const monthKeys = ['jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+        const monthIndices = { jun: 5, jul: 6, ago: 7, sep: 8, oct: 9, nov: 10, dic: 11 };
+
+        let totalAvailable = 0;
+
+        monthKeys.forEach(month => {
+            const monthIndex = monthIndices[month];
+            if (monthIndex > startMonth) {
+                // Full month available
+                totalAvailable += monthlyHours[month];
+            } else if (monthIndex === startMonth) {
+                // Partial month - estimate based on day of month
+                // Assume hours are spread evenly across the month
+                const daysInMonth = new Date(2025, monthIndex + 1, 0).getDate();
+                const daysAvailable = daysInMonth - startDay + 1;
+                const partialHours = Math.round((monthlyHours[month] * daysAvailable) / daysInMonth);
+                totalAvailable += partialHours;
+            }
+            // If monthIndex < startMonth, student wasn't enrolled yet
+        });
+
+        return totalAvailable;
+    }
+
     async init() {
         if (this.initialized) return;
         console.log('📊 Initializing COATS Reports Manager...');
@@ -329,13 +360,21 @@ class CoatsReportsManager {
             totalHours += group.totalGroupHours;
             group.students.forEach(student => {
                 totalStudents++;
-                const attendancePct = (student.total / this.programData.maxPossibleHours) * 100;
+
+                // Calculate max possible hours for this student
+                // If student has lateStart, calculate based on available hours since their start date
+                let maxPossibleHours = this.programData.maxPossibleHours;
+                if (student.lateStart) {
+                    maxPossibleHours = this.calculateAvailableHoursSince(student.lateStart);
+                }
+                const attendancePct = (student.total / maxPossibleHours) * 100;
 
                 const studentData = {
                     ...student,
                     group: group.name,
                     groupId: group.id,
                     attendancePct,
+                    maxPossibleHours,
                     booksStart: group.startBook,
                     booksCurrent: group.currentBook,
                     booksAdvanced: group.currentBook - group.startBook
