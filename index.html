@@ -577,6 +577,7 @@
                 <button class="tab" onclick="switchTab('leads')" id="leadsTab">👥 Leads</button>
                 <button class="tab" onclick="switchTab('pipeline')" id="pipelineTab">🎯 Pipeline</button>
                 <button class="tab" onclick="switchTab('reports')" id="reportsTab">📊 Reportes</button>
+                <button class="tab" onclick="switchTab('coatsReports')" id="coatsReportsTab">🏢 COATS</button>
                 <button class="tab" onclick="switchTab('monitoring')" id="monitoringTab" style="display: none;">👀 Monitoreo</button>
                 <button onclick="switchTab('tasks')" class="tab">📋 Tareas</button>
                 <button class="tab" onclick="switchTab('auditLog')" id="auditLogTab" style="display: none;">📋 Registro</button>
@@ -1197,6 +1198,18 @@
             <!-- ========== SECTION 15.1: TAB CONTENT - GRUPOS 2.0 (ADMIN ONLY) ========== -->
             <div id="grupos2Container" class="tab-content hidden">
                 <!-- El contenido se carga dinámicamente desde grupos2.js -->
+            </div>
+
+            <!-- ========== SECTION 15.2: TAB CONTENT - COATS REPORTS ========== -->
+            <div id="coatsReports" class="tab-content hidden">
+                <div id="coatsReportContainer">
+                    <!-- El contenido se carga dinámicamente desde coats-reports.js -->
+                    <div style="text-align: center; padding: 50px;">
+                        <div style="font-size: 48px; margin-bottom: 20px;">📊</div>
+                        <h2 style="color: #1e3a5f;">COATS Cadena - Corporate English Training</h2>
+                        <p style="color: #64748b;">Loading report / Cargando reporte...</p>
+                    </div>
+                </div>
             </div>
 
         </div> <!-- End of container -->
@@ -1968,8 +1981,13 @@ onAuthStateChanged(auth, async (user) => {
                     if (typeof loadAuditLogTab === 'function') {
                         loadAuditLogTab();
                     }
+                } else if (tabName === 'coatsReports') {
+                    // Load COATS Reports
+                    if (window.CoatsReports) {
+                        window.CoatsReports.renderReport('coatsReportContainer');
+                    }
                 }
-                
+
                 console.log('✅ Tab switched successfully:', tabName);
                         
             } catch (error) {
@@ -3424,6 +3442,7 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
     <script src="import-students.js"></script>
     <script src="invoice-integration.js"></script>
     <script src="reports.js"></script>
+    <script src="coats-reports.js"></script>
     <script src="finance.js"></script>
     <script src="payroll.js"></script>
     <script src="payroll-import.js"></script>

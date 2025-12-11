@@ -1,0 +1,1678 @@
+// coats-reports.js - COATS Cadena Corporate English Training Reports
+// ===== PROFESSIONAL BILINGUAL REPORTING SYSTEM =====
+
+class CoatsReportsManager {
+    constructor() {
+        this.initialized = false;
+        this.language = 'es'; // 'es' or 'en'
+        this.charts = {};
+
+        // COATS Program Data - June to December 2025
+        this.programData = {
+            company: 'COATS Cadena',
+            programName: 'Corporate English Training Program',
+            programNameEs: 'Programa de Capacitación en Inglés Corporativo',
+            period: {
+                start: '2025-06-11',
+                end: '2025-12-31',
+                semester: '2nd Semester 2025 / 2do Semestre 2025'
+            },
+            totalBooks: 12, // Full program has 12 books
+            maxPossibleHours: 110, // Max hours June-December (4hrs/week)
+            monthlyMaxHours: {
+                jun: 12, jul: 22, ago: 12, sep: 18, oct: 18, nov: 16, dic: 12
+            },
+            groups: this.initializeGroupsData()
+        };
+
+        // Translations
+        this.translations = {
+            es: {
+                title: 'Reporte de Progreso - Programa de Inglés',
+                subtitle: 'Ciudad Bilingüe para COATS Cadena',
+                executiveSummary: 'Resumen Ejecutivo',
+                programOverview: 'Vista General del Programa',
+                groupProgress: 'Progreso por Grupo',
+                individualProgress: 'Progreso Individual',
+                attendanceAnalysis: 'Análisis de Asistencia',
+                recognitionAwards: 'Reconocimientos y Premios',
+                attendanceVsProgress: 'Asistencia vs Progreso',
+                monthlyTrend: 'Tendencia Mensual',
+                totalStudents: 'Total Estudiantes',
+                totalHours: 'Total Horas Impartidas',
+                avgAttendance: 'Asistencia Promedio',
+                booksCompleted: 'Libros Completados',
+                activeGroups: 'Grupos Activos',
+                completionRate: 'Tasa de Finalización',
+                hours: 'horas',
+                attendance: 'Asistencia',
+                progress: 'Progreso',
+                book: 'Libro',
+                page: 'Página',
+                schedule: 'Horario',
+                teachers: 'Profesores',
+                students: 'Estudiantes',
+                startDate: 'Fecha de Inicio',
+                currentStatus: 'Estado Actual',
+                name: 'Nombre',
+                group: 'Grupo',
+                totalHoursAttended: 'Horas Totales Asistidas',
+                attendanceRate: 'Tasa de Asistencia',
+                booksAdvanced: 'Libros Avanzados',
+                goldAward: 'Premio Oro - Excelencia en Asistencia',
+                silverAward: 'Premio Plata - Alta Dedicación',
+                bronzeAward: 'Premio Bronce - Compromiso Destacado',
+                perfectAttendance: 'Asistencia Perfecta',
+                mostImproved: 'Mayor Progreso',
+                consistency: 'Consistencia Ejemplar',
+                correlation: 'Correlación Asistencia-Progreso',
+                correlationText: 'Los datos demuestran una correlación directa entre la asistencia regular y el progreso en el aprendizaje del idioma.',
+                highAttendance: 'Alta Asistencia (≥70%)',
+                mediumAttendance: 'Asistencia Media (50-69%)',
+                lowAttendance: 'Baja Asistencia (<50%)',
+                exportPDF: 'Exportar PDF',
+                exportExcel: 'Exportar Excel',
+                print: 'Imprimir',
+                jan: 'Ene', feb: 'Feb', mar: 'Mar', apr: 'Abr', may: 'May', jun: 'Jun',
+                jul: 'Jul', aug: 'Ago', sep: 'Sep', oct: 'Oct', nov: 'Nov', dec: 'Dic',
+                programCompleted: '¡PROGRAMA COMPLETADO!',
+                inProgress: 'En Progreso',
+                groupCompleted: 'Grupo Completó el Programa',
+                bookProgress: 'Progreso del Libro Actual',
+                overallProgress: 'Progreso General del Programa',
+                keyInsights: 'Hallazgos Clave',
+                insight1: 'Los estudiantes con >70% asistencia avanzan 40% más rápido',
+                insight2: 'El Grupo 1 Nivel 6 completó exitosamente el programa',
+                insight3: 'Tasa de retención del programa: 85%',
+                generatedOn: 'Generado el',
+                confidential: 'Documento Confidencial - Solo para uso interno de COATS'
+            },
+            en: {
+                title: 'Progress Report - English Program',
+                subtitle: 'Ciudad Bilingüe for COATS Cadena',
+                executiveSummary: 'Executive Summary',
+                programOverview: 'Program Overview',
+                groupProgress: 'Group Progress',
+                individualProgress: 'Individual Progress',
+                attendanceAnalysis: 'Attendance Analysis',
+                recognitionAwards: 'Recognition & Awards',
+                attendanceVsProgress: 'Attendance vs Progress',
+                monthlyTrend: 'Monthly Trend',
+                totalStudents: 'Total Students',
+                totalHours: 'Total Hours Delivered',
+                avgAttendance: 'Average Attendance',
+                booksCompleted: 'Books Completed',
+                activeGroups: 'Active Groups',
+                completionRate: 'Completion Rate',
+                hours: 'hours',
+                attendance: 'Attendance',
+                progress: 'Progress',
+                book: 'Book',
+                page: 'Page',
+                schedule: 'Schedule',
+                teachers: 'Teachers',
+                students: 'Students',
+                startDate: 'Start Date',
+                currentStatus: 'Current Status',
+                name: 'Name',
+                group: 'Group',
+                totalHoursAttended: 'Total Hours Attended',
+                attendanceRate: 'Attendance Rate',
+                booksAdvanced: 'Books Advanced',
+                goldAward: 'Gold Award - Attendance Excellence',
+                silverAward: 'Silver Award - High Dedication',
+                bronzeAward: 'Bronze Award - Outstanding Commitment',
+                perfectAttendance: 'Perfect Attendance',
+                mostImproved: 'Most Improved',
+                consistency: 'Exemplary Consistency',
+                correlation: 'Attendance-Progress Correlation',
+                correlationText: 'Data demonstrates a direct correlation between regular attendance and language learning progress.',
+                highAttendance: 'High Attendance (≥70%)',
+                mediumAttendance: 'Medium Attendance (50-69%)',
+                lowAttendance: 'Low Attendance (<50%)',
+                exportPDF: 'Export PDF',
+                exportExcel: 'Export Excel',
+                print: 'Print',
+                jan: 'Jan', feb: 'Feb', mar: 'Mar', apr: 'Apr', may: 'May', jun: 'Jun',
+                jul: 'Jul', aug: 'Aug', sep: 'Sep', oct: 'Oct', nov: 'Nov', dec: 'Dec',
+                programCompleted: 'PROGRAM COMPLETED!',
+                inProgress: 'In Progress',
+                groupCompleted: 'Group Completed Program',
+                bookProgress: 'Current Book Progress',
+                overallProgress: 'Overall Program Progress',
+                keyInsights: 'Key Insights',
+                insight1: 'Students with >70% attendance progress 40% faster',
+                insight2: 'Group 1 Level 6 successfully completed the program',
+                insight3: 'Program retention rate: 85%',
+                generatedOn: 'Generated on',
+                confidential: 'Confidential Document - For COATS Internal Use Only'
+            }
+        };
+    }
+
+    initializeGroupsData() {
+        return [
+            {
+                id: 'grupo-libros-3-4-5-6',
+                name: 'Grupo Libros 3-4-5-6',
+                nameEn: 'Group Books 3-4-5-6',
+                schedule: 'Lunes y Miércoles 7-9 AM',
+                scheduleEn: 'Monday & Wednesday 7-9 AM',
+                startDate: '2025-06-11',
+                startBook: 3,
+                currentBook: 6,
+                currentPage: 126,
+                totalPages: 136,
+                teachers: ['David Bedoya', 'Juanita Echavarría', 'Anderson Bedoya'],
+                students: [
+                    { name: 'BEATRIZ VALENCIA', hours: { jun: 8, jul: 22, ago: 12, sep: 14, oct: 12, nov: 10, dic: 12 }, total: 90, status: 'active' },
+                    { name: 'CATALINA VALENCIA QUINTERO', hours: { jun: 8, jul: 22, ago: 10, sep: 12, oct: 14, nov: 10, dic: 12 }, total: 88, status: 'active' },
+                    { name: 'MARIA ALEJANDRA OCAMPO', hours: { jun: 0, jul: 18, ago: 10, sep: 16, oct: 20, nov: 4, dic: 12 }, total: 80, status: 'transferred', note: 'Transferred to advanced group' },
+                    { name: 'FRANCINET HERRERA', hours: { jun: 4, jul: 18, ago: 10, sep: 8, oct: 18, nov: 10, dic: 10 }, total: 78, status: 'active' },
+                    { name: 'VALERIA GIRALDO PULGARÍN', hours: { jun: 0, jul: 18, ago: 10, sep: 12, oct: 12, nov: 6, dic: 12 }, total: 70, status: 'transferred', note: 'Transferred to advanced group' },
+                    { name: 'MARTIN VERA', hours: { jun: 0, jul: 18, ago: 8, sep: 14, oct: 12, nov: 4, dic: 12 }, total: 68, status: 'active' },
+                    { name: 'MARCELA LÓPEZ', hours: { jun: 6, jul: 16, ago: 4, sep: 10, oct: 12, nov: 8, dic: 10 }, total: 66, status: 'active' },
+                    { name: 'ALEXANDRA LONDOÑO', hours: { jun: 4, jul: 14, ago: 8, sep: 16, oct: 8, nov: 4, dic: 4 }, total: 58, status: 'active' },
+                    { name: 'ANDREA CATALINA VALENCIA', hours: { jun: 8, jul: 6, ago: 0, sep: 0, oct: 0, nov: 0, dic: 0 }, total: 14, status: 'inactive', note: 'Did not return' }
+                ],
+                totalGroupHours: 612
+            },
+            {
+                id: 'grupo-4-nivel-3',
+                name: 'Grupo 4 Nivel 3 (Libros 2-3-4)',
+                nameEn: 'Group 4 Level 3 (Books 2-3-4)',
+                schedule: 'Lunes y Miércoles 7-9 AM',
+                scheduleEn: 'Monday & Wednesday 7-9 AM',
+                startDate: '2025-06-18',
+                startBook: 2,
+                currentBook: 4,
+                currentPage: 215,
+                totalPages: 239,
+                teachers: ['Juan Pablo Bedoya'],
+                students: [
+                    { name: 'MAURICIO SEPÚLVEDA HENAO', hours: { jun: 6, jul: 20, ago: 8, sep: 16, oct: 8, nov: 14, dic: 6 }, total: 78, status: 'active' },
+                    { name: 'GERSAÍN BEDOYA P.', hours: { jun: 4, jul: 18, ago: 8, sep: 18, oct: 12, nov: 14, dic: 4 }, total: 78, status: 'active' },
+                    { name: 'CATALINA DUQUE OSORIO', hours: { jun: 6, jul: 16, ago: 8, sep: 14, oct: 14, nov: 14, dic: 4 }, total: 76, status: 'active' },
+                    { name: 'CARLOS EMANUEL ZAPATA', hours: { jun: 4, jul: 20, ago: 0, sep: 18, oct: 14, nov: 14, dic: 6 }, total: 76, status: 'active' },
+                    { name: 'CARLOS ARTURO ORTIZ C.', hours: { jun: 4, jul: 18, ago: 8, sep: 14, oct: 9, nov: 12, dic: 2 }, total: 67, status: 'active' },
+                    { name: 'JOSHEPLEEN DUQUE NATAL', hours: { jun: 4, jul: 18, ago: 8, sep: 14, oct: 8, nov: 10, dic: 4 }, total: 66, status: 'active' },
+                    { name: 'LEONARDO CUERVO BUITRAGO', hours: { jun: 6, jul: 16, ago: 6, sep: 10, oct: 14, nov: 10, dic: 2 }, total: 64, status: 'active' },
+                    { name: 'CARLOS ANDRES MEJÍA', hours: { jun: 2, jul: 12, ago: 4, sep: 10, oct: 8, nov: 2, dic: 0 }, total: 38, status: 'active' },
+                    { name: 'ANDRES FELIPE CALVO OSPINA', hours: { jun: 4, jul: 16, ago: 4, sep: 0, oct: 0, nov: 0, dic: 0 }, total: 24, status: 'inactive', note: 'Did not return since September' },
+                    { name: 'VALERIA GIRALDO PULGARÍN', hours: { jun: 4, jul: 4, ago: 0, sep: 0, oct: 0, nov: 0, dic: 0 }, total: 8, status: 'transferred' },
+                    { name: 'MARIA ALEJANDRA OCAMPO HOLGUÍN', hours: { jun: 6, jul: 4, ago: 0, sep: 0, oct: 0, nov: 0, dic: 0 }, total: 10, status: 'transferred' }
+                ],
+                totalGroupHours: 585
+            },
+            {
+                id: 'grupo-2-nivel-4',
+                name: 'Grupo 2 Nivel 4 (Libros 4-5-6)',
+                nameEn: 'Group 2 Level 4 (Books 4-5-6)',
+                schedule: 'Martes y Miércoles 7-9 AM',
+                scheduleEn: 'Tuesday & Wednesday 7-9 AM',
+                startDate: '2025-06-11',
+                startBook: 4,
+                currentBook: 6,
+                currentPage: 131,
+                totalPages: 136,
+                teachers: ['Anderson Bedoya', 'César Grisales', 'Alexander Osorio'],
+                students: [
+                    { name: 'DANIELA GARCÍA FLOREZ', hours: { jun: 10, jul: 12, ago: 2, sep: 12, oct: 14, nov: 16, dic: 4 }, total: 70, status: 'active' },
+                    { name: 'JUAN PABLO BERMUDEZ', hours: { jun: 12, jul: 8, ago: 2, sep: 12, oct: 14, nov: 16, dic: 4 }, total: 68, status: 'active' },
+                    { name: 'ANDREA CATALINA VALENCIA', hours: { jun: 10, jul: 14, ago: 4, sep: 12, oct: 14, nov: 10, dic: 4 }, total: 68, status: 'active', note: 'Transferred to this group' },
+                    { name: 'PAULA CARDONA', hours: { jun: 12, jul: 12, ago: 4, sep: 12, oct: 12, nov: 10, dic: 4 }, total: 66, status: 'active' },
+                    { name: 'MARIANA OBANDO', hours: { jun: 12, jul: 12, ago: 4, sep: 12, oct: 10, nov: 10, dic: 4 }, total: 64, status: 'active' },
+                    { name: 'LUIS MAFLA', hours: { jun: 10, jul: 14, ago: 4, sep: 10, oct: 10, nov: 12, dic: 4 }, total: 64, status: 'active' },
+                    { name: 'VIVIANA URIBE', hours: { jun: 12, jul: 14, ago: 0, sep: 12, oct: 10, nov: 10, dic: 4 }, total: 62, status: 'active' },
+                    { name: 'GISELA ARCILA', hours: { jun: 12, jul: 10, ago: 0, sep: 10, oct: 6, nov: 10, dic: 4 }, total: 52, status: 'active' },
+                    { name: 'EDITH ALEJANDRA GIL', hours: { jun: 12, jul: 12, ago: 4, sep: 10, oct: 8, nov: 0, dic: 0 }, total: 46, status: 'inactive', note: 'Did not return since Oct 28' },
+                    { name: 'LUZ MARÍA HURTADO', hours: { jun: 10, jul: 0, ago: 0, sep: 0, oct: 4, nov: 14, dic: 4 }, total: 32, status: 'active' }
+                ],
+                totalGroupHours: 592
+            },
+            {
+                id: 'grupo-1-nivel-6',
+                name: 'Grupo 1 Nivel 6 (Libros 6-7)',
+                nameEn: 'Group 1 Level 6 (Books 6-7)',
+                schedule: 'Jueves y Viernes 7-9 AM',
+                scheduleEn: 'Thursday & Friday 7-9 AM',
+                startDate: '2025-06-12',
+                startBook: 6,
+                currentBook: 7,
+                currentPage: 244,
+                totalPages: 244,
+                completed: true,
+                teachers: ['Juan Pablo Bedoya', 'César Grisales', 'Anderson Bedoya'],
+                students: [
+                    { name: 'JULIANA ÁLVAREZ', hours: { jun: 12, jul: 10, ago: 10, sep: 18, oct: 12, nov: 14, dic: 4 }, total: 80, status: 'active' },
+                    { name: 'JUAN CAMILO ARANGO', hours: { jun: 12, jul: 12, ago: 10, sep: 18, oct: 16, nov: 8, dic: 4 }, total: 80, status: 'active' },
+                    { name: 'VIVIANA VARGAS', hours: { jun: 10, jul: 12, ago: 10, sep: 18, oct: 18, nov: 10, dic: 0 }, total: 78, status: 'active' },
+                    { name: 'WILSON GONZÁLEZ', hours: { jun: 12, jul: 12, ago: 10, sep: 18, oct: 10, nov: 12, dic: 4 }, total: 78, status: 'active' },
+                    { name: 'CAROLINA AGUDELO', hours: { jun: 10, jul: 10, ago: 10, sep: 18, oct: 16, nov: 4, dic: 4 }, total: 72, status: 'active' },
+                    { name: 'ANGELA ARANZAZU', hours: { jun: 12, jul: 10, ago: 10, sep: 0, oct: 16, nov: 4, dic: 4 }, total: 56, status: 'active' }
+                ],
+                totalGroupHours: 444
+            }
+        ];
+    }
+
+    t(key) {
+        return this.translations[this.language][key] || key;
+    }
+
+    async init() {
+        if (this.initialized) return;
+        console.log('📊 Initializing COATS Reports Manager...');
+
+        // Load Chart.js if not loaded
+        if (!window.Chart) {
+            await this.loadChartJS();
+        }
+
+        this.initialized = true;
+        console.log('✅ COATS Reports Manager initialized');
+    }
+
+    async loadChartJS() {
+        return new Promise((resolve, reject) => {
+            if (window.Chart) { resolve(); return; }
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js';
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
+    }
+
+    // ===== ANALYTICS CALCULATIONS =====
+
+    calculateProgramStats() {
+        const groups = this.programData.groups;
+        let totalStudents = 0;
+        let activeStudents = 0;
+        let totalHours = 0;
+        let totalAttendanceSum = 0;
+        const allStudents = [];
+
+        groups.forEach(group => {
+            totalHours += group.totalGroupHours;
+            group.students.forEach(student => {
+                totalStudents++;
+                if (student.status === 'active') {
+                    activeStudents++;
+                    const attendancePct = (student.total / this.programData.maxPossibleHours) * 100;
+                    totalAttendanceSum += attendancePct;
+                    allStudents.push({
+                        ...student,
+                        group: group.name,
+                        groupId: group.id,
+                        attendancePct,
+                        booksStart: group.startBook,
+                        booksCurrent: group.currentBook,
+                        booksAdvanced: group.currentBook - group.startBook
+                    });
+                }
+            });
+        });
+
+        // Sort by attendance
+        allStudents.sort((a, b) => b.attendancePct - a.attendancePct);
+
+        // Calculate completion stats
+        const completedGroups = groups.filter(g => g.completed).length;
+        const avgBookCompletion = groups.reduce((sum, g) => {
+            return sum + (g.currentPage / g.totalPages) * 100;
+        }, 0) / groups.length;
+
+        return {
+            totalStudents,
+            activeStudents,
+            totalHours,
+            avgAttendance: activeStudents > 0 ? totalAttendanceSum / activeStudents : 0,
+            groups: groups.length,
+            completedGroups,
+            avgBookCompletion,
+            allStudents,
+            topPerformers: allStudents.slice(0, 10),
+            highAttendance: allStudents.filter(s => s.attendancePct >= 70),
+            mediumAttendance: allStudents.filter(s => s.attendancePct >= 50 && s.attendancePct < 70),
+            lowAttendance: allStudents.filter(s => s.attendancePct < 50)
+        };
+    }
+
+    getAwardWinners() {
+        const stats = this.calculateProgramStats();
+        const students = stats.allStudents;
+
+        // Gold Award - Top 3 highest attendance
+        const goldAward = students.slice(0, 3);
+
+        // Silver Award - Next 5
+        const silverAward = students.slice(3, 8);
+
+        // Bronze Award - Anyone with 65%+ attendance not in gold/silver
+        const bronzeAward = students.filter(s =>
+            s.attendancePct >= 65 &&
+            !goldAward.includes(s) &&
+            !silverAward.includes(s)
+        );
+
+        // Special recognition - Consistency (least variance in monthly attendance)
+        const consistencyAward = this.findMostConsistentStudents(students);
+
+        return {
+            gold: goldAward,
+            silver: silverAward,
+            bronze: bronzeAward,
+            consistency: consistencyAward
+        };
+    }
+
+    findMostConsistentStudents(students) {
+        return students
+            .map(s => {
+                // Find the original student data to get monthly hours
+                let monthlyHours = [];
+                this.programData.groups.forEach(g => {
+                    const found = g.students.find(st => st.name === s.name);
+                    if (found && found.hours) {
+                        monthlyHours = Object.values(found.hours).filter(h => h > 0);
+                    }
+                });
+
+                if (monthlyHours.length < 3) return { ...s, variance: Infinity };
+
+                const avg = monthlyHours.reduce((a, b) => a + b, 0) / monthlyHours.length;
+                const variance = monthlyHours.reduce((sum, h) => sum + Math.pow(h - avg, 2), 0) / monthlyHours.length;
+
+                return { ...s, variance, avgMonthly: avg };
+            })
+            .filter(s => s.variance !== Infinity && s.attendancePct >= 60)
+            .sort((a, b) => a.variance - b.variance)
+            .slice(0, 3);
+    }
+
+    // ===== RENDER MAIN REPORT =====
+
+    async renderReport(containerId) {
+        await this.init();
+        const container = document.getElementById(containerId);
+        if (!container) {
+            console.error('Container not found:', containerId);
+            return;
+        }
+
+        const stats = this.calculateProgramStats();
+        const awards = this.getAwardWinners();
+
+        container.innerHTML = this.generateReportHTML(stats, awards);
+
+        // Render charts after DOM update
+        setTimeout(() => {
+            this.renderCharts(stats);
+        }, 100);
+    }
+
+    generateReportHTML(stats, awards) {
+        const now = new Date();
+        const dateStr = now.toLocaleDateString(this.language === 'es' ? 'es-CO' : 'en-US', {
+            year: 'numeric', month: 'long', day: 'numeric'
+        });
+
+        return `
+        <div class="coats-report" id="coats-report-content">
+            <!-- Header -->
+            <div class="coats-report-header">
+                <div class="coats-logos">
+                    <div class="coats-logo-placeholder">
+                        <span style="font-size: 24px; font-weight: bold; color: #1e3a5f;">Ciudad Bilingüe</span>
+                    </div>
+                    <div class="coats-logo-placeholder">
+                        <span style="font-size: 24px; font-weight: bold; color: #c41e3a;">COATS</span>
+                    </div>
+                </div>
+                <h1 class="coats-report-title">${this.t('title')}</h1>
+                <h2 class="coats-report-subtitle">${this.t('subtitle')}</h2>
+                <p class="coats-report-period">${this.programData.period.semester}</p>
+
+                <!-- Language Toggle -->
+                <div class="coats-language-toggle">
+                    <button onclick="window.CoatsReports.setLanguage('es')" class="${this.language === 'es' ? 'active' : ''}">Español</button>
+                    <button onclick="window.CoatsReports.setLanguage('en')" class="${this.language === 'en' ? 'active' : ''}">English</button>
+                </div>
+            </div>
+
+            <!-- Executive Summary -->
+            <div class="coats-section coats-executive-summary">
+                <h3><span class="section-icon">📋</span> ${this.t('executiveSummary')}</h3>
+                <div class="coats-summary-grid">
+                    <div class="coats-stat-card coats-stat-highlight">
+                        <div class="stat-icon">👥</div>
+                        <div class="stat-value">${stats.activeStudents}</div>
+                        <div class="stat-label">${this.t('totalStudents')}</div>
+                    </div>
+                    <div class="coats-stat-card">
+                        <div class="stat-icon">⏱️</div>
+                        <div class="stat-value">${stats.totalHours.toLocaleString()}</div>
+                        <div class="stat-label">${this.t('totalHours')}</div>
+                    </div>
+                    <div class="coats-stat-card">
+                        <div class="stat-icon">📊</div>
+                        <div class="stat-value">${stats.avgAttendance.toFixed(1)}%</div>
+                        <div class="stat-label">${this.t('avgAttendance')}</div>
+                    </div>
+                    <div class="coats-stat-card">
+                        <div class="stat-icon">📚</div>
+                        <div class="stat-value">${stats.avgBookCompletion.toFixed(0)}%</div>
+                        <div class="stat-label">${this.t('completionRate')}</div>
+                    </div>
+                    <div class="coats-stat-card">
+                        <div class="stat-icon">🏆</div>
+                        <div class="stat-value">${stats.completedGroups}</div>
+                        <div class="stat-label">${this.t('groupCompleted')}</div>
+                    </div>
+                    <div class="coats-stat-card">
+                        <div class="stat-icon">📖</div>
+                        <div class="stat-value">${stats.groups}</div>
+                        <div class="stat-label">${this.t('activeGroups')}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Key Insights -->
+            <div class="coats-section coats-insights">
+                <h3><span class="section-icon">💡</span> ${this.t('keyInsights')}</h3>
+                <div class="coats-insights-grid">
+                    <div class="insight-card insight-success">
+                        <span class="insight-icon">✅</span>
+                        <span>${this.t('insight1')}</span>
+                    </div>
+                    <div class="insight-card insight-achievement">
+                        <span class="insight-icon">🎓</span>
+                        <span>${this.t('insight2')}</span>
+                    </div>
+                    <div class="insight-card insight-info">
+                        <span class="insight-icon">📈</span>
+                        <span>${this.t('insight3')}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Group Progress -->
+            <div class="coats-section">
+                <h3><span class="section-icon">📈</span> ${this.t('groupProgress')}</h3>
+                <div class="coats-groups-container">
+                    ${this.programData.groups.map(group => this.renderGroupCard(group)).join('')}
+                </div>
+            </div>
+
+            <!-- Charts Section -->
+            <div class="coats-section coats-charts-section">
+                <h3><span class="section-icon">📊</span> ${this.t('attendanceAnalysis')}</h3>
+                <div class="coats-charts-grid">
+                    <div class="coats-chart-container">
+                        <canvas id="coats-attendance-chart"></canvas>
+                    </div>
+                    <div class="coats-chart-container">
+                        <canvas id="coats-progress-chart"></canvas>
+                    </div>
+                    <div class="coats-chart-container">
+                        <canvas id="coats-monthly-trend-chart"></canvas>
+                    </div>
+                    <div class="coats-chart-container">
+                        <canvas id="coats-correlation-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Attendance vs Progress Correlation -->
+            <div class="coats-section coats-correlation-section">
+                <h3><span class="section-icon">🔗</span> ${this.t('correlation')}</h3>
+                <p class="correlation-description">${this.t('correlationText')}</p>
+                <div class="correlation-stats">
+                    <div class="correlation-stat high">
+                        <div class="correlation-count">${stats.highAttendance.length}</div>
+                        <div class="correlation-label">${this.t('highAttendance')}</div>
+                        <div class="correlation-bar" style="width: ${(stats.highAttendance.length / stats.activeStudents) * 100}%"></div>
+                    </div>
+                    <div class="correlation-stat medium">
+                        <div class="correlation-count">${stats.mediumAttendance.length}</div>
+                        <div class="correlation-label">${this.t('mediumAttendance')}</div>
+                        <div class="correlation-bar" style="width: ${(stats.mediumAttendance.length / stats.activeStudents) * 100}%"></div>
+                    </div>
+                    <div class="correlation-stat low">
+                        <div class="correlation-count">${stats.lowAttendance.length}</div>
+                        <div class="correlation-label">${this.t('lowAttendance')}</div>
+                        <div class="correlation-bar" style="width: ${(stats.lowAttendance.length / stats.activeStudents) * 100}%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recognition & Awards -->
+            <div class="coats-section coats-awards-section">
+                <h3><span class="section-icon">🏆</span> ${this.t('recognitionAwards')}</h3>
+
+                <!-- Gold Awards -->
+                <div class="award-category award-gold">
+                    <div class="award-header">
+                        <span class="award-medal">🥇</span>
+                        <h4>${this.t('goldAward')}</h4>
+                    </div>
+                    <div class="award-winners">
+                        ${awards.gold.map((s, i) => this.renderAwardWinner(s, i + 1, 'gold')).join('')}
+                    </div>
+                </div>
+
+                <!-- Silver Awards -->
+                <div class="award-category award-silver">
+                    <div class="award-header">
+                        <span class="award-medal">🥈</span>
+                        <h4>${this.t('silverAward')}</h4>
+                    </div>
+                    <div class="award-winners">
+                        ${awards.silver.map((s, i) => this.renderAwardWinner(s, i + 4, 'silver')).join('')}
+                    </div>
+                </div>
+
+                <!-- Bronze Awards -->
+                ${awards.bronze.length > 0 ? `
+                <div class="award-category award-bronze">
+                    <div class="award-header">
+                        <span class="award-medal">🥉</span>
+                        <h4>${this.t('bronzeAward')}</h4>
+                    </div>
+                    <div class="award-winners">
+                        ${awards.bronze.map((s, i) => this.renderAwardWinner(s, i + 9, 'bronze')).join('')}
+                    </div>
+                </div>
+                ` : ''}
+
+                <!-- Consistency Award -->
+                ${awards.consistency.length > 0 ? `
+                <div class="award-category award-consistency">
+                    <div class="award-header">
+                        <span class="award-medal">⭐</span>
+                        <h4>${this.t('consistency')}</h4>
+                    </div>
+                    <div class="award-winners">
+                        ${awards.consistency.map((s, i) => this.renderAwardWinner(s, i + 1, 'consistency')).join('')}
+                    </div>
+                </div>
+                ` : ''}
+            </div>
+
+            <!-- Individual Progress Table -->
+            <div class="coats-section">
+                <h3><span class="section-icon">👤</span> ${this.t('individualProgress')}</h3>
+                <div class="coats-table-container">
+                    <table class="coats-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>${this.t('name')}</th>
+                                <th>${this.t('group')}</th>
+                                <th>${this.t('totalHoursAttended')}</th>
+                                <th>${this.t('attendanceRate')}</th>
+                                <th>${this.t('booksAdvanced')}</th>
+                                <th>${this.t('progress')}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${stats.allStudents.map((s, i) => this.renderStudentRow(s, i + 1)).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Export Actions -->
+            <div class="coats-section coats-actions">
+                <button class="coats-btn coats-btn-primary" onclick="window.CoatsReports.exportToPDF()">
+                    <span>📄</span> ${this.t('exportPDF')}
+                </button>
+                <button class="coats-btn coats-btn-secondary" onclick="window.CoatsReports.exportToExcel()">
+                    <span>📊</span> ${this.t('exportExcel')}
+                </button>
+                <button class="coats-btn coats-btn-secondary" onclick="window.CoatsReports.printReport()">
+                    <span>🖨️</span> ${this.t('print')}
+                </button>
+            </div>
+
+            <!-- Footer -->
+            <div class="coats-report-footer">
+                <p>${this.t('generatedOn')}: ${dateStr}</p>
+                <p class="confidential">${this.t('confidential')}</p>
+            </div>
+        </div>
+
+        <style>
+            ${this.getReportStyles()}
+        </style>
+        `;
+    }
+
+    renderGroupCard(group) {
+        const activeStudents = group.students.filter(s => s.status === 'active').length;
+        const avgHours = group.students
+            .filter(s => s.status === 'active')
+            .reduce((sum, s) => sum + s.total, 0) / activeStudents || 0;
+        const avgAttendance = (avgHours / this.programData.maxPossibleHours) * 100;
+        const bookProgress = (group.currentPage / group.totalPages) * 100;
+        const overallProgress = ((group.currentBook - 1) / this.programData.totalBooks) * 100;
+        const booksAdvanced = group.currentBook - group.startBook;
+
+        return `
+        <div class="coats-group-card ${group.completed ? 'completed' : ''}">
+            ${group.completed ? `<div class="completed-badge">${this.t('programCompleted')}</div>` : ''}
+            <div class="group-header">
+                <h4>${this.language === 'es' ? group.name : group.nameEn}</h4>
+                <span class="group-schedule">${this.language === 'es' ? group.schedule : group.scheduleEn}</span>
+            </div>
+
+            <div class="group-stats">
+                <div class="group-stat">
+                    <span class="stat-label">${this.t('students')}</span>
+                    <span class="stat-value">${activeStudents}</span>
+                </div>
+                <div class="group-stat">
+                    <span class="stat-label">${this.t('avgAttendance')}</span>
+                    <span class="stat-value">${avgAttendance.toFixed(1)}%</span>
+                </div>
+                <div class="group-stat">
+                    <span class="stat-label">${this.t('totalHours')}</span>
+                    <span class="stat-value">${group.totalGroupHours}</span>
+                </div>
+            </div>
+
+            <div class="group-progress-section">
+                <div class="progress-item">
+                    <span class="progress-label">${this.t('book')} ${group.startBook} → ${group.currentBook} (+${booksAdvanced})</span>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar progress-bar-books" style="width: ${Math.min(overallProgress, 100)}%">
+                            <span class="progress-text">${overallProgress.toFixed(0)}%</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="progress-item">
+                    <span class="progress-label">${this.t('bookProgress')}: ${this.t('page')} ${group.currentPage}/${group.totalPages}</span>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar progress-bar-pages" style="width: ${bookProgress}%">
+                            <span class="progress-text">${bookProgress.toFixed(0)}%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="group-teachers">
+                <span class="teachers-label">${this.t('teachers')}:</span>
+                <span class="teachers-names">${group.teachers.join(', ')}</span>
+            </div>
+        </div>
+        `;
+    }
+
+    renderAwardWinner(student, rank, type) {
+        return `
+        <div class="award-winner award-${type}">
+            <span class="winner-rank">#${rank}</span>
+            <span class="winner-name">${this.formatName(student.name)}</span>
+            <span class="winner-stats">${student.total} ${this.t('hours')} (${student.attendancePct.toFixed(1)}%)</span>
+            <span class="winner-group">${student.group}</span>
+        </div>
+        `;
+    }
+
+    renderStudentRow(student, rank) {
+        const attendanceClass = student.attendancePct >= 70 ? 'high' :
+                               student.attendancePct >= 50 ? 'medium' : 'low';
+
+        return `
+        <tr class="attendance-${attendanceClass}">
+            <td>${rank}</td>
+            <td class="student-name">${this.formatName(student.name)}</td>
+            <td>${student.group.split('(')[0].trim()}</td>
+            <td><strong>${student.total}</strong> ${this.t('hours')}</td>
+            <td>
+                <div class="attendance-badge ${attendanceClass}">
+                    ${student.attendancePct.toFixed(1)}%
+                </div>
+            </td>
+            <td>${student.booksStart} → ${student.booksCurrent} (+${student.booksAdvanced})</td>
+            <td>
+                <div class="mini-progress-bar">
+                    <div class="mini-progress" style="width: ${student.attendancePct}%"></div>
+                </div>
+            </td>
+        </tr>
+        `;
+    }
+
+    formatName(name) {
+        return name.split(' ')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+            .join(' ');
+    }
+
+    // ===== CHARTS =====
+
+    renderCharts(stats) {
+        this.destroyCharts();
+
+        // Attendance Distribution Pie Chart
+        const attendanceCtx = document.getElementById('coats-attendance-chart');
+        if (attendanceCtx) {
+            this.charts.attendance = new Chart(attendanceCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: [this.t('highAttendance'), this.t('mediumAttendance'), this.t('lowAttendance')],
+                    datasets: [{
+                        data: [stats.highAttendance.length, stats.mediumAttendance.length, stats.lowAttendance.length],
+                        backgroundColor: ['#22c55e', '#f59e0b', '#ef4444'],
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: this.t('attendanceAnalysis'),
+                            font: { size: 16, weight: 'bold' }
+                        },
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
+        }
+
+        // Group Progress Bar Chart
+        const progressCtx = document.getElementById('coats-progress-chart');
+        if (progressCtx) {
+            const groups = this.programData.groups;
+            this.charts.progress = new Chart(progressCtx, {
+                type: 'bar',
+                data: {
+                    labels: groups.map(g => g.name.split('(')[0].trim()),
+                    datasets: [{
+                        label: this.t('booksAdvanced'),
+                        data: groups.map(g => g.currentBook - g.startBook),
+                        backgroundColor: '#3b82f6',
+                        borderRadius: 8
+                    }, {
+                        label: this.t('bookProgress') + ' %',
+                        data: groups.map(g => (g.currentPage / g.totalPages) * 100),
+                        backgroundColor: '#8b5cf6',
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: this.t('groupProgress'),
+                            font: { size: 16, weight: 'bold' }
+                        },
+                        legend: { position: 'bottom' }
+                    },
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+
+        // Monthly Trend Line Chart
+        const trendCtx = document.getElementById('coats-monthly-trend-chart');
+        if (trendCtx) {
+            const months = ['jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+            const monthLabels = this.language === 'es'
+                ? ['Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+                : ['Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+            const groupTrends = this.programData.groups.map(group => {
+                const monthlyTotals = months.map(month => {
+                    return group.students
+                        .filter(s => s.status === 'active')
+                        .reduce((sum, s) => sum + (s.hours[month] || 0), 0);
+                });
+                return {
+                    label: group.name.split('(')[0].trim(),
+                    data: monthlyTotals,
+                    borderWidth: 2,
+                    tension: 0.3,
+                    fill: false
+                };
+            });
+
+            const colors = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444'];
+            groupTrends.forEach((trend, i) => {
+                trend.borderColor = colors[i];
+                trend.backgroundColor = colors[i];
+            });
+
+            this.charts.trend = new Chart(trendCtx, {
+                type: 'line',
+                data: {
+                    labels: monthLabels,
+                    datasets: groupTrends
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: this.t('monthlyTrend'),
+                            font: { size: 16, weight: 'bold' }
+                        },
+                        legend: { position: 'bottom' }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: this.t('hours') }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Correlation Scatter Chart
+        const correlationCtx = document.getElementById('coats-correlation-chart');
+        if (correlationCtx) {
+            const scatterData = stats.allStudents.map(s => ({
+                x: s.attendancePct,
+                y: s.booksAdvanced
+            }));
+
+            this.charts.correlation = new Chart(correlationCtx, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: this.t('attendanceVsProgress'),
+                        data: scatterData,
+                        backgroundColor: scatterData.map(d =>
+                            d.x >= 70 ? '#22c55e' : d.x >= 50 ? '#f59e0b' : '#ef4444'
+                        ),
+                        pointRadius: 8,
+                        pointHoverRadius: 12
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: this.t('attendanceVsProgress'),
+                            font: { size: 16, weight: 'bold' }
+                        },
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            title: { display: true, text: this.t('attendanceRate') + ' %' },
+                            min: 0,
+                            max: 100
+                        },
+                        y: {
+                            title: { display: true, text: this.t('booksAdvanced') },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    destroyCharts() {
+        Object.values(this.charts).forEach(chart => {
+            if (chart) chart.destroy();
+        });
+        this.charts = {};
+    }
+
+    // ===== EXPORT FUNCTIONS =====
+
+    async exportToPDF() {
+        // Use browser print with PDF option
+        const printContent = document.getElementById('coats-report-content');
+        if (!printContent) return;
+
+        const originalContent = document.body.innerHTML;
+        document.body.innerHTML = printContent.outerHTML;
+
+        // Add print styles
+        const style = document.createElement('style');
+        style.innerHTML = `
+            @media print {
+                body { margin: 0; padding: 20px; }
+                .coats-actions { display: none !important; }
+                .coats-language-toggle { display: none !important; }
+                .coats-report { box-shadow: none !important; }
+                @page { margin: 1cm; size: A4 portrait; }
+            }
+        `;
+        document.head.appendChild(style);
+
+        window.print();
+
+        document.body.innerHTML = originalContent;
+
+        // Re-render the report
+        setTimeout(() => {
+            this.renderReport('coatsReportContainer');
+        }, 100);
+    }
+
+    exportToExcel() {
+        const stats = this.calculateProgramStats();
+        let csvContent = '\uFEFF'; // BOM for Excel UTF-8
+
+        // Header
+        csvContent += 'COATS CADENA - ATTENDANCE REPORT / REPORTE DE ASISTENCIA\n';
+        csvContent += `Generated / Generado: ${new Date().toLocaleDateString()}\n\n`;
+
+        // Summary
+        csvContent += 'EXECUTIVE SUMMARY / RESUMEN EJECUTIVO\n';
+        csvContent += `Total Students / Estudiantes,${stats.activeStudents}\n`;
+        csvContent += `Total Hours / Horas Totales,${stats.totalHours}\n`;
+        csvContent += `Average Attendance / Asistencia Promedio,${stats.avgAttendance.toFixed(1)}%\n\n`;
+
+        // Individual data
+        csvContent += 'INDIVIDUAL PROGRESS / PROGRESO INDIVIDUAL\n';
+        csvContent += 'Rank,Name/Nombre,Group/Grupo,Hours/Horas,Attendance/Asistencia,Books Start/Libro Inicio,Books Current/Libro Actual,Books Advanced/Libros Avanzados\n';
+
+        stats.allStudents.forEach((s, i) => {
+            csvContent += `${i + 1},"${s.name}","${s.group}",${s.total},${s.attendancePct.toFixed(1)}%,${s.booksStart},${s.booksCurrent},${s.booksAdvanced}\n`;
+        });
+
+        // Download
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `COATS_Report_${new Date().toISOString().split('T')[0]}.csv`;
+        link.click();
+    }
+
+    printReport() {
+        window.print();
+    }
+
+    setLanguage(lang) {
+        this.language = lang;
+        this.renderReport('coatsReportContainer');
+    }
+
+    // ===== STYLES =====
+
+    getReportStyles() {
+        return `
+        .coats-report {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 30px;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            border-radius: 20px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+        }
+
+        .coats-report-header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 30px;
+            border-bottom: 3px solid #1e3a5f;
+        }
+
+        .coats-logos {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 0 50px;
+        }
+
+        .coats-report-title {
+            font-size: 32px;
+            color: #1e3a5f;
+            margin: 0 0 10px 0;
+            font-weight: 700;
+        }
+
+        .coats-report-subtitle {
+            font-size: 20px;
+            color: #64748b;
+            margin: 0 0 10px 0;
+            font-weight: 400;
+        }
+
+        .coats-report-period {
+            font-size: 16px;
+            color: #94a3b8;
+            margin: 0;
+        }
+
+        .coats-language-toggle {
+            margin-top: 20px;
+        }
+
+        .coats-language-toggle button {
+            padding: 8px 20px;
+            margin: 0 5px;
+            border: 2px solid #1e3a5f;
+            background: white;
+            color: #1e3a5f;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .coats-language-toggle button.active,
+        .coats-language-toggle button:hover {
+            background: #1e3a5f;
+            color: white;
+        }
+
+        .coats-section {
+            background: white;
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .coats-section h3 {
+            color: #1e3a5f;
+            font-size: 22px;
+            margin: 0 0 20px 0;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-icon {
+            font-size: 24px;
+        }
+
+        .coats-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 20px;
+        }
+
+        .coats-stat-card {
+            background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .coats-stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+        }
+
+        .coats-stat-highlight {
+            background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
+            color: white;
+        }
+
+        .coats-stat-highlight .stat-label {
+            color: #cbd5e1;
+        }
+
+        .stat-icon {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .stat-value {
+            font-size: 36px;
+            font-weight: 700;
+            color: #1e3a5f;
+        }
+
+        .coats-stat-highlight .stat-value {
+            color: white;
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 5px;
+        }
+
+        /* Insights */
+        .coats-insights-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .insight-card {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px 20px;
+            border-radius: 10px;
+            font-weight: 500;
+        }
+
+        .insight-success {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .insight-achievement {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .insight-info {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .insight-icon {
+            font-size: 24px;
+        }
+
+        /* Group Cards */
+        .coats-groups-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .coats-group-card {
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            border: 2px solid #e2e8f0;
+            border-radius: 16px;
+            padding: 20px;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .coats-group-card:hover {
+            border-color: #3b82f6;
+            box-shadow: 0 10px 30px -10px rgba(59, 130, 246, 0.3);
+        }
+
+        .coats-group-card.completed {
+            border-color: #22c55e;
+            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+        }
+
+        .completed-badge {
+            position: absolute;
+            top: -10px;
+            right: 20px;
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            box-shadow: 0 4px 10px rgba(34, 197, 94, 0.4);
+        }
+
+        .group-header h4 {
+            margin: 0 0 5px 0;
+            color: #1e3a5f;
+            font-size: 16px;
+        }
+
+        .group-schedule {
+            font-size: 13px;
+            color: #64748b;
+        }
+
+        .group-stats {
+            display: flex;
+            justify-content: space-between;
+            margin: 15px 0;
+            padding: 15px 0;
+            border-top: 1px solid #e2e8f0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .group-stat {
+            text-align: center;
+        }
+
+        .group-stat .stat-label {
+            font-size: 11px;
+            color: #94a3b8;
+            display: block;
+        }
+
+        .group-stat .stat-value {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1e3a5f;
+        }
+
+        .group-progress-section {
+            margin: 15px 0;
+        }
+
+        .progress-item {
+            margin-bottom: 12px;
+        }
+
+        .progress-label {
+            font-size: 12px;
+            color: #64748b;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .progress-bar-container {
+            background: #e2e8f0;
+            border-radius: 10px;
+            height: 24px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: width 0.5s ease;
+        }
+
+        .progress-bar-books {
+            background: linear-gradient(90deg, #3b82f6 0%, #1d4ed8 100%);
+        }
+
+        .progress-bar-pages {
+            background: linear-gradient(90deg, #8b5cf6 0%, #6d28d9 100%);
+        }
+
+        .progress-text {
+            color: white;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .group-teachers {
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 10px;
+        }
+
+        .teachers-label {
+            font-weight: 600;
+        }
+
+        /* Charts */
+        .coats-charts-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+
+        .coats-chart-container {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 20px;
+            min-height: 300px;
+        }
+
+        /* Correlation Section */
+        .correlation-description {
+            color: #64748b;
+            margin-bottom: 20px;
+            font-style: italic;
+        }
+
+        .correlation-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .correlation-stat {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px;
+            border-radius: 10px;
+            position: relative;
+        }
+
+        .correlation-stat.high {
+            background: #dcfce7;
+        }
+
+        .correlation-stat.medium {
+            background: #fef3c7;
+        }
+
+        .correlation-stat.low {
+            background: #fee2e2;
+        }
+
+        .correlation-count {
+            font-size: 28px;
+            font-weight: 700;
+            min-width: 50px;
+        }
+
+        .correlation-stat.high .correlation-count { color: #166534; }
+        .correlation-stat.medium .correlation-count { color: #92400e; }
+        .correlation-stat.low .correlation-count { color: #991b1b; }
+
+        .correlation-label {
+            flex: 1;
+            font-weight: 500;
+        }
+
+        .correlation-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 4px;
+            border-radius: 0 0 10px 10px;
+        }
+
+        .correlation-stat.high .correlation-bar { background: #22c55e; }
+        .correlation-stat.medium .correlation-bar { background: #f59e0b; }
+        .correlation-stat.low .correlation-bar { background: #ef4444; }
+
+        /* Awards Section */
+        .coats-awards-section {
+            background: linear-gradient(135deg, #fefce8 0%, #fef9c3 100%);
+        }
+
+        .award-category {
+            margin-bottom: 25px;
+            padding: 20px;
+            border-radius: 12px;
+            background: white;
+        }
+
+        .award-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .award-medal {
+            font-size: 32px;
+        }
+
+        .award-header h4 {
+            margin: 0;
+            color: #1e3a5f;
+        }
+
+        .award-winners {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 10px;
+        }
+
+        .award-winner {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 15px;
+            border-radius: 8px;
+            background: #f8fafc;
+        }
+
+        .award-gold .award-winner {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border: 2px solid #f59e0b;
+        }
+
+        .award-silver .award-winner {
+            background: linear-gradient(135deg, #f1f5f9 0%, #cbd5e1 100%);
+            border: 2px solid #94a3b8;
+        }
+
+        .award-bronze .award-winner {
+            background: linear-gradient(135deg, #fed7aa 0%, #fdba74 100%);
+            border: 2px solid #ea580c;
+        }
+
+        .winner-rank {
+            font-weight: 700;
+            color: #1e3a5f;
+            min-width: 30px;
+        }
+
+        .winner-name {
+            flex: 1;
+            font-weight: 600;
+        }
+
+        .winner-stats {
+            font-size: 12px;
+            color: #64748b;
+        }
+
+        .winner-group {
+            font-size: 11px;
+            color: #94a3b8;
+            max-width: 100px;
+            text-overflow: ellipsis;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+
+        /* Table */
+        .coats-table-container {
+            overflow-x: auto;
+        }
+
+        .coats-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .coats-table th {
+            background: #1e3a5f;
+            color: white;
+            padding: 12px 15px;
+            text-align: left;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .coats-table th:first-child {
+            border-radius: 8px 0 0 0;
+        }
+
+        .coats-table th:last-child {
+            border-radius: 0 8px 0 0;
+        }
+
+        .coats-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .coats-table tr:hover {
+            background: #f8fafc;
+        }
+
+        .coats-table tr.attendance-high {
+            background: linear-gradient(90deg, rgba(34, 197, 94, 0.1) 0%, transparent 50%);
+        }
+
+        .coats-table tr.attendance-low {
+            background: linear-gradient(90deg, rgba(239, 68, 68, 0.1) 0%, transparent 50%);
+        }
+
+        .student-name {
+            font-weight: 600;
+            color: #1e3a5f;
+        }
+
+        .attendance-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        .attendance-badge.high {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .attendance-badge.medium {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .attendance-badge.low {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .mini-progress-bar {
+            width: 100px;
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .mini-progress {
+            height: 100%;
+            background: linear-gradient(90deg, #22c55e 0%, #16a34a 100%);
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+
+        /* Actions */
+        .coats-actions {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .coats-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 25px;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+        }
+
+        .coats-btn-primary {
+            background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
+            color: white;
+        }
+
+        .coats-btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px -5px rgba(30, 58, 95, 0.4);
+        }
+
+        .coats-btn-secondary {
+            background: white;
+            color: #1e3a5f;
+            border: 2px solid #1e3a5f;
+        }
+
+        .coats-btn-secondary:hover {
+            background: #1e3a5f;
+            color: white;
+        }
+
+        /* Footer */
+        .coats-report-footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 2px solid #e2e8f0;
+            color: #64748b;
+            font-size: 13px;
+        }
+
+        .confidential {
+            font-style: italic;
+            color: #94a3b8;
+            margin-top: 10px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .coats-report {
+                padding: 15px;
+            }
+
+            .coats-charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .coats-groups-container {
+                grid-template-columns: 1fr;
+            }
+
+            .coats-summary-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .stat-value {
+                font-size: 28px;
+            }
+        }
+
+        /* Print Styles */
+        @media print {
+            .coats-actions,
+            .coats-language-toggle {
+                display: none !important;
+            }
+
+            .coats-report {
+                box-shadow: none;
+                background: white;
+            }
+
+            .coats-section {
+                break-inside: avoid;
+            }
+        }
+        `;
+    }
+}
+
+// Initialize global instance
+window.CoatsReports = new CoatsReportsManager();
+
+// Function to open COATS reports
+window.openCoatsReports = async function() {
+    const container = document.getElementById('coatsReportContainer');
+    if (container) {
+        await window.CoatsReports.renderReport('coatsReportContainer');
+    }
+};
+
+console.log('📊 COATS Reports module loaded');
