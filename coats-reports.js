@@ -96,6 +96,8 @@ class CoatsReportsManager {
                 advancedBooksNote: 'Nota: Los libros 7-12 son considerablemente más extensos que los libros 1-6, requiriendo más horas de estudio por libro.',
                 advancedBooksNoteShort: 'Libros avanzados (7-12) son más extensos',
                 lateStartNote: 'Inició',
+                withdrawnStudents: 'Estudiantes Retirados',
+                withdrawnNote: 'No se incluyen en el cálculo de asistencia promedio',
                 generatedOn: 'Generado el',
                 confidential: 'Documento Confidencial - Solo para uso interno de COATS'
             },
@@ -168,6 +170,8 @@ class CoatsReportsManager {
                 advancedBooksNote: 'Note: Books 7-12 are considerably more extensive than books 1-6, requiring more study hours per book.',
                 advancedBooksNoteShort: 'Advanced books (7-12) are more extensive',
                 lateStartNote: 'Started',
+                withdrawnStudents: 'Withdrawn Students',
+                withdrawnNote: 'Not included in average attendance calculation',
                 generatedOn: 'Generated on',
                 confidential: 'Confidential Document - For COATS Internal Use Only'
             }
@@ -381,6 +385,7 @@ class CoatsReportsManager {
             avgBookCompletion,
             allStudents,
             allStudentsIncludingInactive,
+            withdrawnStudents: allStudentsIncludingInactive.filter(s => s.status === 'inactive'),
             topPerformers: allStudents.slice(0, 10),
             highAttendance: allStudents.filter(s => s.attendancePct >= 70),
             mediumAttendance: allStudents.filter(s => s.attendancePct >= 50 && s.attendancePct < 70),
@@ -748,6 +753,23 @@ class CoatsReportsManager {
                     </table>
                 </div>
             </div>
+
+            <!-- Withdrawn Students -->
+            ${stats.withdrawnStudents.length > 0 ? `
+            <div class="coats-section coats-withdrawn-section">
+                <h3><span class="section-icon">📋</span> ${this.t('withdrawnStudents')}</h3>
+                <p class="withdrawn-note">${this.t('withdrawnNote')}</p>
+                <div class="withdrawn-list">
+                    ${stats.withdrawnStudents.map(s => `
+                        <div class="withdrawn-student">
+                            <span class="withdrawn-name">${this.formatName(s.name)}</span>
+                            <span class="withdrawn-group">${s.group.split(' - ')[0]}</span>
+                            <span class="withdrawn-reason">${s.note || ''}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+            ` : ''}
 
             <!-- Export Actions -->
             <div class="coats-section coats-actions">
@@ -2042,6 +2064,54 @@ class CoatsReportsManager {
             background: linear-gradient(90deg, #22c55e 0%, #16a34a 100%);
             border-radius: 4px;
             transition: width 0.5s ease;
+        }
+
+        /* Withdrawn Students */
+        .coats-withdrawn-section {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 12px;
+        }
+
+        .withdrawn-note {
+            font-size: 13px;
+            color: #991b1b;
+            font-style: italic;
+            margin-bottom: 15px;
+        }
+
+        .withdrawn-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .withdrawn-student {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 12px 15px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #fecaca;
+        }
+
+        .withdrawn-name {
+            font-weight: 600;
+            color: #1e3a5f;
+            min-width: 200px;
+        }
+
+        .withdrawn-group {
+            font-size: 13px;
+            color: #64748b;
+            min-width: 80px;
+        }
+
+        .withdrawn-reason {
+            font-size: 13px;
+            color: #991b1b;
+            font-style: italic;
         }
 
         /* Actions */
