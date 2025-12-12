@@ -23,28 +23,28 @@ class CoatsReportsManager {
                 jun: 12, jul: 22, ago: 12, sep: 18, oct: 18, nov: 16, dic: 8 // Dec only through Dec 12
             },
             // Book structure with page counts
-            // Books 1-6: Basic level (PreA1 → A2)
-            // Books 7-12: Advanced level (B1 → B2) - divided into parts A and B
+            // CEFR Levels: PreA1 (1-3), A1 (4-5), A2 (6-7), B1 (8), B2 (9-10), C1 (11-12)
+            // Current program reaches B2 (Book 10). Books 7-12 divided into parts A and B.
             bookPages: {
                 1: { pages: 62, level: 'PreA1' },
-                2: { pages: 61, level: 'PreA1-A1' },
-                3: { pages: 50, level: 'A1' },
-                4: { pages: 65, level: 'A1-A2' },
-                5: { pages: 50, level: 'A2' },
+                2: { pages: 61, level: 'PreA1' },
+                3: { pages: 50, level: 'PreA1' },
+                4: { pages: 65, level: 'A1' },
+                5: { pages: 50, level: 'A1' },
                 6: { pages: 87, level: 'A2' },
                 // Advanced books are divided into Part A and Part B (bound together)
-                '7A': { pages: 50, level: 'B1', part: 'A' },
-                '7B': { pages: 107, level: 'B1', part: 'B' },
+                '7A': { pages: 50, level: 'A2', part: 'A' },
+                '7B': { pages: 107, level: 'A2', part: 'B' },
                 '8A': { pages: 50, level: 'B1', part: 'A' },
-                '8B': { pages: 107, level: 'B1-B2', part: 'B' },
+                '8B': { pages: 107, level: 'B1', part: 'B' },
                 '9A': { pages: 50, level: 'B2', part: 'A' },
                 '9B': { pages: 107, level: 'B2', part: 'B' },
                 '10A': { pages: 50, level: 'B2', part: 'A' },
                 '10B': { pages: 107, level: 'B2', part: 'B' },
-                '11A': { pages: 50, level: 'B2', part: 'A' },
-                '11B': { pages: 107, level: 'B2', part: 'B' },
-                '12A': { pages: 50, level: 'B2', part: 'A' },
-                '12B': { pages: 107, level: 'B2', part: 'B' }
+                '11A': { pages: 50, level: 'C1', part: 'A' },
+                '11B': { pages: 107, level: 'C1', part: 'B' },
+                '12A': { pages: 50, level: 'C1', part: 'A' },
+                '12B': { pages: 107, level: 'C1', part: 'B' }
             },
             groups: this.initializeGroupsData()
         };
@@ -76,7 +76,7 @@ class CoatsReportsManager {
                 programStructure: 'Estructura del Programa',
                 programBooks: 'Libros del Programa',
                 cefrLevel: 'Nivel CEFR',
-                preA1toB2: 'PreA1 → B2',
+                preA1toC1: 'PreA1 → C1',
                 cefrFramework: 'Marco Común Europeo de Referencia',
                 hours: 'horas',
                 attendance: 'Asistencia',
@@ -154,7 +154,7 @@ class CoatsReportsManager {
                 programStructure: 'Program Structure',
                 programBooks: 'Program Books',
                 cefrLevel: 'CEFR Level',
-                preA1toB2: 'PreA1 → B2',
+                preA1toC1: 'PreA1 → C1',
                 cefrFramework: 'Common European Framework of Reference',
                 hours: 'hours',
                 attendance: 'Attendance',
@@ -630,16 +630,35 @@ class CoatsReportsManager {
                             <div class="cefr-journey">
                                 <span class="cefr-start">PreA1</span>
                                 <span class="cefr-arrow">→</span>
-                                <span class="cefr-end">B2</span>
+                                <span class="cefr-end">C1</span>
                             </div>
                         </div>
                         <div class="cefr-framework-label">${this.t('cefrFramework')}</div>
-                        <div class="cefr-levels-visual">
-                            <div class="cefr-level-box prea1">PreA1</div>
-                            <div class="cefr-level-box a1">A1</div>
-                            <div class="cefr-level-box a2">A2</div>
-                            <div class="cefr-level-box b1">B1</div>
-                            <div class="cefr-level-box b2">B2</div>
+                        <div class="cefr-levels-grid">
+                            <div class="cefr-level-item prea1">
+                                <div class="cefr-level-name">PreA1</div>
+                                <div class="cefr-level-books">${this.language === 'es' ? 'Libros' : 'Books'} 1-3</div>
+                            </div>
+                            <div class="cefr-level-item a1">
+                                <div class="cefr-level-name">A1</div>
+                                <div class="cefr-level-books">${this.language === 'es' ? 'Libros' : 'Books'} 4-5</div>
+                            </div>
+                            <div class="cefr-level-item a2">
+                                <div class="cefr-level-name">A2</div>
+                                <div class="cefr-level-books">${this.language === 'es' ? 'Libros' : 'Books'} 6-7</div>
+                            </div>
+                            <div class="cefr-level-item b1">
+                                <div class="cefr-level-name">B1</div>
+                                <div class="cefr-level-books">${this.language === 'es' ? 'Libro' : 'Book'} 8</div>
+                            </div>
+                            <div class="cefr-level-item b2">
+                                <div class="cefr-level-name">B2</div>
+                                <div class="cefr-level-books">${this.language === 'es' ? 'Libros' : 'Books'} 9-10</div>
+                            </div>
+                            <div class="cefr-level-item c1">
+                                <div class="cefr-level-name">C1</div>
+                                <div class="cefr-level-books">${this.language === 'es' ? 'Libros' : 'Books'} 11-12</div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1710,6 +1729,45 @@ class CoatsReportsManager {
         .cefr-level-box.a2 { background: #3b82f6; }
         .cefr-level-box.b1 { background: #8b5cf6; }
         .cefr-level-box.b2 { background: #f59e0b; }
+
+        /* CEFR Levels Grid with Books */
+        .cefr-levels-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .cefr-level-item {
+            padding: 10px 6px;
+            border-radius: 8px;
+            text-align: center;
+            color: white;
+        }
+
+        .cefr-level-item.prea1 { background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%); }
+        .cefr-level-item.a1 { background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); }
+        .cefr-level-item.a2 { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
+        .cefr-level-item.b1 { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); }
+        .cefr-level-item.b2 { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+        .cefr-level-item.c1 { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
+
+        .cefr-level-name {
+            font-weight: 700;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .cefr-level-books {
+            font-size: 10px;
+            opacity: 0.9;
+        }
+
+        @media (max-width: 768px) {
+            .cefr-levels-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
 
         /* Hours Breakdown */
         .hours-breakdown-container {
