@@ -837,6 +837,9 @@ class CoatsReportsManager {
                         <span class="award-medal">⭐</span>
                         <h4>${this.t('consistency')}</h4>
                     </div>
+                    <p class="consistency-explanation">${this.language === 'es'
+                        ? 'Estudiantes con la asistencia más estable mes a mes. Menor variación en horas mensuales indica mayor compromiso sostenido.'
+                        : 'Students with the most stable attendance month to month. Lower variation in monthly hours indicates sustained commitment.'}</p>
                     <div class="award-winners">
                         ${awards.consistency.map((s, i) => this.renderAwardWinner(s, i + 1, 'consistency')).join('')}
                     </div>
@@ -2370,6 +2373,17 @@ class CoatsReportsManager {
         .award-bronze .award-winner {
             background: linear-gradient(135deg, #fed7aa 0%, #fdba74 100%);
             border: 2px solid #ea580c;
+        }
+
+        .consistency-explanation {
+            font-size: 13px;
+            color: #64748b;
+            font-style: italic;
+            margin: 0 0 15px 0;
+            padding: 8px 12px;
+            background: rgba(255,255,255,0.5);
+            border-radius: 6px;
+            border-left: 3px solid #f59e0b;
         }
 
         .winner-rank {
