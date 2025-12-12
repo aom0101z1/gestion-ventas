@@ -906,11 +906,18 @@ class CoatsReportsManager {
     }
 
     renderGroupCard(group) {
-        const activeStudents = group.students.filter(s => s.status === 'active').length;
-        const avgHours = group.students
-            .filter(s => s.status === 'active')
-            .reduce((sum, s) => sum + s.total, 0) / activeStudents || 0;
-        const avgAttendance = (avgHours / this.programData.maxPossibleHours) * 100;
+        const activeStudentsList = group.students.filter(s => s.status === 'active');
+        const activeStudents = activeStudentsList.length;
+
+        // Calculate average attendance considering late-start students
+        let totalAttendancePct = 0;
+        activeStudentsList.forEach(student => {
+            const maxHours = student.lateStart
+                ? this.calculateAvailableHoursSince(student.lateStart)
+                : this.programData.maxPossibleHours;
+            totalAttendancePct += (student.total / maxHours) * 100;
+        });
+        const avgAttendance = activeStudents > 0 ? totalAttendancePct / activeStudents : 0;
         const bookProgress = (group.currentPage / group.totalPages) * 100;
         const overallProgress = ((group.currentBook - 1) / this.programData.totalBooks) * 100;
         const booksAdvanced = group.currentBook - group.startBook;
