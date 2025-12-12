@@ -391,7 +391,11 @@ class CoatsReportsManager {
         groups.forEach(group => {
             totalHours += group.totalGroupHours;
             group.students.forEach(student => {
-                totalStudents++;
+                // Don't count transferred students as they are duplicates
+                // (they appear in both their old and new group)
+                if (student.status !== 'transferred') {
+                    totalStudents++;
+                }
 
                 // Calculate max possible hours for this student
                 // If student has lateStart, calculate based on available hours since their start date
