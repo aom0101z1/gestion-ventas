@@ -18,9 +18,33 @@ class CoatsReportsManager {
                 semester: '2nd Semester 2025 / 2do Semestre 2025'
             },
             totalBooks: 12, // Full program has 12 books
-            maxPossibleHours: 110, // Max hours June-December (4hrs/week)
+            maxPossibleHours: 106, // Max hours June-Dec 12 (4hrs/week, partial December)
             monthlyMaxHours: {
-                jun: 12, jul: 22, ago: 12, sep: 18, oct: 18, nov: 16, dic: 12
+                jun: 12, jul: 22, ago: 12, sep: 18, oct: 18, nov: 16, dic: 8 // Dec only through Dec 12
+            },
+            // Book structure with page counts
+            // Books 1-6: Basic level (PreA1 → A2)
+            // Books 7-12: Advanced level (B1 → B2) - divided into parts A and B
+            bookPages: {
+                1: { pages: 62, level: 'PreA1' },
+                2: { pages: 61, level: 'PreA1-A1' },
+                3: { pages: 50, level: 'A1' },
+                4: { pages: 65, level: 'A1-A2' },
+                5: { pages: 50, level: 'A2' },
+                6: { pages: 87, level: 'A2' },
+                // Advanced books are divided into Part A and Part B (bound together)
+                '7A': { pages: 50, level: 'B1', part: 'A' },
+                '7B': { pages: 107, level: 'B1', part: 'B' },
+                '8A': { pages: 50, level: 'B1', part: 'A' },
+                '8B': { pages: 107, level: 'B1-B2', part: 'B' },
+                '9A': { pages: 50, level: 'B2', part: 'A' },
+                '9B': { pages: 107, level: 'B2', part: 'B' },
+                '10A': { pages: 50, level: 'B2', part: 'A' },
+                '10B': { pages: 107, level: 'B2', part: 'B' },
+                '11A': { pages: 50, level: 'B2', part: 'A' },
+                '11B': { pages: 107, level: 'B2', part: 'B' },
+                '12A': { pages: 50, level: 'B2', part: 'A' },
+                '12B': { pages: 107, level: 'B2', part: 'B' }
             },
             groups: this.initializeGroupsData()
         };
@@ -37,7 +61,9 @@ class CoatsReportsManager {
                 attendanceAnalysis: 'Análisis de Asistencia',
                 recognitionAwards: 'Reconocimientos y Premios',
                 attendanceVsProgress: 'Asistencia vs Progreso',
-                monthlyTrend: 'Tendencia Mensual',
+                attendanceVsProgressDesc: 'Gráfica de Dispersión: Cada punto representa un estudiante. El eje horizontal (X) muestra su porcentaje de asistencia, y el eje vertical (Y) muestra cuántos libros ha avanzado. Los colores indican el nivel de asistencia: verde (≥70%), amarillo (50-69%), rojo (<50%). Esta gráfica permite visualizar la correlación entre asistencia y progreso académico.',
+                monthlyTrend: 'Tendencia Mensual de Asistencia',
+                monthlyTrendDesc: 'Gráfica de Líneas: Muestra la evolución de las horas de asistencia totales por grupo a lo largo del semestre (Junio-Diciembre). Cada línea representa un grupo diferente, permitiendo comparar el comportamiento de asistencia entre grupos y detectar patrones o variaciones mensuales.',
                 totalStudents: 'Total Estudiantes',
                 totalHours: 'Total Horas-Estudiante',
                 classHoursDelivered: 'Horas de Clase Impartidas',
@@ -92,7 +118,7 @@ class CoatsReportsManager {
                 keyInsights: 'Hallazgos Clave',
                 insight1: 'Los estudiantes con >70% asistencia avanzan 40% más rápido',
                 insight2: 'Grupo 4 completó el Libro 7 - Los libros 7-12 son significativamente más extensos',
-                insight3: 'Tasa de retención del programa: 94% (solo 2 retiros)',
+                insight3: 'Tasa de retención del programa: 94% (solo 2 retiros confirmados)',
                 advancedBooksNote: 'Nota: Los libros 7-12 son considerablemente más extensos que los libros 1-6, requiriendo más horas de estudio por libro.',
                 advancedBooksNoteShort: 'Libros avanzados (7-12) son más extensos',
                 lateStartNote: 'Inició',
@@ -111,7 +137,9 @@ class CoatsReportsManager {
                 attendanceAnalysis: 'Attendance Analysis',
                 recognitionAwards: 'Recognition & Awards',
                 attendanceVsProgress: 'Attendance vs Progress',
-                monthlyTrend: 'Monthly Trend',
+                attendanceVsProgressDesc: 'Scatter Plot: Each point represents a student. The horizontal axis (X) shows their attendance percentage, and the vertical axis (Y) shows how many books they have advanced. Colors indicate attendance level: green (≥70%), yellow (50-69%), red (<50%). This chart visualizes the correlation between attendance and academic progress.',
+                monthlyTrend: 'Monthly Attendance Trend',
+                monthlyTrendDesc: 'Line Chart: Shows the evolution of total attendance hours per group throughout the semester (June-December). Each line represents a different group, allowing comparison of attendance behavior between groups and detection of monthly patterns or variations.',
                 totalStudents: 'Total Students',
                 totalHours: 'Total Student-Hours',
                 classHoursDelivered: 'Class Hours Delivered',
@@ -166,7 +194,7 @@ class CoatsReportsManager {
                 keyInsights: 'Key Insights',
                 insight1: 'Students with >70% attendance progress 40% faster',
                 insight2: 'Group 4 completed Book 7 - Books 7-12 are significantly more extensive',
-                insight3: 'Program retention rate: 94% (only 2 dropouts)',
+                insight3: 'Program retention rate: 94% (only 2 confirmed dropouts)',
                 advancedBooksNote: 'Note: Books 7-12 are considerably more extensive than books 1-6, requiring more study hours per book.',
                 advancedBooksNoteShort: 'Advanced books (7-12) are more extensive',
                 lateStartNote: 'Started',
@@ -193,17 +221,17 @@ class CoatsReportsManager {
                 totalPages: 136,
                 teachers: ['David Bedoya', 'Juanita Echavarría', 'Anderson Bedoya'],
                 students: [
-                    { name: 'BEATRIZ VALENCIA', hours: { jun: 8, jul: 22, ago: 12, sep: 14, oct: 12, nov: 10, dic: 12 }, total: 90, status: 'active' },
-                    { name: 'MARIA ALEJANDRA OCAMPO', hours: { jun: 6, jul: 22, ago: 10, sep: 16, oct: 20, nov: 4, dic: 12 }, total: 90, status: 'active', note: 'Transferred to this group' },
-                    { name: 'CATALINA VALENCIA QUINTERO', hours: { jun: 8, jul: 22, ago: 10, sep: 12, oct: 14, nov: 10, dic: 12 }, total: 88, status: 'active' },
-                    { name: 'FRANCINET HERRERA', hours: { jun: 4, jul: 18, ago: 10, sep: 8, oct: 18, nov: 10, dic: 10 }, total: 78, status: 'active' },
-                    { name: 'VALERIA GIRALDO PULGARÍN', hours: { jun: 4, jul: 22, ago: 10, sep: 12, oct: 12, nov: 6, dic: 12 }, total: 78, status: 'active', note: 'Transferred to this group' },
-                    { name: 'MARTIN VERA', hours: { jun: 0, jul: 18, ago: 8, sep: 14, oct: 12, nov: 4, dic: 12 }, total: 68, status: 'active' },
-                    { name: 'MARCELA LÓPEZ', hours: { jun: 6, jul: 16, ago: 4, sep: 10, oct: 12, nov: 8, dic: 10 }, total: 66, status: 'active' },
+                    { name: 'BEATRIZ VALENCIA', hours: { jun: 8, jul: 22, ago: 12, sep: 14, oct: 12, nov: 10, dic: 8 }, total: 86, status: 'active' },
+                    { name: 'MARIA ALEJANDRA OCAMPO', hours: { jun: 6, jul: 22, ago: 10, sep: 16, oct: 20, nov: 4, dic: 8 }, total: 86, status: 'active', note: 'Transferred to this group' },
+                    { name: 'CATALINA VALENCIA QUINTERO', hours: { jun: 8, jul: 22, ago: 10, sep: 12, oct: 14, nov: 10, dic: 8 }, total: 84, status: 'active' },
+                    { name: 'FRANCINET HERRERA', hours: { jun: 4, jul: 18, ago: 10, sep: 8, oct: 18, nov: 10, dic: 8 }, total: 76, status: 'active' },
+                    { name: 'VALERIA GIRALDO PULGARÍN', hours: { jun: 4, jul: 22, ago: 10, sep: 12, oct: 12, nov: 6, dic: 8 }, total: 74, status: 'active', note: 'Transferred to this group' },
+                    { name: 'MARTIN VERA', hours: { jun: 0, jul: 18, ago: 8, sep: 14, oct: 12, nov: 4, dic: 8 }, total: 64, status: 'active' },
+                    { name: 'MARCELA LÓPEZ', hours: { jun: 6, jul: 16, ago: 4, sep: 10, oct: 12, nov: 8, dic: 8 }, total: 64, status: 'active' },
                     { name: 'ALEXANDRA LONDOÑO', hours: { jun: 4, jul: 14, ago: 8, sep: 16, oct: 8, nov: 4, dic: 4 }, total: 58, status: 'active' },
-                    { name: 'ANDREA CATALINA VALENCIA', hours: { jun: 8, jul: 6, ago: 0, sep: 0, oct: 0, nov: 0, dic: 0 }, total: 14, status: 'transferred', note: 'Transferred to Group 2' }
+                    { name: 'ANDREA CATALINA VALENCIA', hours: { jun: 8, jul: 6, ago: 0, sep: 0, oct: 0, nov: 0, dic: 0 }, total: 14, status: 'transferred', note: 'Transferred to Group 3' }
                 ],
-                totalGroupHours: 630
+                totalGroupHours: 606
             },
             {
                 id: 'grupo-2',
@@ -218,19 +246,19 @@ class CoatsReportsManager {
                 totalPages: 239,
                 teachers: ['Juan Pablo Bedoya'],
                 students: [
-                    { name: 'MAURICIO SEPÚLVEDA HENAO', hours: { jun: 6, jul: 20, ago: 18, sep: 16, oct: 8, nov: 14, dic: 6 }, total: 88, status: 'active' },
-                    { name: 'CARLOS EMANUEL ZAPATA', hours: { jun: 4, jul: 20, ago: 12, sep: 18, oct: 14, nov: 14, dic: 6 }, total: 88, status: 'active' },
-                    { name: 'GERSAÍN BEDOYA P.', hours: { jun: 4, jul: 18, ago: 16, sep: 18, oct: 12, nov: 14, dic: 4 }, total: 86, status: 'active' },
-                    { name: 'CATALINA DUQUE OSORIO', hours: { jun: 6, jul: 16, ago: 10, sep: 14, oct: 14, nov: 14, dic: 4 }, total: 78, status: 'active' },
+                    { name: 'MAURICIO SEPÚLVEDA HENAO', hours: { jun: 6, jul: 20, ago: 18, sep: 16, oct: 8, nov: 14, dic: 8 }, total: 90, status: 'active' },
+                    { name: 'CARLOS EMANUEL ZAPATA', hours: { jun: 4, jul: 20, ago: 12, sep: 18, oct: 14, nov: 14, dic: 8 }, total: 90, status: 'active' },
+                    { name: 'GERSAÍN BEDOYA P.', hours: { jun: 4, jul: 18, ago: 16, sep: 18, oct: 12, nov: 14, dic: 6 }, total: 88, status: 'active' },
+                    { name: 'CATALINA DUQUE OSORIO', hours: { jun: 6, jul: 16, ago: 10, sep: 14, oct: 14, nov: 14, dic: 6 }, total: 80, status: 'active' },
                     { name: 'CARLOS ARTURO ORTIZ C.', hours: { jun: 4, jul: 18, ago: 18, sep: 14, oct: 9, nov: 12, dic: 2 }, total: 77, status: 'active' },
                     { name: 'LEONARDO CUERVO BUITRAGO', hours: { jun: 6, jul: 16, ago: 16, sep: 10, oct: 14, nov: 10, dic: 2 }, total: 74, status: 'active' },
-                    { name: 'JOSHEPLEEN DUQUE NATAL', hours: { jun: 4, jul: 18, ago: 12, sep: 14, oct: 8, nov: 10, dic: 4 }, total: 70, status: 'active' },
+                    { name: 'JOSHEPLEEN DUQUE NATAL', hours: { jun: 4, jul: 18, ago: 12, sep: 14, oct: 8, nov: 10, dic: 6 }, total: 72, status: 'active' },
                     { name: 'CARLOS ANDRES MEJÍA', hours: { jun: 2, jul: 12, ago: 12, sep: 10, oct: 8, nov: 2, dic: 0 }, total: 46, status: 'active' },
                     { name: 'ANDRES FELIPE CALVO OSPINA', hours: { jun: 4, jul: 16, ago: 10, sep: 0, oct: 0, nov: 0, dic: 0 }, total: 30, status: 'inactive', note: 'Did not return since September' },
                     { name: 'VALERIA GIRALDO PULGARÍN', hours: { jun: 0, jul: 0, ago: 0, sep: 0, oct: 0, nov: 0, dic: 0 }, total: 0, status: 'transferred', note: 'Transferred to Group 1' },
                     { name: 'MARIA ALEJANDRA OCAMPO HOLGUÍN', hours: { jun: 0, jul: 0, ago: 0, sep: 0, oct: 0, nov: 0, dic: 0 }, total: 0, status: 'transferred', note: 'Transferred to Group 1' }
                 ],
-                totalGroupHours: 637
+                totalGroupHours: 617 // Excludes inactive student (Andres Felipe: 30 hrs)
             },
             {
                 id: 'grupo-3',
@@ -256,7 +284,7 @@ class CoatsReportsManager {
                     { name: 'EDITH ALEJANDRA GIL', hours: { jun: 12, jul: 12, ago: 10, sep: 10, oct: 8, nov: 0, dic: 0 }, total: 52, status: 'inactive', note: 'Did not return since Oct 28' },
                     { name: 'LUZ MARÍA HURTADO', hours: { jun: 0, jul: 0, ago: 0, sep: 0, oct: 4, nov: 14, dic: 8 }, total: 26, status: 'active', note: 'Started Oct 28', lateStart: '2025-10-28' }
                 ],
-                totalGroupHours: 696
+                totalGroupHours: 644 // Excludes inactive student (Edith: 52 hrs)
             },
             {
                 id: 'grupo-4',
@@ -272,14 +300,14 @@ class CoatsReportsManager {
                 bookCompleted: true,
                 teachers: ['Juan Pablo Bedoya', 'César Grisales', 'Anderson Bedoya'],
                 students: [
-                    { name: 'JULIANA ÁLVAREZ', hours: { jun: 12, jul: 14, ago: 10, sep: 18, oct: 12, nov: 14, dic: 4 }, total: 84, status: 'active' },
-                    { name: 'JUAN CAMILO ARANGO', hours: { jun: 12, jul: 14, ago: 10, sep: 18, oct: 16, nov: 8, dic: 4 }, total: 82, status: 'active' },
-                    { name: 'WILSON GONZÁLEZ', hours: { jun: 12, jul: 14, ago: 10, sep: 18, oct: 10, nov: 12, dic: 4 }, total: 80, status: 'active' },
-                    { name: 'VIVIANA VARGAS', hours: { jun: 10, jul: 12, ago: 10, sep: 18, oct: 18, nov: 10, dic: 0 }, total: 78, status: 'active' },
-                    { name: 'CAROLINA AGUDELO', hours: { jun: 10, jul: 12, ago: 10, sep: 18, oct: 16, nov: 4, dic: 4 }, total: 74, status: 'active' },
+                    { name: 'JULIANA ÁLVAREZ', hours: { jun: 12, jul: 14, ago: 10, sep: 18, oct: 12, nov: 14, dic: 8 }, total: 88, status: 'active' },
+                    { name: 'JUAN CAMILO ARANGO', hours: { jun: 12, jul: 14, ago: 10, sep: 18, oct: 16, nov: 8, dic: 8 }, total: 86, status: 'active' },
+                    { name: 'WILSON GONZÁLEZ', hours: { jun: 12, jul: 14, ago: 10, sep: 18, oct: 10, nov: 12, dic: 8 }, total: 84, status: 'active' },
+                    { name: 'VIVIANA VARGAS', hours: { jun: 10, jul: 12, ago: 10, sep: 18, oct: 18, nov: 10, dic: 4 }, total: 82, status: 'active' },
+                    { name: 'CAROLINA AGUDELO', hours: { jun: 10, jul: 12, ago: 10, sep: 18, oct: 16, nov: 4, dic: 6 }, total: 76, status: 'active' },
                     { name: 'ANGELA ARANZAZU', hours: { jun: 12, jul: 12, ago: 10, sep: 0, oct: 16, nov: 4, dic: 4 }, total: 58, status: 'active' }
                 ],
-                totalGroupHours: 456
+                totalGroupHours: 474
             }
         ];
     }
@@ -685,11 +713,29 @@ class CoatsReportsManager {
                     <div class="coats-chart-container">
                         <canvas id="coats-progress-chart"></canvas>
                     </div>
+                </div>
+
+                <!-- Monthly Trend Chart with Description -->
+                <div class="coats-chart-full-width">
+                    <h4 class="chart-title">${this.t('monthlyTrend')}</h4>
                     <div class="coats-chart-container">
                         <canvas id="coats-monthly-trend-chart"></canvas>
                     </div>
+                    <div class="chart-description-box">
+                        <span class="chart-type-badge">${this.language === 'es' ? 'Gráfica de Líneas' : 'Line Chart'}</span>
+                        <p class="chart-description">${this.t('monthlyTrendDesc')}</p>
+                    </div>
+                </div>
+
+                <!-- Attendance vs Progress Scatter Chart with Description -->
+                <div class="coats-chart-full-width">
+                    <h4 class="chart-title">${this.t('attendanceVsProgress')}</h4>
                     <div class="coats-chart-container">
                         <canvas id="coats-correlation-chart"></canvas>
+                    </div>
+                    <div class="chart-description-box">
+                        <span class="chart-type-badge">${this.language === 'es' ? 'Gráfica de Dispersión' : 'Scatter Plot'}</span>
+                        <p class="chart-description">${this.t('attendanceVsProgressDesc')}</p>
                     </div>
                 </div>
             </div>
@@ -1863,6 +1909,54 @@ class CoatsReportsManager {
             border-radius: 12px;
             padding: 20px;
             min-height: 300px;
+        }
+
+        .coats-chart-full-width {
+            margin-top: 25px;
+            background: #fff;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .chart-title {
+            color: #1e3a5f;
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin: 0 0 15px 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .chart-description-box {
+            margin-top: 15px;
+            padding: 15px;
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border-radius: 10px;
+            border: 1px solid #bae6fd;
+        }
+
+        .chart-type-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+        }
+
+        .chart-description {
+            margin: 10px 0 0 0;
+            padding: 0;
+            background: transparent;
+            font-size: 0.9rem;
+            color: #334155;
+            line-height: 1.6;
+            border-left: none;
         }
 
         /* Correlation Section */
