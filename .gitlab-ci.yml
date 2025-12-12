@@ -1,0 +1,11 @@
+pages:
+  stage: deploy
+  script:
+    - mkdir -p public
+    - cp coats-public.html public/index.html
+    - cp coats-reports.js public/
+  artifacts:
+    paths:
+      - public
+  only:
+    - main
