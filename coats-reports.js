@@ -216,8 +216,8 @@ class CoatsReportsManager {
                 id: 'grupo-1',
                 name: 'Grupo 1 - Libros 3-4-5-6',
                 nameEn: 'Group 1 - Books 3-4-5-6',
-                schedule: 'Lunes y Miércoles 7-9 AM',
-                scheduleEn: 'Monday & Wednesday 7-9 AM',
+                schedule: 'Martes y Miércoles 7-9 AM',
+                scheduleEn: 'Tuesday & Wednesday 7-9 AM',
                 startDate: '2025-06-11',
                 startBook: 3,
                 currentBook: 6,
@@ -241,8 +241,8 @@ class CoatsReportsManager {
                 id: 'grupo-2',
                 name: 'Grupo 2 - Libros 2-3-4',
                 nameEn: 'Group 2 - Books 2-3-4',
-                schedule: 'Lunes y Miércoles 7-9 AM',
-                scheduleEn: 'Monday & Wednesday 7-9 AM',
+                schedule: 'Martes y Miércoles 7-9 AM',
+                scheduleEn: 'Tuesday & Wednesday 7-9 AM',
                 startDate: '2025-06-18',
                 startBook: 2,
                 currentBook: 4,
@@ -389,7 +389,12 @@ class CoatsReportsManager {
         const allStudentsIncludingInactive = [];
 
         groups.forEach(group => {
-            totalHours += group.totalGroupHours;
+            // Sum hours from active students only (matching individual progress table)
+            const activeStudentHours = group.students
+                .filter(s => s.status === 'active')
+                .reduce((sum, s) => sum + s.total, 0);
+            totalHours += activeStudentHours;
+
             group.students.forEach(student => {
                 // Don't count transferred students as they are duplicates
                 // (they appear in both their old and new group)
