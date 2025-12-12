@@ -143,7 +143,9 @@ class CoatsReportsManager {
                 areasToImprove: 'Áreas de Mejora',
                 strengths: 'Fortalezas',
                 teacherNotes: 'Observaciones del Profesor',
-                alsoInGroup: 'También en'
+                alsoInGroup: 'También en',
+                generalObservations: 'Observaciones Generales de los Profesores',
+                generalObservationsDesc: 'Comentarios consolidados del equipo docente sobre el progreso general del programa'
             },
             en: {
                 title: 'Progress Report - English Program',
@@ -237,7 +239,9 @@ class CoatsReportsManager {
                 areasToImprove: 'Areas to Improve',
                 strengths: 'Strengths',
                 teacherNotes: 'Teacher Notes',
-                alsoInGroup: 'Also in'
+                alsoInGroup: 'Also in',
+                generalObservations: 'General Teacher Observations',
+                generalObservationsDesc: 'Consolidated comments from the teaching team on overall program progress'
             }
         };
     }
@@ -269,8 +273,8 @@ class CoatsReportsManager {
                     { es: 'Necesita desarrollar más autoconfianza', en: 'Needs to develop more self-confidence' }
                 ],
                 teacherNotes: {
-                    es: 'Inició muy débil en el grupo pero gracias a la combinación de clases privadas y grupales ha mejorado considerablemente. Ahora está cómoda en Grupo 1 trabajando con Libro 7. El miedo a cometer errores la pone nerviosa, pero con práctica continua seguirá mejorando.',
-                    en: 'Started very weak in the group but thanks to the combination of private and group classes has improved considerably. Now comfortable in Group 1 working with Book 7. Fear of making mistakes makes her nervous, but with continued practice she will keep improving.'
+                    es: 'Inició muy débil en el grupo pero gracias a la combinación de clases privadas y grupales ha mejorado considerablemente. Ahora está cómoda en Grupo 1 trabajando con Libro 6. El miedo a cometer errores la pone nerviosa, pero con práctica continua seguirá mejorando.',
+                    en: 'Started very weak in the group but thanks to the combination of private and group classes has improved considerably. Now comfortable in Group 1 working with Book 6. Fear of making mistakes makes her nervous, but with continued practice she will keep improving.'
                 }
             },
             {
@@ -290,8 +294,8 @@ class CoatsReportsManager {
                     { es: 'Continuar practicando pronunciación de palabras poco familiares', en: 'Continue practicing pronunciation of unfamiliar words' }
                 ],
                 teacherNotes: {
-                    es: 'Enfoque en temas específicos de su rol en recursos humanos: presentar avances de procesos, explicar estado de tareas y reportar novedades de forma clara y estructurada. Se ha trabajado intensivamente la pronunciación de palabras que le causan dificultad.',
-                    en: 'Focus on topics specific to her HR role: presenting process updates, explaining task status, and reporting news clearly and in a structured manner. Intensive work on pronunciation of words that cause her difficulty.'
+                    es: 'Nos hemos enfocado en temas específicos de su rol en recursos humanos: presentar avances de procesos, explicar estado de tareas y reportar novedades de forma clara y estructurada. Se ha trabajado intensivamente la pronunciación de palabras que le causan dificultad.',
+                    en: 'We have focused on topics specific to her HR role: presenting process updates, explaining task status, and reporting news clearly and in a structured manner. Intensive work on pronunciation of words that cause her difficulty.'
                 }
             }
         ];
@@ -924,6 +928,35 @@ class CoatsReportsManager {
                 <p class="section-description">${this.t('privateClassesDesc')}</p>
                 <div class="private-students-grid">
                     ${this.renderPrivateStudents()}
+                </div>
+            </div>
+
+            <!-- General Teacher Observations -->
+            <div class="coats-section general-observations-section">
+                <h3><span class="section-icon">📋</span> ${this.t('generalObservations')}</h3>
+                <p class="section-description">${this.t('generalObservationsDesc')}</p>
+                <div class="observations-grid">
+                    <div class="observation-card positive">
+                        <div class="observation-icon">📈</div>
+                        <h4>${this.language === 'es' ? 'Progreso Notable en Expresión Oral' : 'Notable Progress in Speaking'}</h4>
+                        <p>${this.language === 'es'
+                            ? 'Todos los profesores coinciden en que se nota un progreso notable en la capacidad de hablar de los estudiantes. Se observa mayor confianza y fluidez en todos los grupos.'
+                            : 'All teachers agree that there is notable progress in students\' speaking ability. Greater confidence and fluency is observed across all groups.'}</p>
+                    </div>
+                    <div class="observation-card positive">
+                        <div class="observation-icon">✓</div>
+                        <h4>${this.language === 'es' ? 'Correlación Asistencia-Progreso' : 'Attendance-Progress Correlation'}</h4>
+                        <p>${this.language === 'es'
+                            ? 'Las personas que asisten más constantemente a clases han tenido mucho mejor progreso y pueden hablar con mucha más fluidez y confianza que quienes asisten de manera irregular.'
+                            : 'Students who attend classes more consistently have shown much better progress and can speak with much more fluency and confidence than those who attend irregularly.'}</p>
+                    </div>
+                    <div class="observation-card recommendation">
+                        <div class="observation-icon">📱</div>
+                        <h4>${this.language === 'es' ? 'Uso del Teléfono en Clase' : 'Phone Use in Class'}</h4>
+                        <p>${this.language === 'es'
+                            ? 'Se observa que el uso del teléfono en clase afecta el progreso de los estudiantes. En algunas ocasiones deben estar pendientes de su teléfono, lo cual es entendible ya que están en su lugar de trabajo, pero se recomienda hacerlo lo menos posible para maximizar el aprovechamiento de las clases.'
+                            : 'Phone use during class has been observed to affect student progress. Sometimes students need to check their phones, which is understandable since they are at their workplace, but it is recommended to do so as little as possible to maximize class benefit.'}</p>
+                    </div>
                 </div>
             </div>
 
@@ -2795,6 +2828,56 @@ class CoatsReportsManager {
             }
             .skills-grid {
                 grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        /* General Observations Section */
+        .general-observations-section {
+            background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%);
+        }
+
+        .observations-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .observation-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .observation-card.positive {
+            border-left: 4px solid #22c55e;
+        }
+
+        .observation-card.recommendation {
+            border-left: 4px solid #f59e0b;
+        }
+
+        .observation-icon {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .observation-card h4 {
+            margin: 0 0 10px 0;
+            color: #1e3a5f;
+            font-size: 16px;
+        }
+
+        .observation-card p {
+            margin: 0;
+            color: #475569;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        @media (max-width: 600px) {
+            .observations-grid {
+                grid-template-columns: 1fr;
             }
         }
 
