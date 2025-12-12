@@ -1,11 +1,5 @@
 // permission-enforcer.js - Lightweight Permission Enforcement System
 // Works with admin-center.js to control module visibility
-
-// Skip permission enforcer entirely in public COATS mode
-if (window.isCoatsPublicMode) {
-    console.log('🔓 Permission Enforcer skipped - Public COATS mode');
-} else {
-
 console.log('🔒 Loading Permission Enforcer...');
 
 // ============ IMMEDIATE SECURITY CSS ============
@@ -736,5 +730,3 @@ console.log('  fixSchoolButtonPosition() - Restore floating position & vertical 
 console.log('');
 console.log('🔧 Quick fix if modules are horizontal:');
 console.log("  document.getElementById('schoolButtonBar').style.flexDirection = 'column'");
-
-} // End of else block for non-public COATS mode
