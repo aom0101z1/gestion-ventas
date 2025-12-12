@@ -138,7 +138,7 @@ class CoatsReportsManager {
                 grammar: 'Gramática',
                 reading: 'Lectura',
                 writing: 'Escritura',
-                speaking: 'Expresión Oral',
+                speaking: 'Speaking',
                 listening: 'Comprensión Auditiva',
                 areasToImprove: 'Áreas de Mejora',
                 strengths: 'Fortalezas',
@@ -253,13 +253,13 @@ class CoatsReportsManager {
                 privateHours: 40,
                 groupRef: 'Grupo 1',
                 currentBook: '7A',
-                examDate: '2024-12-07',
-                examDuration: '1.5 hours',
+                examDate: '2025-12-07',
+                examDuration: null,
                 skills: {
                     grammar: { level: 'B1', status: 'improving' },
                     reading: { level: 'A2', status: 'on-track' },
                     writing: { level: 'A2', status: 'on-track' },
-                    speaking: { level: 'A1-A2', status: 'needs-work' },
+                    speaking: { level: 'A2', status: 'needs-work' },
                     listening: { level: 'A1-A2', status: 'needs-work' }
                 },
                 strengths: [
@@ -1211,11 +1211,12 @@ class CoatsReportsManager {
             const dateStr = examDate.toLocaleDateString(lang === 'es' ? 'es-CO' : 'en-US', {
                 year: 'numeric', month: 'long', day: 'numeric'
             });
+            const evalLabel = lang === 'es' ? 'Evaluación y resumen de progreso' : 'Evaluation and progress summary';
             examHTML = `
                 <div class="private-exam-info">
-                    <span class="exam-badge">📝 ${this.t('evaluation')}</span>
+                    <span class="exam-badge">📝 ${evalLabel}</span>
                     <span class="exam-date">${dateStr}</span>
-                    <span class="exam-duration">(${student.examDuration})</span>
+                    ${student.examDuration ? `<span class="exam-duration">(${student.examDuration})</span>` : ''}
                 </div>
             `;
         }
