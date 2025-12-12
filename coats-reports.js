@@ -1216,11 +1216,14 @@ class CoatsReportsManager {
         // Correlation Scatter Chart
         const correlationCtx = document.getElementById('coats-correlation-chart');
         if (correlationCtx) {
+            // Store student names for tooltip
+            const studentNames = stats.allStudents.map(s => s.name);
             const scatterData = stats.allStudents.map(s => ({
-                x: s.attendancePct,
+                x: Math.round(s.attendancePct * 10) / 10,
                 y: s.booksAdvanced
             }));
 
+            const self = this;
             this.charts.correlation = new Chart(correlationCtx, {
                 type: 'scatter',
                 data: {
@@ -1243,7 +1246,22 @@ class CoatsReportsManager {
                             text: this.t('attendanceVsProgress'),
                             font: { size: 16, weight: 'bold' }
                         },
-                        legend: { display: false }
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const index = context.dataIndex;
+                                    const name = studentNames[index] || '';
+                                    const attendance = context.parsed.x.toFixed(1);
+                                    const books = context.parsed.y;
+                                    return [
+                                        name,
+                                        `${self.language === 'es' ? 'Asistencia' : 'Attendance'}: ${attendance}%`,
+                                        `${self.language === 'es' ? 'Libros' : 'Books'}: +${books}`
+                                    ];
+                                }
+                            }
+                        }
                     },
                     scales: {
                         x: {
@@ -1253,7 +1271,8 @@ class CoatsReportsManager {
                         },
                         y: {
                             title: { display: true, text: this.t('booksAdvanced') },
-                            beginAtZero: true
+                            beginAtZero: true,
+                            max: 5
                         }
                     }
                 }
