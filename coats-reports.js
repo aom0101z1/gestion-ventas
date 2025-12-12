@@ -919,7 +919,11 @@ class CoatsReportsManager {
         });
         const avgAttendance = activeStudents > 0 ? totalAttendancePct / activeStudents : 0;
         const bookProgress = (group.currentPage / group.totalPages) * 100;
-        const overallProgress = ((group.currentBook - 1) / this.programData.totalBooks) * 100;
+        // Progress towards C1 (Book 12) - assumes student started from Book 1
+        // Completed books + current book progress percentage
+        const completedBooks = group.currentBook - 1;
+        const currentBookPct = group.currentPage / group.totalPages;
+        const overallProgressToC1 = ((completedBooks + currentBookPct) / this.programData.totalBooks) * 100;
         const booksAdvanced = group.currentBook - group.startBook;
 
         // Check if this is an advanced group (book 7+) to show note
@@ -950,15 +954,15 @@ class CoatsReportsManager {
 
             <div class="group-progress-section">
                 <div class="progress-item">
-                    <span class="progress-label">${this.t('book')} ${group.startBook} → ${group.currentBook} (+${booksAdvanced})</span>
+                    <span class="progress-label">${this.language === 'es' ? 'Progreso hacia C1' : 'Progress to C1'} (PreA1 → C1)</span>
                     <div class="progress-bar-container">
-                        <div class="progress-bar progress-bar-books" style="width: ${Math.min(overallProgress, 100)}%">
-                            <span class="progress-text">${overallProgress.toFixed(0)}%</span>
+                        <div class="progress-bar progress-bar-books" style="width: ${Math.min(overallProgressToC1, 100)}%">
+                            <span class="progress-text">${overallProgressToC1.toFixed(0)}%</span>
                         </div>
                     </div>
                 </div>
                 <div class="progress-item">
-                    <span class="progress-label">${this.t('bookProgress')}: ${this.t('page')} ${group.currentPage}/${group.totalPages}</span>
+                    <span class="progress-label">${this.t('bookProgress')}: ${this.t('book')} ${group.currentBook} - ${this.t('page')} ${group.currentPage}/${group.totalPages}</span>
                     <div class="progress-bar-container">
                         <div class="progress-bar progress-bar-pages" style="width: ${bookProgress}%">
                             <span class="progress-text">${bookProgress.toFixed(0)}%</span>
