@@ -478,22 +478,83 @@
     }
 }
 
+/* ===== PUBLIC COATS REPORT MODE ===== */
+body.coats-public-mode #loginScreen,
+body.coats-public-mode #firebaseStatus,
+body.coats-public-mode .header,
+body.coats-public-mode .user-info,
+body.coats-public-mode .stats-grid,
+body.coats-public-mode .tabs,
+body.coats-public-mode #socialMedia,
+body.coats-public-mode #contacts,
+body.coats-public-mode #leads,
+body.coats-public-mode #pipeline,
+body.coats-public-mode #reports,
+body.coats-public-mode #monitoring,
+body.coats-public-mode #tasks,
+body.coats-public-mode #auditLog,
+body.coats-public-mode #grupos,
+body.coats-public-mode #finance,
+body.coats-public-mode #config {
+    display: none !important;
+}
+
+body.coats-public-mode #mainApp {
+    display: block !important;
+}
+
+body.coats-public-mode #coatsReports {
+    display: block !important;
+}
+
+body.coats-public-mode .container {
+    max-width: 100%;
+    padding: 0;
+}
+
+body.coats-public-mode {
+    background: #f8fafc;
+}
+
     </style>
 </head>
 
 <body>
      <script>
-    // Simple password protection
-    if (!sessionStorage.getItem('authenticated')) {
-        const password = prompt('Ingrese la contraseña del sistema:');
-        if (password !== 'ziudad2025') {  // ← CHANGE THIS PASSWORD
-            alert('Contraseña incorrecta');
-            window.location.href = 'https://google.com';
+    // Check for public COATS report mode
+    const urlParams = new URLSearchParams(window.location.search);
+    const isCoatsPublic = urlParams.get('coats') === 'report';
+    window.isCoatsPublicMode = isCoatsPublic;
+
+    // Skip password protection for public COATS report
+    if (!isCoatsPublic) {
+        if (!sessionStorage.getItem('authenticated')) {
+            const password = prompt('Ingrese la contraseña del sistema:');
+            if (password !== 'ziudad2025') {  // ← CHANGE THIS PASSWORD
+                alert('Contraseña incorrecta');
+                window.location.href = 'https://google.com';
+            }
+            sessionStorage.setItem('authenticated', 'true');
         }
-        sessionStorage.setItem('authenticated', 'true');
+    }
+
+    // Apply public mode class and initialize COATS report
+    if (isCoatsPublic) {
+        document.body.classList.add('coats-public-mode');
+        // Initialize COATS report when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            // Wait for coats-reports.js to load, then initialize
+            const checkCoats = setInterval(() => {
+                if (window.CoatsReportsManager) {
+                    clearInterval(checkCoats);
+                    const coatsManager = new CoatsReportsManager('es');
+                    coatsManager.init();
+                }
+            }, 100);
+        });
     }
     </script>
-    
+
     <!-- ========== SECTION 3: FIREBASE STATUS INDICATOR ========== -->
     <div id="firebaseStatus" class="firebase-status connecting">
         <div class="loading-spinner" style="width: 12px; height: 12px; border-width: 2px;"></div>
@@ -3453,7 +3514,7 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
     <script src="import-students.js"></script>
     <script src="invoice-integration.js"></script>
     <script src="reports.js"></script>
-    <script src="coats-reports.js?v=20251212r"></script>
+    <script src="coats-reports.js?v=20251212s"></script>
     <script src="finance.js"></script>
     <script src="payroll.js"></script>
     <script src="payroll-import.js"></script>
