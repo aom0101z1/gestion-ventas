@@ -2731,6 +2731,9 @@ window.loadPaymentsTab = async function() {
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                             <h3 style="margin: 0;">🔍 Filtros Avanzados</h3>
                             <div style="display: flex; gap: 0.5rem;">
+                                <button onclick="showBulkSemesterPaymentModal()" class="btn btn-sm" style="background: #8b5cf6; color: white; padding: 0.5rem 1rem;">
+                                    📅 Pago Semestre Masivo
+                                </button>
                                 <button onclick="clearPaymentFilters()" class="btn btn-sm" style="background: #6b7280; color: white; padding: 0.5rem 1rem;">
                                     🔄 Limpiar Filtros
                                 </button>
@@ -3736,6 +3739,267 @@ async function processPayment(studentId) {
         window.showNotification('❌ Error al registrar pago', 'error');
     }
 }
+
+// ==================================================================================
+// SECTION 8.5: BULK SEMESTER PAYMENT - Mass payment registration for all students
+// ==================================================================================
+
+window.showBulkSemesterPaymentModal = async function() {
+    console.log('📅 Opening bulk semester payment modal');
+
+    // Get all active students
+    await window.StudentManager.init();
+    const allStudents = window.StudentManager.getStudents();
+    const activeStudents = allStudents.filter(s => s.estado === 'Activo' || s.estado === 'activo');
+
+    if (activeStudents.length === 0) {
+        window.showNotification('No hay estudiantes activos', 'error');
+        return;
+    }
+
+    const modalHTML = `
+        <div id="bulkPaymentModal" style="
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5); display: flex; align-items: center;
+            justify-content: center; z-index: 1000;">
+            <div style="background: white; padding: 2rem; border-radius: 12px; max-width: 900px; width: 95%; max-height: 90vh; overflow-y: auto;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                    <h3 style="margin: 0;">📅 Pago Semestre Masivo - Semestre 1 2026</h3>
+                    <button onclick="closeBulkPaymentModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">×</button>
+                </div>
+
+                <div style="background: #f0f9ff; border: 2px solid #0ea5e9; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem;">
+                    <p style="margin: 0; color: #0369a1;">
+                        <strong>ℹ️ Instrucciones:</strong> Selecciona los estudiantes y asigna el valor del semestre para cada uno.
+                        El valor puede variar según promociones o descuentos especiales.
+                    </p>
+                </div>
+
+                <div style="margin-bottom: 1rem;">
+                    <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+                        <label style="display: flex; align-items: center; gap: 0.5rem;">
+                            <input type="checkbox" id="selectAllStudents" onchange="toggleAllStudentsBulk()">
+                            <strong>Seleccionar Todos</strong>
+                        </label>
+                        <span style="color: #6b7280;">|</span>
+                        <span id="selectedCountBulk">0 estudiantes seleccionados</span>
+                        <span style="color: #6b7280;">|</span>
+                        <label style="display: flex; align-items: center; gap: 0.5rem;">
+                            Valor por defecto: $
+                            <input type="number" id="defaultBulkAmount" value="0" min="0"
+                                   style="width: 120px; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px;"
+                                   onchange="applyDefaultAmountToSelected()">
+                        </label>
+                        <button onclick="applyDefaultAmountToSelected()" class="btn btn-sm" style="background: #3b82f6; color: white; padding: 0.5rem 1rem;">
+                            Aplicar a Seleccionados
+                        </button>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 1rem;">
+                    <label style="font-weight: 500;">Método de Pago:</label>
+                    <select id="bulkPaymentMethod" style="margin-left: 0.5rem; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px;">
+                        <option value="Transferencia">Transferencia</option>
+                        <option value="Efectivo">Efectivo</option>
+                    </select>
+                    <select id="bulkPaymentBank" style="margin-left: 0.5rem; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px;">
+                        <option value="Nequi">Nequi</option>
+                        <option value="Bancolombia">Bancolombia</option>
+                        <option value="Otro">Otro</option>
+                    </select>
+                </div>
+
+                <div style="max-height: 400px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 8px;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead style="background: #f3f4f6; position: sticky; top: 0;">
+                            <tr>
+                                <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid #e5e7eb;">✓</th>
+                                <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid #e5e7eb;">Estudiante</th>
+                                <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid #e5e7eb;">Modalidad</th>
+                                <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid #e5e7eb;">Valor Mensual</th>
+                                <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid #e5e7eb;">Valor Semestre</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${activeStudents.map(s => `
+                                <tr style="border-bottom: 1px solid #e5e7eb;">
+                                    <td style="padding: 0.75rem;">
+                                        <input type="checkbox" class="bulk-student-checkbox" data-student-id="${s.id}" onchange="updateBulkSelectedCount()">
+                                    </td>
+                                    <td style="padding: 0.75rem; font-weight: 500;">${s.nombre}</td>
+                                    <td style="padding: 0.75rem; color: #6b7280;">${s.modalidad || 'Regular'}</td>
+                                    <td style="padding: 0.75rem; color: #6b7280;">$${(s.valor || 0).toLocaleString()}</td>
+                                    <td style="padding: 0.75rem;">
+                                        <input type="number"
+                                               class="bulk-amount-input"
+                                               data-student-id="${s.id}"
+                                               value="0"
+                                               min="0"
+                                               style="width: 120px; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px;">
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #e5e7eb;">
+                    <div>
+                        <strong>Total a Registrar: </strong>
+                        <span id="bulkTotalAmount" style="font-size: 1.25rem; color: #059669;">$0</span>
+                    </div>
+                    <div style="display: flex; gap: 1rem;">
+                        <button onclick="closeBulkPaymentModal()" class="btn btn-secondary" style="padding: 0.75rem 1.5rem;">
+                            Cancelar
+                        </button>
+                        <button onclick="processBulkSemesterPayments()" class="btn btn-primary" style="padding: 0.75rem 1.5rem; background: #8b5cf6;">
+                            ✅ Registrar Pagos Seleccionados
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Remove existing modal if any
+    const existingModal = document.getElementById('bulkPaymentModal');
+    if (existingModal) existingModal.remove();
+
+    // Add modal to DOM
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+};
+
+window.closeBulkPaymentModal = function() {
+    const modal = document.getElementById('bulkPaymentModal');
+    if (modal) modal.remove();
+};
+
+window.toggleAllStudentsBulk = function() {
+    const selectAll = document.getElementById('selectAllStudents');
+    const checkboxes = document.querySelectorAll('.bulk-student-checkbox');
+    checkboxes.forEach(cb => cb.checked = selectAll.checked);
+    updateBulkSelectedCount();
+};
+
+window.updateBulkSelectedCount = function() {
+    const checkboxes = document.querySelectorAll('.bulk-student-checkbox:checked');
+    document.getElementById('selectedCountBulk').textContent = `${checkboxes.length} estudiantes seleccionados`;
+
+    // Update total
+    let total = 0;
+    checkboxes.forEach(cb => {
+        const studentId = cb.dataset.studentId;
+        const amountInput = document.querySelector(`.bulk-amount-input[data-student-id="${studentId}"]`);
+        if (amountInput) {
+            total += parseFloat(amountInput.value) || 0;
+        }
+    });
+    document.getElementById('bulkTotalAmount').textContent = `$${total.toLocaleString()}`;
+};
+
+window.applyDefaultAmountToSelected = function() {
+    const defaultAmount = parseFloat(document.getElementById('defaultBulkAmount').value) || 0;
+    const checkboxes = document.querySelectorAll('.bulk-student-checkbox:checked');
+
+    checkboxes.forEach(cb => {
+        const studentId = cb.dataset.studentId;
+        const amountInput = document.querySelector(`.bulk-amount-input[data-student-id="${studentId}"]`);
+        if (amountInput) {
+            amountInput.value = defaultAmount;
+        }
+    });
+
+    updateBulkSelectedCount();
+    window.showNotification(`Valor $${defaultAmount.toLocaleString()} aplicado a ${checkboxes.length} estudiantes`, 'success');
+};
+
+window.processBulkSemesterPayments = async function() {
+    const checkboxes = document.querySelectorAll('.bulk-student-checkbox:checked');
+
+    if (checkboxes.length === 0) {
+        window.showNotification('Selecciona al menos un estudiante', 'error');
+        return;
+    }
+
+    const method = document.getElementById('bulkPaymentMethod').value;
+    const bank = document.getElementById('bulkPaymentBank').value;
+
+    // Collect payments to process
+    const paymentsToProcess = [];
+    checkboxes.forEach(cb => {
+        const studentId = cb.dataset.studentId;
+        const amountInput = document.querySelector(`.bulk-amount-input[data-student-id="${studentId}"]`);
+        const amount = parseFloat(amountInput?.value) || 0;
+
+        if (amount > 0) {
+            paymentsToProcess.push({ studentId, amount });
+        }
+    });
+
+    if (paymentsToProcess.length === 0) {
+        window.showNotification('Ingresa el valor del semestre para al menos un estudiante', 'error');
+        return;
+    }
+
+    // Confirm
+    const totalAmount = paymentsToProcess.reduce((sum, p) => sum + p.amount, 0);
+    if (!confirm(`¿Registrar ${paymentsToProcess.length} pagos por un total de $${totalAmount.toLocaleString()}?`)) {
+        return;
+    }
+
+    // Process each payment
+    let successCount = 0;
+    let errorCount = 0;
+
+    // Semester 1 2026 months
+    const semester1Months = ['febrero', 'marzo', 'abril', 'mayo', 'junio'];
+
+    for (const payment of paymentsToProcess) {
+        try {
+            const student = window.StudentManager.getStudentById(payment.studentId);
+            if (!student) {
+                errorCount++;
+                continue;
+            }
+
+            // Create payment record
+            const paymentData = {
+                fecha: window.getLocalDate ? window.getLocalDate() : new Date().toISOString().split('T')[0],
+                monto: payment.amount,
+                metodo: method,
+                banco: method === 'Transferencia' ? bank : null,
+                meses: semester1Months,
+                año: 2026,
+                semestre: 'Semestre 1 2026',
+                tipoPago: 'semester',
+                notas: 'Pago Semestre 1 2026 - Registro masivo'
+            };
+
+            await window.PaymentManager.addPayment(payment.studentId, paymentData);
+            successCount++;
+
+        } catch (error) {
+            console.error(`Error processing payment for ${payment.studentId}:`, error);
+            errorCount++;
+        }
+    }
+
+    // Close modal and refresh
+    closeBulkPaymentModal();
+
+    // Show result
+    if (errorCount === 0) {
+        window.showNotification(`✅ ${successCount} pagos registrados exitosamente`, 'success');
+    } else {
+        window.showNotification(`⚠️ ${successCount} pagos registrados, ${errorCount} errores`, 'warning');
+    }
+
+    // Reload payments tab
+    setTimeout(() => {
+        loadPaymentsTab();
+    }, 500);
+};
+
 // ==================================================================================
 // SECTION 9: STYLES AND UTILITIES - CSS styles and backward compatibility
 // ==================================================================================
