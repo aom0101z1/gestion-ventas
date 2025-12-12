@@ -29,9 +29,9 @@
     <div id="coatsReportContainer"></div>
     <script src="coats-reports.js?v=20251212t"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             const coatsManager = new CoatsReportsManager('es');
-            coatsManager.init();
+            await coatsManager.renderReport('coatsReportContainer');
         });
     </script>
 </body>
