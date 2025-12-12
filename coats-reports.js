@@ -472,18 +472,14 @@ class CoatsReportsManager {
         const stats = this.calculateProgramStats();
         const students = stats.allStudents;
 
-        // Gold Award - Top 3 highest attendance
-        const goldAward = students.slice(0, 3);
+        // Gold Award - Top 6 highest attendance
+        const goldAward = students.slice(0, 6);
 
-        // Silver Award - Next 5
-        const silverAward = students.slice(3, 8);
+        // Silver Award - Next 6
+        const silverAward = students.slice(6, 12);
 
-        // Bronze Award - Anyone with 65%+ attendance not in gold/silver
-        const bronzeAward = students.filter(s =>
-            s.attendancePct >= 65 &&
-            !goldAward.includes(s) &&
-            !silverAward.includes(s)
-        );
+        // Bronze Award - Next 6
+        const bronzeAward = students.slice(12, 18);
 
         // Special recognition - Consistency (least variance in monthly attendance)
         const consistencyAward = this.findMostConsistentStudents(students);
@@ -812,7 +808,7 @@ class CoatsReportsManager {
                         <h4>${this.t('silverAward')}</h4>
                     </div>
                     <div class="award-winners">
-                        ${awards.silver.map((s, i) => this.renderAwardWinner(s, i + 4, 'silver')).join('')}
+                        ${awards.silver.map((s, i) => this.renderAwardWinner(s, i + 7, 'silver')).join('')}
                     </div>
                 </div>
 
@@ -824,7 +820,7 @@ class CoatsReportsManager {
                         <h4>${this.t('bronzeAward')}</h4>
                     </div>
                     <div class="award-winners">
-                        ${awards.bronze.map((s, i) => this.renderAwardWinner(s, i + 9, 'bronze')).join('')}
+                        ${awards.bronze.map((s, i) => this.renderAwardWinner(s, i + 13, 'bronze')).join('')}
                     </div>
                 </div>
                 ` : ''}
@@ -1030,12 +1026,16 @@ class CoatsReportsManager {
     }
 
     renderAwardWinner(student, rank, type) {
+        // Extract group number (Grupo 1, Grupo 2, etc.)
+        const groupNumber = student.groupId ? student.groupId.replace('grupo-', '') : '';
+        const groupLabel = this.language === 'es' ? `Grupo ${groupNumber}` : `Group ${groupNumber}`;
+
         return `
         <div class="award-winner award-${type}">
             <span class="winner-rank">#${rank}</span>
             <span class="winner-name">${this.formatName(student.name)}</span>
-            <span class="winner-stats">${student.total} ${this.t('hours')} (${student.attendancePct.toFixed(1)}%)</span>
-            <span class="winner-group">${student.group}</span>
+            <span class="winner-stats">${student.attendancePct.toFixed(1)}%</span>
+            <span class="winner-group">${groupLabel}</span>
         </div>
         `;
     }
