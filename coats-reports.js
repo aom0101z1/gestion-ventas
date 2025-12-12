@@ -63,7 +63,7 @@ class CoatsReportsManager {
                 attendanceVsProgress: 'Asistencia vs Progreso',
                 attendanceVsProgressDesc: 'Gráfica de Dispersión: Cada punto representa un estudiante. El eje horizontal (X) muestra su porcentaje de asistencia, y el eje vertical (Y) muestra cuántos libros ha avanzado. Los colores indican el nivel de asistencia: verde (≥70%), amarillo (50-69%), rojo (<50%). Esta gráfica permite visualizar la correlación entre asistencia y progreso académico.',
                 monthlyTrend: 'Tendencia Mensual de Asistencia',
-                monthlyTrendDesc: 'Gráfica de Líneas: Muestra la evolución de las horas de asistencia totales por grupo a lo largo del semestre (Junio-Diciembre). Cada línea representa un grupo diferente, permitiendo comparar el comportamiento de asistencia entre grupos y detectar patrones o variaciones mensuales.',
+                monthlyTrendDesc: 'Gráfica de Líneas: Muestra el promedio de horas de asistencia por estudiante en cada grupo a lo largo del semestre (Junio-Diciembre). Al usar promedios, se normalizan los datos permitiendo comparar grupos con diferente número de estudiantes (Grupo 1: 8, Grupo 2: 8, Grupo 3: 9, Grupo 4: 6).',
                 totalStudents: 'Total Estudiantes',
                 totalHours: 'Total Horas-Estudiante',
                 classHoursDelivered: 'Horas de Clase Impartidas',
@@ -139,7 +139,7 @@ class CoatsReportsManager {
                 attendanceVsProgress: 'Attendance vs Progress',
                 attendanceVsProgressDesc: 'Scatter Plot: Each point represents a student. The horizontal axis (X) shows their attendance percentage, and the vertical axis (Y) shows how many books they have advanced. Colors indicate attendance level: green (≥70%), yellow (50-69%), red (<50%). This chart visualizes the correlation between attendance and academic progress.',
                 monthlyTrend: 'Monthly Attendance Trend',
-                monthlyTrendDesc: 'Line Chart: Shows the evolution of total attendance hours per group throughout the semester (June-December). Each line represents a different group, allowing comparison of attendance behavior between groups and detection of monthly patterns or variations.',
+                monthlyTrendDesc: 'Line Chart: Shows the average attendance hours per student in each group throughout the semester (June-December). By using averages, the data is normalized allowing comparison between groups with different numbers of students (Group 1: 8, Group 2: 8, Group 3: 9, Group 4: 6).',
                 totalStudents: 'Total Students',
                 totalHours: 'Total Student-Hours',
                 classHoursDelivered: 'Class Hours Delivered',
@@ -1086,14 +1086,17 @@ class CoatsReportsManager {
                 : ['Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
             const groupTrends = this.programData.groups.map(group => {
-                const monthlyTotals = months.map(month => {
-                    return group.students
-                        .filter(s => s.status === 'active')
-                        .reduce((sum, s) => sum + (s.hours[month] || 0), 0);
+                const activeStudents = group.students.filter(s => s.status === 'active');
+                const activeCount = activeStudents.length;
+
+                // Calculate average hours per student per month (normalized)
+                const monthlyAverages = months.map(month => {
+                    const totalHours = activeStudents.reduce((sum, s) => sum + (s.hours[month] || 0), 0);
+                    return activeCount > 0 ? Math.round((totalHours / activeCount) * 10) / 10 : 0;
                 });
                 return {
-                    label: group.name.split('-')[0].trim(),
-                    data: monthlyTotals,
+                    label: `${group.name.split('-')[0].trim()} (${activeCount} est.)`,
+                    data: monthlyAverages,
                     borderWidth: 2,
                     tension: 0.3,
                     fill: false
@@ -1126,7 +1129,7 @@ class CoatsReportsManager {
                     scales: {
                         y: {
                             beginAtZero: true,
-                            title: { display: true, text: this.t('hours') }
+                            title: { display: true, text: this.language === 'es' ? 'Promedio horas/estudiante' : 'Avg hours/student' }
                         }
                     }
                 }
