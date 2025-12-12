@@ -127,7 +127,23 @@ class CoatsReportsManager {
                 generatedOn: 'Generado el',
                 confidential: 'Documento Confidencial - Solo para uso interno de COATS',
                 viewStudentList: 'Ver Lista de Estudiantes',
-                hideStudentList: 'Ocultar Lista'
+                hideStudentList: 'Ocultar Lista',
+                privateClasses: 'Clases Privadas',
+                privateClassesDesc: 'Estudiantes que complementan las clases grupales con sesiones individuales personalizadas',
+                privateHours: 'Horas Privadas',
+                evaluation: 'Evaluación',
+                examDate: 'Fecha de Examen',
+                examDuration: 'Duración del Examen',
+                skillLevel: 'Nivel por Habilidad',
+                grammar: 'Gramática',
+                reading: 'Lectura',
+                writing: 'Escritura',
+                speaking: 'Expresión Oral',
+                listening: 'Comprensión Auditiva',
+                areasToImprove: 'Áreas de Mejora',
+                strengths: 'Fortalezas',
+                teacherNotes: 'Observaciones del Profesor',
+                alsoInGroup: 'También en'
             },
             en: {
                 title: 'Progress Report - English Program',
@@ -205,9 +221,80 @@ class CoatsReportsManager {
                 generatedOn: 'Generated on',
                 confidential: 'Confidential Document - For COATS Internal Use Only',
                 viewStudentList: 'View Student List',
-                hideStudentList: 'Hide List'
+                hideStudentList: 'Hide List',
+                privateClasses: 'Private Classes',
+                privateClassesDesc: 'Students complementing group classes with personalized individual sessions',
+                privateHours: 'Private Hours',
+                evaluation: 'Evaluation',
+                examDate: 'Exam Date',
+                examDuration: 'Exam Duration',
+                skillLevel: 'Skill Level',
+                grammar: 'Grammar',
+                reading: 'Reading',
+                writing: 'Writing',
+                speaking: 'Speaking',
+                listening: 'Listening',
+                areasToImprove: 'Areas to Improve',
+                strengths: 'Strengths',
+                teacherNotes: 'Teacher Notes',
+                alsoInGroup: 'Also in'
             }
         };
+    }
+
+    initializePrivateStudents() {
+        return [
+            {
+                name: 'Beatriz Valencia',
+                privateHours: 40,
+                groupRef: 'Grupo 1',
+                currentBook: '7A',
+                examDate: '2024-12-07',
+                examDuration: '1.5 hours',
+                skills: {
+                    grammar: { level: 'B1', status: 'improving' },
+                    reading: { level: 'A2', status: 'on-track' },
+                    writing: { level: 'A2', status: 'on-track' },
+                    speaking: { level: 'A1-A2', status: 'needs-work' },
+                    listening: { level: 'A1-A2', status: 'needs-work' }
+                },
+                strengths: [
+                    { es: 'Mejora significativa en gramática - alcanzó nivel B1', en: 'Significant grammar improvement - reached B1 level' },
+                    { es: 'Buen uso de tiempos verbales en pasado', en: 'Good use of past tenses' },
+                    { es: 'Capacidad de narrar eventos con coherencia', en: 'Ability to narrate events coherently' }
+                ],
+                areasToImprove: [
+                    { es: 'Speaking y Listening son las áreas de mayor preocupación', en: 'Speaking and Listening are the main areas of concern' },
+                    { es: 'La ansiedad y nerviosismo afectan su fluidez', en: 'Anxiety and nervousness affect her fluency' },
+                    { es: 'Necesita desarrollar más autoconfianza', en: 'Needs to develop more self-confidence' }
+                ],
+                teacherNotes: {
+                    es: 'Inició muy débil en el grupo pero gracias a la combinación de clases privadas y grupales ha mejorado considerablemente. Ahora está cómoda en Grupo 1 trabajando con Libro 7. El miedo a cometer errores la pone nerviosa, pero con práctica continua seguirá mejorando.',
+                    en: 'Started very weak in the group but thanks to the combination of private and group classes has improved considerably. Now comfortable in Group 1 working with Book 7. Fear of making mistakes makes her nervous, but with continued practice she will keep improving.'
+                }
+            },
+            {
+                name: 'Lina Arias',
+                privateHours: 40,
+                groupRef: null,
+                currentBook: null,
+                examDate: null,
+                skills: null,
+                strengths: [
+                    { es: 'Muy disciplinada y constante en su asistencia', en: 'Very disciplined and consistent in attendance' },
+                    { es: 'Ha integrado vocabulario y expresiones de recursos humanos efectivamente', en: 'Has effectively integrated HR vocabulary and expressions' },
+                    { es: 'Comunica con mayor precisión y profesionalismo', en: 'Communicates with greater precision and professionalism' },
+                    { es: 'Notable progreso en confianza para hablar', en: 'Notable progress in speaking confidence' }
+                ],
+                areasToImprove: [
+                    { es: 'Continuar practicando pronunciación de palabras poco familiares', en: 'Continue practicing pronunciation of unfamiliar words' }
+                ],
+                teacherNotes: {
+                    es: 'Enfoque en temas específicos de su rol en recursos humanos: presentar avances de procesos, explicar estado de tareas y reportar novedades de forma clara y estructurada. Se ha trabajado intensivamente la pronunciación de palabras que le causan dificultad.',
+                    en: 'Focus on topics specific to her HR role: presenting process updates, explaining task status, and reporting news clearly and in a structured manner. Intensive work on pronunciation of words that cause her difficulty.'
+                }
+            }
+        ];
     }
 
     initializeGroupsData() {
@@ -831,6 +918,15 @@ class CoatsReportsManager {
                 ` : ''}
             </div>
 
+            <!-- Private Classes Section -->
+            <div class="coats-section private-classes-section">
+                <h3><span class="section-icon">👩‍🏫</span> ${this.t('privateClasses')}</h3>
+                <p class="section-description">${this.t('privateClassesDesc')}</p>
+                <div class="private-students-grid">
+                    ${this.renderPrivateStudents()}
+                </div>
+            </div>
+
             <!-- Individual Progress Table -->
             <div class="coats-section">
                 <h3><span class="section-icon">👤</span> ${this.t('individualProgress')}</h3>
@@ -1039,6 +1135,97 @@ class CoatsReportsManager {
             <span class="winner-name">${this.formatName(student.name)}</span>
             <span class="winner-stats">${student.attendancePct.toFixed(1)}%</span>
             <span class="winner-group">${groupLabel}</span>
+        </div>
+        `;
+    }
+
+    renderPrivateStudents() {
+        const privateStudents = this.initializePrivateStudents();
+        return privateStudents.map(student => this.renderPrivateStudentCard(student)).join('');
+    }
+
+    renderPrivateStudentCard(student) {
+        const lang = this.language;
+
+        // Skills table for Beatriz (has exam results)
+        let skillsHTML = '';
+        if (student.skills) {
+            const skillOrder = ['grammar', 'reading', 'writing', 'speaking', 'listening'];
+            skillsHTML = `
+                <div class="private-skills">
+                    <h5>${this.t('skillLevel')}</h5>
+                    <div class="skills-grid">
+                        ${skillOrder.map(skill => {
+                            const skillData = student.skills[skill];
+                            const statusClass = skillData.status === 'improving' ? 'improving' :
+                                               skillData.status === 'on-track' ? 'on-track' : 'needs-work';
+                            return `
+                                <div class="skill-item ${statusClass}">
+                                    <span class="skill-name">${this.t(skill)}</span>
+                                    <span class="skill-level">${skillData.level}</span>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Exam info
+        let examHTML = '';
+        if (student.examDate) {
+            const examDate = new Date(student.examDate);
+            const dateStr = examDate.toLocaleDateString(lang === 'es' ? 'es-CO' : 'en-US', {
+                year: 'numeric', month: 'long', day: 'numeric'
+            });
+            examHTML = `
+                <div class="private-exam-info">
+                    <span class="exam-badge">📝 ${this.t('evaluation')}</span>
+                    <span class="exam-date">${dateStr}</span>
+                    <span class="exam-duration">(${student.examDuration})</span>
+                </div>
+            `;
+        }
+
+        // Group reference badge
+        let groupBadge = '';
+        if (student.groupRef) {
+            groupBadge = `<span class="group-ref-badge">${this.t('alsoInGroup')} ${student.groupRef}</span>`;
+        }
+
+        return `
+        <div class="private-student-card">
+            <div class="private-student-header">
+                <h4>${student.name}</h4>
+                <div class="private-badges">
+                    <span class="hours-badge">${student.privateHours} ${this.t('privateHours')}</span>
+                    ${groupBadge}
+                </div>
+            </div>
+
+            ${examHTML}
+            ${skillsHTML}
+
+            <div class="private-details">
+                <div class="private-strengths">
+                    <h5>✓ ${this.t('strengths')}</h5>
+                    <ul>
+                        ${student.strengths.map(s => `<li>${s[lang]}</li>`).join('')}
+                    </ul>
+                </div>
+
+                <div class="private-improve">
+                    <h5>↗ ${this.t('areasToImprove')}</h5>
+                    <ul>
+                        ${student.areasToImprove.map(a => `<li>${a[lang]}</li>`).join('')}
+                    </ul>
+                </div>
+            </div>
+
+            <div class="private-teacher-notes">
+                <h5>💬 ${this.t('teacherNotes')}</h5>
+                <p>${student.teacherNotes[lang]}</p>
+            </div>
         </div>
         `;
     }
@@ -2393,6 +2580,222 @@ class CoatsReportsManager {
             text-overflow: ellipsis;
             overflow: hidden;
             white-space: nowrap;
+        }
+
+        /* Private Classes Section */
+        .private-classes-section {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+        }
+
+        .section-description {
+            color: #64748b;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        .private-students-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+            gap: 20px;
+        }
+
+        .private-student-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            border: 1px solid #e2e8f0;
+        }
+
+        .private-student-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .private-student-header h4 {
+            margin: 0;
+            color: #1e3a5f;
+            font-size: 18px;
+        }
+
+        .private-badges {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .hours-badge {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .group-ref-badge {
+            background: #f1f5f9;
+            color: #475569;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            border: 1px solid #cbd5e1;
+        }
+
+        .private-exam-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #fffbeb;
+            border-radius: 8px;
+            border-left: 3px solid #f59e0b;
+            flex-wrap: wrap;
+        }
+
+        .exam-badge {
+            font-weight: 600;
+            color: #92400e;
+        }
+
+        .exam-date {
+            color: #78350f;
+        }
+
+        .exam-duration {
+            color: #a16207;
+            font-size: 12px;
+        }
+
+        .private-skills {
+            margin-bottom: 15px;
+        }
+
+        .private-skills h5 {
+            margin: 0 0 10px 0;
+            color: #475569;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .skills-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 8px;
+        }
+
+        .skill-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .skill-item.improving {
+            background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+            border: 1px solid #22c55e;
+        }
+
+        .skill-item.on-track {
+            background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+            border: 1px solid #0ea5e9;
+        }
+
+        .skill-item.needs-work {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border: 1px solid #f59e0b;
+        }
+
+        .skill-name {
+            font-size: 11px;
+            color: #64748b;
+            margin-bottom: 4px;
+        }
+
+        .skill-level {
+            font-weight: 700;
+            font-size: 16px;
+            color: #1e3a5f;
+        }
+
+        .private-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .private-strengths, .private-improve {
+            padding: 12px;
+            border-radius: 8px;
+        }
+
+        .private-strengths {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+        }
+
+        .private-improve {
+            background: #fffbeb;
+            border: 1px solid #fde68a;
+        }
+
+        .private-strengths h5, .private-improve h5 {
+            margin: 0 0 8px 0;
+            font-size: 12px;
+            color: #475569;
+        }
+
+        .private-strengths ul, .private-improve ul {
+            margin: 0;
+            padding-left: 18px;
+            font-size: 13px;
+            color: #334155;
+        }
+
+        .private-strengths li, .private-improve li {
+            margin-bottom: 4px;
+        }
+
+        .private-teacher-notes {
+            background: #f8fafc;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .private-teacher-notes h5 {
+            margin: 0 0 8px 0;
+            font-size: 12px;
+            color: #475569;
+        }
+
+        .private-teacher-notes p {
+            margin: 0;
+            font-size: 13px;
+            color: #475569;
+            line-height: 1.5;
+            font-style: italic;
+        }
+
+        @media (max-width: 600px) {
+            .private-students-grid {
+                grid-template-columns: 1fr;
+            }
+            .private-details {
+                grid-template-columns: 1fr;
+            }
+            .skills-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
         }
 
         /* Table */
