@@ -829,22 +829,6 @@ class CoatsReportsManager {
                     </div>
                 </div>
                 ` : ''}
-
-                <!-- Consistency Award -->
-                ${awards.consistency.length > 0 ? `
-                <div class="award-category award-consistency">
-                    <div class="award-header">
-                        <span class="award-medal">⭐</span>
-                        <h4>${this.t('consistency')}</h4>
-                    </div>
-                    <p class="consistency-explanation">${this.language === 'es'
-                        ? 'Estudiantes con la asistencia más estable mes a mes. Menor variación en horas mensuales indica mayor compromiso sostenido.'
-                        : 'Students with the most stable attendance month to month. Lower variation in monthly hours indicates sustained commitment.'}</p>
-                    <div class="award-winners">
-                        ${awards.consistency.map((s, i) => this.renderAwardWinner(s, i + 1, 'consistency')).join('')}
-                    </div>
-                </div>
-                ` : ''}
             </div>
 
             <!-- Individual Progress Table -->
