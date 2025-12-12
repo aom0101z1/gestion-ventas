@@ -285,7 +285,7 @@ class CoatsReportsManager {
                     { name: 'PAULA CARDONA', hours: { jun: 12, jul: 12, ago: 10, sep: 12, oct: 12, nov: 10, dic: 8 }, total: 76, status: 'active' },
                     { name: 'MARIANA OBANDO', hours: { jun: 12, jul: 12, ago: 12, sep: 12, oct: 10, nov: 10, dic: 6 }, total: 74, status: 'active' },
                     { name: 'GISELA ARCILA', hours: { jun: 12, jul: 10, ago: 10, sep: 10, oct: 6, nov: 10, dic: 8 }, total: 66, status: 'active' },
-                    { name: 'EDITH ALEJANDRA GIL', hours: { jun: 12, jul: 12, ago: 10, sep: 10, oct: 8, nov: 0, dic: 0 }, total: 52, status: 'inactive', note: 'Did not return since Oct 28' },
+                    { name: 'EDITH ALEJANDRA GIL', hours: { jun: 12, jul: 12, ago: 10, sep: 10, oct: 8, nov: 0, dic: 0 }, total: 52, status: 'inactive', note: 'Did not return since Oct 28 - No ha confirmado si se retira' },
                     { name: 'LUZ MARÍA HURTADO', hours: { jun: 0, jul: 0, ago: 0, sep: 0, oct: 4, nov: 14, dic: 8 }, total: 26, status: 'active', note: 'Started Oct 28', lateStart: '2025-10-28' }
                 ],
                 totalGroupHours: 644 // Excludes inactive student (Edith: 52 hrs)
