@@ -125,7 +125,9 @@ class CoatsReportsManager {
                 withdrawnStudents: 'Estudiantes Retirados',
                 withdrawnNote: 'No se incluyen en el cálculo de asistencia promedio',
                 generatedOn: 'Generado el',
-                confidential: 'Documento Confidencial - Solo para uso interno de COATS'
+                confidential: 'Documento Confidencial - Solo para uso interno de COATS',
+                viewStudentList: 'Ver Lista de Estudiantes',
+                hideStudentList: 'Ocultar Lista'
             },
             en: {
                 title: 'Progress Report - English Program',
@@ -201,7 +203,9 @@ class CoatsReportsManager {
                 withdrawnStudents: 'Withdrawn Students',
                 withdrawnNote: 'Not included in average attendance calculation',
                 generatedOn: 'Generated on',
-                confidential: 'Confidential Document - For COATS Internal Use Only'
+                confidential: 'Confidential Document - For COATS Internal Use Only',
+                viewStudentList: 'View Student List',
+                hideStudentList: 'Hide List'
             }
         };
     }
@@ -948,6 +952,56 @@ class CoatsReportsManager {
                 <span class="note-text">${this.t('advancedBooksNoteShort')}</span>
             </div>
             ` : ''}
+
+            <!-- Student List Dropdown -->
+            <div class="student-list-dropdown">
+                <button class="dropdown-toggle" onclick="window.CoatsReports.toggleStudentList('${group.id}')">
+                    <span class="dropdown-icon">👥</span>
+                    <span class="dropdown-text">${this.t('viewStudentList')}</span>
+                    <span class="dropdown-arrow" id="arrow-${group.id}">▼</span>
+                </button>
+                <div class="student-list-content" id="students-${group.id}" style="display: none;">
+                    <table class="student-mini-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>${this.t('name')}</th>
+                                <th>${this.t('totalHoursAttended')}</th>
+                                <th>${this.t('attendanceRate')}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${group.students
+                                .filter(s => s.status === 'active')
+                                .sort((a, b) => b.total - a.total)
+                                .map((student, index) => {
+                                    const maxHours = student.lateStart
+                                        ? this.calculateAvailableHoursSince(student.lateStart)
+                                        : this.programData.maxPossibleHours;
+                                    const pct = ((student.total / maxHours) * 100).toFixed(1);
+                                    const pctClass = pct >= 70 ? 'high' : pct >= 50 ? 'medium' : 'low';
+                                    return `
+                                        <tr>
+                                            <td>${index + 1}</td>
+                                            <td class="student-name-cell">
+                                                ${student.name}
+                                                ${student.lateStart ? '<span class="late-badge">⏰</span>' : ''}
+                                            </td>
+                                            <td>${student.total}h</td>
+                                            <td><span class="pct-badge ${pctClass}">${pct}%</span></td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                        </tbody>
+                    </table>
+                    ${group.students.filter(s => s.status === 'inactive').length > 0 ? `
+                    <div class="inactive-students-note">
+                        <strong>${this.t('withdrawnStudents')}:</strong>
+                        ${group.students.filter(s => s.status === 'inactive').map(s => s.name).join(', ')}
+                    </div>
+                    ` : ''}
+                </div>
+            </div>
         </div>
         `;
     }
@@ -1189,6 +1243,26 @@ class CoatsReportsManager {
             if (chart) chart.destroy();
         });
         this.charts = {};
+    }
+
+    // ===== STUDENT LIST DROPDOWN =====
+
+    toggleStudentList(groupId) {
+        const content = document.getElementById(`students-${groupId}`);
+        const arrow = document.getElementById(`arrow-${groupId}`);
+        const button = arrow?.parentElement;
+        const textSpan = button?.querySelector('.dropdown-text');
+
+        if (content && arrow) {
+            const isVisible = content.style.display !== 'none';
+            content.style.display = isVisible ? 'none' : 'block';
+            arrow.textContent = isVisible ? '▼' : '▲';
+            arrow.classList.toggle('open', !isVisible);
+
+            if (textSpan) {
+                textSpan.textContent = isVisible ? this.t('viewStudentList') : this.t('hideStudentList');
+            }
+        }
     }
 
     // ===== EXPORT FUNCTIONS =====
@@ -1807,6 +1881,126 @@ class CoatsReportsManager {
 
         .advanced-books-note .note-text {
             flex: 1;
+        }
+
+        /* Student List Dropdown */
+        .student-list-dropdown {
+            margin-top: 15px;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 12px;
+        }
+
+        .dropdown-toggle {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 15px;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            color: #475569;
+            transition: all 0.2s ease;
+        }
+
+        .dropdown-toggle:hover {
+            background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
+            border-color: #94a3b8;
+        }
+
+        .dropdown-arrow {
+            transition: transform 0.3s ease;
+            font-size: 10px;
+        }
+
+        .dropdown-arrow.open {
+            transform: rotate(180deg);
+        }
+
+        .student-list-content {
+            margin-top: 12px;
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .student-mini-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        .student-mini-table th {
+            background: #f1f5f9;
+            padding: 8px 6px;
+            text-align: left;
+            font-weight: 600;
+            color: #475569;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .student-mini-table td {
+            padding: 8px 6px;
+            border-bottom: 1px solid #f1f5f9;
+            color: #334155;
+        }
+
+        .student-mini-table tr:hover {
+            background: #f8fafc;
+        }
+
+        .student-name-cell {
+            font-weight: 500;
+        }
+
+        .late-badge {
+            font-size: 10px;
+            margin-left: 4px;
+        }
+
+        .pct-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 11px;
+        }
+
+        .pct-badge.high {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .pct-badge.medium {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .pct-badge.low {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .inactive-students-note {
+            margin-top: 10px;
+            padding: 8px 10px;
+            background: #fef2f2;
+            border-radius: 6px;
+            font-size: 11px;
+            color: #991b1b;
         }
 
         .group-header h4 {
