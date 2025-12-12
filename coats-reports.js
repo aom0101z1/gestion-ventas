@@ -845,21 +845,9 @@ class CoatsReportsManager {
                         <p class="chart-description">${this.t('monthlyTrendDesc')}</p>
                     </div>
                 </div>
-
-                <!-- Attendance vs Progress Scatter Chart with Description -->
-                <div class="coats-chart-full-width">
-                    <h4 class="chart-title">${this.t('attendanceVsProgress')}</h4>
-                    <div class="coats-chart-container">
-                        <canvas id="coats-correlation-chart"></canvas>
-                    </div>
-                    <div class="chart-description-box">
-                        <span class="chart-type-badge">${this.language === 'es' ? 'Gráfica de Dispersión' : 'Scatter Plot'}</span>
-                        <p class="chart-description">${this.t('attendanceVsProgressDesc')}</p>
-                    </div>
-                </div>
             </div>
 
-            <!-- Attendance vs Progress Correlation -->
+            <!-- Attendance Distribution -->
             <div class="coats-section coats-correlation-section">
                 <h3><span class="section-icon">🔗</span> ${this.t('correlation')}</h3>
                 <p class="correlation-description">${this.t('correlationText')}</p>
@@ -1431,72 +1419,6 @@ class CoatsReportsManager {
                         y: {
                             beginAtZero: true,
                             title: { display: true, text: this.language === 'es' ? 'Promedio horas/estudiante' : 'Avg hours/student' }
-                        }
-                    }
-                }
-            });
-        }
-
-        // Correlation Scatter Chart
-        const correlationCtx = document.getElementById('coats-correlation-chart');
-        if (correlationCtx) {
-            // Store student names for tooltip
-            const studentNames = stats.allStudents.map(s => s.name);
-            const scatterData = stats.allStudents.map(s => ({
-                x: Math.round(s.attendancePct * 10) / 10,
-                y: s.booksAdvanced
-            }));
-
-            const self = this;
-            this.charts.correlation = new Chart(correlationCtx, {
-                type: 'scatter',
-                data: {
-                    datasets: [{
-                        label: this.t('attendanceVsProgress'),
-                        data: scatterData,
-                        backgroundColor: scatterData.map(d =>
-                            d.x >= 70 ? '#22c55e' : d.x >= 50 ? '#f59e0b' : '#ef4444'
-                        ),
-                        pointRadius: 8,
-                        pointHoverRadius: 12
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    plugins: {
-                        title: {
-                            display: true,
-                            text: this.t('attendanceVsProgress'),
-                            font: { size: 16, weight: 'bold' }
-                        },
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    const index = context.dataIndex;
-                                    const name = studentNames[index] || '';
-                                    const attendance = context.parsed.x.toFixed(1);
-                                    const books = context.parsed.y;
-                                    return [
-                                        name,
-                                        `${self.language === 'es' ? 'Asistencia' : 'Attendance'}: ${attendance}%`,
-                                        `${self.language === 'es' ? 'Libros' : 'Books'}: +${books}`
-                                    ];
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            title: { display: true, text: this.t('attendanceRate') + ' %' },
-                            min: 0,
-                            max: 100
-                        },
-                        y: {
-                            title: { display: true, text: this.t('booksAdvanced') },
-                            beginAtZero: true,
-                            max: 5
                         }
                     }
                 }
