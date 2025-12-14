@@ -1882,25 +1882,26 @@ function renderPaymentTable(students) {
 }
 
 // NEW: Render payment history row with monthly grid
-function renderPaymentHistoryContent(studentId, history, stats) {
-    const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 
+function renderPaymentHistoryContent(studentId, history, stats, year = 2025) {
+    const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
                    'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-    
+
     const statusColors = {
         'paid': '#10b981',
         'pending': '#f59e0b',
         'overdue': '#ef4444',
         'no-payment': '#d1d5db'
     };
-    
+
     return `
         <div style="padding: 20px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                <h4 style="margin: 0; color: #1f2937; font-size: 16px;">📅 Historial de Pagos ${new Date().getFullYear()}</h4>
-                <select onchange="changeHistoryYear('${studentId}', this.value)" 
+                <h4 style="margin: 0; color: #1f2937; font-size: 16px;">📅 Historial de Pagos ${year}</h4>
+                <select onchange="changeHistoryYear('${studentId}', this.value)"
                         style="padding: 6px 12px; border: 1px solid #d1d5db; border-radius: 6px; background: white;">
-                    <option value="${new Date().getFullYear()}">${new Date().getFullYear()}</option>
-                    <option value="${new Date().getFullYear() - 1}">${new Date().getFullYear() - 1}</option>
+                    <option value="2026"${year == 2026 ? ' selected' : ''}>2026</option>
+                    <option value="2025"${year == 2025 ? ' selected' : ''}>2025</option>
+                    <option value="2024"${year == 2024 ? ' selected' : ''}>2024</option>
                 </select>
             </div>
             
@@ -2322,7 +2323,7 @@ window.changeHistoryYear = async function(studentId, year) {
         // Update display
         historyRow.innerHTML = `
             <td colspan="8" style="padding: 0; background: #f9fafb;">
-                ${renderPaymentHistoryContent(studentId, history, stats)}
+                ${renderPaymentHistoryContent(studentId, history, stats, parseInt(year))}
             </td>
         `;
     } catch (error) {
