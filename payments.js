@@ -362,6 +362,11 @@ async recordPayment(studentId, paymentData) {
 // Delete payment (admin only)
 async deletePayment(paymentId) {
     try {
+        // Verify admin access
+        if (window.FirebaseData?.currentUser?.email !== 'admin@ciudadbilingue.com') {
+            throw new Error('No autorizado - Solo el administrador puede eliminar pagos');
+        }
+
         // Get the payment before deleting for audit log
         const payment = this.payments.get(paymentId);
         if (!payment) {
@@ -2068,7 +2073,7 @@ function renderPaymentHistoryContent(studentId, history, stats, year = 2025) {
                                         🧾 Ver Factura
                                     </button>` : ''}
 
-                                ${payment.status === 'paid' && payment.paymentId ?
+                                ${payment.status === 'paid' && payment.paymentId && window.FirebaseData?.currentUser?.email === 'admin@ciudadbilingue.com' ?
                                     `<button
                                         onclick="confirmDeletePayment('${payment.paymentId}', '${studentId}')"
                                         class="btn btn-sm"
@@ -2132,7 +2137,7 @@ function renderPaymentHistoryContent(studentId, history, stats, year = 2025) {
                                                     onmouseout="this.style.background='#3b82f6'">
                                                     🧾 Recibo ${index + 1}
                                                 </button>` : ''}
-                                            ${p.paymentId ?
+                                            ${p.paymentId && window.FirebaseData?.currentUser?.email === 'admin@ciudadbilingue.com' ?
                                                 `<button
                                                     onclick="confirmDeletePayment('${p.paymentId}', '${studentId}')"
                                                     class="btn btn-sm"
