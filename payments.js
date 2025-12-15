@@ -26,9 +26,9 @@ const PaymentConfig = {
             },
             semester2: {
                 name: "Semestre 2 2025",
-                startDate: "2025-07-01", 
+                startDate: "2025-07-01",
                 endDate: "2025-12-07",
-                months: ['julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+                months: ['julio', 'agosto', 'septiembre', 'octubre', 'noviembre']
             }
         },
         2026: {
@@ -42,11 +42,22 @@ const PaymentConfig = {
                 name: "Semestre 2 2026",
                 startDate: "2026-07-01",
                 endDate: "2026-12-07",
-                months: ['julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+                months: ['julio', 'agosto', 'septiembre', 'octubre', 'noviembre']
             }
         }
     },
-    
+
+    // Holiday periods - no payment required during these months
+    holidays: [
+        { year: 2025, month: 'diciembre', label: 'Vacaciones' },
+        { year: 2026, month: 'enero', label: 'Vacaciones' }
+    ],
+
+    // Helper function to check if a month is a holiday
+    isHoliday: function(year, month) {
+        return this.holidays.some(h => h.year === year && h.month === month.toLowerCase());
+    },
+
     // Payment type options
     paymentTypes: {
         monthly: { name: "Mensual", months: 1 },
@@ -138,12 +149,17 @@ getPaymentStatus(student) {
     const currentMonth = today.getMonth();
     const currentDay = today.getDate();
     const payDay = parseInt(student.diaPago) || 1;
-    
+
     // Check if payment was made this month
-    const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 
+    const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
                       'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
     const monthName = monthNames[currentMonth];
     const currentYear = today.getFullYear();
+
+    // Check if current month is a holiday - no payment required
+    if (PaymentConfig.isHoliday(currentYear, monthName)) {
+        return { color: '#60a5fa', status: '🏖️ Vacaciones', icon: '🏖️' };
+    }
     
     // Look for payment in the payments Map
     const payment = Array.from(this.payments.values()).find(p => 
@@ -416,58 +432,69 @@ async recordPayment(studentId, paymentData) {
                     paymentId: monthPayments[0].id
                 };
             } else {
-                // Check if payment is due/overdue for this month
-                const monthIndex = months.indexOf(month);
-                const today = new Date();
-                const currentYear = today.getFullYear();
-                const currentMonth = today.getMonth();
-
-                if (targetYear < currentYear || (targetYear === currentYear && monthIndex < currentMonth)) {
-                    // Past month - check if it should have been paid
-                    if (student?.diaPago) {
-                        history[month] = {
-                            status: 'overdue',
-                            amount: defaultAmount,
-                            date: null,
-                            payments: []
-                        };
-                    } else {
-                        history[month] = {
-                            status: 'no-payment',
-                            amount: 0,
-                            date: null,
-                            payments: []
-                        };
-                    }
-                } else if (targetYear === currentYear && monthIndex === currentMonth) {
-                    // Current month
-                    if (student?.diaPago) {
-                        const payDay = parseInt(student.diaPago);
-                        const dueDate = new Date(targetYear, monthIndex, payDay);
-                        const isPending = dueDate >= today;
-
-                        history[month] = {
-                            status: isPending ? 'pending' : 'overdue',
-                            amount: defaultAmount,
-                            date: null,
-                            payments: []
-                        };
-                    } else {
-                        history[month] = {
-                            status: 'no-payment',
-                            amount: 0,
-                            date: null,
-                            payments: []
-                        };
-                    }
-                } else {
-                    // Future month
+                // Check if this is a holiday month first
+                if (PaymentConfig.isHoliday(targetYear, month)) {
                     history[month] = {
-                        status: 'no-payment',
+                        status: 'holiday',
                         amount: 0,
                         date: null,
-                        payments: []
+                        payments: [],
+                        label: 'Vacaciones'
                     };
+                } else {
+                    // Check if payment is due/overdue for this month
+                    const monthIndex = months.indexOf(month);
+                    const today = new Date();
+                    const currentYear = today.getFullYear();
+                    const currentMonth = today.getMonth();
+
+                    if (targetYear < currentYear || (targetYear === currentYear && monthIndex < currentMonth)) {
+                        // Past month - check if it should have been paid
+                        if (student?.diaPago) {
+                            history[month] = {
+                                status: 'overdue',
+                                amount: defaultAmount,
+                                date: null,
+                                payments: []
+                            };
+                        } else {
+                            history[month] = {
+                                status: 'no-payment',
+                                amount: 0,
+                                date: null,
+                                payments: []
+                            };
+                        }
+                    } else if (targetYear === currentYear && monthIndex === currentMonth) {
+                        // Current month
+                        if (student?.diaPago) {
+                            const payDay = parseInt(student.diaPago);
+                            const dueDate = new Date(targetYear, monthIndex, payDay);
+                            const isPending = dueDate >= today;
+
+                            history[month] = {
+                                status: isPending ? 'pending' : 'overdue',
+                                amount: defaultAmount,
+                                date: null,
+                                payments: []
+                            };
+                        } else {
+                            history[month] = {
+                                status: 'no-payment',
+                                amount: 0,
+                                date: null,
+                                payments: []
+                            };
+                        }
+                    } else {
+                        // Future month
+                        history[month] = {
+                            status: 'no-payment',
+                            amount: 0,
+                            date: null,
+                            payments: []
+                        };
+                    }
                 }
             }
         }
@@ -586,6 +613,11 @@ async recordPayment(studentId, paymentData) {
             // No date filter - use original logic (current month only)
             students.forEach(student => {
                 const status = this.getPaymentStatus(student);
+
+                // Skip holiday students from payment stats
+                if (status.status === '🏖️ Vacaciones') {
+                    return; // Don't count in any category during holidays
+                }
 
                 if (status.partial) {
                     summary.partial++;
@@ -1890,7 +1922,8 @@ function renderPaymentHistoryContent(studentId, history, stats, year = 2025) {
         'paid': '#10b981',
         'pending': '#f59e0b',
         'overdue': '#ef4444',
-        'no-payment': '#d1d5db'
+        'no-payment': '#d1d5db',
+        'holiday': '#60a5fa'
     };
 
     return `
@@ -1946,12 +1979,12 @@ function renderPaymentHistoryContent(studentId, history, stats, year = 2025) {
                             </div>
 
                             <div style="font-weight: 600; font-size: 15px; color: ${color};">
-                                ${payment.amount > 0 ? '$' + payment.amount.toLocaleString('es-CO') : '-'}
+                                ${payment.status === 'holiday' ? '🏖️' : (payment.amount > 0 ? '$' + payment.amount.toLocaleString('es-CO') : '-')}
                             </div>
 
                             ${!hasMultiplePayments ? `
                                 <div style="font-size: 11px; color: #6b7280; margin-top: 4px;">
-                                    ${payment.date || (payment.status === 'pending' ? 'Pendiente' : payment.status === 'overdue' ? 'Vencido' : '')}
+                                    ${payment.date || (payment.status === 'pending' ? 'Pendiente' : payment.status === 'overdue' ? 'Vencido' : payment.status === 'holiday' ? 'Vacaciones' : '')}
                                 </div>
 
                                 ${payment.status === 'paid' && payment.method ?
