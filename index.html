@@ -479,6 +479,9 @@
 }
 
     </style>
+
+    <!-- Twemoji for emoji fallback on older systems (Windows 7, etc.) -->
+    <script src="https://cdn.jsdelivr.net/npm/twemoji@14.0.2/dist/twemoji.min.js" crossorigin="anonymous"></script>
 </head>
 
 <body>
@@ -3525,6 +3528,52 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
             }, 2000);
         });
     </script>
+
+    <!-- Twemoji initialization for emoji fallback -->
+    <script>
+        // Parse emojis with Twemoji for systems that don't support native emojis (Windows 7, etc.)
+        if (typeof twemoji !== 'undefined') {
+            // Initial parse
+            twemoji.parse(document.body, {
+                folder: 'svg',
+                ext: '.svg',
+                className: 'twemoji'
+            });
+
+            // Re-parse when DOM changes (for dynamically loaded content)
+            const observer = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    mutation.addedNodes.forEach((node) => {
+                        if (node.nodeType === 1) { // Element node
+                            twemoji.parse(node, {
+                                folder: 'svg',
+                                ext: '.svg',
+                                className: 'twemoji'
+                            });
+                        }
+                    });
+                });
+            });
+
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+
+            console.log('✅ Twemoji initialized for emoji fallback');
+        }
+    </script>
+
+    <style>
+        /* Twemoji styling - make emoji images inline and properly sized */
+        img.twemoji {
+            height: 1.2em;
+            width: 1.2em;
+            margin: 0 0.05em 0 0.1em;
+            vertical-align: -0.15em;
+            display: inline-block;
+        }
+    </style>
 
 </body>
 </html>
