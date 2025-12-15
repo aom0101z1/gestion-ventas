@@ -359,6 +359,57 @@ async recordPayment(studentId, paymentData) {
     }
 }
 
+// Delete payment (admin only)
+async deletePayment(paymentId) {
+    try {
+        // Get the payment before deleting for audit log
+        const payment = this.payments.get(paymentId);
+        if (!payment) {
+            throw new Error('Pago no encontrado');
+        }
+
+        const db = window.firebaseModules.database;
+        const ref = db.ref(window.FirebaseData.database, `payments/${paymentId}`);
+        await db.remove(ref);
+
+        this.payments.delete(paymentId);
+
+        console.log('🗑️ Payment deleted:', paymentId);
+
+        // Audit log
+        if (typeof window.logAudit === 'function') {
+            const student = window.StudentManager?.students.get(payment.studentId);
+            const studentName = student?.nombre || 'Estudiante desconocido';
+            await window.logAudit(
+                'Pago eliminado',
+                'payment',
+                paymentId,
+                `${studentName} - $${payment.amount?.toLocaleString()} - ${payment.month} ${payment.year}`,
+                {
+                    before: {
+                        estudiante: studentName,
+                        monto: payment.amount,
+                        mes: payment.month,
+                        año: payment.year,
+                        metodo: payment.method,
+                        banco: payment.bank
+                    }
+                }
+            );
+        }
+
+        // Force UI refresh
+        setTimeout(() => {
+            window.loadPaymentsTab();
+        }, 100);
+
+        return true;
+    } catch (error) {
+        console.error('❌ Error deleting payment:', error);
+        throw error;
+    }
+}
+
     // Update student payment status
     async updateStudentPaymentStatus(studentId, month, paid) {
         const db = window.firebaseModules.database;
@@ -2016,6 +2067,31 @@ function renderPaymentHistoryContent(studentId, history, stats, year = 2025) {
                                         onmouseout="this.style.background='#3b82f6'">
                                         🧾 Ver Factura
                                     </button>` : ''}
+
+                                ${payment.status === 'paid' && payment.paymentId ?
+                                    `<button
+                                        onclick="confirmDeletePayment('${payment.paymentId}', '${studentId}')"
+                                        class="btn btn-sm"
+                                        style="
+                                            background: #ef4444;
+                                            color: white;
+                                            border: none;
+                                            padding: 4px 8px;
+                                            border-radius: 4px;
+                                            font-size: 10px;
+                                            margin-top: 4px;
+                                            width: 100%;
+                                            cursor: pointer;
+                                            display: flex;
+                                            align-items: center;
+                                            justify-content: center;
+                                            gap: 4px;
+                                            transition: background 0.2s;
+                                        "
+                                        onmouseover="this.style.background='#dc2626'"
+                                        onmouseout="this.style.background='#ef4444'">
+                                        🗑️ Eliminar
+                                    </button>` : ''}
                             ` : `
                                 <!-- Multiple payments - show list -->
                                 <div style="margin-top: 8px; max-height: 200px; overflow-y: auto;">
@@ -2055,6 +2131,26 @@ function renderPaymentHistoryContent(studentId, history, stats, year = 2025) {
                                                     onmouseover="this.style.background='#2563eb'"
                                                     onmouseout="this.style.background='#3b82f6'">
                                                     🧾 Recibo ${index + 1}
+                                                </button>` : ''}
+                                            ${p.paymentId ?
+                                                `<button
+                                                    onclick="confirmDeletePayment('${p.paymentId}', '${studentId}')"
+                                                    class="btn btn-sm"
+                                                    style="
+                                                        background: #ef4444;
+                                                        color: white;
+                                                        border: none;
+                                                        padding: 3px 6px;
+                                                        border-radius: 4px;
+                                                        font-size: 9px;
+                                                        margin-top: 4px;
+                                                        width: 100%;
+                                                        cursor: pointer;
+                                                        transition: background 0.2s;
+                                                    "
+                                                    onmouseover="this.style.background='#dc2626'"
+                                                    onmouseout="this.style.background='#ef4444'">
+                                                    🗑️ Eliminar
                                                 </button>` : ''}
                                         </div>
                                     `).join('')}
@@ -3906,6 +4002,141 @@ window.showBulkSemesterPaymentModal = async function() {
 window.closeBulkPaymentModal = function() {
     const modal = document.getElementById('bulkPaymentModal');
     if (modal) modal.remove();
+};
+
+// ==================================================================================
+// SECTION 8.6: DELETE PAYMENT - Admin function to delete payments
+// ==================================================================================
+
+window.confirmDeletePayment = async function(paymentId, studentId) {
+    // Get payment details for confirmation message
+    const payment = window.PaymentManager.payments.get(paymentId);
+    if (!payment) {
+        window.showNotification('❌ Pago no encontrado', 'error');
+        return;
+    }
+
+    const student = window.StudentManager?.students.get(studentId);
+    const studentName = student?.nombre || 'Estudiante';
+    const amount = payment.amount?.toLocaleString() || '0';
+    const month = payment.month || '';
+    const year = payment.year || '';
+
+    // Create confirmation modal
+    const existingModal = document.getElementById('deletePaymentModal');
+    if (existingModal) existingModal.remove();
+
+    document.body.insertAdjacentHTML('beforeend', `
+        <div id="deletePaymentModal" style="
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        ">
+            <div style="
+                background: white;
+                border-radius: 12px;
+                padding: 24px;
+                max-width: 400px;
+                width: 90%;
+                box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+            ">
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>
+                    <h3 style="margin: 0 0 8px 0; color: #1f2937;">¿Eliminar este pago?</h3>
+                    <p style="color: #6b7280; margin: 0;">Esta acción no se puede deshacer</p>
+                </div>
+
+                <div style="
+                    background: #fef2f2;
+                    border: 1px solid #fecaca;
+                    border-radius: 8px;
+                    padding: 16px;
+                    margin-bottom: 20px;
+                ">
+                    <div style="font-weight: 600; color: #991b1b; margin-bottom: 8px;">
+                        ${studentName}
+                    </div>
+                    <div style="color: #7f1d1d; font-size: 14px;">
+                        <div><strong>Monto:</strong> $${amount}</div>
+                        <div><strong>Mes:</strong> ${month.charAt(0).toUpperCase() + month.slice(1)} ${year}</div>
+                        <div><strong>ID:</strong> ${paymentId}</div>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 12px;">
+                    <button onclick="closeDeletePaymentModal()" style="
+                        flex: 1;
+                        padding: 12px;
+                        border: 1px solid #d1d5db;
+                        background: white;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-weight: 500;
+                        color: #374151;
+                    ">
+                        Cancelar
+                    </button>
+                    <button onclick="executeDeletePayment('${paymentId}', '${studentId}')" style="
+                        flex: 1;
+                        padding: 12px;
+                        border: none;
+                        background: #ef4444;
+                        color: white;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-weight: 500;
+                    ">
+                        🗑️ Eliminar
+                    </button>
+                </div>
+            </div>
+        </div>
+    `);
+};
+
+window.closeDeletePaymentModal = function() {
+    const modal = document.getElementById('deletePaymentModal');
+    if (modal) modal.remove();
+};
+
+window.executeDeletePayment = async function(paymentId, studentId) {
+    try {
+        closeDeletePaymentModal();
+        window.showNotification('🗑️ Eliminando pago...', 'info');
+
+        await window.PaymentManager.deletePayment(paymentId);
+
+        window.showNotification('✅ Pago eliminado correctamente', 'success');
+
+        // Refresh the payment history for this student
+        const historyRow = document.querySelector(`#history-${studentId}`);
+        if (historyRow && historyRow.style.display !== 'none') {
+            // Get current year from the select if available
+            const yearSelect = historyRow.querySelector('select');
+            const currentYear = yearSelect ? parseInt(yearSelect.value) : new Date().getFullYear();
+
+            // Reload history
+            const history = await window.PaymentManager.getStudentPaymentHistory(studentId, currentYear);
+            const stats = window.PaymentManager.calculatePaymentStats(history);
+
+            historyRow.innerHTML = `
+                <td colspan="8" style="padding: 0; background: #f9fafb;">
+                    ${renderPaymentHistoryContent(studentId, history, stats, currentYear)}
+                </td>
+            `;
+        }
+
+    } catch (error) {
+        console.error('Error deleting payment:', error);
+        window.showNotification('❌ Error al eliminar pago: ' + error.message, 'error');
+    }
 };
 
 window.toggleAllStudentsBulk = function() {
