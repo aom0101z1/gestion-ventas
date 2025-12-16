@@ -614,7 +614,7 @@ class CoatsReportsManager {
 
     // ===== RENDER MAIN REPORT =====
 
-    async renderReport(containerId) {
+    async renderReport(containerId, activeTab = 'report') {
         await this.init();
         const container = document.getElementById(containerId);
         if (!container) {
@@ -622,15 +622,697 @@ class CoatsReportsManager {
             return;
         }
 
+        this.currentTab = activeTab;
+        const isAdmin = window.FirebaseData?.currentUser?.email === 'admin@ciudadbilingue.com';
+
         const stats = this.calculateProgramStats();
         const awards = this.getAwardWinners();
 
-        container.innerHTML = this.generateReportHTML(stats, awards);
+        // Generate tabs + content
+        let html = '';
 
-        // Render charts after DOM update
-        setTimeout(() => {
-            this.renderCharts(stats);
-        }, 100);
+        // Only show tabs if admin
+        if (isAdmin) {
+            html += this.generateTabsHTML(activeTab);
+        }
+
+        if (activeTab === 'report') {
+            html += this.generateReportHTML(stats, awards);
+        } else if (activeTab === 'admin' && isAdmin) {
+            html += this.generateAdminHTML();
+        }
+
+        container.innerHTML = html;
+
+        // Render charts after DOM update (only for report tab)
+        if (activeTab === 'report') {
+            setTimeout(() => {
+                this.renderCharts(stats);
+            }, 100);
+        }
+    }
+
+    generateTabsHTML(activeTab) {
+        return `
+        <div class="coats-tabs-container">
+            <div class="coats-tabs">
+                <button class="coats-tab ${activeTab === 'report' ? 'active' : ''}" onclick="window.CoatsReports.switchTab('report')">
+                    📊 Reporte
+                </button>
+                <button class="coats-tab ${activeTab === 'admin' ? 'active' : ''}" onclick="window.CoatsReports.switchTab('admin')">
+                    ⚙️ Admin
+                </button>
+            </div>
+        </div>
+        `;
+    }
+
+    switchTab(tab) {
+        this.renderReport('coatsReportContainer', tab);
+    }
+
+    // ===== ADMIN PANEL =====
+
+    generateAdminHTML() {
+        const groups = this.programData.groups;
+
+        // Generate weeks for the semester (Jun 11 - Dec 12, 2025)
+        const weeks = this.generateWeeksForSemester();
+
+        return `
+        <div class="coats-admin-panel">
+            <div class="admin-header">
+                <h2>⚙️ Panel de Administración COATS</h2>
+                <p>Gestión de estudiantes y asistencia - Semestre 2 2025</p>
+            </div>
+
+            <!-- Group Selector -->
+            <div class="admin-section">
+                <div class="admin-group-tabs">
+                    ${groups.map((g, i) => `
+                        <button class="admin-group-tab ${i === 0 ? 'active' : ''}" onclick="window.CoatsReports.selectAdminGroup('${g.id}')">
+                            ${g.name.split(' - ')[0]}
+                        </button>
+                    `).join('')}
+                </div>
+            </div>
+
+            <!-- Group Details -->
+            <div id="adminGroupContent">
+                ${this.renderAdminGroupContent(groups[0], weeks)}
+            </div>
+
+            <!-- Save Button -->
+            <div class="admin-actions">
+                <button class="coats-btn coats-btn-primary" onclick="window.CoatsReports.saveToFirebase()">
+                    💾 Guardar en Firebase (Próximo Semestre)
+                </button>
+                <button class="coats-btn coats-btn-secondary" onclick="window.CoatsReports.exportAdminData()">
+                    📥 Exportar Datos
+                </button>
+            </div>
+        </div>
+
+        <style>
+            ${this.getAdminStyles()}
+        </style>
+        `;
+    }
+
+    generateWeeksForSemester() {
+        const weeks = [];
+        const startDate = new Date('2025-06-11');
+        const endDate = new Date('2025-12-12');
+
+        let currentDate = new Date(startDate);
+        let weekNum = 1;
+
+        while (currentDate <= endDate) {
+            const weekStart = new Date(currentDate);
+            const weekEnd = new Date(currentDate);
+            weekEnd.setDate(weekEnd.getDate() + 6);
+
+            const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+            weeks.push({
+                num: weekNum,
+                start: weekStart,
+                end: weekEnd,
+                label: `S${weekNum}`,
+                monthLabel: monthNames[weekStart.getMonth()],
+                month: weekStart.getMonth()
+            });
+
+            currentDate.setDate(currentDate.getDate() + 7);
+            weekNum++;
+        }
+
+        return weeks;
+    }
+
+    renderAdminGroupContent(group, weeks) {
+        // Calculate attendance per week based on total hours
+        // Each week = 4 hours (2 classes of 2 hours)
+        const hoursPerWeek = 4;
+
+        return `
+        <div class="admin-group-details" data-group-id="${group.id}">
+            <div class="admin-group-info">
+                <h3>${group.name}</h3>
+                <p><strong>Horario:</strong> ${group.schedule}</p>
+                <p><strong>Profesores:</strong> ${group.teachers.join(', ')}</p>
+                <p><strong>Libro Actual:</strong> ${group.currentBook} (Pág ${group.currentPage}/${group.totalPages})</p>
+            </div>
+
+            <!-- Attendance Grid -->
+            <div class="admin-attendance-container">
+                <table class="admin-attendance-table">
+                    <thead>
+                        <tr>
+                            <th class="sticky-col">Estudiante</th>
+                            <th class="sticky-col-2">Estado</th>
+                            <th class="sticky-col-3">Total Hrs</th>
+                            ${this.renderWeekHeaders(weeks)}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${group.students.map(student => this.renderAdminStudentRow(student, group.id, weeks, hoursPerWeek)).join('')}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Add Student -->
+            <div class="admin-add-student">
+                <h4>➕ Agregar Estudiante</h4>
+                <div class="add-student-form">
+                    <input type="text" id="newStudentName_${group.id}" placeholder="Nombre completo" />
+                    <input type="date" id="newStudentStart_${group.id}" value="2025-06-11" />
+                    <button onclick="window.CoatsReports.addStudent('${group.id}')">Agregar</button>
+                </div>
+            </div>
+        </div>
+        `;
+    }
+
+    renderWeekHeaders(weeks) {
+        let html = '';
+        let currentMonth = -1;
+
+        weeks.forEach(week => {
+            if (week.month !== currentMonth) {
+                currentMonth = week.month;
+                html += `<th class="week-header month-start" title="Semana ${week.num}">${week.monthLabel}</th>`;
+            } else {
+                html += `<th class="week-header" title="Semana ${week.num}">${week.label}</th>`;
+            }
+        });
+
+        return html;
+    }
+
+    renderAdminStudentRow(student, groupId, weeks, hoursPerWeek) {
+        // Calculate which weeks the student attended based on monthly hours
+        const attendedWeeks = this.calculateAttendedWeeks(student, weeks, hoursPerWeek);
+
+        const statusClass = student.status === 'active' ? 'status-active' :
+                           student.status === 'inactive' ? 'status-inactive' : 'status-transferred';
+
+        return `
+        <tr class="admin-student-row ${statusClass}" data-student-name="${student.name}">
+            <td class="sticky-col student-name-cell">
+                <input type="text" class="student-name-input" value="${this.formatName(student.name)}"
+                       onchange="window.CoatsReports.updateStudentName('${student.name}', '${groupId}', this.value)" />
+            </td>
+            <td class="sticky-col-2">
+                <select class="student-status-select" onchange="window.CoatsReports.updateStudentStatus('${student.name}', '${groupId}', this.value)">
+                    <option value="active" ${student.status === 'active' ? 'selected' : ''}>Activo</option>
+                    <option value="inactive" ${student.status === 'inactive' ? 'selected' : ''}>Inactivo</option>
+                    <option value="transferred" ${student.status === 'transferred' ? 'selected' : ''}>Transferido</option>
+                </select>
+            </td>
+            <td class="sticky-col-3 total-hours-cell">
+                <strong>${student.total}</strong> hrs
+            </td>
+            ${weeks.map((week, i) => `
+                <td class="week-cell">
+                    <input type="checkbox" class="attendance-checkbox"
+                           data-week="${week.num}"
+                           data-student="${student.name}"
+                           data-group="${groupId}"
+                           ${attendedWeeks[i] ? 'checked' : ''}
+                           onchange="window.CoatsReports.toggleWeekAttendance('${student.name}', '${groupId}', ${week.num}, this.checked)" />
+                </td>
+            `).join('')}
+        </tr>
+        `;
+    }
+
+    calculateAttendedWeeks(student, weeks, hoursPerWeek) {
+        // Reverse engineer: based on monthly hours, determine which weeks were attended
+        const monthlyHours = student.hours || {};
+        const attendedWeeks = [];
+
+        // Map month indices to keys
+        const monthKeyMap = { 5: 'jun', 6: 'jul', 7: 'ago', 8: 'sep', 9: 'oct', 10: 'nov', 11: 'dic' };
+
+        // Track remaining hours per month
+        const remainingHours = { ...monthlyHours };
+
+        weeks.forEach(week => {
+            const monthKey = monthKeyMap[week.month];
+            if (monthKey && remainingHours[monthKey] && remainingHours[monthKey] >= hoursPerWeek) {
+                attendedWeeks.push(true);
+                remainingHours[monthKey] -= hoursPerWeek;
+            } else if (monthKey && remainingHours[monthKey] && remainingHours[monthKey] >= 2) {
+                // Partial attendance (at least one class)
+                attendedWeeks.push(true);
+                remainingHours[monthKey] -= 2;
+            } else {
+                attendedWeeks.push(false);
+            }
+        });
+
+        return attendedWeeks;
+    }
+
+    selectAdminGroup(groupId) {
+        const group = this.programData.groups.find(g => g.id === groupId);
+        if (!group) return;
+
+        const weeks = this.generateWeeksForSemester();
+
+        // Update content
+        document.getElementById('adminGroupContent').innerHTML = this.renderAdminGroupContent(group, weeks);
+
+        // Update active tab
+        document.querySelectorAll('.admin-group-tab').forEach(tab => {
+            tab.classList.remove('active');
+            if (tab.textContent.includes(group.name.split(' - ')[0].replace('Grupo ', ''))) {
+                tab.classList.add('active');
+            }
+        });
+
+        // Fix: Match by group id
+        document.querySelectorAll('.admin-group-tab').forEach((tab, i) => {
+            tab.classList.toggle('active', this.programData.groups[i].id === groupId);
+        });
+    }
+
+    updateStudentName(oldName, groupId, newName) {
+        const group = this.programData.groups.find(g => g.id === groupId);
+        if (!group) return;
+
+        const student = group.students.find(s => s.name === oldName);
+        if (student) {
+            student.name = newName.toUpperCase();
+            console.log(`✏️ Student renamed: ${oldName} → ${newName}`);
+        }
+    }
+
+    updateStudentStatus(studentName, groupId, newStatus) {
+        const group = this.programData.groups.find(g => g.id === groupId);
+        if (!group) return;
+
+        const student = group.students.find(s => s.name === studentName);
+        if (student) {
+            student.status = newStatus;
+            console.log(`📝 ${studentName} status changed to: ${newStatus}`);
+        }
+    }
+
+    toggleWeekAttendance(studentName, groupId, weekNum, attended) {
+        const group = this.programData.groups.find(g => g.id === groupId);
+        if (!group) return;
+
+        const student = group.students.find(s => s.name === studentName);
+        if (!student) return;
+
+        // Recalculate total hours based on all checkboxes
+        const checkboxes = document.querySelectorAll(`input.attendance-checkbox[data-student="${studentName}"][data-group="${groupId}"]`);
+        let totalHours = 0;
+        checkboxes.forEach(cb => {
+            if (cb.checked) totalHours += 4; // 4 hours per week
+        });
+
+        student.total = totalHours;
+
+        // Update the display
+        const row = document.querySelector(`tr[data-student-name="${studentName}"]`);
+        if (row) {
+            const totalCell = row.querySelector('.total-hours-cell');
+            if (totalCell) {
+                totalCell.innerHTML = `<strong>${totalHours}</strong> hrs`;
+            }
+        }
+
+        console.log(`📅 ${studentName} week ${weekNum}: ${attended ? 'attended' : 'absent'} - Total: ${totalHours} hrs`);
+    }
+
+    addStudent(groupId) {
+        const nameInput = document.getElementById(`newStudentName_${groupId}`);
+        const startInput = document.getElementById(`newStudentStart_${groupId}`);
+
+        if (!nameInput.value.trim()) {
+            alert('Por favor ingrese el nombre del estudiante');
+            return;
+        }
+
+        const group = this.programData.groups.find(g => g.id === groupId);
+        if (!group) return;
+
+        const newStudent = {
+            name: nameInput.value.toUpperCase(),
+            hours: { jun: 0, jul: 0, ago: 0, sep: 0, oct: 0, nov: 0, dic: 0 },
+            total: 0,
+            status: 'active',
+            lateStart: startInput.value !== '2025-06-11' ? startInput.value : null
+        };
+
+        group.students.push(newStudent);
+
+        // Refresh the group content
+        this.selectAdminGroup(groupId);
+
+        console.log(`➕ Added student: ${newStudent.name} to ${group.name}`);
+    }
+
+    async saveToFirebase() {
+        try {
+            if (!window.FirebaseData?.currentUser?.email === 'admin@ciudadbilingue.com') {
+                alert('Solo el administrador puede guardar datos');
+                return;
+            }
+
+            const db = window.firebaseModules.database;
+            const ref = db.ref(window.FirebaseData.database, 'coats/semester_2025_2');
+
+            const dataToSave = {
+                groups: this.programData.groups,
+                period: this.programData.period,
+                savedAt: new Date().toISOString(),
+                savedBy: window.FirebaseData.currentUser.email
+            };
+
+            await db.set(ref, dataToSave);
+
+            alert('✅ Datos guardados en Firebase exitosamente');
+            console.log('💾 COATS data saved to Firebase');
+
+        } catch (error) {
+            console.error('Error saving to Firebase:', error);
+            alert('❌ Error al guardar: ' + error.message);
+        }
+    }
+
+    exportAdminData() {
+        const data = {
+            program: this.programData,
+            exportedAt: new Date().toISOString()
+        };
+
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `coats_data_${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+
+        console.log('📥 Data exported');
+    }
+
+    getAdminStyles() {
+        return `
+        .coats-tabs-container {
+            margin-bottom: 20px;
+        }
+
+        .coats-tabs {
+            display: flex;
+            gap: 10px;
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 0;
+        }
+
+        .coats-tab {
+            padding: 12px 24px;
+            border: none;
+            background: transparent;
+            font-size: 15px;
+            font-weight: 600;
+            color: #6b7280;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.2s;
+        }
+
+        .coats-tab:hover {
+            color: #1e3a5f;
+        }
+
+        .coats-tab.active {
+            color: #1e3a5f;
+            border-bottom-color: #1e3a5f;
+        }
+
+        .coats-admin-panel {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .admin-header {
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .admin-header h2 {
+            margin: 0 0 8px 0;
+            color: #1e3a5f;
+        }
+
+        .admin-header p {
+            margin: 0;
+            color: #6b7280;
+        }
+
+        .admin-group-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .admin-group-tab {
+            padding: 10px 20px;
+            border: 2px solid #e5e7eb;
+            background: white;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .admin-group-tab:hover {
+            border-color: #1e3a5f;
+            color: #1e3a5f;
+        }
+
+        .admin-group-tab.active {
+            background: #1e3a5f;
+            color: white;
+            border-color: #1e3a5f;
+        }
+
+        .admin-group-details {
+            background: #f9fafb;
+            border-radius: 10px;
+            padding: 20px;
+        }
+
+        .admin-group-info {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            border-left: 4px solid #1e3a5f;
+        }
+
+        .admin-group-info h3 {
+            margin: 0 0 10px 0;
+            color: #1e3a5f;
+        }
+
+        .admin-group-info p {
+            margin: 5px 0;
+            font-size: 14px;
+            color: #374151;
+        }
+
+        .admin-attendance-container {
+            overflow-x: auto;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .admin-attendance-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            min-width: 1200px;
+        }
+
+        .admin-attendance-table th,
+        .admin-attendance-table td {
+            padding: 8px;
+            text-align: center;
+            border: 1px solid #e5e7eb;
+        }
+
+        .admin-attendance-table th {
+            background: #1e3a5f;
+            color: white;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .sticky-col {
+            position: sticky;
+            left: 0;
+            background: white;
+            z-index: 5;
+            min-width: 180px;
+            text-align: left !important;
+        }
+
+        .sticky-col-2 {
+            position: sticky;
+            left: 180px;
+            background: white;
+            z-index: 5;
+            min-width: 100px;
+        }
+
+        .sticky-col-3 {
+            position: sticky;
+            left: 280px;
+            background: white;
+            z-index: 5;
+            min-width: 80px;
+        }
+
+        thead .sticky-col,
+        thead .sticky-col-2,
+        thead .sticky-col-3 {
+            background: #1e3a5f;
+            z-index: 15;
+        }
+
+        .week-header {
+            min-width: 40px;
+            font-size: 11px;
+        }
+
+        .week-header.month-start {
+            background: #2d5a87 !important;
+        }
+
+        .week-cell {
+            padding: 4px !important;
+        }
+
+        .attendance-checkbox {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .attendance-checkbox:checked {
+            accent-color: #22c55e;
+        }
+
+        .student-name-input {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            font-size: 13px;
+            background: transparent;
+        }
+
+        .student-name-input:hover,
+        .student-name-input:focus {
+            border-color: #d1d5db;
+            background: white;
+            outline: none;
+        }
+
+        .student-status-select {
+            padding: 4px 8px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 12px;
+            background: white;
+        }
+
+        .admin-student-row.status-inactive {
+            background: #fef2f2;
+        }
+
+        .admin-student-row.status-transferred {
+            background: #fefce8;
+        }
+
+        .total-hours-cell {
+            background: #f0fdf4 !important;
+            font-size: 12px;
+        }
+
+        .admin-add-student {
+            margin-top: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            border: 2px dashed #d1d5db;
+        }
+
+        .admin-add-student h4 {
+            margin: 0 0 12px 0;
+            color: #374151;
+        }
+
+        .add-student-form {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .add-student-form input[type="text"] {
+            flex: 1;
+            min-width: 200px;
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .add-student-form input[type="date"] {
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .add-student-form button {
+            padding: 10px 20px;
+            background: #22c55e;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .add-student-form button:hover {
+            background: #16a34a;
+        }
+
+        .admin-actions {
+            margin-top: 24px;
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        `;
     }
 
     generateReportHTML(stats, awards) {
