@@ -962,7 +962,7 @@ class CoatsReportsManager {
                                 <th>${this.t('attendanceRate')}</th>
                                 <th>${this.t('booksAdvanced')}</th>
                                 <th>${this.t('progress')}</th>
-                                <th>${this.language === 'es' ? 'Estado' : 'Status'}</th>
+                                ${window.FirebaseData?.currentUser?.email === 'admin@ciudadbilingue.com' ? `<th>${this.language === 'es' ? 'Estado' : 'Status'}</th>` : ''}
                             </tr>
                         </thead>
                         <tbody>
@@ -1265,6 +1265,9 @@ class CoatsReportsManager {
         // Create safe student ID for data attribute
         const studentId = student.name.replace(/[^a-zA-Z0-9]/g, '_');
 
+        // Check if admin is logged in (only in CRM context)
+        const isAdmin = window.FirebaseData?.currentUser?.email === 'admin@ciudadbilingue.com';
+
         return `
         <tr class="attendance-${attendanceClass}" data-student-id="${studentId}" data-group-id="${student.groupId}">
             <td>${rank}</td>
@@ -1282,11 +1285,13 @@ class CoatsReportsManager {
                     <div class="mini-progress" style="width: ${student.attendancePct}%"></div>
                 </div>
             </td>
+            ${isAdmin ? `
             <td class="toggle-cell">
                 <button class="status-toggle-btn active" onclick="window.CoatsReports.toggleStudentStatus('${student.name}', '${student.groupId}')" title="${this.language === 'es' ? 'Click para desactivar' : 'Click to deactivate'}">
                     ✓ ${this.language === 'es' ? 'Activo' : 'Active'}
                 </button>
             </td>
+            ` : ''}
         </tr>
         `;
     }
@@ -1294,20 +1299,31 @@ class CoatsReportsManager {
     renderWithdrawnStudentRow(student) {
         const studentId = student.name.replace(/[^a-zA-Z0-9]/g, '_');
 
+        // Check if admin is logged in (only in CRM context)
+        const isAdmin = window.FirebaseData?.currentUser?.email === 'admin@ciudadbilingue.com';
+
         return `
         <div class="withdrawn-student" data-student-id="${studentId}" data-group-id="${student.groupId}">
             <span class="withdrawn-name">${this.formatName(student.name)}</span>
             <span class="withdrawn-group">${student.group.split(' - ')[0]}</span>
             <span class="withdrawn-hours">${student.total} ${this.t('hours')} (${student.attendancePct.toFixed(1)}%)</span>
             <span class="withdrawn-reason">${student.note || ''}</span>
+            ${isAdmin ? `
             <button class="status-toggle-btn inactive" onclick="window.CoatsReports.toggleStudentStatus('${student.name}', '${student.groupId}')" title="${this.language === 'es' ? 'Click para activar' : 'Click to activate'}">
                 ✗ ${this.language === 'es' ? 'Inactivo' : 'Inactive'}
             </button>
+            ` : ''}
         </div>
         `;
     }
 
     toggleStudentStatus(studentName, groupId) {
+        // Security check - only admin can toggle status
+        if (window.FirebaseData?.currentUser?.email !== 'admin@ciudadbilingue.com') {
+            console.error('❌ Unauthorized: Only admin can change student status');
+            return;
+        }
+
         // Find the student in the group data
         const group = this.programData.groups.find(g => g.id === groupId);
         if (!group) {
