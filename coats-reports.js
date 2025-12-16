@@ -962,6 +962,7 @@ class CoatsReportsManager {
                                 <th>${this.t('attendanceRate')}</th>
                                 <th>${this.t('booksAdvanced')}</th>
                                 <th>${this.t('progress')}</th>
+                                <th>${this.language === 'es' ? 'Estado' : 'Status'}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -977,13 +978,7 @@ class CoatsReportsManager {
                 <h3><span class="section-icon">📋</span> ${this.t('withdrawnStudents')}</h3>
                 <p class="withdrawn-note">${this.t('withdrawnNote')}</p>
                 <div class="withdrawn-list">
-                    ${stats.withdrawnStudents.map(s => `
-                        <div class="withdrawn-student">
-                            <span class="withdrawn-name">${this.formatName(s.name)}</span>
-                            <span class="withdrawn-group">${s.group.split(' - ')[0]}</span>
-                            <span class="withdrawn-reason">${s.note || ''}</span>
-                        </div>
-                    `).join('')}
+                    ${stats.withdrawnStudents.map(s => this.renderWithdrawnStudentRow(s)).join('')}
                 </div>
             </div>
             ` : ''}
@@ -1267,8 +1262,11 @@ class CoatsReportsManager {
             lateStartBadge = `<span class="late-start-badge" title="${this.t('lateStartNote')} ${formattedDate}">(${this.t('lateStartNote')} ${formattedDate})</span>`;
         }
 
+        // Create safe student ID for data attribute
+        const studentId = student.name.replace(/[^a-zA-Z0-9]/g, '_');
+
         return `
-        <tr class="attendance-${attendanceClass}">
+        <tr class="attendance-${attendanceClass}" data-student-id="${studentId}" data-group-id="${student.groupId}">
             <td>${rank}</td>
             <td class="student-name">${this.formatName(student.name)} ${lateStartBadge}</td>
             <td>${student.group.split('(')[0].trim()}</td>
@@ -1284,8 +1282,67 @@ class CoatsReportsManager {
                     <div class="mini-progress" style="width: ${student.attendancePct}%"></div>
                 </div>
             </td>
+            <td class="toggle-cell">
+                <button class="status-toggle-btn active" onclick="window.CoatsReports.toggleStudentStatus('${student.name}', '${student.groupId}')" title="${this.language === 'es' ? 'Click para desactivar' : 'Click to deactivate'}">
+                    ✓ ${this.language === 'es' ? 'Activo' : 'Active'}
+                </button>
+            </td>
         </tr>
         `;
+    }
+
+    renderWithdrawnStudentRow(student) {
+        const studentId = student.name.replace(/[^a-zA-Z0-9]/g, '_');
+
+        return `
+        <div class="withdrawn-student" data-student-id="${studentId}" data-group-id="${student.groupId}">
+            <span class="withdrawn-name">${this.formatName(student.name)}</span>
+            <span class="withdrawn-group">${student.group.split(' - ')[0]}</span>
+            <span class="withdrawn-hours">${student.total} ${this.t('hours')} (${student.attendancePct.toFixed(1)}%)</span>
+            <span class="withdrawn-reason">${student.note || ''}</span>
+            <button class="status-toggle-btn inactive" onclick="window.CoatsReports.toggleStudentStatus('${student.name}', '${student.groupId}')" title="${this.language === 'es' ? 'Click para activar' : 'Click to activate'}">
+                ✗ ${this.language === 'es' ? 'Inactivo' : 'Inactive'}
+            </button>
+        </div>
+        `;
+    }
+
+    toggleStudentStatus(studentName, groupId) {
+        // Find the student in the group data
+        const group = this.programData.groups.find(g => g.id === groupId);
+        if (!group) {
+            console.error('Group not found:', groupId);
+            return;
+        }
+
+        const student = group.students.find(s => s.name === studentName);
+        if (!student) {
+            console.error('Student not found:', studentName);
+            return;
+        }
+
+        // Toggle status
+        if (student.status === 'active') {
+            student.status = 'inactive';
+            if (!student.note) {
+                student.note = this.language === 'es' ? 'Desactivado manualmente' : 'Manually deactivated';
+            }
+            console.log(`🔴 ${studentName} set to inactive`);
+        } else if (student.status === 'inactive') {
+            student.status = 'active';
+            console.log(`🟢 ${studentName} set to active`);
+        }
+
+        // Re-render the report
+        this.refreshReport();
+    }
+
+    refreshReport() {
+        const container = document.getElementById('coatsReportContainer');
+        if (container) {
+            this.renderReport('coatsReportContainer');
+            console.log('📊 Report refreshed');
+        }
     }
 
     formatName(name) {
@@ -2946,6 +3003,53 @@ class CoatsReportsManager {
             font-size: 13px;
             color: #991b1b;
             font-style: italic;
+            flex: 1;
+        }
+
+        .withdrawn-hours {
+            font-size: 13px;
+            color: #64748b;
+            min-width: 120px;
+        }
+
+        /* Status Toggle Buttons */
+        .toggle-cell {
+            text-align: center;
+        }
+
+        .status-toggle-btn {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .status-toggle-btn.active {
+            background: #dcfce7;
+            color: #166534;
+            border: 1px solid #86efac;
+        }
+
+        .status-toggle-btn.active:hover {
+            background: #fef2f2;
+            color: #991b1b;
+            border-color: #fecaca;
+        }
+
+        .status-toggle-btn.inactive {
+            background: #fef2f2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+        }
+
+        .status-toggle-btn.inactive:hover {
+            background: #dcfce7;
+            color: #166534;
+            border-color: #86efac;
         }
 
         /* Actions */
