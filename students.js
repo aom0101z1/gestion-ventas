@@ -421,6 +421,34 @@ function renderPaymentNotesModal(student) {
 // SECTION 4: FORM RENDERING
 // ============================================
 
+// Helper function to get Grupos 2.0 options for the dropdown
+function getGrupos2Options(selectedGrupo) {
+    // Try to get groups from Grupos 2.0 system first
+    if (window.GroupsManager2 && window.GroupsManager2.groups && window.GroupsManager2.groups.size > 0) {
+        const groups = Array.from(window.GroupsManager2.groups.values())
+            .filter(g => g.status === 'active')
+            .sort((a, b) => a.groupId - b.groupId);
+
+        return groups.map(g => {
+            const displayName = g.displayName || `Grupo ${g.groupId}`;
+            const studentCount = g.studentIds ? g.studentIds.length : 0;
+            const maxStudents = g.maxStudents || 8;
+            return `<option value="${g.groupId}" ${selectedGrupo == g.groupId ? 'selected' : ''}>
+                ${g.groupId} - ${displayName} (${studentCount}/${maxStudents})
+            </option>`;
+        }).join('');
+    }
+
+    // Fallback to old groups system if Grupos 2.0 not available
+    if (window.groupsData && window.groupsData.size > 0) {
+        return Array.from(window.groupsData.keys()).map(g =>
+            `<option value="${g}" ${selectedGrupo === g ? 'selected' : ''}>${g}</option>`
+        ).join('');
+    }
+
+    return '';
+}
+
 function renderStudentForm(student = null) {
     const isEdit = !!student;
     return `
@@ -503,9 +531,7 @@ function renderStudentForm(student = null) {
                         <label>Grupo</label>
                         <select id="stuGrupo">
                             <option value="">Sin asignar</option>
-                            ${window.groupsData ? Array.from(window.groupsData.keys()).map(g =>
-                                `<option value="${g}" ${student?.grupo === g ? 'selected' : ''}>${g}</option>`
-                            ).join('') : ''}
+                            ${getGrupos2Options(student?.grupo)}
                         </select>
                     </div>
 
@@ -634,7 +660,7 @@ function renderStudentTable(students) {
                                 ${index + 1}
                             </td>
                             <td style="padding: 0.75rem;">
-                                ${s.nombre || '-'}
+                                ${s.grupo ? '<span title="Asignado a grupo" style="color: #10b981;">📚</span> ' : ''}${s.nombre || '-'}
                                 ${s.paymentNotes ? ' 📋' : ''}
                             </td>
                             <td style="padding: 0.75rem;">${s.tipoDoc || ''} ${s.numDoc || '-'}</td>
@@ -646,7 +672,13 @@ function renderStudentTable(students) {
                                     </a>
                                 ` : '-'}
                             </td>
-                            <td style="padding: 0.75rem;">${s.grupo || 'Sin grupo'}</td>
+                            <td style="padding: 0.75rem;">
+                                ${s.grupo ? `
+                                    <span style="background: #10b981; color: white; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.85rem; font-weight: 500;">
+                                        📚 ${s.grupo}
+                                    </span>
+                                ` : '<span style="color: #9ca3af;">Sin grupo</span>'}
+                            </td>
                             <td style="padding: 0.75rem;">
                                 ${s.modalidad || '-'}
                                 ${s.modalidadDetalle ? `<br><small style="color: #6b7280;">${s.modalidadDetalle}</small>` : ''}
@@ -828,17 +860,22 @@ window.loadStudentsTab = async function() {
 // SECTION 7: GLOBAL FUNCTIONS (UPDATED)
 // ============================================
 
-window.showStudentForm = function(studentId = null) {
+window.showStudentForm = async function(studentId = null) {
     const student = studentId ? window.StudentManager.students.get(studentId) : null;
-    
+
     // Remove any existing modal first
     const existingModal = document.getElementById('studentFormModal');
     if (existingModal) existingModal.remove();
-    
+
+    // Ensure Grupos 2.0 data is loaded for the dropdown
+    if (window.GroupsManager2) {
+        await window.GroupsManager2.init(true); // Force reload to get latest groups
+    }
+
     // Append modal to container
     const container = document.getElementById('studentsContainer');
     container.insertAdjacentHTML('beforeend', renderStudentForm(student));
-    
+
     document.getElementById('studentForm').onsubmit = async (e) => {
         e.preventDefault();
         await saveStudentForm(studentId);
@@ -1183,6 +1220,11 @@ function formatDateTime(dateStr) {
 async function saveStudentForm(studentId) {
     try {
         const tipoPago = document.getElementById('stuTipoPago').value;
+        const newGrupo = document.getElementById('stuGrupo').value;
+
+        // Get old grupo value if editing
+        const existingStudent = studentId ? window.StudentManager.students.get(studentId) : null;
+        const oldGrupo = existingStudent?.grupo || '';
 
         const studentData = {
             id: studentId,
@@ -1195,7 +1237,7 @@ async function saveStudentForm(studentId) {
             acudiente: document.getElementById('stuAcudiente').value,
             docAcudiente: document.getElementById('stuDocAcudiente').value,
             fechaInicio: document.getElementById('stuFechaInicio').value,
-            grupo: document.getElementById('stuGrupo').value,
+            grupo: newGrupo,
             modalidad: document.getElementById('stuModalidad').value,
             modalidadDetalle: document.getElementById('stuModalidadDetalle').value,
             tipoPago: tipoPago,
@@ -1207,7 +1249,7 @@ async function saveStudentForm(studentId) {
         let savedStudent;
         if (studentId) {
             await window.StudentManager.updateStudent(studentId, studentData);
-            savedStudent = studentData;
+            savedStudent = { ...existingStudent, ...studentData };
         } else {
             savedStudent = await window.StudentManager.saveStudent(studentData);
 
@@ -1245,6 +1287,46 @@ async function saveStudentForm(studentId) {
                     console.error('❌ Error registering enrollment fee:', error);
                     window.showNotification('⚠️ Estudiante guardado pero error al registrar matrícula', 'warning');
                 }
+            }
+        }
+
+        // Update Grupos 2.0 studentIds if group changed
+        if (window.GroupsManager2 && (oldGrupo !== newGrupo)) {
+            try {
+                // Remove student from old group
+                if (oldGrupo) {
+                    const oldGroupId = parseInt(oldGrupo);
+                    const oldGroup = window.GroupsManager2.groups.get(oldGroupId);
+                    if (oldGroup) {
+                        const studentIds = oldGroup.studentIds || [];
+                        const newStudentIds = studentIds.filter(id => id !== savedStudent.id);
+                        await window.GroupsManager2.saveGroup({
+                            ...oldGroup,
+                            studentIds: newStudentIds
+                        });
+                        console.log(`📚 Removed student from group ${oldGrupo}`);
+                    }
+                }
+
+                // Add student to new group
+                if (newGrupo) {
+                    const newGroupId = parseInt(newGrupo);
+                    const newGroup = window.GroupsManager2.groups.get(newGroupId);
+                    if (newGroup) {
+                        const studentIds = newGroup.studentIds || [];
+                        if (!studentIds.includes(savedStudent.id)) {
+                            studentIds.push(savedStudent.id);
+                            await window.GroupsManager2.saveGroup({
+                                ...newGroup,
+                                studentIds: studentIds
+                            });
+                            console.log(`📚 Added student to group ${newGrupo}`);
+                        }
+                    }
+                }
+            } catch (groupError) {
+                console.error('⚠️ Error updating group studentIds:', groupError);
+                // Don't fail the whole save, just log the error
             }
         }
 
