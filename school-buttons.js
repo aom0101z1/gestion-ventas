@@ -54,7 +54,10 @@ function addSchoolButtons() {
         // Skip director-only modules if user is not director
         if (module.directorOnly) {
             const userRole = window.userRole || '';
-            if (userRole !== 'director' && userRole !== 'admin') {
+            const userEmail = window.FirebaseData?.currentUser?.email || '';
+            // Allow director, admin, or specific email accounts
+            const allowedEmails = ['admin@ciudadbilingue.com', 'contacto@ciudadbilingue.com'];
+            if (userRole !== 'director' && userRole !== 'admin' && !allowedEmails.includes(userEmail)) {
                 console.log(`⚠️ Skipping ${module.name} - director only`);
                 return; // Skip this module
             }
