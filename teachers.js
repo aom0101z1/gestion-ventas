@@ -120,7 +120,8 @@ class TeacherManager {
         let teachers = this.getTeachersWithStats();
 
         if (filters.status && filters.status !== 'all') {
-            teachers = teachers.filter(t => t.status === filters.status);
+            // Treat teachers without status field as 'active'
+            teachers = teachers.filter(t => (t.status || 'active') === filters.status);
         }
 
         if (filters.language && filters.language !== 'all') {
@@ -321,9 +322,10 @@ function renderTeachersTable(teachers) {
 }
 
 function renderTeacherRow(teacher) {
-    const statusColor = teacher.status === 'active' ? '#10b981' : '#6b7280';
-    const statusText = teacher.status === 'active' ? 'Activo' : 'Inactivo';
-    const statusBg = teacher.status === 'active' ? '#d1fae5' : '#f3f4f6';
+    const status = teacher.status || 'active'; // Default to active if not set
+    const statusColor = status === 'active' ? '#10b981' : '#6b7280';
+    const statusText = status === 'active' ? 'Activo' : 'Inactivo';
+    const statusBg = status === 'active' ? '#d1fae5' : '#f3f4f6';
 
     const languageFlags = {
         english: '🇬🇧',
