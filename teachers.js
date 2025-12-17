@@ -323,9 +323,9 @@ function renderTeachersTable(teachers) {
 
 function renderTeacherRow(teacher) {
     const status = teacher.status || 'active'; // Default to active if not set
-    const statusColor = status === 'active' ? '#10b981' : '#6b7280';
-    const statusText = status === 'active' ? 'Activo' : 'Inactivo';
-    const statusBg = status === 'active' ? '#d1fae5' : '#f3f4f6';
+    const statusColor = status === 'active' ? '#065f46' : '#dc2626';
+    const statusText = status === 'active' ? '✓ Activo' : '✗ Inactivo';
+    const statusBg = status === 'active' ? '#d1fae5' : '#fee2e2';
 
     const languageFlags = {
         english: '🇬🇧',
@@ -392,22 +392,22 @@ function renderTeacherRow(teacher) {
                 `}
             </td>
             <td style="padding: 1rem; text-align: center;">
-                <button onclick="toggleTeacherStatus('${teacher.id}')"
-                        style="background: ${statusBg}; color: ${statusColor}; border: none; padding: 0.35rem 0.75rem;
-                               border-radius: 20px; cursor: pointer; font-size: 0.8rem; font-weight: 600; transition: all 0.2s;">
+                <button onclick="toggleTeacherStatus('${teacher.id}')" title="Click para ${status === 'active' ? 'desactivar' : 'activar'}"
+                        style="background: ${statusBg}; color: ${statusColor}; border: 2px solid ${statusColor}; padding: 0.4rem 1rem;
+                               border-radius: 20px; cursor: pointer; font-size: 0.85rem; font-weight: 600; transition: all 0.2s; min-width: 100px;">
                     ${statusText}
                 </button>
             </td>
             <td style="padding: 1rem; text-align: center;">
                 <div style="display: flex; gap: 0.5rem; justify-content: center;">
-                    <button onclick="showTeacherModal('${teacher.id}')" title="Editar"
-                            style="background: #3b82f6; color: white; border: none; width: 32px; height: 32px;
-                                   border-radius: 6px; cursor: pointer; font-size: 0.9rem;">
+                    <button onclick="showTeacherModal('${teacher.id}')" title="Editar profesor"
+                            style="background: #3b82f6; color: white; border: none; width: 36px; height: 36px;
+                                   border-radius: 8px; cursor: pointer; font-size: 1rem;">
                         ✏️
                     </button>
-                    <button onclick="deleteTeacher('${teacher.id}')" title="Eliminar"
-                            style="background: #ef4444; color: white; border: none; width: 32px; height: 32px;
-                                   border-radius: 6px; cursor: pointer; font-size: 0.9rem;">
+                    <button onclick="confirmDeleteTeacher('${teacher.id}')" title="Eliminar profesor"
+                            style="background: #fee2e2; color: #dc2626; border: 2px solid #dc2626; width: 36px; height: 36px;
+                                   border-radius: 8px; cursor: pointer; font-size: 1rem;">
                         🗑️
                     </button>
                 </div>
@@ -658,7 +658,7 @@ window.toggleTeacherStatus = async function(teacherId) {
     }
 };
 
-window.deleteTeacher = async function(teacherId) {
+window.confirmDeleteTeacher = async function(teacherId) {
     const teacher = window.TeacherManager.teachers.get(teacherId);
     if (!teacher) return;
 
@@ -669,13 +669,22 @@ window.deleteTeacher = async function(teacherId) {
         return;
     }
 
-    if (!confirm(`¿Eliminar al profesor "${teacher.name}"?\n\nEsta acción no se puede deshacer.`)) {
+    // Double confirmation for delete
+    const firstConfirm = confirm(`⚠️ ¿Estás seguro de ELIMINAR al profesor "${teacher.name}"?\n\n⛔ Esta acción NO se puede deshacer.`);
+    if (!firstConfirm) return;
+
+    const secondConfirm = confirm(`🚨 ÚLTIMA CONFIRMACIÓN 🚨\n\n¿Realmente deseas ELIMINAR PERMANENTEMENTE a "${teacher.name}"?\n\nEscribe en el siguiente prompt el nombre del profesor para confirmar.`);
+    if (!secondConfirm) return;
+
+    const nameConfirm = prompt(`Escribe el nombre "${teacher.name}" para confirmar la eliminación:`);
+    if (nameConfirm !== teacher.name) {
+        alert('❌ El nombre no coincide. Eliminación cancelada.');
         return;
     }
 
     try {
         await window.TeacherManager.deleteTeacher(teacherId);
-        window.showNotification('✅ Profesor eliminado', 'success');
+        window.showNotification('✅ Profesor eliminado permanentemente', 'success');
         await refreshTeachersGrid();
     } catch (error) {
         console.error('❌ Error deleting teacher:', error);
