@@ -36,9 +36,9 @@ class GroupsManager2 {
     }
 
     // Initialize
-    async init() {
-        if (this.initialized) return;
-        console.log('🚀 Initializing Grupos2 manager');
+    async init(forceReload = false) {
+        if (this.initialized && !forceReload) return;
+        console.log('🚀 Initializing Grupos2 manager', forceReload ? '(force reload)' : '');
         await this.loadGroups();
         this.initialized = true;
     }
@@ -47,6 +47,9 @@ class GroupsManager2 {
     async loadGroups() {
         try {
             console.log('📂 Loading groups from Firebase (grupos2)...');
+
+            // Clear existing data to ensure fresh load
+            this.groups.clear();
 
             const db = window.firebaseModules.database;
             const ref = db.ref(window.FirebaseData.database, 'grupos2');
@@ -275,7 +278,8 @@ window.loadGrupos2Tab = async function() {
         container.innerHTML = viewHTML;
         console.log('📝 Container updated');
 
-        await window.GroupsManager2.init();
+        // Force reload to get fresh data from Firebase each time tab is opened
+        await window.GroupsManager2.init(true);
         await refreshGrupos2Grid();
         console.log('✅ Grupos2 tab loaded successfully');
         console.log('✅ showGrupo2Form available?:', typeof showGrupo2Form);
