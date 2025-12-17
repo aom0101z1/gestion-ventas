@@ -39,6 +39,12 @@ class EmployeeManager {
             'Desarrollador',
             'Otro'
         ];
+
+        // Employee types
+        this.employeeTypes = [
+            { value: 'administrativo', label: 'Administrativo', description: 'Tiempo completo con salario fijo' },
+            { value: 'contratista', label: 'Contratista', description: 'Por horas o proyecto' }
+        ];
     }
 
     // Initialize
@@ -91,10 +97,12 @@ class EmployeeManager {
                 email: employeeData.email.toLowerCase(),
                 position: employeeData.position,
                 department: employeeData.department,
+                employeeType: employeeData.employeeType || 'administrativo',
                 phone: employeeData.phone || '',
                 hireDate: employeeData.hireDate || now.split('T')[0],
                 status: employeeData.status || 'active',
                 salary: parseFloat(employeeData.salary) || 0,
+                hourlyRate: parseFloat(employeeData.hourlyRate) || 0,
                 photoURL: employeeData.photoURL || '',
                 notes: employeeData.notes || '',
                 createdAt: now,
@@ -495,6 +503,7 @@ function renderEmployeesTable(employees) {
                         <th style="padding: 1rem; text-align: left; font-weight: 600; color: #374151;">Empleado</th>
                         <th style="padding: 1rem; text-align: left; font-weight: 600; color: #374151;">Posición</th>
                         <th style="padding: 1rem; text-align: left; font-weight: 600; color: #374151;">Departamento</th>
+                        <th style="padding: 1rem; text-align: left; font-weight: 600; color: #374151;">Tipo</th>
                         <th style="padding: 1rem; text-align: left; font-weight: 600; color: #374151;">Contacto</th>
                         <th style="padding: 1rem; text-align: left; font-weight: 600; color: #374151;">Estado</th>
                         <th style="padding: 1rem; text-align: center; font-weight: 600; color: #374151;">Acciones</th>
@@ -536,6 +545,23 @@ function renderEmployeeRow(employee) {
                 <span style="background: #e0e7ff; color: #3730a3; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.85rem; font-weight: 500;">
                     ${employee.department}
                 </span>
+            </td>
+            <td style="padding: 1rem;">
+                ${employee.employeeType === 'contratista' ? `
+                    <span style="background: #fef3c7; color: #92400e; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.85rem; font-weight: 500;">
+                        ⏰ Contratista
+                    </span>
+                    <div style="font-size: 0.75rem; color: #6b7280; margin-top: 0.25rem;">
+                        $${(employee.hourlyRate || 0).toLocaleString('es-CO')}/hora
+                    </div>
+                ` : `
+                    <span style="background: #d1fae5; color: #065f46; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.85rem; font-weight: 500;">
+                        💼 Administrativo
+                    </span>
+                    <div style="font-size: 0.75rem; color: #6b7280; margin-top: 0.25rem;">
+                        $${(employee.salary || 0).toLocaleString('es-CO')}/mes
+                    </div>
+                `}
             </td>
             <td style="padding: 1rem; color: #6b7280; font-size: 0.9rem;">
                 ${employee.phone || 'N/A'}
@@ -616,14 +642,29 @@ function renderEmployeeForm(employee = null) {
                     </div>
 
                     <div>
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Tipo de Empleado *</label>
+                        <select id="empType" onchange="toggleEmployeePaymentFields()" style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px;" required>
+                            ${window.EmployeeManager.employeeTypes.map(type =>
+                                `<option value="${type.value}" ${employee?.employeeType === type.value ? 'selected' : ''}>${type.label} - ${type.description}</option>`
+                            ).join('')}
+                        </select>
+                    </div>
+
+                    <div>
                         <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Fecha de Ingreso</label>
                         <input type="date" id="empHireDate" value="${employee?.hireDate || new Date().toISOString().split('T')[0]}" style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px;">
                     </div>
 
-                    <div>
+                    <div id="empSalaryGroup" style="display: ${employee?.employeeType === 'contratista' ? 'none' : 'block'};">
                         <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Salario Mensual</label>
                         <input type="number" id="empSalary" value="${employee?.salary || 0}" placeholder="0" style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px;">
                         <small style="color: #6b7280; font-size: 0.85rem;">En pesos colombianos (COP)</small>
+                    </div>
+
+                    <div id="empHourlyRateGroup" style="display: ${employee?.employeeType === 'contratista' ? 'block' : 'none'};">
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Tarifa por Hora</label>
+                        <input type="number" id="empHourlyRate" value="${employee?.hourlyRate || 0}" placeholder="0" style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px;">
+                        <small style="color: #6b7280; font-size: 0.85rem;">En pesos colombianos (COP) por hora</small>
                     </div>
 
                     <div style="grid-column: 1 / -1;">
@@ -673,8 +714,25 @@ window.closeEmployeeModal = function() {
     }
 };
 
+// Toggle payment fields based on employee type
+window.toggleEmployeePaymentFields = function() {
+    const empType = document.getElementById('empType').value;
+    const salaryGroup = document.getElementById('empSalaryGroup');
+    const hourlyRateGroup = document.getElementById('empHourlyRateGroup');
+
+    if (empType === 'contratista') {
+        salaryGroup.style.display = 'none';
+        hourlyRateGroup.style.display = 'block';
+    } else {
+        salaryGroup.style.display = 'block';
+        hourlyRateGroup.style.display = 'none';
+    }
+};
+
 window.saveEmployee = async function(event, employeeId = null) {
     event.preventDefault();
+
+    const employeeType = document.getElementById('empType').value;
 
     const employeeData = {
         name: document.getElementById('empName').value.trim(),
@@ -682,8 +740,10 @@ window.saveEmployee = async function(event, employeeId = null) {
         phone: document.getElementById('empPhone').value.trim(),
         position: document.getElementById('empPosition').value,
         department: document.getElementById('empDepartment').value,
+        employeeType: employeeType,
         hireDate: document.getElementById('empHireDate').value,
-        salary: document.getElementById('empSalary').value,
+        salary: employeeType === 'administrativo' ? document.getElementById('empSalary').value : 0,
+        hourlyRate: employeeType === 'contratista' ? document.getElementById('empHourlyRate').value : 0,
         photoURL: document.getElementById('empPhotoURL').value.trim(),
         notes: document.getElementById('empNotes').value.trim()
     };

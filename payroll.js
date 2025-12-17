@@ -318,6 +318,19 @@ window.loadPayrollTab = async function() {
         return;
     }
 
+    // Restrict access to admin@ciudadbilingue.com only
+    const currentUserEmail = window.FirebaseData?.currentUser?.email || '';
+    if (currentUserEmail !== 'admin@ciudadbilingue.com') {
+        container.innerHTML = `
+            <div style="padding: 3rem; text-align: center;">
+                <div style="font-size: 4rem; margin-bottom: 1rem;">🔒</div>
+                <h2 style="color: #ef4444; margin: 0 0 1rem 0;">Acceso Restringido</h2>
+                <p style="color: #6b7280;">Este módulo está disponible solo para administradores.</p>
+            </div>
+        `;
+        return;
+    }
+
     await window.PayrollManager.init();
 
     const today = new Date();
@@ -354,7 +367,10 @@ window.loadPayrollTab = async function() {
                 <!-- Tabs -->
                 <div style="background: white; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); overflow: hidden;">
                     <div style="display: flex; border-bottom: 2px solid #e5e7eb;">
-                        <button onclick="switchPayrollTab('teachers')" id="tabTeachers" class="payroll-tab active" style="flex: 1; padding: 1rem; border: none; background: white; cursor: pointer; font-weight: 500; transition: all 0.2s;">
+                        <button onclick="switchPayrollTab('summary')" id="tabSummary" class="payroll-tab active" style="flex: 1; padding: 1rem; border: none; background: white; cursor: pointer; font-weight: 500; transition: all 0.2s;">
+                            📊 Resumen Global
+                        </button>
+                        <button onclick="switchPayrollTab('teachers')" id="tabTeachers" class="payroll-tab" style="flex: 1; padding: 1rem; border: none; background: white; cursor: pointer; font-weight: 500; transition: all 0.2s;">
                             👩‍🏫 Profesores
                         </button>
                         <button onclick="switchPayrollTab('administrative')" id="tabAdministrative" class="payroll-tab" style="flex: 1; padding: 1rem; border: none; background: white; cursor: pointer; font-weight: 500; transition: all 0.2s;">
@@ -402,7 +418,7 @@ window.loadPayrollTab = async function() {
     document.head.appendChild(style);
 
     // Load default tab
-    window.switchPayrollTab('teachers');
+    window.switchPayrollTab('summary');
 };
 
 // Switch between tabs
@@ -413,6 +429,9 @@ window.switchPayrollTab = function(tab) {
 
     // Load tab content
     switch(tab) {
+        case 'summary':
+            renderSummaryTab();
+            break;
         case 'teachers':
             renderTeachersTab();
             break;
@@ -424,6 +443,288 @@ window.switchPayrollTab = function(tab) {
             break;
     }
 };
+
+// Render summary tab - shows all employees and teachers together
+async function renderSummaryTab() {
+    const year = parseInt(document.getElementById('payrollYear').value);
+    const month = parseInt(document.getElementById('payrollMonth').value);
+    const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+    // Load data from all sources
+    // 1. From Employees 2.0 module
+    let employees2 = [];
+    if (window.EmployeeManager && window.EmployeeManager.employees) {
+        await window.EmployeeManager.init();
+        employees2 = Array.from(window.EmployeeManager.employees.values()).filter(e => e.status === 'active');
+    }
+
+    // 2. From Teachers 2.0 module
+    let teachers2 = [];
+    if (window.TeacherManager && window.TeacherManager.teachers) {
+        await window.TeacherManager.init();
+        teachers2 = Array.from(window.TeacherManager.teachers.values());
+    }
+
+    // 3. From Payroll module (legacy)
+    const payrollTeachers = Array.from(window.PayrollManager.teachers.values());
+    const payrollAdmin = Array.from(window.PayrollManager.administrative.values());
+    const monthlyPayroll = await window.PayrollManager.getMonthlyPayroll(year, month);
+
+    // Calculate totals
+    let totalAdminSalary = 0;
+    let totalContratistaSalary = 0;
+    let totalTeachersSalary = 0;
+
+    // Process Employees 2.0
+    employees2.forEach(emp => {
+        if (emp.employeeType === 'contratista') {
+            totalContratistaSalary += parseFloat(emp.hourlyRate) || 0; // Note: This would need hours tracking
+        } else {
+            totalAdminSalary += parseFloat(emp.salary) || 0;
+        }
+    });
+
+    // Process Teachers 2.0 (hourly)
+    teachers2.forEach(teacher => {
+        if (teacher.paymentType === 'salary') {
+            totalTeachersSalary += parseFloat(teacher.monthlySalary) || 0;
+        }
+        // Hourly teachers need hours tracking
+    });
+
+    // Process Payroll legacy teachers
+    payrollTeachers.forEach(teacher => {
+        const payroll = monthlyPayroll.teachers?.[teacher.id];
+        if (payroll) {
+            totalTeachersSalary += payroll.total || 0;
+        }
+    });
+
+    // Process Payroll legacy admin
+    payrollAdmin.forEach(emp => {
+        const payroll = monthlyPayroll.administrative?.[emp.id];
+        totalAdminSalary += payroll?.total || emp.salary?.amount || 0;
+    });
+
+    const grandTotal = totalAdminSalary + totalContratistaSalary + totalTeachersSalary;
+
+    const content = `
+        <div>
+            <div style="margin-bottom: 2rem;">
+                <h3 style="margin: 0 0 0.5rem 0;">📊 Resumen Global de Nómina</h3>
+                <p style="color: #6b7280; margin: 0;">${monthNames[month - 1]} ${year}</p>
+            </div>
+
+            <!-- Summary Cards -->
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem;">
+                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1.5rem; border-radius: 12px;">
+                    <div style="font-size: 0.875rem; opacity: 0.9; margin-bottom: 0.5rem;">💼 Administrativos</div>
+                    <div style="font-size: 1.75rem; font-weight: bold;">${formatCurrency(totalAdminSalary)}</div>
+                    <div style="font-size: 0.75rem; opacity: 0.8; margin-top: 0.5rem;">${employees2.filter(e => e.employeeType !== 'contratista').length + payrollAdmin.length} personas</div>
+                </div>
+                <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 1.5rem; border-radius: 12px;">
+                    <div style="font-size: 0.875rem; opacity: 0.9; margin-bottom: 0.5rem;">⏰ Contratistas</div>
+                    <div style="font-size: 1.75rem; font-weight: bold;">${formatCurrency(totalContratistaSalary)}</div>
+                    <div style="font-size: 0.75rem; opacity: 0.8; margin-top: 0.5rem;">${employees2.filter(e => e.employeeType === 'contratista').length} personas</div>
+                </div>
+                <div style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; padding: 1.5rem; border-radius: 12px;">
+                    <div style="font-size: 0.875rem; opacity: 0.9; margin-bottom: 0.5rem;">👩‍🏫 Profesores</div>
+                    <div style="font-size: 1.75rem; font-weight: bold;">${formatCurrency(totalTeachersSalary)}</div>
+                    <div style="font-size: 0.75rem; opacity: 0.8; margin-top: 0.5rem;">${teachers2.length + payrollTeachers.length} personas</div>
+                </div>
+                <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 1.5rem; border-radius: 12px;">
+                    <div style="font-size: 0.875rem; opacity: 0.9; margin-bottom: 0.5rem;">💰 TOTAL NÓMINA</div>
+                    <div style="font-size: 1.75rem; font-weight: bold;">${formatCurrency(grandTotal)}</div>
+                    <div style="font-size: 0.75rem; opacity: 0.8; margin-top: 0.5rem;">Total mensual</div>
+                </div>
+            </div>
+
+            <!-- Employees 2.0 Table -->
+            ${employees2.length > 0 ? `
+                <div style="margin-bottom: 2rem;">
+                    <h4 style="margin: 0 0 1rem 0; display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="background: #667eea; color: white; padding: 0.25rem 0.75rem; border-radius: 6px; font-size: 0.875rem;">Empleados 2.0</span>
+                        Personal desde módulo Empleados
+                    </h4>
+                    <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead style="background: #f9fafb;">
+                                <tr>
+                                    <th style="padding: 0.75rem; text-align: left; border-bottom: 1px solid #e5e7eb;">Nombre</th>
+                                    <th style="padding: 0.75rem; text-align: left; border-bottom: 1px solid #e5e7eb;">Posición</th>
+                                    <th style="padding: 0.75rem; text-align: center; border-bottom: 1px solid #e5e7eb;">Tipo</th>
+                                    <th style="padding: 0.75rem; text-align: right; border-bottom: 1px solid #e5e7eb;">Salario/Tarifa</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${employees2.map(emp => `
+                                    <tr style="border-bottom: 1px solid #f3f4f6;">
+                                        <td style="padding: 0.75rem;">
+                                            <div style="font-weight: 500;">${emp.name}</div>
+                                            <div style="font-size: 0.75rem; color: #6b7280;">${emp.email}</div>
+                                        </td>
+                                        <td style="padding: 0.75rem; color: #6b7280;">${emp.position}</td>
+                                        <td style="padding: 0.75rem; text-align: center;">
+                                            ${emp.employeeType === 'contratista' ? `
+                                                <span style="background: #fef3c7; color: #92400e; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem;">⏰ Contratista</span>
+                                            ` : `
+                                                <span style="background: #d1fae5; color: #065f46; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem;">💼 Administrativo</span>
+                                            `}
+                                        </td>
+                                        <td style="padding: 0.75rem; text-align: right; font-weight: 600;">
+                                            ${emp.employeeType === 'contratista'
+                                                ? `${formatCurrency(emp.hourlyRate || 0)}/hora`
+                                                : formatCurrency(emp.salary || 0)}
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            ` : ''}
+
+            <!-- Teachers 2.0 Table -->
+            ${teachers2.length > 0 ? `
+                <div style="margin-bottom: 2rem;">
+                    <h4 style="margin: 0 0 1rem 0; display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="background: #3b82f6; color: white; padding: 0.25rem 0.75rem; border-radius: 6px; font-size: 0.875rem;">Profesores 2.0</span>
+                        Profesores desde módulo Profesores
+                    </h4>
+                    <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead style="background: #f9fafb;">
+                                <tr>
+                                    <th style="padding: 0.75rem; text-align: left; border-bottom: 1px solid #e5e7eb;">Nombre</th>
+                                    <th style="padding: 0.75rem; text-align: left; border-bottom: 1px solid #e5e7eb;">Contacto</th>
+                                    <th style="padding: 0.75rem; text-align: center; border-bottom: 1px solid #e5e7eb;">Tipo Pago</th>
+                                    <th style="padding: 0.75rem; text-align: right; border-bottom: 1px solid #e5e7eb;">Tarifa/Salario</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${teachers2.map(teacher => `
+                                    <tr style="border-bottom: 1px solid #f3f4f6;">
+                                        <td style="padding: 0.75rem;">
+                                            <div style="font-weight: 500;">${teacher.name}</div>
+                                        </td>
+                                        <td style="padding: 0.75rem; color: #6b7280;">
+                                            ${teacher.phone || ''} ${teacher.email ? `• ${teacher.email}` : ''}
+                                        </td>
+                                        <td style="padding: 0.75rem; text-align: center;">
+                                            ${teacher.paymentType === 'salary' ? `
+                                                <span style="background: #d1fae5; color: #065f46; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem;">💼 Salario</span>
+                                            ` : `
+                                                <span style="background: #dbeafe; color: #1e40af; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem;">⏰ Por hora</span>
+                                            `}
+                                        </td>
+                                        <td style="padding: 0.75rem; text-align: right; font-weight: 600;">
+                                            ${teacher.paymentType === 'salary'
+                                                ? formatCurrency(teacher.monthlySalary || 0)
+                                                : `${formatCurrency(teacher.hourlyRate || 0)}/hora`}
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            ` : ''}
+
+            <!-- Payroll Legacy Teachers -->
+            ${payrollTeachers.length > 0 ? `
+                <div style="margin-bottom: 2rem;">
+                    <h4 style="margin: 0 0 1rem 0; display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="background: #f59e0b; color: white; padding: 0.25rem 0.75rem; border-radius: 6px; font-size: 0.875rem;">Nómina</span>
+                        Profesores desde módulo Nómina
+                    </h4>
+                    <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead style="background: #f9fafb;">
+                                <tr>
+                                    <th style="padding: 0.75rem; text-align: left; border-bottom: 1px solid #e5e7eb;">Nombre</th>
+                                    <th style="padding: 0.75rem; text-align: center; border-bottom: 1px solid #e5e7eb;">Horas CB</th>
+                                    <th style="padding: 0.75rem; text-align: center; border-bottom: 1px solid #e5e7eb;">Horas COATS</th>
+                                    <th style="padding: 0.75rem; text-align: center; border-bottom: 1px solid #e5e7eb;">Horas Nazaret</th>
+                                    <th style="padding: 0.75rem; text-align: right; border-bottom: 1px solid #e5e7eb;">Total a Pagar</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${payrollTeachers.map(teacher => {
+                                    const payroll = monthlyPayroll.teachers?.[teacher.id] || { hours: {cb: 0, coats: 0, nazaret: 0}, total: 0 };
+                                    return `
+                                        <tr style="border-bottom: 1px solid #f3f4f6;">
+                                            <td style="padding: 0.75rem;">
+                                                <div style="font-weight: 500;">${teacher.personalInfo?.name || 'N/A'}</div>
+                                                <div style="font-size: 0.75rem; color: #6b7280;">${teacher.personalInfo?.cedula || ''}</div>
+                                            </td>
+                                            <td style="padding: 0.75rem; text-align: center;">${payroll.hours?.cb || 0}h</td>
+                                            <td style="padding: 0.75rem; text-align: center;">${payroll.hours?.coats || 0}h</td>
+                                            <td style="padding: 0.75rem; text-align: center;">${payroll.hours?.nazaret || 0}h</td>
+                                            <td style="padding: 0.75rem; text-align: right; font-weight: 600; color: #10b981;">
+                                                ${formatCurrency(payroll.total || 0)}
+                                            </td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            ` : ''}
+
+            <!-- Payroll Legacy Admin -->
+            ${payrollAdmin.length > 0 ? `
+                <div style="margin-bottom: 2rem;">
+                    <h4 style="margin: 0 0 1rem 0; display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="background: #8b5cf6; color: white; padding: 0.25rem 0.75rem; border-radius: 6px; font-size: 0.875rem;">Nómina</span>
+                        Personal Administrativo desde módulo Nómina
+                    </h4>
+                    <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead style="background: #f9fafb;">
+                                <tr>
+                                    <th style="padding: 0.75rem; text-align: left; border-bottom: 1px solid #e5e7eb;">Nombre</th>
+                                    <th style="padding: 0.75rem; text-align: left; border-bottom: 1px solid #e5e7eb;">Cargo</th>
+                                    <th style="padding: 0.75rem; text-align: center; border-bottom: 1px solid #e5e7eb;">Frecuencia</th>
+                                    <th style="padding: 0.75rem; text-align: right; border-bottom: 1px solid #e5e7eb;">Salario</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${payrollAdmin.map(emp => `
+                                    <tr style="border-bottom: 1px solid #f3f4f6;">
+                                        <td style="padding: 0.75rem;">
+                                            <div style="font-weight: 500;">${emp.personalInfo?.name || 'N/A'}</div>
+                                            <div style="font-size: 0.75rem; color: #6b7280;">${emp.personalInfo?.cedula || ''}</div>
+                                        </td>
+                                        <td style="padding: 0.75rem; color: #6b7280;">${emp.personalInfo?.position || 'N/A'}</td>
+                                        <td style="padding: 0.75rem; text-align: center;">
+                                            <span style="background: #f3f4f6; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem;">
+                                                ${emp.salary?.frequency === 'quincenal' ? 'Quincenal' : 'Mensual'}
+                                            </span>
+                                        </td>
+                                        <td style="padding: 0.75rem; text-align: right; font-weight: 600; color: #8b5cf6;">
+                                            ${formatCurrency(emp.salary?.amount || 0)}
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            ` : ''}
+
+            ${employees2.length === 0 && teachers2.length === 0 && payrollTeachers.length === 0 && payrollAdmin.length === 0 ? `
+                <div style="text-align: center; padding: 3rem; color: #9ca3af;">
+                    <p style="font-size: 1.125rem; margin: 0;">No hay personal registrado</p>
+                    <p style="margin: 0.5rem 0 0 0;">Agrega empleados en los módulos Empleados 2.0, Profesores 2.0 o en las pestañas de este módulo</p>
+                </div>
+            ` : ''}
+        </div>
+    `;
+
+    document.getElementById('payrollTabContent').innerHTML = content;
+}
 
 // Render teachers tab
 async function renderTeachersTab() {
