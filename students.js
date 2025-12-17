@@ -660,7 +660,7 @@ function renderStudentTable(students) {
                                 ${index + 1}
                             </td>
                             <td style="padding: 0.75rem;">
-                                ${s.grupo ? '<span title="Asignado a grupo" style="color: #10b981;">📚</span> ' : ''}${s.nombre || '-'}
+                                ${s.nombre || '-'}
                                 ${s.paymentNotes ? ' 📋' : ''}
                             </td>
                             <td style="padding: 0.75rem;">${s.tipoDoc || ''} ${s.numDoc || '-'}</td>
@@ -673,7 +673,7 @@ function renderStudentTable(students) {
                                 ` : '-'}
                             </td>
                             <td style="padding: 0.75rem;">
-                                ${s.grupo ? `
+                                ${(s.grupo && !isNaN(parseInt(s.grupo))) ? `
                                     <span style="background: #10b981; color: white; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.85rem; font-weight: 500;">
                                         📚 ${s.grupo}
                                     </span>
