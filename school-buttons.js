@@ -42,7 +42,7 @@ function addSchoolButtons() {
         { name: 'Pagos', icon: '💰', color: '#10b981', func: 'Payments' },
         { name: 'Tienda', icon: '🏪', color: '#ec4899', func: 'Tienda' },
         { name: 'Finanzas', icon: '💵', color: '#6366f1', func: 'Finance' },
-        { name: 'Nómina', icon: '💼', color: '#0ea5e9', func: 'Payroll', directorOnly: true },
+        { name: 'Nómina', icon: '💼', color: '#0ea5e9', func: 'Payroll', adminOnly: true },
         { name: 'Grupos', icon: '📚', color: '#8b5cf6', func: 'Groups' },
         { name: 'Grupos 2.0', icon: '🎓', color: '#667eea', func: 'Grupos2', directorOnly: true },
         { name: 'Empleados 2.0', icon: '👔', color: '#14b8a6', func: 'Employees', directorOnly: true },
@@ -51,10 +51,19 @@ function addSchoolButtons() {
     ];
     
     modules.forEach(module => {
+        const userRole = window.userRole || '';
+        const userEmail = window.FirebaseData?.currentUser?.email || '';
+
+        // Skip admin-only modules (only admin@ciudadbilingue.com)
+        if (module.adminOnly) {
+            if (userEmail !== 'admin@ciudadbilingue.com') {
+                console.log(`⚠️ Skipping ${module.name} - admin only`);
+                return; // Skip this module
+            }
+        }
+
         // Skip director-only modules if user is not director
         if (module.directorOnly) {
-            const userRole = window.userRole || '';
-            const userEmail = window.FirebaseData?.currentUser?.email || '';
             // Allow director, admin, or specific email accounts
             const allowedEmails = ['admin@ciudadbilingue.com', 'contacto@ciudadbilingue.com'];
             if (userRole !== 'director' && userRole !== 'admin' && !allowedEmails.includes(userEmail)) {
