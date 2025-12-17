@@ -8,6 +8,45 @@ class TeacherManager {
         this.attendance = new Map();
         this.payRates = [10000, 12000, 15000, 17500, 20000, 22000, 25000];
         this.initialized = false;
+
+        // Document types
+        this.documentTypes = [
+            { value: 'CC', label: 'C.C. - Cédula de Ciudadanía' },
+            { value: 'CE', label: 'C.E. - Cédula de Extranjería' },
+            { value: 'PASSPORT', label: 'Pasaporte' },
+            { value: 'OTHER', label: 'Otro' }
+        ];
+
+        // Colombian banks
+        this.banks = [
+            { value: 'bancolombia', label: 'Bancolombia' },
+            { value: 'bogota', label: 'Banco de Bogotá' },
+            { value: 'davivienda', label: 'Davivienda' },
+            { value: 'bbva', label: 'BBVA Colombia' },
+            { value: 'occidente', label: 'Banco de Occidente' },
+            { value: 'popular', label: 'Banco Popular' },
+            { value: 'cajasocial', label: 'Banco Caja Social' },
+            { value: 'falabella', label: 'Banco Falabella' },
+            { value: 'avvillas', label: 'Banco AV Villas' },
+            { value: 'agrario', label: 'Banco Agrario' },
+            { value: 'nequi', label: 'Nequi' },
+            { value: 'daviplata', label: 'Daviplata' },
+            { value: 'colpatria', label: 'Scotiabank Colpatria' },
+            { value: 'gnb', label: 'Banco GNB Sudameris' },
+            { value: 'itau', label: 'Banco Itaú' },
+            { value: 'pichincha', label: 'Banco Pichincha' },
+            { value: 'serfinanza', label: 'Banco Serfinanza' },
+            { value: 'lulo', label: 'Lulo Bank' },
+            { value: 'bancamia', label: 'Bancamía' },
+            { value: 'nu', label: 'Nu Colombia' },
+            { value: 'other', label: 'Otro' }
+        ];
+
+        // Account types
+        this.accountTypes = [
+            { value: 'ahorros', label: 'Cuenta de Ahorros' },
+            { value: 'corriente', label: 'Cuenta Corriente' }
+        ];
     }
 
     // Initialize
@@ -310,6 +349,7 @@ function renderTeachersTable(teachers) {
                     <th style="padding: 1rem; text-align: center; font-weight: 600; color: #374151;">Idiomas</th>
                     <th style="padding: 1rem; text-align: center; font-weight: 600; color: #374151;">Grupos</th>
                     <th style="padding: 1rem; text-align: center; font-weight: 600; color: #374151;">Pago</th>
+                    <th style="padding: 1rem; text-align: center; font-weight: 600; color: #374151;">Banco</th>
                     <th style="padding: 1rem; text-align: center; font-weight: 600; color: #374151;">Estado</th>
                     <th style="padding: 1rem; text-align: center; font-weight: 600; color: #374151;">Acciones</th>
                 </tr>
@@ -319,6 +359,13 @@ function renderTeachersTable(teachers) {
             </tbody>
         </table>
     `;
+}
+
+// Helper function to get bank label
+function getBankLabel(bankValue, otherBankName) {
+    if (bankValue === 'other') return otherBankName || 'Otro';
+    const bank = window.TeacherManager.banks.find(b => b.value === bankValue);
+    return bank ? bank.label : bankValue;
 }
 
 function renderTeacherRow(teacher) {
@@ -356,6 +403,11 @@ function renderTeacherRow(teacher) {
             </td>
             <td style="padding: 1rem;">
                 <div style="font-size: 0.875rem;">
+                    ${teacher.documentType ? `
+                        <div style="color: #374151; margin-bottom: 0.25rem;">
+                            🪪 ${teacher.documentType}: ${teacher.documentNumber || '-'}
+                        </div>
+                    ` : ''}
                     <div style="color: #374151;">📱 ${teacher.phone || '-'}</div>
                     <div style="color: #6b7280;">✉️ ${teacher.email || '-'}</div>
                 </div>
@@ -389,6 +441,20 @@ function renderTeacherRow(teacher) {
                     <div style="font-size: 0.75rem; color: #6b7280; margin-top: 0.25rem;">
                         $${(teacher.hourlyRate || 0).toLocaleString('es-CO')}/h
                     </div>
+                `}
+            </td>
+            <td style="padding: 1rem; text-align: center;">
+                ${teacher.bank ? `
+                    <div style="font-size: 0.8rem; color: #374151;">
+                        🏦 ${getBankLabel(teacher.bank, teacher.otherBankName)}
+                    </div>
+                    ${teacher.accountNumber ? `
+                        <div style="font-size: 0.7rem; color: #6b7280; margin-top: 0.25rem;">
+                            ${teacher.accountType === 'ahorros' ? 'Ahorros' : teacher.accountType === 'corriente' ? 'Corriente' : ''}: ***${teacher.accountNumber.slice(-4)}
+                        </div>
+                    ` : ''}
+                ` : `
+                    <span style="color: #9ca3af; font-size: 0.8rem;">Sin datos</span>
                 `}
             </td>
             <td style="padding: 1rem; text-align: center;">
@@ -443,133 +509,241 @@ window.showTeacherModal = function(teacherId = null) {
 
                 <!-- Modal Body -->
                 <form id="teacherForm" style="padding: 1.5rem;">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                        <!-- Name -->
-                        <div style="grid-column: 1 / -1;">
-                            <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #374151;">
-                                Nombre Completo *
-                            </label>
-                            <input type="text" id="tchName" value="${teacher?.name || ''}" required
-                                   placeholder="Nombre del profesor"
-                                   style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1rem;">
-                        </div>
+                    <!-- Section: Datos Personales -->
+                    <div style="margin-bottom: 1.5rem;">
+                        <h3 style="margin: 0 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid #e5e7eb; color: #374151; font-size: 1rem;">
+                            👤 Datos Personales
+                        </h3>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                            <!-- Name -->
+                            <div style="grid-column: 1 / -1;">
+                                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #374151;">
+                                    Nombre Completo *
+                                </label>
+                                <input type="text" id="tchName" value="${teacher?.name || ''}" required
+                                       placeholder="Nombre del profesor"
+                                       style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1rem;">
+                            </div>
 
-                        <!-- Phone -->
-                        <div>
-                            <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #374151;">
-                                Teléfono *
-                            </label>
-                            <input type="tel" id="tchPhone" value="${teacher?.phone || ''}" required
-                                   placeholder="300 123 4567"
-                                   style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1rem;">
-                        </div>
+                            <!-- Document Type -->
+                            <div>
+                                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #374151;">
+                                    Tipo de Documento
+                                </label>
+                                <select id="tchDocType"
+                                        style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1rem;">
+                                    <option value="">Seleccionar...</option>
+                                    ${window.TeacherManager.documentTypes.map(doc => `
+                                        <option value="${doc.value}" ${teacher?.documentType === doc.value ? 'selected' : ''}>
+                                            ${doc.label}
+                                        </option>
+                                    `).join('')}
+                                </select>
+                            </div>
 
-                        <!-- Email -->
-                        <div>
-                            <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #374151;">
-                                Correo *
-                            </label>
-                            <input type="email" id="tchEmail" value="${teacher?.email || ''}" required
-                                   placeholder="profesor@email.com"
-                                   style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1rem;">
-                        </div>
+                            <!-- Document Number -->
+                            <div>
+                                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #374151;">
+                                    Número de Documento
+                                </label>
+                                <input type="text" id="tchDocNumber" value="${teacher?.documentNumber || ''}"
+                                       placeholder="Ej: 1234567890"
+                                       style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1rem;">
+                            </div>
 
-                        <!-- Languages -->
-                        <div style="grid-column: 1 / -1;">
-                            <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #374151;">
-                                Idiomas que Enseña
-                            </label>
-                            <div style="display: flex; gap: 1rem; flex-wrap: wrap; padding: 0.5rem; background: #f9fafb; border-radius: 8px;">
-                                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                    <input type="checkbox" name="tchLanguages" value="english"
-                                           ${teacher?.languages?.includes('english') ? 'checked' : ''}>
-                                    <span>🇬🇧 Inglés</span>
+                            <!-- Phone -->
+                            <div>
+                                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #374151;">
+                                    Teléfono *
                                 </label>
-                                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                    <input type="checkbox" name="tchLanguages" value="portuguese"
-                                           ${teacher?.languages?.includes('portuguese') ? 'checked' : ''}>
-                                    <span>🇧🇷 Portugués</span>
+                                <input type="tel" id="tchPhone" value="${teacher?.phone || ''}" required
+                                       placeholder="300 123 4567"
+                                       style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1rem;">
+                            </div>
+
+                            <!-- Email -->
+                            <div>
+                                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #374151;">
+                                    Correo *
                                 </label>
-                                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                    <input type="checkbox" name="tchLanguages" value="german"
-                                           ${teacher?.languages?.includes('german') ? 'checked' : ''}>
-                                    <span>🇩🇪 Alemán</span>
-                                </label>
-                                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                    <input type="checkbox" name="tchLanguages" value="spanish"
-                                           ${teacher?.languages?.includes('spanish') ? 'checked' : ''}>
-                                    <span>🇪🇸 Español</span>
-                                </label>
+                                <input type="email" id="tchEmail" value="${teacher?.email || ''}" required
+                                       placeholder="profesor@email.com"
+                                       style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1rem;">
                             </div>
                         </div>
+                    </div>
 
-                        <!-- Payment Type -->
-                        <div>
-                            <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #374151;">
-                                Tipo de Pago
-                            </label>
-                            <select id="tchPaymentType" onchange="toggleTeacherPaymentFields()"
-                                    style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1rem;">
-                                <option value="hourly" ${(!teacher || teacher.paymentType === 'hourly') ? 'selected' : ''}>
-                                    ⏰ Por Hora
-                                </option>
-                                <option value="salary" ${teacher?.paymentType === 'salary' ? 'selected' : ''}>
-                                    💼 Salario Mensual
-                                </option>
-                            </select>
+                    <!-- Section: Idiomas y Disponibilidad -->
+                    <div style="margin-bottom: 1.5rem;">
+                        <h3 style="margin: 0 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid #e5e7eb; color: #374151; font-size: 1rem;">
+                            🌐 Idiomas y Disponibilidad
+                        </h3>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                            <!-- Languages -->
+                            <div>
+                                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #374151;">
+                                    Idiomas que Enseña
+                                </label>
+                                <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; padding: 0.75rem; background: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb;">
+                                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                        <input type="checkbox" name="tchLanguages" value="english"
+                                               ${teacher?.languages?.includes('english') ? 'checked' : ''}>
+                                        <span>🇬🇧 Inglés</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                        <input type="checkbox" name="tchLanguages" value="portuguese"
+                                               ${teacher?.languages?.includes('portuguese') ? 'checked' : ''}>
+                                        <span>🇧🇷 Portugués</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                        <input type="checkbox" name="tchLanguages" value="german"
+                                               ${teacher?.languages?.includes('german') ? 'checked' : ''}>
+                                        <span>🇩🇪 Alemán</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                        <input type="checkbox" name="tchLanguages" value="spanish"
+                                               ${teacher?.languages?.includes('spanish') ? 'checked' : ''}>
+                                        <span>🇪🇸 Español</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Availability -->
+                            <div>
+                                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #374151;">
+                                    Disponibilidad
+                                </label>
+                                <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; padding: 0.75rem; background: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb;">
+                                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                        <input type="checkbox" name="tchAvailability" value="morning"
+                                               ${teacher?.availability?.includes('morning') ? 'checked' : ''}>
+                                        <span>🌅 Mañana</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                        <input type="checkbox" name="tchAvailability" value="afternoon"
+                                               ${teacher?.availability?.includes('afternoon') ? 'checked' : ''}>
+                                        <span>☀️ Tarde</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                        <input type="checkbox" name="tchAvailability" value="evening"
+                                               ${teacher?.availability?.includes('evening') ? 'checked' : ''}>
+                                        <span>🌙 Noche</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                        <input type="checkbox" name="tchAvailability" value="saturday"
+                                               ${teacher?.availability?.includes('saturday') ? 'checked' : ''}>
+                                        <span>📅 Sábados</span>
+                                    </label>
+                                </div>
+                            </div>
                         </div>
+                    </div>
 
-                        <!-- Hourly Rate -->
-                        <div id="tchHourlyRateGroup" style="display: ${(!teacher || teacher.paymentType !== 'salary') ? 'block' : 'none'};">
-                            <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #374151;">
-                                Tarifa por Hora
-                            </label>
-                            <select id="tchHourlyRate"
-                                    style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1rem;">
-                                ${window.TeacherManager.payRates.map(rate => `
-                                    <option value="${rate}" ${teacher?.hourlyRate === rate ? 'selected' : ''}>
-                                        $${rate.toLocaleString('es-CO')}
+                    <!-- Section: Información de Pago -->
+                    <div style="margin-bottom: 1.5rem;">
+                        <h3 style="margin: 0 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid #e5e7eb; color: #374151; font-size: 1rem;">
+                            💰 Información de Pago
+                        </h3>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                            <!-- Payment Type -->
+                            <div>
+                                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #374151;">
+                                    Tipo de Pago
+                                </label>
+                                <select id="tchPaymentType" onchange="toggleTeacherPaymentFields()"
+                                        style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1rem;">
+                                    <option value="hourly" ${(!teacher || teacher.paymentType === 'hourly') ? 'selected' : ''}>
+                                        ⏰ Por Hora
                                     </option>
-                                `).join('')}
-                            </select>
-                        </div>
+                                    <option value="salary" ${teacher?.paymentType === 'salary' ? 'selected' : ''}>
+                                        💼 Salario Mensual
+                                    </option>
+                                </select>
+                            </div>
 
-                        <!-- Monthly Salary -->
-                        <div id="tchSalaryGroup" style="display: ${teacher?.paymentType === 'salary' ? 'block' : 'none'};">
-                            <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #374151;">
-                                Salario Mensual
-                            </label>
-                            <input type="number" id="tchMonthlySalary" value="${teacher?.monthlySalary || ''}" min="0"
-                                   placeholder="1000000"
-                                   style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1rem;">
-                        </div>
+                            <!-- Hourly Rate -->
+                            <div id="tchHourlyRateGroup" style="display: ${(!teacher || teacher.paymentType !== 'salary') ? 'block' : 'none'};">
+                                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #374151;">
+                                    Tarifa por Hora
+                                </label>
+                                <select id="tchHourlyRate"
+                                        style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1rem;">
+                                    ${window.TeacherManager.payRates.map(rate => `
+                                        <option value="${rate}" ${teacher?.hourlyRate === rate ? 'selected' : ''}>
+                                            $${rate.toLocaleString('es-CO')}
+                                        </option>
+                                    `).join('')}
+                                </select>
+                            </div>
 
-                        <!-- Availability -->
-                        <div style="grid-column: 1 / -1;">
-                            <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #374151;">
-                                Disponibilidad
-                            </label>
-                            <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; padding: 0.5rem; background: #f9fafb; border-radius: 8px;">
-                                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                    <input type="checkbox" name="tchAvailability" value="morning"
-                                           ${teacher?.availability?.includes('morning') ? 'checked' : ''}>
-                                    <span>🌅 Mañana</span>
+                            <!-- Monthly Salary -->
+                            <div id="tchSalaryGroup" style="display: ${teacher?.paymentType === 'salary' ? 'block' : 'none'};">
+                                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #374151;">
+                                    Salario Mensual
                                 </label>
-                                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                    <input type="checkbox" name="tchAvailability" value="afternoon"
-                                           ${teacher?.availability?.includes('afternoon') ? 'checked' : ''}>
-                                    <span>☀️ Tarde</span>
+                                <input type="number" id="tchMonthlySalary" value="${teacher?.monthlySalary || ''}" min="0"
+                                       placeholder="1000000"
+                                       style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1rem;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section: Datos Bancarios -->
+                    <div style="margin-bottom: 1rem;">
+                        <h3 style="margin: 0 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid #e5e7eb; color: #374151; font-size: 1rem;">
+                            🏦 Datos Bancarios
+                        </h3>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                            <!-- Bank -->
+                            <div>
+                                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #374151;">
+                                    Banco
                                 </label>
-                                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                    <input type="checkbox" name="tchAvailability" value="evening"
-                                           ${teacher?.availability?.includes('evening') ? 'checked' : ''}>
-                                    <span>🌙 Noche</span>
+                                <select id="tchBank" onchange="toggleOtherBank()"
+                                        style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1rem;">
+                                    <option value="">Seleccionar banco...</option>
+                                    ${window.TeacherManager.banks.map(bank => `
+                                        <option value="${bank.value}" ${teacher?.bank === bank.value ? 'selected' : ''}>
+                                            ${bank.label}
+                                        </option>
+                                    `).join('')}
+                                </select>
+                            </div>
+
+                            <!-- Other Bank Name (shown when "Otro" is selected) -->
+                            <div id="tchOtherBankGroup" style="display: ${teacher?.bank === 'other' ? 'block' : 'none'};">
+                                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #374151;">
+                                    Nombre del Banco
                                 </label>
-                                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                    <input type="checkbox" name="tchAvailability" value="saturday"
-                                           ${teacher?.availability?.includes('saturday') ? 'checked' : ''}>
-                                    <span>📅 Sábados</span>
+                                <input type="text" id="tchOtherBank" value="${teacher?.otherBankName || ''}"
+                                       placeholder="Nombre del banco"
+                                       style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1rem;">
+                            </div>
+
+                            <!-- Account Type -->
+                            <div>
+                                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #374151;">
+                                    Tipo de Cuenta
                                 </label>
+                                <select id="tchAccountType"
+                                        style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1rem;">
+                                    <option value="">Seleccionar...</option>
+                                    ${window.TeacherManager.accountTypes.map(type => `
+                                        <option value="${type.value}" ${teacher?.accountType === type.value ? 'selected' : ''}>
+                                            ${type.label}
+                                        </option>
+                                    `).join('')}
+                                </select>
+                            </div>
+
+                            <!-- Account Number -->
+                            <div>
+                                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #374151;">
+                                    Número de Cuenta
+                                </label>
+                                <input type="text" id="tchAccountNumber" value="${teacher?.accountNumber || ''}"
+                                       placeholder="Ej: 123456789012"
+                                       style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1rem;">
                             </div>
                         </div>
                     </div>
@@ -611,6 +785,14 @@ window.toggleTeacherPaymentFields = function() {
     document.getElementById('tchSalaryGroup').style.display = type === 'salary' ? 'block' : 'none';
 };
 
+window.toggleOtherBank = function() {
+    const bank = document.getElementById('tchBank').value;
+    const otherBankGroup = document.getElementById('tchOtherBankGroup');
+    if (otherBankGroup) {
+        otherBankGroup.style.display = bank === 'other' ? 'block' : 'none';
+    }
+};
+
 async function saveTeacherForm(teacherId) {
     try {
         const languagesCheckboxes = document.querySelectorAll('input[name="tchLanguages"]:checked');
@@ -620,14 +802,25 @@ async function saveTeacherForm(teacherId) {
 
         const teacherData = {
             id: teacherId,
+            // Personal data
             name: document.getElementById('tchName').value.trim(),
+            documentType: document.getElementById('tchDocType').value,
+            documentNumber: document.getElementById('tchDocNumber').value.trim(),
             phone: document.getElementById('tchPhone').value.trim(),
             email: document.getElementById('tchEmail').value.trim(),
+            // Languages and availability
             languages: Array.from(languagesCheckboxes).map(cb => cb.value),
+            availability: Array.from(availabilityCheckboxes).map(cb => cb.value),
+            // Payment info
             paymentType: document.getElementById('tchPaymentType').value,
             hourlyRate: parseInt(document.getElementById('tchHourlyRate').value) || 0,
             monthlySalary: parseInt(document.getElementById('tchMonthlySalary').value) || 0,
-            availability: Array.from(availabilityCheckboxes).map(cb => cb.value),
+            // Bank info
+            bank: document.getElementById('tchBank').value,
+            otherBankName: document.getElementById('tchOtherBank')?.value.trim() || '',
+            accountType: document.getElementById('tchAccountType').value,
+            accountNumber: document.getElementById('tchAccountNumber').value.trim(),
+            // Status
             status: existingTeacher?.status || 'active',
             createdAt: existingTeacher?.createdAt
         };
