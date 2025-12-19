@@ -2075,6 +2075,29 @@ function renderPaymentHistoryContent(studentId, history, stats, year = 2025) {
 
                                 ${payment.status === 'paid' && payment.paymentId && window.FirebaseData?.currentUser?.email === 'admin@ciudadbilingue.com' ?
                                     `<button
+                                        onclick="openEditPaymentModal('${payment.paymentId}', '${studentId}')"
+                                        class="btn btn-sm"
+                                        style="
+                                            background: #f59e0b;
+                                            color: white;
+                                            border: none;
+                                            padding: 4px 8px;
+                                            border-radius: 4px;
+                                            font-size: 10px;
+                                            margin-top: 4px;
+                                            width: 100%;
+                                            cursor: pointer;
+                                            display: flex;
+                                            align-items: center;
+                                            justify-content: center;
+                                            gap: 4px;
+                                            transition: background 0.2s;
+                                        "
+                                        onmouseover="this.style.background='#d97706'"
+                                        onmouseout="this.style.background='#f59e0b'">
+                                        ✏️ Editar
+                                    </button>
+                                    <button
                                         onclick="confirmDeletePayment('${payment.paymentId}', '${studentId}')"
                                         class="btn btn-sm"
                                         style="
@@ -2139,6 +2162,25 @@ function renderPaymentHistoryContent(studentId, history, stats, year = 2025) {
                                                 </button>` : ''}
                                             ${p.paymentId && window.FirebaseData?.currentUser?.email === 'admin@ciudadbilingue.com' ?
                                                 `<button
+                                                    onclick="openEditPaymentModal('${p.paymentId}', '${studentId}')"
+                                                    class="btn btn-sm"
+                                                    style="
+                                                        background: #f59e0b;
+                                                        color: white;
+                                                        border: none;
+                                                        padding: 3px 6px;
+                                                        border-radius: 4px;
+                                                        font-size: 9px;
+                                                        margin-top: 4px;
+                                                        width: 100%;
+                                                        cursor: pointer;
+                                                        transition: background 0.2s;
+                                                    "
+                                                    onmouseover="this.style.background='#d97706'"
+                                                    onmouseout="this.style.background='#f59e0b'">
+                                                    ✏️ Editar
+                                                </button>
+                                                <button
                                                     onclick="confirmDeletePayment('${p.paymentId}', '${studentId}')"
                                                     class="btn btn-sm"
                                                     style="
@@ -4143,6 +4185,297 @@ window.executeDeletePayment = async function(paymentId, studentId) {
         window.showNotification('❌ Error al eliminar pago: ' + error.message, 'error');
     }
 };
+
+// ==================== EDIT PAYMENT FUNCTIONS (Admin Only) ====================
+
+window.openEditPaymentModal = async function(paymentId, studentId) {
+    // Verify admin access
+    if (window.FirebaseData?.currentUser?.email !== 'admin@ciudadbilingue.com') {
+        window.showNotification('❌ Solo el administrador puede editar pagos', 'error');
+        return;
+    }
+
+    // Get payment details
+    const payment = window.PaymentManager.payments.get(paymentId);
+    if (!payment) {
+        window.showNotification('❌ Pago no encontrado', 'error');
+        return;
+    }
+
+    const student = window.StudentManager?.students.get(studentId);
+    const studentName = student?.nombre || 'Estudiante';
+
+    // Remove existing modal if any
+    const existingModal = document.getElementById('editPaymentModal');
+    if (existingModal) existingModal.remove();
+
+    const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+                   'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
+    document.body.insertAdjacentHTML('beforeend', `
+        <div id="editPaymentModal" style="
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        ">
+            <div style="
+                background: white;
+                border-radius: 12px;
+                padding: 24px;
+                max-width: 500px;
+                width: 90%;
+                max-height: 90vh;
+                overflow-y: auto;
+                box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+            ">
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <div style="font-size: 48px; margin-bottom: 16px;">✏️</div>
+                    <h3 style="margin: 0 0 8px 0; color: #1f2937;">Editar Pago</h3>
+                    <p style="color: #6b7280; margin: 0;">${studentName}</p>
+                </div>
+
+                <form id="editPaymentForm" style="display: flex; flex-direction: column; gap: 16px;">
+                    <input type="hidden" id="editPaymentId" value="${paymentId}">
+                    <input type="hidden" id="editStudentId" value="${studentId}">
+
+                    <div>
+                        <label style="display: block; font-weight: 500; margin-bottom: 6px; color: #374151;">
+                            Monto ($)
+                        </label>
+                        <input type="number" id="editPaymentAmount" value="${payment.amount || 0}"
+                            style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px;"
+                            required min="1">
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                        <div>
+                            <label style="display: block; font-weight: 500; margin-bottom: 6px; color: #374151;">
+                                Mes
+                            </label>
+                            <select id="editPaymentMonth" style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px;">
+                                ${months.map(m => `<option value="${m}" ${payment.month === m ? 'selected' : ''}>${m.charAt(0).toUpperCase() + m.slice(1)}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div>
+                            <label style="display: block; font-weight: 500; margin-bottom: 6px; color: #374151;">
+                                Año
+                            </label>
+                            <select id="editPaymentYear" style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px;">
+                                <option value="2024" ${payment.year == 2024 ? 'selected' : ''}>2024</option>
+                                <option value="2025" ${payment.year == 2025 ? 'selected' : ''}>2025</option>
+                                <option value="2026" ${payment.year == 2026 ? 'selected' : ''}>2026</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label style="display: block; font-weight: 500; margin-bottom: 6px; color: #374151;">
+                            Método de Pago
+                        </label>
+                        <select id="editPaymentMethod" style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px;">
+                            <option value="Efectivo en la escuela" ${payment.method === 'Efectivo en la escuela' ? 'selected' : ''}>Efectivo en la escuela</option>
+                            <option value="Transferencia bancaria" ${payment.method === 'Transferencia bancaria' ? 'selected' : ''}>Transferencia bancaria</option>
+                            <option value="Nequi" ${payment.method === 'Nequi' ? 'selected' : ''}>Nequi</option>
+                            <option value="Daviplata" ${payment.method === 'Daviplata' ? 'selected' : ''}>Daviplata</option>
+                            <option value="Tarjeta de crédito" ${payment.method === 'Tarjeta de crédito' ? 'selected' : ''}>Tarjeta de crédito</option>
+                            <option value="Tarjeta débito" ${payment.method === 'Tarjeta débito' ? 'selected' : ''}>Tarjeta débito</option>
+                            <option value="Consignación" ${payment.method === 'Consignación' ? 'selected' : ''}>Consignación</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label style="display: block; font-weight: 500; margin-bottom: 6px; color: #374151;">
+                            Banco (opcional)
+                        </label>
+                        <input type="text" id="editPaymentBank" value="${payment.bank || ''}"
+                            style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px;"
+                            placeholder="Ej: Bancolombia, Davivienda...">
+                    </div>
+
+                    <div>
+                        <label style="display: block; font-weight: 500; margin-bottom: 6px; color: #374151;">
+                            Notas (opcional)
+                        </label>
+                        <textarea id="editPaymentNotes" rows="2"
+                            style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; resize: vertical;"
+                            placeholder="Notas adicionales...">${payment.notes || ''}</textarea>
+                    </div>
+
+                    <div style="
+                        background: #fef3c7;
+                        border: 1px solid #fcd34d;
+                        border-radius: 8px;
+                        padding: 12px;
+                        font-size: 13px;
+                        color: #92400e;
+                    ">
+                        <strong>⚠️ Importante:</strong> Los cambios quedarán registrados en el log de auditoría.
+                    </div>
+
+                    <div style="display: flex; gap: 12px; margin-top: 8px;">
+                        <button type="button" onclick="closeEditPaymentModal()" style="
+                            flex: 1;
+                            padding: 12px;
+                            border: 1px solid #d1d5db;
+                            background: white;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            font-weight: 500;
+                            color: #374151;
+                        ">
+                            Cancelar
+                        </button>
+                        <button type="submit" style="
+                            flex: 1;
+                            padding: 12px;
+                            border: none;
+                            background: #f59e0b;
+                            color: white;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            font-weight: 500;
+                        ">
+                            ✅ Guardar Cambios
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `);
+
+    // Add form submit handler
+    document.getElementById('editPaymentForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        saveEditedPayment();
+    });
+};
+
+window.closeEditPaymentModal = function() {
+    const modal = document.getElementById('editPaymentModal');
+    if (modal) modal.remove();
+};
+
+window.saveEditedPayment = async function() {
+    try {
+        // Verify admin access
+        if (window.FirebaseData?.currentUser?.email !== 'admin@ciudadbilingue.com') {
+            window.showNotification('❌ Solo el administrador puede editar pagos', 'error');
+            return;
+        }
+
+        const paymentId = document.getElementById('editPaymentId').value;
+        const studentId = document.getElementById('editStudentId').value;
+        const newAmount = parseFloat(document.getElementById('editPaymentAmount').value);
+        const newMonth = document.getElementById('editPaymentMonth').value;
+        const newYear = parseInt(document.getElementById('editPaymentYear').value);
+        const newMethod = document.getElementById('editPaymentMethod').value;
+        const newBank = document.getElementById('editPaymentBank').value.trim();
+        const newNotes = document.getElementById('editPaymentNotes').value.trim();
+
+        // Validation
+        if (!newAmount || newAmount <= 0) {
+            window.showNotification('❌ El monto debe ser mayor a cero', 'error');
+            return;
+        }
+
+        if (newAmount > 50000000) {
+            window.showNotification('❌ El monto es demasiado alto (máximo $50.000.000)', 'error');
+            return;
+        }
+
+        // Get original payment for audit
+        const originalPayment = window.PaymentManager.payments.get(paymentId);
+        if (!originalPayment) {
+            window.showNotification('❌ Pago no encontrado', 'error');
+            return;
+        }
+
+        closeEditPaymentModal();
+        window.showNotification('💾 Guardando cambios...', 'info');
+
+        // Prepare updated payment data
+        const updatedPayment = {
+            ...originalPayment,
+            amount: newAmount,
+            month: newMonth,
+            year: newYear,
+            method: newMethod,
+            bank: newBank,
+            notes: newNotes,
+            lastEditedBy: window.FirebaseData.currentUser?.email,
+            lastEditedAt: window.getColombiaDateTime ? window.getColombiaDateTime() : new Date().toISOString()
+        };
+
+        // Update in Firebase
+        const db = window.firebaseModules.database;
+        const ref = db.ref(window.FirebaseData.database, `payments/${paymentId}`);
+        await db.set(ref, updatedPayment);
+
+        // Update local cache
+        window.PaymentManager.payments.set(paymentId, updatedPayment);
+
+        // Audit log
+        if (typeof window.logAudit === 'function') {
+            const student = window.StudentManager?.students.get(studentId);
+            const studentName = student?.nombre || 'Estudiante desconocido';
+            await window.logAudit(
+                'Pago editado',
+                'payment',
+                paymentId,
+                `${studentName} - Pago modificado`,
+                {
+                    before: {
+                        monto: originalPayment.amount,
+                        mes: originalPayment.month,
+                        año: originalPayment.year,
+                        metodo: originalPayment.method,
+                        banco: originalPayment.bank,
+                        notas: originalPayment.notes
+                    },
+                    after: {
+                        monto: newAmount,
+                        mes: newMonth,
+                        año: newYear,
+                        metodo: newMethod,
+                        banco: newBank,
+                        notas: newNotes
+                    }
+                }
+            );
+        }
+
+        window.showNotification('✅ Pago actualizado correctamente', 'success');
+
+        // Refresh the payment history for this student
+        const historyRow = document.querySelector(`#history-${studentId}`);
+        if (historyRow && historyRow.style.display !== 'none') {
+            const yearSelect = historyRow.querySelector('select');
+            const currentYear = yearSelect ? parseInt(yearSelect.value) : new Date().getFullYear();
+
+            const history = await window.PaymentManager.getStudentPaymentHistory(studentId, currentYear);
+            const stats = window.PaymentManager.calculatePaymentStats(history);
+
+            historyRow.innerHTML = `
+                <td colspan="8" style="padding: 0; background: #f9fafb;">
+                    ${renderPaymentHistoryContent(studentId, history, stats, currentYear)}
+                </td>
+            `;
+        }
+
+    } catch (error) {
+        console.error('Error editing payment:', error);
+        window.showNotification('❌ Error al editar pago: ' + error.message, 'error');
+    }
+};
+
+// ==================== END EDIT PAYMENT FUNCTIONS ====================
 
 window.toggleAllStudentsBulk = function() {
     const selectAll = document.getElementById('selectAllStudents');
