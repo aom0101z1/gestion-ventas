@@ -291,7 +291,13 @@ async recordMultiMonthPayment(studentId, paymentData) {
             payments,
             totalAmount: paymentData.totalAmount,
             paymentType: paymentData.paymentType,
-            paymentPeriod: paymentData.paymentPeriod
+            paymentPeriod: paymentData.paymentPeriod,
+            // Additional items for invoice
+            lineItems: paymentData.lineItems || [],
+            matriculaAmount: paymentData.matriculaAmount || 0,
+            certificadoAmount: paymentData.certificadoAmount || 0,
+            otroConcepto: paymentData.otroConcepto || '',
+            otroAmount: paymentData.otroAmount || 0
         };
     } catch (error) {
         console.error('❌ Error recording multi-month payment:', error);
@@ -308,13 +314,20 @@ async recordPayment(studentId, paymentData) {
             id: `PAY-${Date.now()}`,
             studentId,
             amount: Number(paymentData.amount), // Ensure amount is stored as number
+            baseAmount: Number(paymentData.baseAmount || paymentData.amount),
             method: paymentData.method,
             bank: paymentData.bank,
             month: paymentData.month.toLowerCase(), // Ensure lowercase
             year: paymentData.year || new Date().getFullYear(),
             date: window.getColombiaDateTime(), // Use Colombia timezone
             registeredBy: window.FirebaseData.currentUser?.uid,
-            notes: paymentData.notes || ''
+            notes: paymentData.notes || '',
+            // Additional items
+            lineItems: paymentData.lineItems || [],
+            matriculaAmount: paymentData.matriculaAmount || 0,
+            certificadoAmount: paymentData.certificadoAmount || 0,
+            otroConcepto: paymentData.otroConcepto || '',
+            otroAmount: paymentData.otroAmount || 0
         };
 
         const db = window.firebaseModules.database;
@@ -1245,6 +1258,29 @@ const InvoiceGenerator = {
         const invoiceDate = payment.date instanceof Date ? payment.date.toISOString() : payment.date;
         console.log('📄 Generating invoice with date:', invoiceDate, 'from payment.date:', payment.date);
 
+        // Build invoice items from lineItems if available, otherwise use single item
+        let invoiceItems = [];
+
+        if (payment.lineItems && payment.lineItems.length > 0) {
+            // Use detailed line items
+            invoiceItems = payment.lineItems.map(item => ({
+                quantity: 1,
+                description: item.concept === 'Mensualidad/Semestre'
+                    ? `${payment.month.charAt(0).toUpperCase() + payment.month.slice(1)} ${payment.year} - ${student.grupo || 'Curso de Inglés'}`
+                    : item.concept,
+                unitPrice: item.amount,
+                total: item.amount
+            }));
+        } else {
+            // Fallback to single item (legacy)
+            invoiceItems = [{
+                quantity: 1,
+                description: `${payment.month.charAt(0).toUpperCase() + payment.month.slice(1)} ${payment.year} - ${student.grupo || 'Curso de Inglés'}`,
+                unitPrice: payment.amount,
+                total: payment.amount
+            }];
+        }
+
         const invoiceData = {
             number: invoiceNumber,
             paymentId: payment.id,
@@ -1256,12 +1292,7 @@ const InvoiceGenerator = {
                 address: student.direccion || '',
                 phone: student.telefono || ''
             },
-            items: [{
-                quantity: 1,
-                description: `${payment.month.charAt(0).toUpperCase() + payment.month.slice(1)} ${payment.year} - ${student.grupo || 'Curso de Inglés'}`,
-                unitPrice: payment.amount,
-                total: payment.amount
-            }],
+            items: invoiceItems,
             subtotal: payment.amount,
             total: payment.amount,
             paymentMethod: payment.method,
@@ -1319,7 +1350,7 @@ const InvoiceGenerator = {
     // NEW: Generate multi-month invoice for semester/annual payments
     async generateMultiMonthInvoice(paymentResult, student) {
         const invoiceNumber = await this.generateInvoiceNumber(student.id);
-        
+
         // Build description based on payment type
         let description = '';
         if (paymentResult.paymentPeriod.includes('Semestre')) {
@@ -1328,12 +1359,35 @@ const InvoiceGenerator = {
             const monthCount = paymentResult.payments.length;
             description = `Pago ${monthCount} meses - ${paymentResult.paymentPeriod}`;
         }
-        
+
         // Ensure date is ISO string
         const invoiceDate = paymentResult.payments[0].date instanceof Date ?
             paymentResult.payments[0].date.toISOString() :
             paymentResult.payments[0].date;
         console.log('📄 Generating multi-month invoice with date:', invoiceDate);
+
+        // Build invoice items from lineItems if available
+        let invoiceItems = [];
+
+        if (paymentResult.lineItems && paymentResult.lineItems.length > 0) {
+            // Use detailed line items
+            invoiceItems = paymentResult.lineItems.map(item => ({
+                quantity: 1,
+                description: item.concept === 'Mensualidad/Semestre'
+                    ? `${description} - ${student.grupo || 'Curso de Inglés'}`
+                    : item.concept,
+                unitPrice: item.amount,
+                total: item.amount
+            }));
+        } else {
+            // Fallback to single item (legacy)
+            invoiceItems = [{
+                quantity: 1,
+                description: `${description} - ${student.grupo || 'Curso de Inglés'}`,
+                unitPrice: paymentResult.totalAmount,
+                total: paymentResult.totalAmount
+            }];
+        }
 
         const invoiceData = {
             number: invoiceNumber,
@@ -1346,12 +1400,7 @@ const InvoiceGenerator = {
                 address: student.direccion || '',
                 phone: student.telefono || ''
             },
-            items: [{
-                quantity: 1,
-                description: `${description} - ${student.grupo || 'Curso de Inglés'}`,
-                unitPrice: paymentResult.totalAmount,
-                total: paymentResult.totalAmount
-            }],
+            items: invoiceItems,
             subtotal: paymentResult.totalAmount,
             total: paymentResult.totalAmount,
             paymentMethod: paymentResult.payments[0].method,
@@ -2379,12 +2428,80 @@ function renderPaymentModal(student) {
                     <!-- Amount Section - Only for regular students (not hourly/Privadas) -->
                     ${(student.tipoPago !== 'POR_HORAS' && student.modalidad !== 'Privadas') ? `
                         <div class="form-group">
-                            <label>Monto Total ($)</label>
-                            <input type="number" id="payAmount" value="${student.valor || ''}" required min="0" onchange="updateInstallmentAmounts()">
+                            <label>Monto Mensualidad/Semestre ($)</label>
+                            <input type="number" id="payAmountBase" value="${student.valor || ''}" required min="0" onchange="updatePaymentTotal()">
                             <small id="amountHelp" style="color: #6b7280; display: block; margin-top: 5px;">
                                 Valor mensual: $${(student.valor || 0).toLocaleString()}
                             </small>
                         </div>
+
+                        <!-- Additional Items Section -->
+                        <div style="background: #f0fdf4; border: 2px solid #22c55e; border-radius: 8px; padding: 1rem; margin: 1rem 0;">
+                            <h4 style="margin: 0 0 1rem 0; color: #166534;">📦 Artículos Adicionales (Opcional)</h4>
+
+                            <div style="display: flex; flex-direction: column; gap: 12px;">
+                                <!-- Matrícula -->
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; min-width: 120px;">
+                                        <input type="checkbox" id="includeMatricula" onchange="updatePaymentTotal()">
+                                        <span style="font-weight: 500;">Matrícula</span>
+                                    </label>
+                                    <input type="number" id="matriculaAmount" value="0" min="0"
+                                           style="flex: 1; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;"
+                                           placeholder="Valor matrícula"
+                                           oninput="updatePaymentTotal()"
+                                           disabled>
+                                </div>
+
+                                <!-- Certificado -->
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; min-width: 120px;">
+                                        <input type="checkbox" id="includeCertificado" onchange="updatePaymentTotal()">
+                                        <span style="font-weight: 500;">Certificado</span>
+                                    </label>
+                                    <input type="number" id="certificadoAmount" value="0" min="0"
+                                           style="flex: 1; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;"
+                                           placeholder="Valor certificado"
+                                           oninput="updatePaymentTotal()"
+                                           disabled>
+                                </div>
+
+                                <!-- Otro concepto -->
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; min-width: 120px;">
+                                        <input type="checkbox" id="includeOtro" onchange="updatePaymentTotal()">
+                                        <span style="font-weight: 500;">Otro</span>
+                                    </label>
+                                    <input type="text" id="otroConcepto"
+                                           style="width: 100px; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;"
+                                           placeholder="Concepto"
+                                           disabled>
+                                    <input type="number" id="otroAmount" value="0" min="0"
+                                           style="flex: 1; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;"
+                                           placeholder="Valor"
+                                           oninput="updatePaymentTotal()"
+                                           disabled>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Payment Summary -->
+                        <div id="paymentSummary" style="background: #fef3c7; border: 2px solid #f59e0b; border-radius: 8px; padding: 1rem; margin: 1rem 0;">
+                            <h4 style="margin: 0 0 0.75rem 0; color: #92400e;">🧾 Resumen del Pago</h4>
+                            <div id="paymentLineItems" style="font-size: 14px; color: #374151;">
+                                <div style="display: flex; justify-content: space-between; padding: 4px 0;">
+                                    <span>Mensualidad/Semestre:</span>
+                                    <span id="summaryBase">$0</span>
+                                </div>
+                            </div>
+                            <div style="border-top: 2px solid #f59e0b; margin-top: 8px; padding-top: 8px; display: flex; justify-content: space-between; font-weight: 700; font-size: 16px; color: #92400e;">
+                                <span>TOTAL:</span>
+                                <span id="summaryTotal">$0</span>
+                            </div>
+                        </div>
+
+                        <!-- Hidden field for actual total -->
+                        <input type="hidden" id="payAmount" value="${student.valor || ''}">
                     ` : ''}
                     
                     <!-- Installment Details (hidden by default) -->
@@ -2783,6 +2900,103 @@ window.calculateHourlyTotal = function() {
     if (calculationDisplay) {
         calculationDisplay.textContent = `$${hourlyRate.toLocaleString('es-CO')} x ${hoursCount} horas = $${total.toLocaleString('es-CO')}`;
     }
+};
+
+// Update payment total with additional items (Matrícula, Certificado, etc.)
+window.updatePaymentTotal = function() {
+    // Get base amount
+    const baseAmount = parseFloat(document.getElementById('payAmountBase')?.value) || 0;
+
+    // Handle checkbox enable/disable for inputs
+    const matriculaCheck = document.getElementById('includeMatricula');
+    const matriculaInput = document.getElementById('matriculaAmount');
+    const certificadoCheck = document.getElementById('includeCertificado');
+    const certificadoInput = document.getElementById('certificadoAmount');
+    const otroCheck = document.getElementById('includeOtro');
+    const otroConceptoInput = document.getElementById('otroConcepto');
+    const otroAmountInput = document.getElementById('otroAmount');
+
+    // Enable/disable inputs based on checkbox state
+    if (matriculaInput) {
+        matriculaInput.disabled = !matriculaCheck?.checked;
+        if (!matriculaCheck?.checked) matriculaInput.value = 0;
+    }
+    if (certificadoInput) {
+        certificadoInput.disabled = !certificadoCheck?.checked;
+        if (!certificadoCheck?.checked) certificadoInput.value = 0;
+    }
+    if (otroConceptoInput && otroAmountInput) {
+        otroConceptoInput.disabled = !otroCheck?.checked;
+        otroAmountInput.disabled = !otroCheck?.checked;
+        if (!otroCheck?.checked) {
+            otroAmountInput.value = 0;
+            otroConceptoInput.value = '';
+        }
+    }
+
+    // Get additional amounts
+    const matriculaAmount = matriculaCheck?.checked ? (parseFloat(matriculaInput?.value) || 0) : 0;
+    const certificadoAmount = certificadoCheck?.checked ? (parseFloat(certificadoInput?.value) || 0) : 0;
+    const otroAmount = otroCheck?.checked ? (parseFloat(otroAmountInput?.value) || 0) : 0;
+    const otroConcepto = otroConceptoInput?.value || 'Otro';
+
+    // Calculate total
+    const total = baseAmount + matriculaAmount + certificadoAmount + otroAmount;
+
+    // Update hidden payAmount field
+    const payAmountField = document.getElementById('payAmount');
+    if (payAmountField) {
+        payAmountField.value = total;
+    }
+
+    // Update summary display
+    const lineItemsDiv = document.getElementById('paymentLineItems');
+    const summaryTotalSpan = document.getElementById('summaryTotal');
+
+    if (lineItemsDiv) {
+        let html = `
+            <div style="display: flex; justify-content: space-between; padding: 4px 0;">
+                <span>Mensualidad/Semestre:</span>
+                <span>$${baseAmount.toLocaleString('es-CO')}</span>
+            </div>
+        `;
+
+        if (matriculaAmount > 0) {
+            html += `
+                <div style="display: flex; justify-content: space-between; padding: 4px 0; color: #166534;">
+                    <span>+ Matrícula:</span>
+                    <span>$${matriculaAmount.toLocaleString('es-CO')}</span>
+                </div>
+            `;
+        }
+
+        if (certificadoAmount > 0) {
+            html += `
+                <div style="display: flex; justify-content: space-between; padding: 4px 0; color: #166534;">
+                    <span>+ Certificado:</span>
+                    <span>$${certificadoAmount.toLocaleString('es-CO')}</span>
+                </div>
+            `;
+        }
+
+        if (otroAmount > 0) {
+            html += `
+                <div style="display: flex; justify-content: space-between; padding: 4px 0; color: #166534;">
+                    <span>+ ${otroConcepto}:</span>
+                    <span>$${otroAmount.toLocaleString('es-CO')}</span>
+                </div>
+            `;
+        }
+
+        lineItemsDiv.innerHTML = html;
+    }
+
+    if (summaryTotalSpan) {
+        summaryTotalSpan.textContent = `$${total.toLocaleString('es-CO')}`;
+    }
+
+    // Also update installment amounts if applicable
+    updateInstallmentAmounts();
 };
 
 // Select academic semester months
@@ -3850,16 +4064,68 @@ async function processPayment(studentId) {
             paymentPeriod = `${firstMonth.month} ${firstMonth.year} - ${lastMonth.month} ${lastMonth.year}`;
         }
         
+        // Get additional items data
+        const includeMatricula = document.getElementById('includeMatricula')?.checked || false;
+        const matriculaAmount = includeMatricula ? (parseFloat(document.getElementById('matriculaAmount')?.value) || 0) : 0;
+
+        const includeCertificado = document.getElementById('includeCertificado')?.checked || false;
+        const certificadoAmount = includeCertificado ? (parseFloat(document.getElementById('certificadoAmount')?.value) || 0) : 0;
+
+        const includeOtro = document.getElementById('includeOtro')?.checked || false;
+        const otroConcepto = document.getElementById('otroConcepto')?.value || 'Otro';
+        const otroAmount = includeOtro ? (parseFloat(document.getElementById('otroAmount')?.value) || 0) : 0;
+
+        // Get base amount (without additional items)
+        const baseAmount = parseFloat(document.getElementById('payAmountBase')?.value) || totalAmount;
+
+        // Build line items array
+        const lineItems = [];
+
+        // Add base payment
+        lineItems.push({
+            concept: 'Mensualidad/Semestre',
+            amount: baseAmount
+        });
+
+        // Add additional items if included
+        if (matriculaAmount > 0) {
+            lineItems.push({
+                concept: 'Matrícula',
+                amount: matriculaAmount
+            });
+        }
+
+        if (certificadoAmount > 0) {
+            lineItems.push({
+                concept: 'Certificado',
+                amount: certificadoAmount
+            });
+        }
+
+        if (otroAmount > 0) {
+            lineItems.push({
+                concept: otroConcepto,
+                amount: otroAmount
+            });
+        }
+
         const paymentData = {
             selectedMonths: selectedMonths,
             totalAmount: totalAmount,
+            baseAmount: baseAmount,
             method: paymentMethod,
             bank: document.getElementById('payBank')?.value || '',
             notes: document.getElementById('payNotes')?.value || '',
             paymentType: paymentType,
             paymentPeriod: paymentPeriod,
             installment: installmentOption > 1 ? `${currentInstallment}/${installmentOption}` : '1/1',
-            totalInstallments: installmentOption
+            totalInstallments: installmentOption,
+            // Additional items
+            lineItems: lineItems,
+            matriculaAmount: matriculaAmount,
+            certificadoAmount: certificadoAmount,
+            otroConcepto: otroConcepto,
+            otroAmount: otroAmount
         };
 
         // Add hourly payment data if applicable
@@ -3877,11 +4143,18 @@ async function processPayment(studentId) {
             // Single month payment (existing logic)
             const singlePaymentData = {
                 amount: totalAmount,
+                baseAmount: paymentData.baseAmount,
                 method: paymentData.method,
                 bank: paymentData.bank,
                 month: selectedMonths[0].month,
                 year: selectedMonths[0].year,
-                notes: paymentData.notes
+                notes: paymentData.notes,
+                // Additional items
+                lineItems: paymentData.lineItems,
+                matriculaAmount: paymentData.matriculaAmount,
+                certificadoAmount: paymentData.certificadoAmount,
+                otroConcepto: paymentData.otroConcepto,
+                otroAmount: paymentData.otroAmount
             };
             const payment = await window.PaymentManager.recordPayment(studentId, singlePaymentData);
             const invoiceData = await InvoiceGenerator.generateInvoice(payment, student);
