@@ -3778,8 +3778,8 @@ async function processPayment(studentId) {
             return;
         }
 
-        if (totalAmount > 999999) {
-            window.showNotification('❌ El monto es demasiado alto', 'error');
+        if (totalAmount > 50000000) {
+            window.showNotification('❌ El monto es demasiado alto (máximo $50.000.000)', 'error');
             return;
         }
 
