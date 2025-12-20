@@ -598,7 +598,7 @@
                 <button class="tab" onclick="switchTab('leads')" id="leadsTab">👥 Leads</button>
                 <button class="tab" onclick="switchTab('pipeline')" id="pipelineTab">🎯 Pipeline</button>
                 <button class="tab" onclick="switchTab('reports')" id="reportsTab" style="display: none;">📊 Reportes</button>
-                <button class="tab" onclick="switchTab('coatsReports')" id="coatsReportsTab">🏢 COATS</button>
+                <button class="tab" onclick="switchTab('coatsReports')" id="coatsReportsTab" style="display: none;">🏢 COATS</button>
                 <button class="tab" onclick="switchTab('monitoring')" id="monitoringTab" style="display: none;">👀 Monitoreo</button>
                 <button onclick="switchTab('tasks')" class="tab">📋 Tareas</button>
                 <button class="tab" onclick="switchTab('auditLog')" id="auditLogTab" style="display: none;">📋 Registro</button>
@@ -1645,16 +1645,20 @@ onAuthStateChanged(auth, async (user) => {
             const configTab = document.getElementById('configTab');
             const adminTab = document.getElementById('adminTab');
             const reportsTab = document.getElementById('reportsTab');
+            const coatsReportsTab = document.getElementById('coatsReportsTab');
             const directorConfig = document.getElementById('directorConfig');
             const leadsFilters = document.getElementById('leadsFilters');
 
-            // Check if current user is admin@ciudadbilingue.com for Reportes access
+            // Check if current user is admin@ciudadbilingue.com for Reportes/COATS access
             const currentUserEmail = window.FirebaseData?.currentUser?.email;
             const isMainAdmin = currentUserEmail === 'admin@ciudadbilingue.com';
 
-            // Show Reportes tab only for admin@ciudadbilingue.com
+            // Show Reportes and COATS tabs only for admin@ciudadbilingue.com
             if (reportsTab) {
                 reportsTab.style.display = isMainAdmin ? 'block' : 'none';
+            }
+            if (coatsReportsTab) {
+                coatsReportsTab.style.display = isMainAdmin ? 'block' : 'none';
             }
 
             if (role === 'director' || role === 'admin') {
