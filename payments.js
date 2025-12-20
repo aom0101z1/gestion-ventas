@@ -2429,9 +2429,9 @@ function renderPaymentModal(student) {
                     ${(student.tipoPago !== 'POR_HORAS' && student.modalidad !== 'Privadas') ? `
                         <div class="form-group">
                             <label>Monto Mensualidad/Semestre ($)</label>
-                            <input type="number" id="payAmountBase" value="${student.valor || ''}" required min="0" onchange="updatePaymentTotal()">
+                            <input type="number" id="payAmountBase" value="" required min="0" onchange="updatePaymentTotal()" placeholder="Ingrese el monto a pagar">
                             <small id="amountHelp" style="color: #6b7280; display: block; margin-top: 5px;">
-                                Valor mensual: $${(student.valor || 0).toLocaleString()}
+                                Ingrese el monto total de la mensualidad o semestre
                             </small>
                         </div>
 
@@ -2872,21 +2872,16 @@ window.updateMonthSelection = function() {
 
     counter.textContent = `(${checkedBoxes.length} seleccionados)`;
 
-    // Update suggested amount based on selection
-    if (student && student.valor && checkedBoxes.length > 0) {
-        const suggestedAmount = student.valor * checkedBoxes.length;
-
-        // Only auto-fill if the field is empty or zero
-        if (amountInput && (!amountInput.value || amountInput.value === '0' || amountInput.value === '')) {
-            amountInput.value = suggestedAmount;
-        }
-
+    // Show selected months count (no auto-fill - user enters amount manually)
+    if (checkedBoxes.length > 0) {
         const amountHelp = document.getElementById('amountHelp');
         if (amountHelp) {
-            amountHelp.innerHTML = `
-                Valor mensual: $${student.valor.toLocaleString()}<br>
-                Total sugerido (${checkedBoxes.length} meses): $${suggestedAmount.toLocaleString()}
-            `;
+            amountHelp.innerHTML = `${checkedBoxes.length} mes(es) seleccionado(s)`;
+        }
+    } else {
+        const amountHelp = document.getElementById('amountHelp');
+        if (amountHelp) {
+            amountHelp.innerHTML = `Ingrese el monto total de la mensualidad o semestre`;
         }
     }
 
