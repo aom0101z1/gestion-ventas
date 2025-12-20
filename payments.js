@@ -1262,16 +1262,21 @@ const InvoiceGenerator = {
         let invoiceItems = [];
 
         if (payment.lineItems && payment.lineItems.length > 0) {
-            // Use detailed line items
-            invoiceItems = payment.lineItems.map(item => ({
-                quantity: 1,
-                description: item.concept === 'Mensualidad/Semestre'
-                    ? `${payment.month.charAt(0).toUpperCase() + payment.month.slice(1)} ${payment.year} - ${student.grupo || 'Curso de Inglés'}`
-                    : item.concept,
-                unitPrice: item.amount,
-                total: item.amount
-            }));
-        } else {
+            // Use detailed line items - FILTER OUT items with amount <= 0
+            invoiceItems = payment.lineItems
+                .filter(item => item.amount > 0) // Only include items with positive amounts
+                .map(item => ({
+                    quantity: 1,
+                    description: item.concept === 'Mensualidad/Semestre'
+                        ? `${payment.month.charAt(0).toUpperCase() + payment.month.slice(1)} ${payment.year} - ${student.grupo || 'Curso de Inglés'}`
+                        : item.concept,
+                    unitPrice: item.amount,
+                    total: item.amount
+                }));
+        }
+
+        // If no items after filtering (or no lineItems), use legacy single item
+        if (invoiceItems.length === 0) {
             // Fallback to single item (legacy)
             invoiceItems = [{
                 quantity: 1,
@@ -1370,17 +1375,21 @@ const InvoiceGenerator = {
         let invoiceItems = [];
 
         if (paymentResult.lineItems && paymentResult.lineItems.length > 0) {
-            // Use detailed line items
-            invoiceItems = paymentResult.lineItems.map(item => ({
-                quantity: 1,
-                description: item.concept === 'Mensualidad/Semestre'
-                    ? `${description} - ${student.grupo || 'Curso de Inglés'}`
-                    : item.concept,
-                unitPrice: item.amount,
-                total: item.amount
-            }));
-        } else {
-            // Fallback to single item (legacy)
+            // Use detailed line items - FILTER OUT items with amount <= 0
+            invoiceItems = paymentResult.lineItems
+                .filter(item => item.amount > 0) // Only include items with positive amounts
+                .map(item => ({
+                    quantity: 1,
+                    description: item.concept === 'Mensualidad/Semestre'
+                        ? `${description} - ${student.grupo || 'Curso de Inglés'}`
+                        : item.concept,
+                    unitPrice: item.amount,
+                    total: item.amount
+                }));
+        }
+
+        // If no items after filtering (or no lineItems), use legacy single item
+        if (invoiceItems.length === 0) {
             invoiceItems = [{
                 quantity: 1,
                 description: `${description} - ${student.grupo || 'Curso de Inglés'}`,
@@ -4086,16 +4095,22 @@ async function processPayment(studentId) {
         const otroAmount = includeOtro ? (parseFloat(document.getElementById('otroAmount')?.value) || 0) : 0;
 
         // Get base amount (without additional items)
-        const baseAmount = parseFloat(document.getElementById('payAmountBase')?.value) || totalAmount;
+        // IMPORTANT: Allow 0 as a valid value (for payments that are only Matrícula/Certificado)
+        const payAmountBaseField = document.getElementById('payAmountBase');
+        const baseAmount = payAmountBaseField
+            ? (parseFloat(payAmountBaseField.value) || 0)  // Allow 0 as valid
+            : totalAmount; // Only use totalAmount as fallback if field doesn't exist
 
         // Build line items array
         const lineItems = [];
 
-        // Add base payment
-        lineItems.push({
-            concept: 'Mensualidad/Semestre',
-            amount: baseAmount
-        });
+        // Only add base payment if amount > 0
+        if (baseAmount > 0) {
+            lineItems.push({
+                concept: 'Mensualidad/Semestre',
+                amount: baseAmount
+            });
+        }
 
         // Add additional items if included
         if (matriculaAmount > 0) {
