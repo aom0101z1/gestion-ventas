@@ -385,10 +385,12 @@ function renderGrupo2Form(group = null) {
     const manager = window.GroupsManager2;
     const isEdit = !!group;
 
-    // Get teachers list
+    // Get teachers list (only active teachers)
     let teacherOptions = '<option value="">Sin asignar</option>';
     if (window.TeacherManager && window.TeacherManager.teachers && window.TeacherManager.teachers.size > 0) {
-        const teachers = Array.from(window.TeacherManager.teachers.values());
+        const teachers = Array.from(window.TeacherManager.teachers.values())
+            .filter(t => t.status !== 'inactive') // Only active teachers
+            .sort((a, b) => a.name.localeCompare(b.name)); // Sort alphabetically
         teacherOptions += teachers.map(t => `
             <option value="${t.id}" ${group?.teacherId === t.id ? 'selected' : ''}>
                 ${t.name}
@@ -608,7 +610,17 @@ function renderGrupo2Card(group) {
 }
 
 // Show/hide form
-window.showGrupo2Form = function(groupId = null) {
+window.showGrupo2Form = async function(groupId = null) {
+    // Ensure TeacherManager is initialized to populate teacher dropdown
+    if (window.TeacherManager && !window.TeacherManager.initialized) {
+        try {
+            await window.TeacherManager.init();
+            console.log('✅ TeacherManager initialized for Grupos 2.0');
+        } catch (err) {
+            console.warn('⚠️ Could not initialize TeacherManager:', err.message || err);
+        }
+    }
+
     const group = groupId ? window.GroupsManager2.groups.get(groupId) : null;
     document.getElementById('grupo2FormContainer').innerHTML = renderGrupo2Form(group);
 };
