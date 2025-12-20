@@ -1798,6 +1798,185 @@ const InvoiceGenerator = {
         window.print();
         alert(`Use "Guardar como PDF" en el diálogo de impresión.\nNombre sugerido: Comprobante_${invoiceNumber}.pdf`);
         return false;
+    },
+
+    // ==================== VOIDED INVOICES SYSTEM ====================
+
+    // Void an invoice (mark as cancelled and create audit record)
+    async voidInvoice(invoiceNumber, reason, replacementInvoiceNumber = null) {
+        try {
+            const db = window.firebaseModules.database;
+
+            // Get the original invoice
+            const invoiceRef = db.ref(window.FirebaseData.database, `invoices/${invoiceNumber}`);
+            const snapshot = await db.get(invoiceRef);
+
+            if (!snapshot.exists()) {
+                throw new Error('Factura no encontrada: ' + invoiceNumber);
+            }
+
+            const originalInvoice = snapshot.val();
+
+            // Create voided invoice record
+            const voidedRecord = {
+                ...originalInvoice,
+                originalNumber: invoiceNumber,
+                status: 'ANULADA',
+                voidedAt: new Date().toISOString(),
+                voidedBy: window.FirebaseData.auth?.currentUser?.email || 'unknown',
+                voidReason: reason,
+                replacementInvoice: replacementInvoiceNumber || null
+            };
+
+            // Save to voidedInvoices collection
+            const voidedRef = db.ref(window.FirebaseData.database, `voidedInvoices/${invoiceNumber}`);
+            await db.set(voidedRef, voidedRecord);
+
+            // Update original invoice to mark as voided (keep for reference but mark status)
+            const updatedInvoice = {
+                ...originalInvoice,
+                status: 'ANULADA',
+                voidedAt: new Date().toISOString(),
+                voidedBy: window.FirebaseData.auth?.currentUser?.email || 'unknown',
+                voidReason: reason,
+                replacementInvoice: replacementInvoiceNumber || null
+            };
+            await db.set(invoiceRef, updatedInvoice);
+
+            // Audit log
+            if (typeof window.logAudit === 'function') {
+                await window.logAudit(
+                    'Factura anulada',
+                    'invoice',
+                    invoiceNumber,
+                    `Factura ${invoiceNumber} ANULADA - ${reason}${replacementInvoiceNumber ? ' → Reemplazada por ' + replacementInvoiceNumber : ''}`,
+                    {
+                        before: { status: 'ACTIVA', total: originalInvoice.total },
+                        after: { status: 'ANULADA', reason: reason, replacement: replacementInvoiceNumber }
+                    }
+                );
+            }
+
+            console.log('✅ Factura anulada:', invoiceNumber);
+            return voidedRecord;
+
+        } catch (error) {
+            console.error('❌ Error anulando factura:', error);
+            throw error;
+        }
+    },
+
+    // Get all voided invoices for audit purposes
+    async getVoidedInvoices() {
+        try {
+            const db = window.firebaseModules.database;
+            const voidedRef = db.ref(window.FirebaseData.database, 'voidedInvoices');
+            const snapshot = await db.get(voidedRef);
+
+            if (!snapshot.exists()) {
+                return [];
+            }
+
+            const voided = [];
+            snapshot.forEach(child => {
+                voided.push({
+                    id: child.key,
+                    ...child.val()
+                });
+            });
+
+            // Sort by voidedAt date descending
+            voided.sort((a, b) => new Date(b.voidedAt) - new Date(a.voidedAt));
+
+            return voided;
+        } catch (error) {
+            console.error('❌ Error getting voided invoices:', error);
+            return [];
+        }
+    },
+
+    // Show voided invoices modal for audit
+    async showVoidedInvoicesModal() {
+        const voided = await this.getVoidedInvoices();
+
+        const existingModal = document.getElementById('voidedInvoicesModal');
+        if (existingModal) existingModal.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'voidedInvoicesModal';
+        modal.style.cssText = `
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5); display: flex; align-items: center;
+            justify-content: center; z-index: 10000;
+        `;
+
+        modal.innerHTML = `
+            <div style="background: white; padding: 2rem; border-radius: 12px; max-width: 900px; width: 95%; max-height: 90vh; overflow-y: auto;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                    <h2 style="margin: 0; color: #dc2626;">🚫 Facturas Anuladas (Auditoría)</h2>
+                    <button onclick="document.getElementById('voidedInvoicesModal').remove()"
+                            style="background: #ef4444; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer;">
+                        ✕ Cerrar
+                    </button>
+                </div>
+
+                ${voided.length === 0 ? `
+                    <div style="text-align: center; padding: 3rem; color: #6b7280;">
+                        <div style="font-size: 48px; margin-bottom: 1rem;">✅</div>
+                        <p>No hay facturas anuladas</p>
+                    </div>
+                ` : `
+                    <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+                        <strong>Total facturas anuladas:</strong> ${voided.length}
+                    </div>
+
+                    <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                        <thead>
+                            <tr style="background: #fee2e2;">
+                                <th style="padding: 10px; border: 1px solid #fecaca; text-align: left;">Factura</th>
+                                <th style="padding: 10px; border: 1px solid #fecaca; text-align: left;">Estudiante</th>
+                                <th style="padding: 10px; border: 1px solid #fecaca; text-align: right;">Monto</th>
+                                <th style="padding: 10px; border: 1px solid #fecaca; text-align: left;">Fecha Anulación</th>
+                                <th style="padding: 10px; border: 1px solid #fecaca; text-align: left;">Motivo</th>
+                                <th style="padding: 10px; border: 1px solid #fecaca; text-align: left;">Reemplazo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${voided.map(inv => `
+                                <tr>
+                                    <td style="padding: 10px; border: 1px solid #fecaca; font-family: monospace; color: #dc2626;">
+                                        ${inv.originalNumber || inv.number}
+                                    </td>
+                                    <td style="padding: 10px; border: 1px solid #fecaca;">
+                                        ${inv.student?.name || 'N/A'}
+                                    </td>
+                                    <td style="padding: 10px; border: 1px solid #fecaca; text-align: right;">
+                                        $${(inv.total || 0).toLocaleString('es-CO')}
+                                    </td>
+                                    <td style="padding: 10px; border: 1px solid #fecaca;">
+                                        ${inv.voidedAt ? new Date(inv.voidedAt).toLocaleString('es-CO') : 'N/A'}
+                                    </td>
+                                    <td style="padding: 10px; border: 1px solid #fecaca; max-width: 200px;">
+                                        ${inv.voidReason || 'Sin motivo'}
+                                    </td>
+                                    <td style="padding: 10px; border: 1px solid #fecaca; font-family: monospace; color: #16a34a;">
+                                        ${inv.replacementInvoice || '—'}
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `}
+
+                <div style="margin-top: 1.5rem; padding: 1rem; background: #f3f4f6; border-radius: 8px; font-size: 13px; color: #6b7280;">
+                    <strong>ℹ️ Nota:</strong> Este reporte muestra todas las facturas que fueron anuladas por errores o
+                    duplicaciones. Cada factura anulada puede tener una factura de reemplazo asociada.
+                    Los saltos en la numeración de facturas se explican por estas anulaciones.
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
     }
 };
 // ==================================================================================
@@ -4774,6 +4953,68 @@ window.saveEditedPayment = async function() {
 };
 
 // ==================== END EDIT PAYMENT FUNCTIONS ====================
+
+// ==================== VOIDED INVOICES WINDOW FUNCTIONS ====================
+
+// Show voided invoices modal (for audit)
+window.showVoidedInvoices = function() {
+    InvoiceGenerator.showVoidedInvoicesModal();
+};
+
+// Void an invoice (admin only)
+window.voidInvoice = async function(invoiceNumber, reason, replacementInvoice = null) {
+    if (window.FirebaseData?.currentUser?.email !== 'admin@ciudadbilingue.com') {
+        window.showNotification('❌ Solo el administrador puede anular facturas', 'error');
+        return;
+    }
+
+    try {
+        await InvoiceGenerator.voidInvoice(invoiceNumber, reason, replacementInvoice);
+        window.showNotification(`✅ Factura ${invoiceNumber} anulada correctamente`, 'success');
+    } catch (error) {
+        window.showNotification(`❌ Error: ${error.message}`, 'error');
+    }
+};
+
+// Delete a payment and its associated invoice (admin only)
+window.deletePaymentWithInvoice = async function(paymentId, studentId, voidInvoice = true) {
+    if (window.FirebaseData?.currentUser?.email !== 'admin@ciudadbilingue.com') {
+        window.showNotification('❌ Solo el administrador puede eliminar pagos', 'error');
+        return;
+    }
+
+    try {
+        const payment = window.PaymentManager.payments.get(paymentId);
+        if (!payment) {
+            throw new Error('Pago no encontrado');
+        }
+
+        // If payment has an invoice, void it first
+        if (voidInvoice && payment.invoiceNumber) {
+            await InvoiceGenerator.voidInvoice(
+                payment.invoiceNumber,
+                'Pago eliminado - duplicado o error',
+                null
+            );
+        }
+
+        // Delete the payment
+        await window.PaymentManager.deletePayment(paymentId);
+
+        window.showNotification('✅ Pago eliminado y factura anulada', 'success');
+
+        // Refresh if viewing student payments
+        if (typeof loadPaymentsTab === 'function') {
+            loadPaymentsTab();
+        }
+
+    } catch (error) {
+        console.error('Error deleting payment:', error);
+        window.showNotification(`❌ Error: ${error.message}`, 'error');
+    }
+};
+
+// ==================== END VOIDED INVOICES FUNCTIONS ====================
 
 window.toggleAllStudentsBulk = function() {
     const selectAll = document.getElementById('selectAllStudents');
