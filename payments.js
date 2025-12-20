@@ -2865,22 +2865,37 @@ window.updateMonthSelection = function() {
     const checkedBoxes = document.querySelectorAll('.month-checkbox:checked');
     const counter = document.getElementById('monthCounter');
     const paymentType = document.getElementById('paymentType').value;
-    const amountInput = document.getElementById('payAmount');
     const student = window.StudentManager.students.get(window.currentStudentId);
-    
+
+    // Use payAmountBase if it exists (new UI), otherwise payAmount (legacy)
+    const amountInput = document.getElementById('payAmountBase') || document.getElementById('payAmount');
+
     counter.textContent = `(${checkedBoxes.length} seleccionados)`;
-    
+
     // Update suggested amount based on selection
     if (student && student.valor && checkedBoxes.length > 0) {
         const suggestedAmount = student.valor * checkedBoxes.length;
-        amountInput.value = suggestedAmount;
-        document.getElementById('amountHelp').innerHTML = `
-            Valor mensual: $${student.valor.toLocaleString()}<br>
-            Total sugerido (${checkedBoxes.length} meses): $${suggestedAmount.toLocaleString()}
-        `;
+
+        // Only auto-fill if the field is empty or zero
+        if (amountInput && (!amountInput.value || amountInput.value === '0' || amountInput.value === '')) {
+            amountInput.value = suggestedAmount;
+        }
+
+        const amountHelp = document.getElementById('amountHelp');
+        if (amountHelp) {
+            amountHelp.innerHTML = `
+                Valor mensual: $${student.valor.toLocaleString()}<br>
+                Total sugerido (${checkedBoxes.length} meses): $${suggestedAmount.toLocaleString()}
+            `;
+        }
     }
-    
-    updateInstallmentAmounts();
+
+    // Update total calculation if the new UI is present
+    if (typeof updatePaymentTotal === 'function' && document.getElementById('payAmountBase')) {
+        updatePaymentTotal();
+    } else {
+        updateInstallmentAmounts();
+    }
 };
 
 // Calculate hourly payment total
