@@ -445,6 +445,52 @@ class ReportsManager {
         };
     }
 
+    // ===== INVOICES REPORT =====
+
+    async getInvoicesReport() {
+        if (!this.cachedData.invoices) await this.refreshData();
+
+        const db = window.firebaseModules.database;
+
+        // Fetch voided invoices
+        let voidedInvoices = {};
+        try {
+            const voidedSnapshot = await db.get(db.ref(window.FirebaseData.database, 'voidedInvoices'));
+            if (voidedSnapshot.exists()) {
+                voidedSnapshot.forEach((childSnapshot) => {
+                    const voidedData = childSnapshot.val();
+                    voidedInvoices[voidedData.invoiceNumber] = voidedData;
+                });
+            }
+        } catch (error) {
+            console.warn('Could not fetch voided invoices:', error);
+        }
+
+        // Process all invoices with voided status
+        const invoicesWithStatus = this.cachedData.invoices.map(invoice => {
+            const isVoided = voidedInvoices[invoice.invoiceNumber] ||
+                             invoice.status === 'ANULADA' ||
+                             (invoice.invoiceNumber && voidedInvoices[invoice.invoiceNumber.toString()]);
+
+            return {
+                ...invoice,
+                isVoided,
+                voidedInfo: isVoided ? voidedInvoices[invoice.invoiceNumber] || voidedInvoices[invoice.invoiceNumber?.toString()] : null
+            };
+        }).sort((a, b) => b.date - a.date); // Sort by most recent first
+
+        const totalActive = invoicesWithStatus.filter(i => !i.isVoided);
+        const totalVoided = invoicesWithStatus.filter(i => i.isVoided);
+
+        return {
+            invoices: invoicesWithStatus,
+            totalCount: invoicesWithStatus.length,
+            voidedCount: totalVoided.length,
+            activeCount: totalActive.length,
+            totalActiveAmount: totalActive.reduce((sum, i) => sum + (i.total || 0), 0)
+        };
+    }
+
     // ===== HELPER FUNCTIONS =====
 
     groupByDay(data, dateField = 'date') {
@@ -637,6 +683,11 @@ window.generateSalesReport = async (period, customStart, customEnd) => {
 window.generateTiendaReport = async (period, customStart, customEnd) => {
     await window.ReportsManager.init();
     return await window.ReportsManager.getTiendaReport(period, customStart, customEnd);
+};
+
+window.generateInvoicesReport = async () => {
+    await window.ReportsManager.init();
+    return await window.ReportsManager.getInvoicesReport();
 };
 
 console.log('📊 Reports module loaded');

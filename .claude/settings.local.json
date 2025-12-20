@@ -1,7 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git revert:*)"
+      "Bash(git revert:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push)",
+      "Bash(git -C \"E:\\\\GITHUB\\\\gestion-ventas\" log --oneline -20)",
+      "Bash(git -C \"E:\\\\GITHUB\\\\gestion-ventas\" log --all --graph --decorate --oneline)",
+      "Bash(wc:*)",
+      "Bash(git push:*)"
     ]
   }
 }

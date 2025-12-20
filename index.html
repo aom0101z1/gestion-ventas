@@ -1014,6 +1014,7 @@
                     <button class="report-tab active" onclick="switchReportTab('financial')" id="financialReportTab">💰 Financiero</button>
                     <button class="report-tab" onclick="switchReportTab('students')" id="studentsReportTab">👥 Estudiantes</button>
                     <button class="report-tab" onclick="switchReportTab('sales')" id="salesReportTab">🎯 Ventas</button>
+                    <button class="report-tab" onclick="switchReportTab('invoices')" id="invoicesReportTab">📄 Facturas</button>
                 </div>
 
                 <!-- Financial Reports -->
@@ -1076,6 +1077,54 @@
                     <div id="salesSummary" style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px;">
                         <h4>Resumen de Ventas</h4>
                         <div id="salesDetails">Cargando datos de ventas...</div>
+                    </div>
+                </div>
+
+                <!-- Invoices Reports -->
+                <div id="invoicesReports" class="report-content hidden">
+                    <h3>📄 Historial de Facturas</h3>
+
+                    <div style="margin-bottom: 1rem; display: flex; gap: 1rem; align-items: center;">
+                        <input type="text" id="invoiceSearchInput" placeholder="Buscar por estudiante o # factura..."
+                            style="padding: 0.5rem 1rem; border: 1px solid #ccc; border-radius: 4px; flex: 1; max-width: 300px;"
+                            onkeyup="filterInvoicesTable()">
+                        <label style="display: flex; align-items: center; gap: 0.5rem;">
+                            <input type="checkbox" id="showVoidedOnly" onchange="filterInvoicesTable()">
+                            Solo anuladas
+                        </label>
+                        <button onclick="exportInvoicesData()" class="btn btn-success">📥 Exportar CSV</button>
+                    </div>
+
+                    <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px; max-height: 600px; overflow-y: auto;">
+                        <table id="invoicesReportTable" style="width: 100%; border-collapse: collapse;">
+                            <thead style="position: sticky; top: 0; background: #f8f9fa;">
+                                <tr style="border-bottom: 2px solid #dee2e6;">
+                                    <th style="padding: 0.75rem; text-align: left;">Factura #</th>
+                                    <th style="padding: 0.75rem; text-align: left;">Fecha</th>
+                                    <th style="padding: 0.75rem; text-align: left;">Estudiante</th>
+                                    <th style="padding: 0.75rem; text-align: right;">Monto</th>
+                                    <th style="padding: 0.75rem; text-align: center;">Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="invoicesReportBody">
+                                <tr><td colspan="5" style="text-align: center; padding: 2rem;">Cargando facturas...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div id="invoicesSummary" style="margin-top: 1rem; display: flex; gap: 2rem; justify-content: center;">
+                        <div style="background: #d4edda; padding: 1rem; border-radius: 8px; text-align: center;">
+                            <strong id="totalInvoicesCount">0</strong>
+                            <div style="font-size: 0.85rem; color: #155724;">Total Facturas</div>
+                        </div>
+                        <div style="background: #f8d7da; padding: 1rem; border-radius: 8px; text-align: center;">
+                            <strong id="voidedInvoicesCount">0</strong>
+                            <div style="font-size: 0.85rem; color: #721c24;">Anuladas</div>
+                        </div>
+                        <div style="background: #cce5ff; padding: 1rem; border-radius: 8px; text-align: center;">
+                            <strong id="totalInvoicesAmount">$0</strong>
+                            <div style="font-size: 0.85rem; color: #004085;">Monto Total (Activas)</div>
+                        </div>
                     </div>
                 </div>
 
@@ -2127,6 +2176,10 @@ onAuthStateChanged(auth, async (user) => {
                         const salesReport = await window.generateSalesReport(currentReportsPeriod, customStart, customEnd);
                         updateSalesReports(salesReport);
                         break;
+                    case 'invoices':
+                        const invoicesReport = await window.generateInvoicesReport();
+                        updateInvoicesReports(invoicesReport);
+                        break;
                 }
             } catch (error) {
                 console.error('❌ Error loading report tab:', error);
@@ -2202,6 +2255,103 @@ onAuthStateChanged(auth, async (user) => {
 
             // Create charts
             createSalesCharts(report);
+        }
+
+        // Store invoices data for filtering
+        let currentInvoicesData = [];
+
+        function updateInvoicesReports(report) {
+            currentInvoicesData = report.invoices;
+
+            // Update summary stats
+            document.getElementById('totalInvoicesCount').textContent = report.totalCount;
+            document.getElementById('voidedInvoicesCount').textContent = report.voidedCount;
+            document.getElementById('totalInvoicesAmount').textContent = window.ReportsManager.formatCurrency(report.totalActiveAmount);
+
+            // Render table
+            renderInvoicesTable(report.invoices);
+        }
+
+        function renderInvoicesTable(invoices) {
+            const tbody = document.getElementById('invoicesReportBody');
+
+            if (!invoices || invoices.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 2rem;">No se encontraron facturas</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = invoices.map(invoice => {
+                const date = invoice.date instanceof Date ? invoice.date : new Date(invoice.date);
+                const formattedDate = date.toLocaleDateString('es-CO', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+
+                const statusStyle = invoice.isVoided
+                    ? 'background: #f8d7da; color: #721c24; padding: 0.25rem 0.5rem; border-radius: 4px; font-weight: bold;'
+                    : 'background: #d4edda; color: #155724; padding: 0.25rem 0.5rem; border-radius: 4px;';
+
+                const statusText = invoice.isVoided ? 'ANULADA' : 'Activa';
+
+                const rowStyle = invoice.isVoided ? 'background: #fff5f5;' : '';
+
+                return `
+                    <tr style="${rowStyle} border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 0.75rem;">${invoice.invoiceNumber || 'N/A'}</td>
+                        <td style="padding: 0.75rem;">${formattedDate}</td>
+                        <td style="padding: 0.75rem;">${invoice.studentName || invoice.customerName || 'N/A'}</td>
+                        <td style="padding: 0.75rem; text-align: right;">${window.ReportsManager.formatCurrency(invoice.total || 0)}</td>
+                        <td style="padding: 0.75rem; text-align: center;">
+                            <span style="${statusStyle}">${statusText}</span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function filterInvoicesTable() {
+            const searchTerm = document.getElementById('invoiceSearchInput').value.toLowerCase();
+            const showVoidedOnly = document.getElementById('showVoidedOnly').checked;
+
+            let filteredInvoices = currentInvoicesData;
+
+            if (showVoidedOnly) {
+                filteredInvoices = filteredInvoices.filter(i => i.isVoided);
+            }
+
+            if (searchTerm) {
+                filteredInvoices = filteredInvoices.filter(i => {
+                    const studentName = (i.studentName || i.customerName || '').toLowerCase();
+                    const invoiceNumber = (i.invoiceNumber || '').toString().toLowerCase();
+                    return studentName.includes(searchTerm) || invoiceNumber.includes(searchTerm);
+                });
+            }
+
+            renderInvoicesTable(filteredInvoices);
+        }
+
+        function exportInvoicesData() {
+            if (!currentInvoicesData || currentInvoicesData.length === 0) {
+                showNotification('No hay datos para exportar', 'warning');
+                return;
+            }
+
+            const dataToExport = currentInvoicesData.map(invoice => {
+                const date = invoice.date instanceof Date ? invoice.date : new Date(invoice.date);
+                return {
+                    'Factura #': invoice.invoiceNumber || 'N/A',
+                    'Fecha': date.toLocaleDateString('es-CO'),
+                    'Estudiante': invoice.studentName || invoice.customerName || 'N/A',
+                    'Monto': invoice.total || 0,
+                    'Estado': invoice.isVoided ? 'ANULADA' : 'Activa'
+                };
+            });
+
+            window.ReportsManager.exportToCSV(dataToExport, 'facturas_reporte.csv');
+            showNotification('Datos exportados exitosamente', 'success');
         }
 
         function createFinancialCharts(report) {
