@@ -129,12 +129,19 @@ class ReportsManager {
     }
 
     processInvoicesData(rawData) {
-        return Object.keys(rawData).map(id => ({
-            id,
-            ...rawData[id],
-            date: new Date(rawData[id].date || rawData[id].createdAt || Date.now()),
-            total: parseFloat(rawData[id].total || 0)
-        })).sort((a, b) => a.date - b.date);
+        return Object.keys(rawData).map(id => {
+            const invoice = rawData[id];
+            return {
+                id,
+                ...invoice,
+                // Invoice number can be stored as 'number', 'invoiceNumber', or the ID itself
+                invoiceNumber: invoice.number || invoice.invoiceNumber || id,
+                // Student name can be in different places
+                studentName: invoice.student?.name || invoice.studentName || invoice.customerName || '',
+                date: new Date(invoice.date || invoice.createdAt || Date.now()),
+                total: parseFloat(invoice.total || 0)
+            };
+        }).sort((a, b) => a.date - b.date);
     }
 
     // ===== PERIOD FILTERING =====
