@@ -625,6 +625,21 @@ function loadClassProgressStats() {
     const container = document.getElementById('cpStatsGrid');
     if (!container || !window.ClassProgressManager) return;
 
+    // Check if managers are ready
+    const groupsReady = window.GroupsManager2 && window.GroupsManager2.initialized;
+    const teachersReady = window.TeacherManager && window.TeacherManager.initialized;
+
+    if (!groupsReady || !teachersReady) {
+        container.innerHTML = `
+            <div class="cp-stat-card">
+                <div class="cp-stat-icon">⏳</div>
+                <div class="cp-stat-number">...</div>
+                <div class="cp-stat-label">Cargando datos...</div>
+            </div>
+        `;
+        return;
+    }
+
     const allGroups = window.ClassProgressManager.getAllGroupsWithProgress();
     const activeGroups = allGroups.filter(g => g.status === 'active');
     const behindGroups = allGroups.filter(g => g.expectedProgress?.status === 'behind');
@@ -636,11 +651,21 @@ function loadClassProgressStats() {
     const todayCount = todayClasses.classes?.length || 0;
     const todayCompleted = todayClasses.classes?.filter(c => c.status === 'completed').length || 0;
 
+    // Get teacher count
+    const teacherCount = window.TeacherManager?.teachers?.size || 0;
+    const activeTeachers = Array.from(window.TeacherManager?.teachers?.values() || [])
+        .filter(t => t.status === 'active').length;
+
     container.innerHTML = `
         <div class="cp-stat-card">
             <div class="cp-stat-icon">👥</div>
             <div class="cp-stat-number">${activeGroups.length}</div>
             <div class="cp-stat-label">Grupos Activos</div>
+        </div>
+        <div class="cp-stat-card">
+            <div class="cp-stat-icon">👨‍🏫</div>
+            <div class="cp-stat-number">${activeTeachers}</div>
+            <div class="cp-stat-label">Profesores</div>
         </div>
         <div class="cp-stat-card">
             <div class="cp-stat-icon">📅</div>
@@ -830,10 +855,11 @@ function renderClassCard(classData, date) {
 // Render Calendar View
 function renderCalendarView(container) {
     const today = new Date();
-    const currentYear = today.getFullYear();
-    const currentMonth = today.getMonth();
+    // Use currentCalendarDate for navigation, not today
+    const displayYear = currentCalendarDate.getFullYear();
+    const displayMonth = currentCalendarDate.getMonth();
 
-    const calendar = window.ClassProgressManager.getMonthCalendar(currentYear, currentMonth);
+    const calendar = window.ClassProgressManager.getMonthCalendar(displayYear, displayMonth);
 
     container.innerHTML = `
         <div class="cp-calendar-header">
@@ -1556,19 +1582,18 @@ function selectClassForProgress(groupId, date) {
 let currentCalendarDate = new Date();
 
 function changeCalendarMonth(delta) {
-    currentCalendarDate.setMonth(currentCalendarDate.getMonth() + delta);
-    const calendar = window.ClassProgressManager.getMonthCalendar(
-        currentCalendarDate.getFullYear(),
-        currentCalendarDate.getMonth()
-    );
-
-    // Update title
-    document.getElementById('cpCalendarTitle').textContent =
-        `${calendar.monthName.charAt(0).toUpperCase() + calendar.monthName.slice(1)} ${calendar.year}`;
+    // Create new date to avoid mutation issues
+    const newDate = new Date(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth() + delta, 1);
+    currentCalendarDate = newDate;
 
     // Re-render calendar grid
     const content = document.getElementById('cpContent');
     if (content) renderCalendarView(content);
+}
+
+// Reset calendar to current month when switching to calendar view
+function resetCalendarToCurrentMonth() {
+    currentCalendarDate = new Date();
 }
 
 // View day details
@@ -1639,15 +1664,59 @@ function exportToExcel() {
 // Create global instance
 window.ClassProgressManager = new ClassProgressManager();
 
+// Wait for required managers to be ready
+async function waitForManagers() {
+    const maxAttempts = 20;
+    let attempts = 0;
+
+    while (attempts < maxAttempts) {
+        const hasGroupsManager = window.GroupsManager2 && window.GroupsManager2.initialized;
+        const hasTeacherManager = window.TeacherManager && window.TeacherManager.initialized;
+
+        if (hasGroupsManager && hasTeacherManager) {
+            console.log('✅ All managers ready for Class Progress');
+            return true;
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 500));
+        attempts++;
+    }
+
+    console.warn('⚠️ Some managers not available after waiting');
+    return false;
+}
+
+// Refresh Class Progress tab data
+async function refreshClassProgressData() {
+    console.log('🔄 Refreshing Class Progress data...');
+
+    // Ensure managers are ready
+    await waitForManagers();
+
+    // Reload progress records
+    await window.ClassProgressManager.init(true);
+
+    // Re-render stats and current view
+    loadClassProgressStats();
+    loadClassProgressAlerts();
+
+    const activeTab = document.querySelector('.cp-subtab.active');
+    if (activeTab) {
+        const viewName = activeTab.id.replace('cp', '').replace('Tab', '').toLowerCase();
+        switchClassProgressView(viewName);
+    }
+}
+
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('📚 Initializing Class Progress module...');
 
     // Wait for other managers to be ready
     setTimeout(async () => {
+        await waitForManagers();
         await window.ClassProgressManager.init();
         console.log('✅ Class Progress Manager initialized');
-    }, 1000);
+    }, 1500);
 });
 
 // Export for module usage

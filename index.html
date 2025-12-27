@@ -2681,8 +2681,10 @@ onAuthStateChanged(auth, async (user) => {
                         window.CoatsReports.renderReport('coatsReportContainer');
                     }
                 } else if (tabName === 'classProgress') {
-                    // Load Class Progress
-                    if (typeof renderClassProgressTab === 'function') {
+                    // Load Class Progress - wait for managers to be ready
+                    if (typeof refreshClassProgressData === 'function') {
+                        refreshClassProgressData();
+                    } else if (typeof renderClassProgressTab === 'function') {
                         renderClassProgressTab();
                     }
                 }
