@@ -732,25 +732,25 @@ function switchClassProgressView(view) {
 
     switch (view) {
         case 'today':
-            renderTodayView(content);
+            cpRenderTodayView(content);
             break;
         case 'calendar':
-            renderCalendarView(content);
+            cpRenderCalendarView(content);
             break;
         case 'groups':
-            renderGroupsView(content);
+            cpRenderGroupsView(content);
             break;
         case 'teachers':
-            renderTeachersView(content);
+            cpRenderTeachersView(content);
             break;
         case 'reports':
-            renderReportsView(content);
+            cpRenderReportsView(content);
             break;
     }
 }
 
-// Render Today's View
-function renderTodayView(container) {
+// Render Today's View (prefixed to avoid conflicts)
+function cpRenderTodayView(container) {
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
     const todayClasses = window.ClassProgressManager.getClassesForDate(todayStr);
@@ -852,8 +852,8 @@ function renderClassCard(classData, date) {
     `;
 }
 
-// Render Calendar View
-function renderCalendarView(container) {
+// Render Calendar View (prefixed to avoid conflicts)
+function cpRenderCalendarView(container) {
     const today = new Date();
     // Use currentCalendarDate for navigation, not today
     const displayYear = currentCalendarDate.getFullYear();
@@ -912,8 +912,8 @@ function renderCalendarView(container) {
     `;
 }
 
-// Render Groups View
-function renderGroupsView(container) {
+// Render Groups View (prefixed to avoid conflicts)
+function cpRenderGroupsView(container) {
     const groups = window.ClassProgressManager.getAllGroupsWithProgress()
         .filter(g => g.status === 'active')
         .sort((a, b) => a.groupId - b.groupId);
@@ -1004,8 +1004,8 @@ function renderGroupRow(group) {
     `;
 }
 
-// Render Teachers View
-function renderTeachersView(container) {
+// Render Teachers View (prefixed to avoid conflicts with teachers.js)
+function cpRenderTeachersView(container) {
     if (!window.TeacherManager) {
         container.innerHTML = '<p>Error: TeacherManager no disponible</p>';
         return;
@@ -1080,8 +1080,8 @@ function renderTeacherCard(teacher, startDate, endDate) {
     `;
 }
 
-// Render Reports View
-function renderReportsView(container) {
+// Render Reports View (prefixed to avoid conflicts)
+function cpRenderReportsView(container) {
     const today = new Date();
     const startOfWeek = new Date(today);
     startOfWeek.setDate(today.getDate() - today.getDay());
@@ -1588,7 +1588,7 @@ function changeCalendarMonth(delta) {
 
     // Re-render calendar grid
     const content = document.getElementById('cpContent');
-    if (content) renderCalendarView(content);
+    if (content) cpRenderCalendarView(content);
 }
 
 // Reset calendar to current month when switching to calendar view
@@ -1632,7 +1632,7 @@ function updateTeacherStats() {
 
     if (startDate && endDate) {
         const container = document.getElementById('cpContent');
-        if (container) renderTeachersView(container);
+        if (container) cpRenderTeachersView(container);
     }
 }
 
