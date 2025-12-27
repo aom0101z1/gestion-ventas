@@ -815,26 +815,38 @@
 
 .cp-summary-stat {
     text-align: center;
+    background: rgba(255,255,255,0.15);
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
+    min-width: 70px;
 }
 
 .cp-summary-stat .stat-number {
-    font-size: 2rem;
+    font-size: 1.75rem;
     font-weight: 700;
     display: block;
     line-height: 1;
+    color: #ffffff;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
 
 .cp-summary-stat .stat-label {
-    font-size: 0.75rem;
-    opacity: 0.85;
+    font-size: 0.7rem;
+    color: rgba(255,255,255,0.9);
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    margin-top: 0.25rem;
 }
 
 .cp-summary-stat.highlight {
-    background: rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.25);
     padding: 0.75rem 1.25rem;
     border-radius: 12px;
+}
+
+.cp-summary-stat.highlight .stat-number {
+    font-size: 2.25rem;
+    color: #ffffff;
 }
 
 /* Position Display */
