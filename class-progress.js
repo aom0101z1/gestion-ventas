@@ -1669,6 +1669,25 @@ async function waitForManagers() {
     const maxAttempts = 20;
     let attempts = 0;
 
+    // Try to initialize managers if they exist but aren't initialized
+    if (window.GroupsManager2 && !window.GroupsManager2.initialized) {
+        console.log('🔄 Initializing GroupsManager2...');
+        try {
+            await window.GroupsManager2.init();
+        } catch (e) {
+            console.error('Error initializing GroupsManager2:', e);
+        }
+    }
+
+    if (window.TeacherManager && !window.TeacherManager.initialized) {
+        console.log('🔄 Initializing TeacherManager...');
+        try {
+            await window.TeacherManager.init();
+        } catch (e) {
+            console.error('Error initializing TeacherManager:', e);
+        }
+    }
+
     while (attempts < maxAttempts) {
         const hasGroupsManager = window.GroupsManager2 && window.GroupsManager2.initialized;
         const hasTeacherManager = window.TeacherManager && window.TeacherManager.initialized;

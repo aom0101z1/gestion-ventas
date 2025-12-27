@@ -80,6 +80,10 @@
       "$date": {
         ".validate": "newData.hasChildren(['date', 'registeredBy']) && newData.child('openingBalance').isNumber() && newData.child('closingCount').isNumber()"
       }
+    },
+    "classProgress": {
+      ".read": "auth != null",
+      ".write": "auth != null"
     }
   }
 }
