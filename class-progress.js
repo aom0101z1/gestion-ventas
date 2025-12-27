@@ -84,14 +84,26 @@ class ClassProgressManager {
             { value: 'other', label: 'Otro (especificar en notas)' }
         ];
 
-        // Books configuration
+        // Books configuration - 12 books × 40 units = 480 total units
         this.books = {
-            1: { name: 'Book 1 - A1 Beginner', totalUnits: 52 },
-            2: { name: 'Book 2 - A2 Elementary', totalUnits: 52 },
-            3: { name: 'Book 3 - B1 Intermediate', totalUnits: 52 },
-            4: { name: 'Book 4 - B1+ Upper Intermediate', totalUnits: 52 },
-            5: { name: 'Book 5 - B2 Advanced', totalUnits: 52 }
+            0: { name: 'Book 0 - Pre-A1 Starter', totalUnits: 40, level: 'Pre-A1' },
+            1: { name: 'Book 1 - A1 Beginner', totalUnits: 40, level: 'A1' },
+            2: { name: 'Book 2 - A1+ Elementary', totalUnits: 40, level: 'A1+' },
+            3: { name: 'Book 3 - A2 Pre-Intermediate', totalUnits: 40, level: 'A2' },
+            4: { name: 'Book 4 - A2+ Intermediate Low', totalUnits: 40, level: 'A2+' },
+            5: { name: 'Book 5 - B1 Intermediate', totalUnits: 40, level: 'B1' },
+            6: { name: 'Book 6 - B1+ Intermediate High', totalUnits: 40, level: 'B1+' },
+            7: { name: 'Book 7 - B2 Upper Intermediate', totalUnits: 40, level: 'B2' },
+            8: { name: 'Book 8 - B2+ Advanced Low', totalUnits: 40, level: 'B2+' },
+            9: { name: 'Book 9 - C1 Advanced', totalUnits: 40, level: 'C1' },
+            10: { name: 'Book 10 - C1+ Advanced High', totalUnits: 40, level: 'C1+' },
+            11: { name: 'Book 11 - C2 Mastery', totalUnits: 40, level: 'C2' }
         };
+
+        // Curriculum totals
+        this.totalBooks = 12;
+        this.unitsPerBook = 40;
+        this.totalCurriculumUnits = 480; // 12 × 40
     }
 
     // Initialize
@@ -204,21 +216,47 @@ class ClassProgressManager {
         return results;
     }
 
-    // Get current unit for a group
+    // Calculate absolute position in curriculum (0-479)
+    // Book 0, Unit 1 = position 1
+    // Book 1, Unit 1 = position 41
+    // Book 11, Unit 40 = position 480
+    getAbsolutePosition(book, unit) {
+        const bookNum = parseInt(book) || 0;
+        const unitNum = parseInt(unit) || 1;
+        return (bookNum * this.unitsPerBook) + unitNum;
+    }
+
+    // Get book and unit from absolute position
+    getBookAndUnit(absolutePosition) {
+        const pos = Math.max(1, Math.min(absolutePosition, this.totalCurriculumUnits));
+        const book = Math.floor((pos - 1) / this.unitsPerBook);
+        const unit = ((pos - 1) % this.unitsPerBook) + 1;
+        return { book, unit };
+    }
+
+    // Get current position for a group (from group data, not progress records)
+    getCurrentPosition(group) {
+        if (!group) return { book: 0, unit: 1, absolutePosition: 1 };
+
+        const book = parseInt(group.book) || 0;
+        const unit = parseInt(group.unit) || 1;
+        const absolutePosition = this.getAbsolutePosition(book, unit);
+
+        return { book, unit, absolutePosition };
+    }
+
+    // Get current unit for a group (legacy - now uses group data)
     getCurrentUnit(groupId) {
-        const groupProgress = this.getGroupProgress(groupId);
-        if (groupProgress.size === 0) return 1;
+        const group = window.GroupsManager2?.groups.get(parseInt(groupId));
+        if (!group) return 1;
+        return parseInt(group.unit) || 1;
+    }
 
-        let maxUnit = 0;
-        groupProgress.forEach(record => {
-            if (record.unitsCovered) {
-                record.unitsCovered.forEach(uc => {
-                    if (uc.unit > maxUnit) maxUnit = uc.unit;
-                });
-            }
-        });
-
-        return maxUnit || 1;
+    // Get current book for a group
+    getCurrentBook(groupId) {
+        const group = window.GroupsManager2?.groups.get(parseInt(groupId));
+        if (!group) return 0;
+        return parseInt(group.book) || 0;
     }
 
     // Check if a date is a holiday
@@ -239,40 +277,36 @@ class ClassProgressManager {
         return null;
     }
 
-    // Get expected progress for a group based on start date and schedule
-    getExpectedProgress(groupId, group) {
+    // Get progress info for a group (simplified - based on recorded sessions)
+    getGroupProgressInfo(groupId, group) {
         if (!group) return null;
 
-        const startDate = new Date(group.startDate || '2025-01-01');
-        const today = new Date();
-        const scheduleType = this.scheduleTypes[group.scheduleType] || this.scheduleTypes.regular;
+        const position = this.getCurrentPosition(group);
+        const progressPercent = Math.round((position.absolutePosition / this.totalCurriculumUnits) * 100);
 
-        // Count class days between start and today (excluding holidays and vacations)
-        let classDays = 0;
-        let currentDate = new Date(startDate);
+        // Count recorded class sessions
+        const groupProgress = this.getGroupProgress(groupId);
+        const sessionsRecorded = groupProgress.size;
 
-        const scheduleDays = this.getScheduleDays(group.days);
-
-        while (currentDate <= today) {
-            const dateStr = currentDate.toISOString().split('T')[0];
-            const dayOfWeek = currentDate.getDay();
-
-            if (scheduleDays.includes(dayOfWeek) && !this.isHoliday(dateStr) && !this.isVacation(dateStr)) {
-                classDays++;
+        // Calculate units covered in recorded sessions
+        let unitsCoveredInSessions = 0;
+        groupProgress.forEach(record => {
+            if (record.unitsCovered) {
+                unitsCoveredInSessions += record.unitsCovered.length;
             }
-
-            currentDate.setDate(currentDate.getDate() + 1);
-        }
-
-        const expectedUnits = classDays * scheduleType.unitsPerClass;
-        const actualUnit = this.getCurrentUnit(groupId);
+        });
 
         return {
-            expectedUnits,
-            actualUnit,
-            difference: actualUnit - expectedUnits,
-            status: actualUnit >= expectedUnits ? 'on_track' : 'behind',
-            classDaysHeld: classDays
+            currentBook: position.book,
+            currentUnit: position.unit,
+            absolutePosition: position.absolutePosition,
+            progressPercent,
+            sessionsRecorded,
+            unitsCoveredInSessions,
+            bookInfo: this.books[position.book] || { name: `Book ${position.book}`, totalUnits: 40 },
+            // Status is based on whether group has any recorded sessions
+            status: sessionsRecorded > 0 ? 'tracking' : 'not_started',
+            statusText: sessionsRecorded > 0 ? `${sessionsRecorded} clases registradas` : 'Sin registro de clases'
         };
     }
 
@@ -298,19 +332,61 @@ class ClassProgressManager {
         if (!window.GroupsManager2) return [];
 
         return Array.from(window.GroupsManager2.groups.entries()).map(([id, group]) => {
-            const currentUnit = this.getCurrentUnit(id);
-            const book = this.books[group.book] || { totalUnits: 52 };
-            const progressPercent = Math.round((currentUnit / book.totalUnits) * 100);
+            const progressInfo = this.getGroupProgressInfo(id, group);
 
             return {
                 ...group,
                 groupId: id,
-                currentUnit,
-                totalUnits: book.totalUnits,
-                progressPercent,
-                expectedProgress: this.getExpectedProgress(id, group)
+                currentBook: progressInfo.currentBook,
+                currentUnit: progressInfo.currentUnit,
+                absolutePosition: progressInfo.absolutePosition,
+                progressPercent: progressInfo.progressPercent,
+                sessionsRecorded: progressInfo.sessionsRecorded,
+                bookInfo: progressInfo.bookInfo,
+                progressStatus: progressInfo.status,
+                progressStatusText: progressInfo.statusText,
+                totalUnits: this.unitsPerBook,
+                totalCurriculumUnits: this.totalCurriculumUnits
             };
         });
+    }
+
+    // Get curriculum summary stats
+    getCurriculumSummary() {
+        const groups = this.getAllGroupsWithProgress().filter(g => g.status === 'active');
+
+        // Group by book level
+        const byBook = {};
+        for (let i = 0; i <= 11; i++) {
+            byBook[i] = { count: 0, groups: [] };
+        }
+
+        groups.forEach(g => {
+            const book = g.currentBook || 0;
+            if (byBook[book]) {
+                byBook[book].count++;
+                byBook[book].groups.push(g);
+            }
+        });
+
+        // Calculate averages
+        const totalGroups = groups.length;
+        const totalStudents = groups.reduce((sum, g) => sum + (g.studentIds?.length || 0), 0);
+        const avgPosition = totalGroups > 0
+            ? Math.round(groups.reduce((sum, g) => sum + g.absolutePosition, 0) / totalGroups)
+            : 0;
+
+        return {
+            totalBooks: this.totalBooks,
+            unitsPerBook: this.unitsPerBook,
+            totalCurriculumUnits: this.totalCurriculumUnits,
+            totalGroups,
+            totalStudents,
+            avgPosition,
+            avgBook: Math.floor((avgPosition - 1) / this.unitsPerBook),
+            byBook,
+            books: this.books
+        };
     }
 
     // Get classes scheduled for a specific date
@@ -918,14 +994,59 @@ function cpRenderGroupsView(container) {
         .filter(g => g.status === 'active')
         .sort((a, b) => a.groupId - b.groupId);
 
+    const summary = window.ClassProgressManager.getCurriculumSummary();
+
     container.innerHTML = `
+        <!-- Curriculum Summary Card -->
+        <div class="cp-curriculum-summary">
+            <div class="cp-summary-card">
+                <div class="cp-summary-title">📚 Currículo TutorBox</div>
+                <div class="cp-summary-stats">
+                    <div class="cp-summary-stat">
+                        <span class="stat-number">${summary.totalBooks}</span>
+                        <span class="stat-label">Libros</span>
+                    </div>
+                    <div class="cp-summary-stat">
+                        <span class="stat-number">×</span>
+                        <span class="stat-label"></span>
+                    </div>
+                    <div class="cp-summary-stat">
+                        <span class="stat-number">${summary.unitsPerBook}</span>
+                        <span class="stat-label">Unidades</span>
+                    </div>
+                    <div class="cp-summary-stat">
+                        <span class="stat-number">=</span>
+                        <span class="stat-label"></span>
+                    </div>
+                    <div class="cp-summary-stat highlight">
+                        <span class="stat-number">${summary.totalCurriculumUnits}</span>
+                        <span class="stat-label">Total</span>
+                    </div>
+                </div>
+            </div>
+            <div class="cp-summary-card">
+                <div class="cp-summary-title">📊 Grupos Activos</div>
+                <div class="cp-summary-stats">
+                    <div class="cp-summary-stat">
+                        <span class="stat-number">${summary.totalGroups}</span>
+                        <span class="stat-label">Grupos</span>
+                    </div>
+                    <div class="cp-summary-stat">
+                        <span class="stat-number">${summary.totalStudents}</span>
+                        <span class="stat-label">Estudiantes</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="cp-groups-header">
-            <h3>👥 Progreso por Grupos</h3>
+            <h3>👥 Posición Actual por Grupo</h3>
             <div class="cp-groups-filters">
-                <select id="cpGroupsFilter" onchange="filterGroupsView()">
-                    <option value="all">Todos</option>
-                    <option value="on_track">Al día</option>
-                    <option value="behind">Atrasados</option>
+                <select id="cpBookFilter" onchange="filterGroupsView()">
+                    <option value="all">Todos los libros</option>
+                    ${Object.entries(summary.books).map(([num, book]) => `
+                        <option value="${num}">Book ${num} (${summary.byBook[num]?.count || 0} grupos)</option>
+                    `).join('')}
                 </select>
                 <select id="cpModalityFilter" onchange="filterGroupsView()">
                     <option value="all">Todas las modalidades</option>
@@ -943,61 +1064,65 @@ function cpRenderGroupsView(container) {
                 <thead>
                     <tr>
                         <th>Grupo</th>
-                        <th>Libro</th>
+                        <th>Posición Actual</th>
                         <th>Profesor</th>
                         <th>Horario</th>
-                        <th>Progreso</th>
-                        <th>Estado</th>
+                        <th>Progreso Global</th>
+                        <th>Clases Registradas</th>
                         <th>Acciones</th>
                     </tr>
                 </thead>
                 <tbody id="cpGroupsTableBody">
-                    ${groups.map(g => renderGroupRow(g)).join('')}
+                    ${groups.map(g => cpRenderGroupRow(g)).join('')}
                 </tbody>
             </table>
         </div>
     `;
 }
 
-// Render a group row
-function renderGroupRow(group) {
+// Render a group row (prefixed)
+function cpRenderGroupRow(group) {
     const teacher = window.TeacherManager?.teachers.get(group.teacherId);
     const teacherName = teacher?.name || 'Sin asignar';
-    const book = window.ClassProgressManager.books[group.book] || { name: `Book ${group.book}`, totalUnits: 52 };
+    const bookInfo = group.bookInfo || { name: `Book ${group.currentBook}`, level: '?' };
 
-    const expected = group.expectedProgress;
-    const status = expected?.status || 'unknown';
-    const diff = expected?.difference || 0;
-
-    const statusDisplay = {
-        'on_track': { class: 'success', text: '✅ Al día' },
-        'behind': { class: 'warning', text: `⚠️ ${Math.abs(diff)} atrás` },
-        'unknown': { class: '', text: '—' }
-    };
-    const statusInfo = statusDisplay[status] || statusDisplay.unknown;
+    // Progress through entire curriculum (480 units)
+    const globalProgressPercent = group.progressPercent || 0;
 
     return `
-        <tr data-status="${status}" data-modality="${group.modality}">
+        <tr data-book="${group.currentBook}" data-modality="${group.modality}" data-group-id="${group.groupId}">
             <td>
                 <strong>Grupo ${group.groupId}</strong>
-                <br><small>${group.modality}</small>
+                <br><small class="modality-badge ${group.modality?.toLowerCase()}">${group.modality}</small>
             </td>
-            <td>${book.name}</td>
+            <td>
+                <div class="cp-position-display">
+                    <span class="cp-book-badge">Book ${group.currentBook}</span>
+                    <span class="cp-unit-badge">Unidad ${group.currentUnit}</span>
+                </div>
+                <small class="cp-level">${bookInfo.level || ''} - ${bookInfo.name?.split(' - ')[1] || ''}</small>
+            </td>
             <td>${teacherName}</td>
             <td>
                 <small>${group.daysShort || group.days?.join(', ') || 'N/A'}</small>
-                <br><small>${group.startTime || 'N/A'}</small>
+                <br><small>${group.startTime || 'N/A'} - ${group.endTime || ''}</small>
             </td>
             <td>
-                <div class="cp-progress-bar">
-                    <div class="cp-progress-fill" style="width: ${group.progressPercent}%"></div>
+                <div class="cp-progress-bar-container">
+                    <div class="cp-progress-bar">
+                        <div class="cp-progress-fill" style="width: ${globalProgressPercent}%"></div>
+                    </div>
+                    <small>${group.absolutePosition}/${group.totalCurriculumUnits} (${globalProgressPercent}%)</small>
                 </div>
-                <small>${group.currentUnit}/${book.totalUnits} (${group.progressPercent}%)</small>
             </td>
-            <td class="${statusInfo.class}">${statusInfo.text}</td>
             <td>
-                <button class="btn btn-small" onclick="viewGroupProgress('${group.groupId}')">
-                    📊 Ver
+                <span class="cp-sessions-badge ${group.sessionsRecorded > 0 ? 'active' : 'inactive'}">
+                    ${group.sessionsRecorded > 0 ? `📝 ${group.sessionsRecorded}` : '⬜ Sin registros'}
+                </span>
+            </td>
+            <td>
+                <button class="btn btn-small btn-primary" onclick="showEditPositionModal(${group.groupId})">
+                    ✏️ Editar
                 </button>
             </td>
         </tr>
@@ -1611,18 +1736,171 @@ function viewGroupProgress(groupId) {
 
 // Filter groups view
 function filterGroupsView() {
-    const statusFilter = document.getElementById('cpGroupsFilter')?.value || 'all';
+    const bookFilter = document.getElementById('cpBookFilter')?.value || 'all';
     const modalityFilter = document.getElementById('cpModalityFilter')?.value || 'all';
 
     document.querySelectorAll('#cpGroupsTableBody tr').forEach(row => {
-        const rowStatus = row.dataset.status;
+        const rowBook = row.dataset.book;
         const rowModality = row.dataset.modality;
 
-        const statusMatch = statusFilter === 'all' || rowStatus === statusFilter;
+        const bookMatch = bookFilter === 'all' || rowBook === bookFilter;
         const modalityMatch = modalityFilter === 'all' || rowModality === modalityFilter;
 
-        row.style.display = (statusMatch && modalityMatch) ? '' : 'none';
+        row.style.display = (bookMatch && modalityMatch) ? '' : 'none';
     });
+}
+
+// Show modal to edit group's current position
+function showEditPositionModal(groupId) {
+    const group = window.GroupsManager2?.groups.get(parseInt(groupId));
+    if (!group) {
+        alert('Grupo no encontrado');
+        return;
+    }
+
+    const currentBook = parseInt(group.book) || 0;
+    const currentUnit = parseInt(group.unit) || 1;
+    const books = window.ClassProgressManager.books;
+
+    const modalHtml = `
+        <div class="modal-overlay" id="editPositionModal" onclick="closeModalOnOverlay(event)">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>✏️ Editar Posición - Grupo ${groupId}</h3>
+                    <button class="modal-close" onclick="closeEditPositionModal()">×</button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="cp-position-editor">
+                        <p class="editor-info">
+                            Ajusta la posición actual del grupo en el currículo.
+                            <br><small>Currículo: 12 libros × 40 unidades = 480 unidades totales</small>
+                        </p>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>📚 Libro Actual</label>
+                                <select id="editBookSelect" onchange="updateUnitOptions()">
+                                    ${Object.entries(books).map(([num, book]) => `
+                                        <option value="${num}" ${parseInt(num) === currentBook ? 'selected' : ''}>
+                                            Book ${num} - ${book.level}
+                                        </option>
+                                    `).join('')}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>📖 Unidad Actual</label>
+                                <select id="editUnitSelect">
+                                    ${Array.from({length: 40}, (_, i) => i + 1).map(u => `
+                                        <option value="${u}" ${u === currentUnit ? 'selected' : ''}>
+                                            Unidad ${u}
+                                        </option>
+                                    `).join('')}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="cp-position-preview" id="positionPreview">
+                            <div class="preview-current">
+                                <span>Posición actual:</span>
+                                <strong id="previewPosition">${window.ClassProgressManager.getAbsolutePosition(currentBook, currentUnit)}</strong>
+                                <span>de 480</span>
+                            </div>
+                            <div class="preview-progress">
+                                <div class="cp-progress-bar">
+                                    <div class="cp-progress-fill" id="previewProgressBar"
+                                         style="width: ${Math.round((window.ClassProgressManager.getAbsolutePosition(currentBook, currentUnit) / 480) * 100)}%">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="quick-positions">
+                            <label>⚡ Posiciones rápidas:</label>
+                            <div class="quick-buttons">
+                                <button class="btn btn-small" onclick="setQuickPosition(0, 1)">Inicio (B0 U1)</button>
+                                <button class="btn btn-small" onclick="setQuickPosition(1, 1)">Book 1 U1</button>
+                                <button class="btn btn-small" onclick="setQuickPosition(2, 1)">Book 2 U1</button>
+                                <button class="btn btn-small" onclick="setQuickPosition(3, 1)">Book 3 U1</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeEditPositionModal()">Cancelar</button>
+                    <button class="btn btn-primary" onclick="saveGroupPosition(${groupId})">
+                        💾 Guardar Cambios
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    // Add event listeners for live preview
+    document.getElementById('editBookSelect').addEventListener('change', updatePositionPreview);
+    document.getElementById('editUnitSelect').addEventListener('change', updatePositionPreview);
+}
+
+// Update position preview
+function updatePositionPreview() {
+    const book = parseInt(document.getElementById('editBookSelect').value) || 0;
+    const unit = parseInt(document.getElementById('editUnitSelect').value) || 1;
+    const position = window.ClassProgressManager.getAbsolutePosition(book, unit);
+    const percent = Math.round((position / 480) * 100);
+
+    document.getElementById('previewPosition').textContent = position;
+    document.getElementById('previewProgressBar').style.width = `${percent}%`;
+}
+
+// Set quick position
+function setQuickPosition(book, unit) {
+    document.getElementById('editBookSelect').value = book;
+    document.getElementById('editUnitSelect').value = unit;
+    updatePositionPreview();
+}
+
+// Close edit position modal
+function closeEditPositionModal() {
+    const modal = document.getElementById('editPositionModal');
+    if (modal) modal.remove();
+}
+
+// Save group position
+async function saveGroupPosition(groupId) {
+    try {
+        const book = parseInt(document.getElementById('editBookSelect').value);
+        const unit = parseInt(document.getElementById('editUnitSelect').value);
+
+        // Get current group data
+        const group = window.GroupsManager2?.groups.get(parseInt(groupId));
+        if (!group) throw new Error('Grupo no encontrado');
+
+        // Update group with new position
+        const updatedGroup = {
+            ...group,
+            book: book,
+            unit: unit
+        };
+
+        // Save to Firebase via GroupsManager2
+        await window.GroupsManager2.saveGroup(updatedGroup);
+
+        // Close modal and refresh view
+        closeEditPositionModal();
+
+        // Refresh the groups view
+        const content = document.getElementById('cpContent');
+        if (content) cpRenderGroupsView(content);
+
+        alert(`✅ Grupo ${groupId} actualizado a Book ${book}, Unidad ${unit}`);
+
+    } catch (error) {
+        console.error('Error saving group position:', error);
+        alert('❌ Error al guardar: ' + error.message);
+    }
 }
 
 // Update teacher stats

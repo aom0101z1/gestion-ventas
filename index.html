@@ -781,6 +781,201 @@
     transition: width 0.3s;
 }
 
+/* Curriculum Summary */
+.cp-curriculum-summary {
+    display: flex;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+}
+
+.cp-summary-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 1.5rem 2rem;
+    border-radius: 16px;
+    flex: 1;
+    min-width: 280px;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.cp-summary-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    opacity: 0.95;
+}
+
+.cp-summary-stats {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.cp-summary-stat {
+    text-align: center;
+}
+
+.cp-summary-stat .stat-number {
+    font-size: 2rem;
+    font-weight: 700;
+    display: block;
+    line-height: 1;
+}
+
+.cp-summary-stat .stat-label {
+    font-size: 0.75rem;
+    opacity: 0.85;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.cp-summary-stat.highlight {
+    background: rgba(255,255,255,0.2);
+    padding: 0.75rem 1.25rem;
+    border-radius: 12px;
+}
+
+/* Position Display */
+.cp-position-display {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.cp-book-badge {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.cp-unit-badge {
+    background: #f3f4f6;
+    color: #374151;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.cp-level {
+    color: #6b7280;
+    font-size: 0.75rem;
+}
+
+.cp-progress-bar-container {
+    min-width: 150px;
+}
+
+.cp-sessions-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+}
+
+.cp-sessions-badge.active {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.cp-sessions-badge.inactive {
+    background: #f3f4f6;
+    color: #6b7280;
+}
+
+/* Modality Badges */
+.modality-badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.modality-badge.cb { background: #dbeafe; color: #1e40af; }
+.modality-badge.coats { background: #fef3c7; color: #92400e; }
+.modality-badge.nazareth { background: #d1fae5; color: #065f46; }
+.modality-badge.privado { background: #ede9fe; color: #5b21b6; }
+.modality-badge.online { background: #fce7f3; color: #be185d; }
+
+/* Position Editor Modal */
+.cp-position-editor {
+    padding: 1rem 0;
+}
+
+.cp-position-editor .editor-info {
+    background: #f0f9ff;
+    border-left: 4px solid #667eea;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    border-radius: 0 8px 8px 0;
+}
+
+.cp-position-preview {
+    background: #f9fafb;
+    padding: 1.25rem;
+    border-radius: 12px;
+    margin: 1.5rem 0;
+    text-align: center;
+}
+
+.preview-current {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+}
+
+.preview-current strong {
+    font-size: 1.75rem;
+    color: #667eea;
+}
+
+.preview-progress .cp-progress-bar {
+    height: 12px;
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+.quick-positions {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e5e7eb;
+}
+
+.quick-positions label {
+    display: block;
+    margin-bottom: 0.75rem;
+    font-weight: 500;
+    color: #374151;
+}
+
+.quick-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.quick-buttons .btn {
+    background: #f3f4f6;
+    color: #374151;
+    border: 1px solid #d1d5db;
+}
+
+.quick-buttons .btn:hover {
+    background: #e5e7eb;
+}
+
 /* Teachers Grid */
 .cp-teachers-header {
     display: flex;
