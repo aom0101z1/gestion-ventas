@@ -1715,15 +1715,8 @@ async function refreshClassProgressData() {
     // Reload progress records
     await window.ClassProgressManager.init(true);
 
-    // Re-render stats and current view
-    loadClassProgressStats();
-    loadClassProgressAlerts();
-
-    const activeTab = document.querySelector('.cp-subtab.active');
-    if (activeTab) {
-        const viewName = activeTab.id.replace('cp', '').replace('Tab', '').toLowerCase();
-        switchClassProgressView(viewName);
-    }
+    // First render the tab structure (creates the containers)
+    renderClassProgressTab();
 }
 
 // Initialize when DOM is ready
