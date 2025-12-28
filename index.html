@@ -990,6 +990,241 @@
     background: #e5e7eb;
 }
 
+/* Expandable Group Rows */
+.cp-group-expand-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.cp-expand-btn {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: #f3f4f6;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.cp-expand-btn:hover {
+    background: #e5e7eb;
+}
+
+.cp-expand-btn.expanded {
+    background: #667eea;
+    color: white;
+}
+
+.expand-icon {
+    font-size: 0.7rem;
+    transition: transform 0.2s;
+}
+
+.cp-schedule-type {
+    color: #667eea;
+    font-weight: 500;
+}
+
+.cp-group-details-row {
+    background: #f8fafc;
+}
+
+.cp-group-details {
+    padding: 1.5rem;
+    border-left: 4px solid #667eea;
+}
+
+/* Details Grid */
+.cp-details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.cp-details-section {
+    background: white;
+    border-radius: 12px;
+    padding: 1rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.cp-details-section h4 {
+    margin: 0 0 0.75rem 0;
+    font-size: 0.95rem;
+    color: #374151;
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 0.5rem;
+}
+
+.cp-details-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.detail-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.875rem;
+}
+
+.detail-label {
+    color: #6b7280;
+}
+
+.detail-value {
+    font-weight: 500;
+    color: #1f2937;
+}
+
+.detail-item.highlight {
+    background: linear-gradient(135deg, #667eea15, #764ba215);
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    margin-top: 0.5rem;
+}
+
+.detail-item.highlight .detail-value {
+    color: #667eea;
+    font-weight: 600;
+}
+
+/* Status Badges */
+.cp-status-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+}
+
+.cp-status-badge.status-ahead {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.cp-status-badge.status-behind {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.cp-status-badge.status-ontrack {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.cp-status-badge.status-nodate {
+    background: #f3f4f6;
+    color: #6b7280;
+}
+
+.no-date-msg {
+    color: #9ca3af;
+    font-size: 0.85rem;
+    font-style: italic;
+    margin: 0.5rem 0 0;
+}
+
+/* Books Timeline */
+.cp-books-timeline {
+    background: white;
+    border-radius: 12px;
+    padding: 1rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.cp-books-timeline h4 {
+    margin: 0 0 1rem 0;
+    font-size: 0.95rem;
+    color: #374151;
+}
+
+.cp-books-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+}
+
+.cp-book-progress {
+    padding: 0.75rem;
+    border-radius: 10px;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+}
+
+.cp-book-progress.in_progress {
+    background: linear-gradient(135deg, #667eea10, #764ba210);
+    border-color: #667eea;
+}
+
+.cp-book-progress.completed {
+    background: #dcfce7;
+    border-color: #22c55e;
+}
+
+.book-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.book-num {
+    font-weight: 600;
+    color: #374151;
+}
+
+.book-level {
+    font-size: 0.75rem;
+    color: #6b7280;
+    background: #e5e7eb;
+    padding: 0.15rem 0.5rem;
+    border-radius: 10px;
+}
+
+.cp-book-progress.in_progress .book-level {
+    background: #667eea;
+    color: white;
+}
+
+.book-bar {
+    height: 8px;
+    background: #e5e7eb;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+
+.book-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #667eea, #764ba2);
+    border-radius: 4px;
+    transition: width 0.3s;
+}
+
+.cp-book-progress.completed .book-bar-fill {
+    background: #22c55e;
+}
+
+.book-info {
+    font-size: 0.75rem;
+    color: #6b7280;
+    text-align: center;
+}
+
+.cp-book-progress.in_progress .book-info {
+    color: #667eea;
+    font-weight: 500;
+}
+
 /* Teachers Grid */
 .cp-teachers-header {
     display: flex;

@@ -37,32 +37,47 @@ class ClassProgressManager {
             { start: '2025-06-15', end: '2025-07-15', name: 'Vacaciones de Mitad de Año' }
         ];
 
-        // Schedule types configuration
+        // Schedule types configuration (1 unit = 1 hour)
         this.scheduleTypes = {
             intensive: {
+                id: 'intensive',
                 name: 'Intensivo (3 días)',
                 daysPerWeek: 3,
                 hoursPerDay: 2,
-                unitsPerClass: 2,
-                unitsPerWeek: 6,
+                unitsPerClass: 2,  // 2 hours = 2 units
+                unitsPerWeek: 6,   // 3 days × 2 units
+                hoursPerWeek: 6,
                 description: 'Lunes, Miércoles, Viernes - 2 horas'
             },
             regular: {
+                id: 'regular',
                 name: 'Regular (2 días)',
                 daysPerWeek: 2,
                 hoursPerDay: 2,
-                unitsPerClass: 2,
-                unitsPerWeek: 4,
+                unitsPerClass: 2,  // 2 hours = 2 units
+                unitsPerWeek: 4,   // 2 days × 2 units
+                hoursPerWeek: 4,
                 description: 'Martes, Jueves - 2 horas'
             },
             weekend: {
-                name: 'Fin de Semana',
+                id: 'weekend',
+                name: 'Fin de Semana (Sábado)',
                 daysPerWeek: 1,
                 hoursPerDay: 4,
-                unitsPerClass: 4,
-                unitsPerWeek: 4,
+                unitsPerClass: 4,  // 4 hours = 4 units
+                unitsPerWeek: 4,   // 1 day × 4 units
+                hoursPerWeek: 4,
                 description: 'Sábado - 4 horas'
             }
+        };
+
+        // Academic year configuration
+        this.academicYear = {
+            startMonth: 1,  // February (0-indexed)
+            startDay: 2,    // First week of February
+            endMonth: 11,   // December
+            endDay: 5,      // First Saturday of December
+            weeksPerYear: 43, // Approximate active weeks (Feb-Dec minus holidays)
         };
 
         // Unit sections that make up a complete unit
@@ -386,6 +401,187 @@ class ClassProgressManager {
             avgBook: Math.floor((avgPosition - 1) / this.unitsPerBook),
             byBook,
             books: this.books
+        };
+    }
+
+    // Detect schedule type from group's days array
+    detectScheduleType(group) {
+        if (!group || !group.days) return this.scheduleTypes.regular;
+
+        const days = group.days;
+        const hasSaturday = days.includes('Sábado');
+        const weekdayCount = days.filter(d => d !== 'Sábado' && d !== 'Domingo').length;
+
+        // Saturday only
+        if (hasSaturday && weekdayCount === 0) {
+            return this.scheduleTypes.weekend;
+        }
+        // 3 or more weekdays = intensive
+        if (weekdayCount >= 3) {
+            return this.scheduleTypes.intensive;
+        }
+        // Default to regular (2 days)
+        return this.scheduleTypes.regular;
+    }
+
+    // Calculate time estimates for a group
+    calculateTimeEstimates(group) {
+        const position = this.getCurrentPosition(group);
+        const schedule = this.detectScheduleType(group);
+        const unitsRemaining = this.totalCurriculumUnits - position.absolutePosition;
+        const currentBookUnitsRemaining = this.unitsPerBook - position.unit;
+
+        // Weeks to complete
+        const weeksToFinishBook = Math.ceil(currentBookUnitsRemaining / schedule.unitsPerWeek);
+        const weeksToFinishCourse = Math.ceil(unitsRemaining / schedule.unitsPerWeek);
+
+        // Months (using 4.33 weeks per month)
+        const monthsToFinishBook = (weeksToFinishBook / 4.33).toFixed(1);
+        const monthsToFinishCourse = (weeksToFinishCourse / 4.33).toFixed(1);
+
+        // Academic years (43 active weeks per year)
+        const academicYearsToFinish = (weeksToFinishCourse / this.academicYear.weeksPerYear).toFixed(1);
+
+        // Estimated completion date
+        const today = new Date();
+        const completionDate = new Date(today);
+        completionDate.setDate(completionDate.getDate() + (weeksToFinishCourse * 7));
+
+        return {
+            schedule,
+            unitsRemaining,
+            currentBookUnitsRemaining,
+            weeksToFinishBook,
+            weeksToFinishCourse,
+            monthsToFinishBook: parseFloat(monthsToFinishBook),
+            monthsToFinishCourse: parseFloat(monthsToFinishCourse),
+            academicYearsToFinish: parseFloat(academicYearsToFinish),
+            estimatedCompletionDate: completionDate.toISOString().split('T')[0]
+        };
+    }
+
+    // Calculate progress status (ahead/behind/on track)
+    calculateProgressStatus(group) {
+        if (!group.startDate) {
+            return { status: 'no_start_date', message: 'Sin fecha de inicio', difference: 0 };
+        }
+
+        const startDate = new Date(group.startDate);
+        const today = new Date();
+        const schedule = this.detectScheduleType(group);
+        const position = this.getCurrentPosition(group);
+
+        // Calculate weeks since start (excluding holidays)
+        let activeWeeks = 0;
+        let currentDate = new Date(startDate);
+
+        while (currentDate <= today) {
+            const weekStart = new Date(currentDate);
+            let hasClassThisWeek = false;
+
+            // Check each day of the week
+            for (let i = 0; i < 7; i++) {
+                const checkDate = new Date(weekStart);
+                checkDate.setDate(checkDate.getDate() + i);
+                const dateStr = checkDate.toISOString().split('T')[0];
+
+                // Skip if holiday or vacation
+                if (!this.isHoliday(dateStr) && !this.isVacation(dateStr)) {
+                    const dayName = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][checkDate.getDay()];
+                    if (group.days && group.days.includes(dayName)) {
+                        hasClassThisWeek = true;
+                    }
+                }
+            }
+
+            if (hasClassThisWeek) activeWeeks++;
+            currentDate.setDate(currentDate.getDate() + 7);
+        }
+
+        // Expected position based on active weeks
+        const expectedUnits = activeWeeks * schedule.unitsPerWeek;
+        const actualUnits = position.absolutePosition;
+        const difference = actualUnits - expectedUnits;
+
+        let status, message;
+        if (difference >= 2) {
+            status = 'ahead';
+            message = `${difference} unidades adelantado`;
+        } else if (difference <= -2) {
+            status = 'behind';
+            message = `${Math.abs(difference)} unidades atrasado`;
+        } else {
+            status = 'on_track';
+            message = 'Al día';
+        }
+
+        return {
+            status,
+            message,
+            difference,
+            activeWeeks,
+            expectedUnits,
+            actualUnits,
+            startDate: group.startDate
+        };
+    }
+
+    // Get detailed progress info for expandable row
+    getDetailedProgressInfo(groupId) {
+        const group = window.GroupsManager2?.groups.get(parseInt(groupId));
+        if (!group) return null;
+
+        const position = this.getCurrentPosition(group);
+        const schedule = this.detectScheduleType(group);
+        const timeEstimates = this.calculateTimeEstimates(group);
+        const progressStatus = this.calculateProgressStatus(group);
+
+        // Progress per book
+        const bookProgress = [];
+        for (let bookNum = 0; bookNum <= 11; bookNum++) {
+            const bookStart = bookNum * this.unitsPerBook;
+            const bookEnd = bookStart + this.unitsPerBook;
+
+            let status, progress;
+            if (position.absolutePosition > bookEnd) {
+                status = 'completed';
+                progress = 100;
+            } else if (position.absolutePosition > bookStart) {
+                status = 'in_progress';
+                progress = Math.round(((position.absolutePosition - bookStart) / this.unitsPerBook) * 100);
+            } else {
+                status = 'pending';
+                progress = 0;
+            }
+
+            // Weeks to complete this book from current position
+            let weeksToComplete = 0;
+            if (status === 'pending') {
+                const unitsToBook = bookStart - position.absolutePosition + this.unitsPerBook;
+                weeksToComplete = Math.ceil(unitsToBook / schedule.unitsPerWeek);
+            } else if (status === 'in_progress') {
+                weeksToComplete = Math.ceil((this.unitsPerBook - (position.absolutePosition - bookStart)) / schedule.unitsPerWeek);
+            }
+
+            bookProgress.push({
+                book: bookNum,
+                name: this.books[bookNum]?.name || `Book ${bookNum}`,
+                level: this.books[bookNum]?.level || '',
+                status,
+                progress,
+                weeksToComplete
+            });
+        }
+
+        return {
+            groupId,
+            group,
+            position,
+            schedule,
+            timeEstimates,
+            progressStatus,
+            bookProgress,
+            totalProgress: Math.round((position.absolutePosition / this.totalCurriculumUnits) * 100)
         };
     }
 
@@ -1080,7 +1276,7 @@ function cpRenderGroupsView(container) {
     `;
 }
 
-// Render a group row (prefixed)
+// Render a group row (prefixed) - now expandable
 function cpRenderGroupRow(group) {
     const teacher = window.TeacherManager?.teachers.get(group.teacherId);
     const teacherName = teacher?.name || 'Sin asignar';
@@ -1089,11 +1285,21 @@ function cpRenderGroupRow(group) {
     // Progress through entire curriculum (480 units)
     const globalProgressPercent = group.progressPercent || 0;
 
+    // Get schedule type
+    const schedule = window.ClassProgressManager.detectScheduleType(group);
+
     return `
-        <tr data-book="${group.currentBook}" data-modality="${group.modality}" data-group-id="${group.groupId}">
+        <tr class="cp-group-row" data-book="${group.currentBook}" data-modality="${group.modality}" data-group-id="${group.groupId}">
             <td>
-                <strong>Grupo ${group.groupId}</strong>
-                <br><small class="modality-badge ${group.modality?.toLowerCase()}">${group.modality}</small>
+                <div class="cp-group-expand-header">
+                    <button class="cp-expand-btn" onclick="toggleGroupDetails(${group.groupId}, this)">
+                        <span class="expand-icon">▶</span>
+                    </button>
+                    <div>
+                        <strong>Grupo ${group.groupId}</strong>
+                        <br><small class="modality-badge ${group.modality?.toLowerCase()}">${group.modality}</small>
+                    </div>
+                </div>
             </td>
             <td>
                 <div class="cp-position-display">
@@ -1106,6 +1312,7 @@ function cpRenderGroupRow(group) {
             <td>
                 <small>${group.daysShort || group.days?.join(', ') || 'N/A'}</small>
                 <br><small>${group.startTime || 'N/A'} - ${group.endTime || ''}</small>
+                <br><small class="cp-schedule-type">${schedule.name}</small>
             </td>
             <td>
                 <div class="cp-progress-bar-container">
@@ -1122,11 +1329,213 @@ function cpRenderGroupRow(group) {
             </td>
             <td>
                 <button class="btn btn-small btn-primary" onclick="showEditPositionModal(${group.groupId})">
-                    ✏️ Editar
+                    ✏️ Posición
+                </button>
+                <button class="btn btn-small btn-secondary" onclick="openGroupInGrupos2(${group.groupId})">
+                    📝 Editar
                 </button>
             </td>
         </tr>
+        <tr class="cp-group-details-row" id="groupDetails_${group.groupId}" style="display: none;">
+            <td colspan="7">
+                <div class="cp-group-details" id="groupDetailsContent_${group.groupId}">
+                    <!-- Content loaded on expand -->
+                </div>
+            </td>
+        </tr>
     `;
+}
+
+// Toggle group details expansion
+function toggleGroupDetails(groupId, btn) {
+    const detailsRow = document.getElementById(`groupDetails_${groupId}`);
+    const contentDiv = document.getElementById(`groupDetailsContent_${groupId}`);
+    const icon = btn.querySelector('.expand-icon');
+
+    if (detailsRow.style.display === 'none') {
+        // Expand
+        detailsRow.style.display = 'table-row';
+        icon.textContent = '▼';
+        btn.classList.add('expanded');
+
+        // Load detailed content
+        const details = window.ClassProgressManager.getDetailedProgressInfo(groupId);
+        if (details) {
+            contentDiv.innerHTML = renderGroupDetailsContent(details);
+        }
+    } else {
+        // Collapse
+        detailsRow.style.display = 'none';
+        icon.textContent = '▶';
+        btn.classList.remove('expanded');
+    }
+}
+
+// Render detailed group content
+function renderGroupDetailsContent(details) {
+    const { group, position, schedule, timeEstimates, progressStatus, bookProgress } = details;
+
+    // Format completion date
+    const completionDate = new Date(timeEstimates.estimatedCompletionDate);
+    const completionDateStr = completionDate.toLocaleDateString('es-ES', {
+        year: 'numeric', month: 'long'
+    });
+
+    // Status badge
+    const statusBadges = {
+        'ahead': { class: 'status-ahead', icon: '🚀', text: progressStatus.message },
+        'behind': { class: 'status-behind', icon: '⚠️', text: progressStatus.message },
+        'on_track': { class: 'status-ontrack', icon: '✅', text: progressStatus.message },
+        'no_start_date': { class: 'status-nodate', icon: '📅', text: 'Sin fecha de inicio' }
+    };
+    const statusBadge = statusBadges[progressStatus.status] || statusBadges.no_start_date;
+
+    // Books progress (show current and next 3)
+    const currentBookIndex = position.book;
+    const booksToShow = bookProgress.slice(currentBookIndex, Math.min(currentBookIndex + 4, 12));
+
+    return `
+        <div class="cp-details-grid">
+            <!-- Schedule Info -->
+            <div class="cp-details-section">
+                <h4>📅 Horario</h4>
+                <div class="cp-details-content">
+                    <div class="detail-item">
+                        <span class="detail-label">Tipo:</span>
+                        <span class="detail-value">${schedule.name}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Días:</span>
+                        <span class="detail-value">${group.days?.join(', ') || 'N/A'}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Horas/semana:</span>
+                        <span class="detail-value">${schedule.hoursPerWeek} horas</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Unidades/semana:</span>
+                        <span class="detail-value">${schedule.unitsPerWeek} unidades</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Current Position -->
+            <div class="cp-details-section">
+                <h4>📍 Posición Actual</h4>
+                <div class="cp-details-content">
+                    <div class="detail-item">
+                        <span class="detail-label">Libro:</span>
+                        <span class="detail-value">Book ${position.book} - ${details.bookProgress[position.book]?.level || ''}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Unidad:</span>
+                        <span class="detail-value">${position.unit} de 40</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Posición global:</span>
+                        <span class="detail-value">${position.absolutePosition} de 480</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Progreso total:</span>
+                        <span class="detail-value">${details.totalProgress}%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Time Estimates -->
+            <div class="cp-details-section">
+                <h4>⏳ Tiempo Estimado</h4>
+                <div class="cp-details-content">
+                    <div class="detail-item">
+                        <span class="detail-label">Para terminar libro actual:</span>
+                        <span class="detail-value">${timeEstimates.weeksToFinishBook} semanas (~${timeEstimates.monthsToFinishBook} meses)</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Para terminar curso:</span>
+                        <span class="detail-value">${timeEstimates.weeksToFinishCourse} semanas (~${timeEstimates.monthsToFinishCourse} meses)</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Años académicos:</span>
+                        <span class="detail-value">~${timeEstimates.academicYearsToFinish} años</span>
+                    </div>
+                    <div class="detail-item highlight">
+                        <span class="detail-label">Fecha estimada fin:</span>
+                        <span class="detail-value">${completionDateStr}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Progress Status -->
+            <div class="cp-details-section">
+                <h4>📊 Estado de Progreso</h4>
+                <div class="cp-details-content">
+                    <div class="cp-status-badge ${statusBadge.class}">
+                        <span>${statusBadge.icon}</span>
+                        <span>${statusBadge.text}</span>
+                    </div>
+                    ${progressStatus.startDate ? `
+                        <div class="detail-item">
+                            <span class="detail-label">Fecha inicio:</span>
+                            <span class="detail-value">${progressStatus.startDate}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Semanas activas:</span>
+                            <span class="detail-value">${progressStatus.activeWeeks}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Esperado:</span>
+                            <span class="detail-value">${progressStatus.expectedUnits} unidades</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Actual:</span>
+                            <span class="detail-value">${progressStatus.actualUnits} unidades</span>
+                        </div>
+                    ` : `
+                        <p class="no-date-msg">Agrega una fecha de inicio en Grupos 2.0 para calcular el progreso esperado.</p>
+                    `}
+                </div>
+            </div>
+        </div>
+
+        <!-- Book Progress Timeline -->
+        <div class="cp-books-timeline">
+            <h4>📚 Progreso por Libro</h4>
+            <div class="cp-books-grid">
+                ${booksToShow.map(book => `
+                    <div class="cp-book-progress ${book.status}">
+                        <div class="book-header">
+                            <span class="book-num">Book ${book.book}</span>
+                            <span class="book-level">${book.level}</span>
+                        </div>
+                        <div class="book-bar">
+                            <div class="book-bar-fill" style="width: ${book.progress}%"></div>
+                        </div>
+                        <div class="book-info">
+                            ${book.status === 'completed' ? '✅ Completado' :
+                              book.status === 'in_progress' ? `${book.progress}% - ${book.weeksToComplete} sem restantes` :
+                              `~${book.weeksToComplete} semanas`}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+}
+
+// Open group in Grupos 2.0
+function openGroupInGrupos2(groupId) {
+    // Switch to school modules and open Grupos 2.0
+    if (typeof window.openModule === 'function') {
+        window.openModule('grupos2');
+        // Try to open edit form after a delay
+        setTimeout(() => {
+            if (typeof window.showGrupo2Form === 'function') {
+                window.showGrupo2Form(groupId);
+            }
+        }, 500);
+    } else {
+        alert('Para editar el grupo, ve a la sección "Escuela" → "Grupos 2.0"');
+    }
 }
 
 // Render Teachers View (prefixed to avoid conflicts with teachers.js)
