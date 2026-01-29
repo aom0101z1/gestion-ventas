@@ -5027,11 +5027,14 @@ window.loadExpensesView = function() {
                                         ${expense.registeredByName || 'Sistema'}
                                     </td>
                                     <td style="padding: 0.75rem; text-align: center;">
+                                        <button onclick="showEditExpenseModal('${expense.id}')" class="btn btn-sm" style="background: #3b82f6; color: white; padding: 0.25rem 0.5rem; margin-right: 0.25rem;">
+                                            ✏️
+                                        </button>
                                         ${(window.userRole === 'admin' || window.userRole === 'director') ? `
                                         <button onclick="deleteExpenseConfirm('${expense.id}')" class="btn btn-sm" style="background: #ef4444; color: white; padding: 0.25rem 0.5rem;">
                                             🗑️
                                         </button>
-                                        ` : '<span style="color: #9ca3af; font-size: 0.85rem;">-</span>'}
+                                        ` : ''}
                                     </td>
                                 </tr>
                             `).join('')}
@@ -5468,6 +5471,239 @@ window.deleteExpenseConfirm = async function(id) {
     } catch (error) {
         console.error('Error deleting expense:', error);
         window.showNotification('❌ Error al eliminar gasto', 'error');
+    }
+};
+
+// Show edit expense modal
+window.showEditExpenseModal = async function(id) {
+    // Check if user is admin or director
+    if (window.userRole !== 'admin' && window.userRole !== 'director') {
+        window.showNotification('🚫 No tienes permisos para editar gastos', 'error');
+        return;
+    }
+
+    // Find the expense
+    const expense = window.FinanceManager.expenses.find(e => e.id === id);
+    if (!expense) {
+        window.showNotification('❌ Gasto no encontrado', 'error');
+        return;
+    }
+
+    const isAdmin = window.userRole === 'admin' || window.userRole === 'director';
+    const customCategories = await window.loadCustomExpenseCategories();
+    const expenseType = expense.type || 'business';
+
+    const modal = document.createElement('div');
+    modal.id = 'editExpenseModal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10001;
+    `;
+
+    // Build category options based on expense type
+    const defaultCategories = expenseType === 'personal' ? PersonalExpenseCategories : BusinessExpenseCategories;
+    const customCats = expenseType === 'personal' ? customCategories.personal : customCategories.business;
+
+    modal.innerHTML = `
+        <div style="background: white; padding: 2rem; border-radius: 12px; max-width: 500px; width: 90%;">
+            <h2 style="margin: 0 0 1.5rem 0;">✏️ Editar Gasto</h2>
+
+            <form id="editExpenseForm" onsubmit="updateExpense(event, '${id}')" style="display: grid; gap: 1rem;">
+                <input type="hidden" id="editExpenseId" value="${id}">
+
+                <!-- Type Selector -->
+                ${isAdmin ? `
+                <div class="form-group">
+                    <label style="font-weight: 600; display: block; margin-bottom: 0.5rem;">Tipo de Gasto*</label>
+                    <div style="display: flex; gap: 0.5rem; background: #f3f4f6; padding: 0.25rem; border-radius: 6px;">
+                        <button type="button" onclick="toggleEditExpenseType('business')" id="editExpenseTypeBusiness" style="flex: 1; padding: 0.5rem; border: none; background: ${expenseType === 'business' ? '#3b82f6' : 'transparent'}; color: ${expenseType === 'business' ? 'white' : '#6b7280'}; border-radius: 4px; cursor: pointer; font-weight: 500;">
+                            🏢 Negocio
+                        </button>
+                        <button type="button" onclick="toggleEditExpenseType('personal')" id="editExpenseTypePersonal" style="flex: 1; padding: 0.5rem; border: none; background: ${expenseType === 'personal' ? '#3b82f6' : 'transparent'}; color: ${expenseType === 'personal' ? 'white' : '#6b7280'}; border-radius: 4px; cursor: pointer; font-weight: 500;">
+                            🏠 Personal
+                        </button>
+                    </div>
+                    <input type="hidden" id="editExpenseType" value="${expenseType}">
+                </div>
+                ` : `<input type="hidden" id="editExpenseType" value="${expenseType}">`}
+
+                <div class="form-group">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <label style="font-weight: 600;">Categoría*</label>
+                        ${isAdmin ? `
+                            <button type="button" onclick="showManageCategoriesModal()" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                ⚙️ Gestionar
+                            </button>
+                        ` : ''}
+                    </div>
+                    <select id="editExpenseCategory" required style="width: 100%; padding: 0.75rem; border: 1px solid #e5e7eb; border-radius: 6px;">
+                        <option value="">Seleccionar...</option>
+                        <optgroup label="Categorías Predeterminadas">
+                            ${Object.entries(defaultCategories).map(([key, label]) => `
+                                <option value="${label}" ${expense.category === label ? 'selected' : ''}>${label}</option>
+                            `).join('')}
+                        </optgroup>
+                        ${customCats.length > 0 ? `
+                            <optgroup label="Categorías Personalizadas">
+                                ${customCats.map(cat => `
+                                    <option value="${cat}" ${expense.category === cat ? 'selected' : ''}>${cat}</option>
+                                `).join('')}
+                            </optgroup>
+                        ` : ''}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label style="font-weight: 600; display: block; margin-bottom: 0.5rem;">Monto (COP)*</label>
+                    <input type="text"
+                           id="editExpenseAmount"
+                           required
+                           oninput="formatCurrencyInput(this)"
+                           value="${formatCurrency(expense.amount)}"
+                           style="width: 100%; padding: 0.75rem; border: 1px solid #e5e7eb; border-radius: 6px;">
+                </div>
+
+                <div class="form-group">
+                    <label style="font-weight: 600; display: block; margin-bottom: 0.5rem;">Fecha*</label>
+                    <input type="date"
+                           id="editExpenseDate"
+                           value="${expense.date}"
+                           required
+                           style="width: 100%; padding: 0.75rem; border: 1px solid #e5e7eb; border-radius: 6px;">
+                </div>
+
+                <div class="form-group">
+                    <label style="font-weight: 600; display: block; margin-bottom: 0.5rem;">Descripción*</label>
+                    <textarea id="editExpenseDescription"
+                              required
+                              rows="3"
+                              style="width: 100%; padding: 0.75rem; border: 1px solid #e5e7eb; border-radius: 6px;">${expense.description || ''}</textarea>
+                </div>
+
+                <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1rem;">
+                    <button type="button" onclick="closeEditExpenseModal()" class="btn btn-secondary">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-primary" style="background: #3b82f6; color: white;">
+                        💾 Guardar Cambios
+                    </button>
+                </div>
+            </form>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+};
+
+window.closeEditExpenseModal = function() {
+    const modal = document.getElementById('editExpenseModal');
+    if (modal) modal.remove();
+};
+
+// Toggle expense type in edit modal
+window.toggleEditExpenseType = async function(type) {
+    const typeInput = document.getElementById('editExpenseType');
+    const businessBtn = document.getElementById('editExpenseTypeBusiness');
+    const personalBtn = document.getElementById('editExpenseTypePersonal');
+    const categorySelect = document.getElementById('editExpenseCategory');
+
+    const customCategories = await window.loadCustomExpenseCategories();
+
+    typeInput.value = type;
+
+    if (type === 'business') {
+        businessBtn.style.background = '#3b82f6';
+        businessBtn.style.color = 'white';
+        personalBtn.style.background = 'transparent';
+        personalBtn.style.color = '#6b7280';
+
+        categorySelect.innerHTML = '<option value="">Seleccionar...</option>' +
+            '<optgroup label="Categorías Predeterminadas">' +
+            Object.entries(BusinessExpenseCategories).map(([key, label]) =>
+                `<option value="${label}">${label}</option>`
+            ).join('') +
+            '</optgroup>' +
+            (customCategories.business.length > 0 ?
+                '<optgroup label="Categorías Personalizadas">' +
+                customCategories.business.map(cat => `<option value="${cat}">${cat}</option>`).join('') +
+                '</optgroup>' : '');
+    } else {
+        personalBtn.style.background = '#3b82f6';
+        personalBtn.style.color = 'white';
+        businessBtn.style.background = 'transparent';
+        businessBtn.style.color = '#6b7280';
+
+        categorySelect.innerHTML = '<option value="">Seleccionar...</option>' +
+            '<optgroup label="Categorías Predeterminadas">' +
+            Object.entries(PersonalExpenseCategories).map(([key, label]) =>
+                `<option value="${label}">${label}</option>`
+            ).join('') +
+            '</optgroup>' +
+            (customCategories.personal.length > 0 ?
+                '<optgroup label="Categorías Personalizadas">' +
+                customCategories.personal.map(cat => `<option value="${cat}">${cat}</option>`).join('') +
+                '</optgroup>' : '');
+    }
+};
+
+// Update expense
+window.updateExpense = async function(event, id) {
+    event.preventDefault();
+
+    const type = document.getElementById('editExpenseType').value;
+    const category = document.getElementById('editExpenseCategory').value;
+    const amountText = document.getElementById('editExpenseAmount').value;
+    const date = document.getElementById('editExpenseDate').value;
+    const description = document.getElementById('editExpenseDescription').value.trim();
+
+    // Parse amount
+    const amount = parseFloat(amountText.replace(/[^\d]/g, ''));
+
+    if (!category || !amount || amount <= 0 || !date || !description) {
+        window.showNotification('⚠️ Por favor complete todos los campos', 'error');
+        return;
+    }
+
+    try {
+        const db = window.firebaseModules.database;
+        const expenseRef = db.ref(window.FirebaseData.database, `expenses/${id}`);
+
+        const updates = {
+            type,
+            category,
+            amount,
+            date,
+            description,
+            updatedAt: new Date().toISOString(),
+            updatedBy: window.currentUser?.uid || 'unknown',
+            updatedByName: window.currentUser?.email || 'unknown'
+        };
+
+        await db.update(expenseRef, updates);
+
+        // Update local data
+        const expenseIndex = window.FinanceManager.expenses.findIndex(e => e.id === id);
+        if (expenseIndex !== -1) {
+            window.FinanceManager.expenses[expenseIndex] = {
+                ...window.FinanceManager.expenses[expenseIndex],
+                ...updates
+            };
+        }
+
+        window.closeEditExpenseModal();
+        window.showNotification('✅ Gasto actualizado correctamente', 'success');
+        loadExpensesView();
+    } catch (error) {
+        console.error('Error updating expense:', error);
+        window.showNotification('❌ Error al actualizar gasto', 'error');
     }
 };
 
@@ -6640,11 +6876,14 @@ async function renderExpensesViewEnhanced() {
                                         ${expense.registeredByName || 'Sistema'}
                                     </td>
                                     <td style="padding: 0.75rem; text-align: center;">
+                                        <button onclick="showEditExpenseModal('${expense.id}')" class="btn btn-sm" style="background: #3b82f6; color: white; padding: 0.25rem 0.5rem; margin-right: 0.25rem;">
+                                            ✏️
+                                        </button>
                                         ${(window.userRole === 'admin' || window.userRole === 'director') ? `
                                         <button onclick="deleteExpenseConfirm('${expense.id}')" class="btn btn-sm" style="background: #ef4444; color: white; padding: 0.25rem 0.5rem;">
                                             🗑️
                                         </button>
-                                        ` : '<span style="color: #9ca3af; font-size: 0.85rem;">-</span>'}
+                                        ` : ''}
                                     </td>
                                 </tr>
                             `}).join('')}

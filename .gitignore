@@ -1,0 +1,69 @@
+# Project documentation (keep local for security)
+PROJECT_SUMMARY_CRM.md
+CLAUDE.md
+.claude/
+
+# Dependencies
+node_modules/
+TutorBoxCRM/node_modules/
+mobile/node_modules/
+
+# Build outputs
+TutorBoxCRM/android/app/build/
+TutorBoxCRM/ios/build/
+mobile/android/app/build/
+mobile/ios/build/
+*.apk
+*.aab
+*.ipa
+
+# Environment files
+.env
+.env.local
+.env.*.local
+TutorBoxCRM/.env
+mobile/.env
+
+# IDE and editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# React Native
+TutorBoxCRM/.metro-health-check*
+TutorBoxCRM/android/.gradle/
+TutorBoxCRM/android/local.properties
+TutorBoxCRM/ios/Pods/
+TutorBoxCRM/ios/Podfile.lock
+
+# Capacitor
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/ios/Pods/
+mobile/ios/Podfile.lock
+
+# Temporary files
+*.tmp
+*.temp
+nul
+
+# Firebase
+.firebase/
+firebase-debug.log
+
+# Test coverage
+coverage/
+
+# Cache
+.cache/
+.npm/

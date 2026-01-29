@@ -4318,7 +4318,7 @@ async function processPayment(studentId) {
             totalAmount: totalAmount,
             baseAmount: baseAmount,
             method: paymentMethod,
-            bank: document.getElementById('payBank')?.value || '',
+            bank: paymentMethod === 'Transferencia' ? (document.getElementById('payBank')?.value || '') : '',
             notes: document.getElementById('payNotes')?.value || '',
             paymentType: paymentType,
             paymentPeriod: paymentPeriod,
