@@ -756,10 +756,256 @@ window.deleteGrupo2 = async function(groupId) {
     }
 };
 
-// View students (placeholder for now)
-window.viewGrupo2Students = function(groupId) {
+// View students modal
+window.viewGrupo2Students = async function(groupId) {
     const group = window.GroupsManager2.groups.get(groupId);
-    window.showNotification(`📚 Ver estudiantes del grupo ${groupId} - Próximamente`, 'info');
+    if (!group) {
+        window.showNotification('❌ Grupo no encontrado', 'error');
+        return;
+    }
+
+    // Ensure StudentManager is initialized
+    if (window.StudentManager && !window.StudentManager.initialized) {
+        try {
+            await window.StudentManager.init();
+        } catch (err) {
+            console.warn('⚠️ Could not initialize StudentManager:', err);
+        }
+    }
+
+    const studentIds = group.studentIds || [];
+    const ageConfig = window.GroupsManager2.ageCategories[group.ageCategory];
+    const cardColor = ageConfig?.color || '#3b82f6';
+
+    // Get student details from StudentManager
+    const assignedStudents = studentIds.map(id => {
+        const student = window.StudentManager?.students?.get(id);
+        return student ? { id, ...student } : { id, nombre: `ID: ${id} (no encontrado)`, notFound: true };
+    });
+
+    // Create modal
+    const modal = document.createElement('div');
+    modal.id = 'grupo2StudentsModal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10001;
+    `;
+
+    modal.innerHTML = `
+        <div style="background: white; border-radius: 12px; max-width: 700px; width: 95%; max-height: 85vh; overflow: hidden; display: flex; flex-direction: column;">
+            <!-- Header -->
+            <div style="background: ${cardColor}; color: ${ageConfig?.textColor || 'white'}; padding: 1.25rem; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h2 style="margin: 0; font-size: 1.25rem;">👥 Estudiantes del Grupo ${groupId}</h2>
+                    <p style="margin: 0.25rem 0 0 0; opacity: 0.9; font-size: 0.9rem;">${group.displayName}</p>
+                </div>
+                <button onclick="closeGrupo2StudentsModal()" style="background: rgba(255,255,255,0.2); border: none; color: inherit; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; font-size: 1.25rem;">
+                    ✕
+                </button>
+            </div>
+
+            <!-- Content -->
+            <div style="padding: 1.25rem; overflow-y: auto; flex: 1;">
+                <!-- Stats -->
+                <div style="display: flex; gap: 1rem; margin-bottom: 1.25rem;">
+                    <div style="flex: 1; background: #f3f4f6; padding: 1rem; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 1.5rem; font-weight: bold; color: ${cardColor};">${assignedStudents.length}</div>
+                        <div style="font-size: 0.85rem; color: #6b7280;">Asignados</div>
+                    </div>
+                    <div style="flex: 1; background: #f3f4f6; padding: 1rem; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 1.5rem; font-weight: bold; color: #6b7280;">${group.maxStudents || 8}</div>
+                        <div style="font-size: 0.85rem; color: #6b7280;">Capacidad</div>
+                    </div>
+                    <div style="flex: 1; background: #f3f4f6; padding: 1rem; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 1.5rem; font-weight: bold; color: ${assignedStudents.length < (group.maxStudents || 8) ? '#10b981' : '#ef4444'};">
+                            ${(group.maxStudents || 8) - assignedStudents.length}
+                        </div>
+                        <div style="font-size: 0.85rem; color: #6b7280;">Disponibles</div>
+                    </div>
+                </div>
+
+                <!-- Add Student Section -->
+                <div style="margin-bottom: 1.25rem; padding: 1rem; background: #f0fdf4; border-radius: 8px; border: 1px solid #bbf7d0;">
+                    <label style="font-weight: 600; display: block; margin-bottom: 0.5rem;">➕ Agregar Estudiante</label>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <select id="addStudentToGroup" style="flex: 1; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px;">
+                            <option value="">Seleccionar estudiante...</option>
+                            ${getAvailableStudentsOptions(studentIds)}
+                        </select>
+                        <button onclick="addStudentToGrupo2(${groupId})" style="background: #10b981; color: white; border: none; padding: 0.75rem 1.25rem; border-radius: 6px; cursor: pointer; font-weight: 500;">
+                            ➕ Agregar
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Student List -->
+                <div>
+                    <h3 style="margin: 0 0 1rem 0; font-size: 1rem; color: #374151;">📋 Lista de Estudiantes (${assignedStudents.length})</h3>
+                    ${assignedStudents.length === 0 ? `
+                        <div style="text-align: center; padding: 2rem; color: #6b7280; background: #f9fafb; border-radius: 8px;">
+                            <p style="font-size: 2rem; margin: 0;">📭</p>
+                            <p style="margin: 0.5rem 0 0 0;">No hay estudiantes asignados a este grupo</p>
+                        </div>
+                    ` : `
+                        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                            ${assignedStudents.map((student, index) => `
+                                <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; background: ${student.notFound ? '#fef2f2' : '#f9fafb'}; border-radius: 8px; border-left: 3px solid ${student.notFound ? '#ef4444' : cardColor};">
+                                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                        <span style="background: ${cardColor}; color: ${ageConfig?.textColor || 'white'}; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: bold;">
+                                            ${index + 1}
+                                        </span>
+                                        <div>
+                                            <div style="font-weight: 500; color: #111827;">${student.nombre || 'Sin nombre'}</div>
+                                            ${!student.notFound ? `
+                                                <div style="font-size: 0.8rem; color: #6b7280;">
+                                                    ${student.telefono || ''} ${student.correo ? '• ' + student.correo : ''}
+                                                </div>
+                                            ` : ''}
+                                        </div>
+                                    </div>
+                                    <button onclick="removeStudentFromGrupo2(${groupId}, '${student.id}')"
+                                            style="background: #fee2e2; color: #dc2626; border: none; padding: 0.5rem 0.75rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">
+                                        🗑️ Quitar
+                                    </button>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `}
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div style="padding: 1rem 1.25rem; background: #f9fafb; border-top: 1px solid #e5e7eb; display: flex; justify-content: flex-end;">
+                <button onclick="closeGrupo2StudentsModal()" style="background: #6b7280; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 6px; cursor: pointer; font-weight: 500;">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+};
+
+// Get available students (not in any group or in this group)
+function getAvailableStudentsOptions(currentGroupStudentIds) {
+    if (!window.StudentManager?.students) return '';
+
+    // Get all active students
+    const allStudents = Array.from(window.StudentManager.students.entries())
+        .filter(([id, s]) => s.status !== 'inactive')
+        .sort((a, b) => (a[1].nombre || '').localeCompare(b[1].nombre || ''));
+
+    // Get students already in other groups
+    const studentsInOtherGroups = new Set();
+    window.GroupsManager2.groups.forEach((group, groupId) => {
+        (group.studentIds || []).forEach(sid => {
+            if (!currentGroupStudentIds.includes(sid)) {
+                studentsInOtherGroups.add(sid);
+            }
+        });
+    });
+
+    return allStudents
+        .filter(([id, s]) => !currentGroupStudentIds.includes(id))
+        .map(([id, student]) => {
+            const inOtherGroup = studentsInOtherGroups.has(id);
+            return `<option value="${id}" ${inOtherGroup ? 'style="color: #9ca3af;"' : ''}>
+                ${student.nombre || 'Sin nombre'}${inOtherGroup ? ' (en otro grupo)' : ''}
+            </option>`;
+        }).join('');
+}
+
+// Close modal
+window.closeGrupo2StudentsModal = function() {
+    const modal = document.getElementById('grupo2StudentsModal');
+    if (modal) modal.remove();
+};
+
+// Add student to group
+window.addStudentToGrupo2 = async function(groupId) {
+    const select = document.getElementById('addStudentToGroup');
+    const studentId = select.value;
+
+    if (!studentId) {
+        window.showNotification('⚠️ Selecciona un estudiante', 'warning');
+        return;
+    }
+
+    try {
+        const group = window.GroupsManager2.groups.get(groupId);
+        if (!group) throw new Error('Grupo no encontrado');
+
+        // Check capacity
+        const currentCount = (group.studentIds || []).length;
+        if (currentCount >= (group.maxStudents || 8)) {
+            window.showNotification('⚠️ El grupo está lleno', 'warning');
+            return;
+        }
+
+        // Add student
+        const studentIds = [...(group.studentIds || []), studentId];
+
+        // Save to Firebase
+        const db = window.firebaseModules.database;
+        const ref = db.ref(window.FirebaseData.database, `grupos2/${groupId}/studentIds`);
+        await db.set(ref, studentIds);
+
+        // Update local cache
+        group.studentIds = studentIds;
+
+        window.showNotification('✅ Estudiante agregado al grupo', 'success');
+
+        // Refresh modal
+        closeGrupo2StudentsModal();
+        viewGrupo2Students(groupId);
+
+        // Refresh grid to update count
+        await refreshGrupos2Grid();
+    } catch (error) {
+        console.error('❌ Error adding student to group:', error);
+        window.showNotification('❌ Error al agregar estudiante', 'error');
+    }
+};
+
+// Remove student from group
+window.removeStudentFromGrupo2 = async function(groupId, studentId) {
+    if (!confirm('¿Quitar este estudiante del grupo?')) return;
+
+    try {
+        const group = window.GroupsManager2.groups.get(groupId);
+        if (!group) throw new Error('Grupo no encontrado');
+
+        // Remove student
+        const studentIds = (group.studentIds || []).filter(id => id !== studentId);
+
+        // Save to Firebase
+        const db = window.firebaseModules.database;
+        const ref = db.ref(window.FirebaseData.database, `grupos2/${groupId}/studentIds`);
+        await db.set(ref, studentIds);
+
+        // Update local cache
+        group.studentIds = studentIds;
+
+        window.showNotification('✅ Estudiante removido del grupo', 'success');
+
+        // Refresh modal
+        closeGrupo2StudentsModal();
+        viewGrupo2Students(groupId);
+
+        // Refresh grid to update count
+        await refreshGrupos2Grid();
+    } catch (error) {
+        console.error('❌ Error removing student from group:', error);
+        window.showNotification('❌ Error al remover estudiante', 'error');
+    }
 };
 
 // Apply filters
