@@ -1597,6 +1597,7 @@ window.loadFinanceTab = async function(activeTab = 'dashboard') {
     // Check user permissions - use window.userRole which is set during login
     console.log('🔍 DEBUG - window.userRole value:', window.userRole);
     const userRole = window.userRole || 'vendedor';
+    const userEmail = window.FirebaseData?.currentUser?.email || '';
     const isAdmin = userRole === 'admin' || userRole === 'director'; // Director has admin privileges
     const isDirector = userRole === 'director';
     const canViewAdvanced = isAdmin || isDirector;
