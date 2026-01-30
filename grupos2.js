@@ -33,6 +33,14 @@ class GroupsManager2 {
             { value: 'Viernes', short: 'V' },
             { value: 'Sábado', short: 'S' }
         ];
+
+        // Age categories with colors
+        this.ageCategories = {
+            'ninos_4_8': { name: 'Niños 4-8', icon: '👶', color: '#ec4899', textColor: 'white' },
+            'ninos_9_12': { name: 'Niños 9-12', icon: '🧒', color: '#f97316', textColor: 'white' },
+            'jovenes_13_17': { name: 'Jóvenes 13-17', icon: '🧑', color: '#eab308', textColor: 'black' },
+            'adultos': { name: 'Adultos', icon: '👨', color: '#22c55e', textColor: 'white' }
+        };
     }
 
     // Initialize
@@ -517,6 +525,20 @@ function renderGrupo2Form(group = null) {
                     </select>
                 </div>
 
+                <!-- Age Category -->
+                <div class="form-group">
+                    <label>Categoría de Edad*</label>
+                    <select id="grupo2AgeCategory" required>
+                        <option value="">Seleccionar...</option>
+                        ${Object.entries(manager.ageCategories).map(([key, val]) => `
+                            <option value="${key}" ${group?.ageCategory === key ? 'selected' : ''}
+                                    style="background: ${val.color}; color: ${val.textColor};">
+                                ${val.icon} ${val.name}
+                            </option>
+                        `).join('')}
+                    </select>
+                </div>
+
                 <!-- Buttons -->
                 <div style="grid-column: 1 / -1; display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1rem;">
                     <button type="button" onclick="cancelGrupo2Form()" class="btn btn-secondary">
@@ -535,26 +557,37 @@ function renderGrupo2Form(group = null) {
 function renderGrupo2Card(group) {
     const manager = window.GroupsManager2;
     const modalityConfig = manager.modalities[group.modality];
+    const ageConfig = manager.ageCategories[group.ageCategory];
     const teacher = window.TeacherManager?.teachers?.get(group.teacherId);
+
+    // Use age category color for the card, fallback to modality color
+    const cardColor = ageConfig?.color || modalityConfig?.color || '#3b82f6';
+    const cardTextColor = ageConfig?.textColor || 'white';
 
     return `
         <div style="background: white; border-radius: 8px; padding: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                    border-left: 4px solid ${modalityConfig?.color || '#3b82f6'};">
+                    border-left: 6px solid ${cardColor}; border-top: 3px solid ${cardColor};">
             <!-- Header -->
             <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
                 <div>
                     <h3 style="margin: 0 0 0.25rem 0; font-size: 1.1rem; color: #111827;">
-                        <span style="background: ${modalityConfig?.color || '#3b82f6'}; color: white;
+                        <span style="background: ${cardColor}; color: ${cardTextColor};
                                      padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.9rem; margin-right: 0.5rem;">
                             ${group.groupId}
                         </span>
                         ${group.displayName}
                     </h3>
-                    <div style="margin-top: 0.5rem;">
+                    <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
                         <span style="background: ${group.status.color}; color: white;
                                      padding: 0.25rem 0.75rem; border-radius: 4px; font-size: 0.8rem;">
                             ${group.studentCount}/${group.maxStudents || 8} - ${group.status.text}
                         </span>
+                        ${ageConfig ? `
+                        <span style="background: ${cardColor}; color: ${cardTextColor};
+                                     padding: 0.25rem 0.75rem; border-radius: 4px; font-size: 0.8rem;">
+                            ${ageConfig.icon} ${ageConfig.name}
+                        </span>
+                        ` : ''}
                     </div>
                 </div>
             </div>
@@ -666,6 +699,13 @@ window.saveGrupo2Form = async function(groupId) {
             if (teacher) teacherName = teacher.name;
         }
 
+        // Validate age category
+        const ageCategory = document.getElementById('grupo2AgeCategory').value;
+        if (!ageCategory) {
+            window.showNotification('⚠️ Selecciona una categoría de edad', 'warning');
+            return false;
+        }
+
         const groupData = {
             groupId: groupId || null,
             modality: document.getElementById('grupo2Modality').value,
@@ -680,6 +720,7 @@ window.saveGrupo2Form = async function(groupId) {
             teacherName: teacherName,
             maxStudents: parseInt(document.getElementById('grupo2MaxStudents').value) || 8,
             status: document.getElementById('grupo2Status').value,
+            ageCategory: ageCategory,
             studentIds: groupId ? window.GroupsManager2.groups.get(groupId)?.studentIds || [] : []
         };
 
