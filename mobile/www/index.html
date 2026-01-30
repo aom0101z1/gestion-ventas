@@ -1,0 +1,2788 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#667eea">
+  <title>TutorBox CRM</title>
+  <link rel="stylesheet" href="css/mobile.css">
+  <style>
+    .module-category { background: var(--white); border-radius: 16px; box-shadow: var(--shadow); margin-bottom: 16px; overflow: hidden; }
+    .category-header { display: flex; align-items: center; justify-content: space-between; padding: 16px; cursor: pointer; background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end)); color: white; }
+    .category-header.collapsed { background: var(--white); color: var(--text-primary); border-bottom: 1px solid var(--gray-100); }
+    .category-title { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 16px; }
+    .category-arrow { font-size: 18px; transition: transform 0.3s; }
+    .category-header.collapsed .category-arrow { transform: rotate(-90deg); }
+    .category-content { padding: 16px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .category-content.hidden { display: none; }
+    .module-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 14px 8px; border-radius: 12px; border: none; cursor: pointer; transition: all 0.2s; min-height: 85px; }
+    .module-btn:active { transform: scale(0.95); }
+    .module-btn-icon { font-size: 28px; margin-bottom: 6px; }
+    .module-btn-label { font-size: 11px; font-weight: 600; text-align: center; }
+    .module-estudiantes { background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; }
+    .module-pagos { background: linear-gradient(135deg, #10b981, #059669); color: white; }
+    .module-tienda { background: linear-gradient(135deg, #ec4899, #db2777); color: white; }
+    .module-finanzas { background: linear-gradient(135deg, #6366f1, #4f46e5); color: white; }
+    .module-nomina { background: linear-gradient(135deg, #0ea5e9, #0284c7); color: white; }
+    .module-grupos { background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; }
+    .module-grupos2 { background: linear-gradient(135deg, #667eea, #5a67d8); color: white; }
+    .module-empleados { background: linear-gradient(135deg, #14b8a6, #0d9488); color: white; }
+    .module-profesores { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; }
+    .module-asistencia { background: linear-gradient(135deg, #ef4444, #dc2626); color: white; }
+    .module-contactos { background: linear-gradient(135deg, #06b6d4, #0891b2); color: white; }
+    .module-leads { background: linear-gradient(135deg, #84cc16, #65a30d); color: white; }
+    .module-pipeline { background: linear-gradient(135deg, #f97316, #ea580c); color: white; }
+    .module-reportes { background: linear-gradient(135deg, #a855f7, #9333ea); color: white; }
+    .module-coats { background: linear-gradient(135deg, #78716c, #57534e); color: white; }
+    .module-monitoreo { background: linear-gradient(135deg, #64748b, #475569); color: white; }
+    .module-tareas { background: linear-gradient(135deg, #fb923c, #f97316); color: white; }
+    .module-registro { background: linear-gradient(135deg, #94a3b8, #64748b); color: white; }
+    .module-config { background: linear-gradient(135deg, #6b7280, #4b5563); color: white; }
+    .module-admin { background: linear-gradient(135deg, #dc2626, #b91c1c); color: white; }
+    .module-social { background: linear-gradient(135deg, #e879f9, #d946ef); color: white; }
+    .module-progreso { background: linear-gradient(135deg, #22d3ee, #06b6d4); color: white; }
+    .module-view { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--background); z-index: 200; display: none; flex-direction: column; }
+    .module-view.active { display: flex; }
+    .module-view-header { background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end)); color: white; padding: 16px 20px; padding-top: calc(16px + env(safe-area-inset-top)); display: flex; align-items: center; gap: 12px; }
+    .module-back-btn { background: rgba(255,255,255,0.2); border: none; color: white; width: 36px; height: 36px; border-radius: 10px; font-size: 18px; cursor: pointer; }
+    .module-view-title { font-size: 18px; font-weight: 600; flex: 1; }
+    .module-view-content { flex: 1; overflow-y: auto; padding: 16px; padding-bottom: 100px; }
+    .quick-stats { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 16px; }
+    .quick-stat { flex: 0 0 auto; background: var(--white); padding: 12px 16px; border-radius: 12px; box-shadow: var(--shadow); text-align: center; min-width: 100px; }
+    .quick-stat-value { font-size: 20px; font-weight: 700; color: var(--primary); }
+    .quick-stat-label { font-size: 11px; color: var(--text-secondary); }
+    .detail-card { background: var(--white); border-radius: 16px; box-shadow: var(--shadow); padding: 20px; margin-bottom: 16px; }
+    .detail-header { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+    .detail-avatar { width: 70px; height: 70px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; color: white; }
+    .detail-info h2 { margin: 0 0 4px; font-size: 20px; }
+    .detail-info p { margin: 0; color: var(--text-secondary); font-size: 14px; }
+    .detail-field { padding: 12px 0; border-bottom: 1px solid var(--gray-100); }
+    .detail-field:last-child { border-bottom: none; }
+    .detail-field label { display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+    .detail-field span { font-size: 15px; color: var(--text-primary); }
+    .edit-form .form-group { margin-bottom: 16px; }
+    .edit-form label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text-primary); }
+    .edit-form input, .edit-form select { width: 100%; padding: 12px; border: 2px solid var(--gray-200); border-radius: 10px; font-size: 15px; }
+    .edit-form input:focus, .edit-form select:focus { outline: none; border-color: var(--primary); }
+    .btn-edit { background: var(--primary); color: white; border: none; padding: 8px 16px; border-radius: 8px; font-size: 14px; cursor: pointer; }
+    .tabs-container { display: flex; gap: 8px; margin-bottom: 16px; overflow-x: auto; }
+    .tab-btn { padding: 10px 16px; border: none; border-radius: 20px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+    .tab-btn.active { background: var(--primary); color: white; }
+    .tab-btn:not(.active) { background: var(--gray-100); color: var(--text-secondary); }
+    .status-active { background: rgba(72, 187, 120, 0.15); color: #22c55e; }
+    .status-inactive { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+    .status-pending { background: rgba(251, 146, 60, 0.15); color: #f97316; }
+  </style>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+</head>
+<body>
+  <div id="app" class="app-container">
+    <div id="login-screen" class="login-container">
+      <div class="login-header">
+        <div class="login-logo">📚</div>
+        <h1 class="login-title">TutorBox CRM</h1>
+        <p class="login-subtitle">Ciudad Bilingue</p>
+      </div>
+      <div class="login-form">
+        <div class="form-group">
+          <label class="form-label">Correo electrónico</label>
+          <input type="email" id="login-email" class="form-input" placeholder="tu@email.com">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Contraseña</label>
+          <input type="password" id="login-password" class="form-input" placeholder="Tu contraseña">
+        </div>
+        <div id="login-error" class="text-center mb-16" style="color: var(--danger); display: none;"></div>
+        <button id="login-btn" class="btn btn-primary">Iniciar Sesión</button>
+      </div>
+    </div>
+    <div id="main-app" class="hidden">
+      <header class="header" style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <h1 class="header-title" id="header-title">TutorBox CRM</h1>
+          <p class="header-subtitle" id="header-subtitle">Bienvenido</p>
+        </div>
+        <button onclick="logout()" style="background:rgba(255,255,255,0.2);border:none;color:white;padding:8px 12px;border-radius:8px;font-size:14px;cursor:pointer;display:flex;align-items:center;gap:4px;">
+          🚪 Salir
+        </button>
+      </header>
+      <main class="main-content" id="main-content"></main>
+      <nav class="bottom-nav">
+        <a href="#" class="nav-item active" data-screen="modules"><div class="nav-icon">🏠</div><span>Módulos</span></a>
+        <a href="#" class="nav-item" data-screen="search"><div class="nav-icon">🔍</div><span>Buscar</span></a>
+        <a href="#" class="nav-item" data-screen="notifications"><div class="nav-icon">🔔</div><span>Alertas</span></a>
+        <a href="#" class="nav-item" data-screen="profile"><div class="nav-icon">👤</div><span>Perfil</span></a>
+      </nav>
+    </div>
+    <div id="module-view" class="module-view">
+      <div class="module-view-header">
+        <button class="module-back-btn" id="mod-back-btn" onclick="goBack()">←</button>
+        <span class="module-view-title" id="module-view-title">Módulo</span>
+        <button class="btn-edit" id="edit-btn" style="display:none;" onclick="toggleEdit()">Editar</button>
+      </div>
+      <div class="module-view-content" id="module-view-content"></div>
+    </div>
+    <div id="loading-overlay" class="hidden" style="position:fixed;inset:0;background:rgba(255,255,255,0.9);display:flex;align-items:center;justify-content:center;z-index:1000;">
+      <div class="loading"><div class="spinner"></div><p style="margin-top:16px;color:var(--text-secondary);">Cargando...</p></div>
+    </div>
+  </div>
+  <script>
+    const firebaseConfig = { apiKey: "AIzaSyCuq1z8eTo9rufdEDXQFfvoxOkce-kBWOY", authDomain: "ciudad-bilingue-crm.firebaseapp.com", databaseURL: "https://ciudad-bilingue-crm-default-rtdb.firebaseio.com", projectId: "ciudad-bilingue-crm", storageBucket: "ciudad-bilingue-crm.firebasestorage.app", messagingSenderId: "690594486040" };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database(), auth = firebase.auth();
+
+    const AppState = {
+      user: null, role: null, email: null,
+      navStack: [],
+      currentModule: null,
+      editMode: false,
+      data: { students: [], grupos2: [], employees: [], teachers: [], contacts: [], leads: [], payments: [], tasks: [] }
+    };
+
+    const MODULE_CATEGORIES = [
+      { id: 'escolares', title: 'Módulos Escolares', icon: '🏫', expanded: true, modules: [
+        { id: 'estudiantes', name: 'Estudiantes', icon: '👥', color: 'estudiantes' },
+        { id: 'pagos', name: 'Pagos', icon: '💰', color: 'pagos' },
+        { id: 'tienda', name: 'Tienda', icon: '🏪', color: 'tienda' },
+        { id: 'finanzas', name: 'Finanzas', icon: '💵', color: 'finanzas' },
+        { id: 'nomina', name: 'Nómina', icon: '💼', color: 'nomina', roles: ['admin'] },
+        { id: 'grupos', name: 'Grupos', icon: '📚', color: 'grupos' },
+        { id: 'grupos2', name: 'Grupos 2.0', icon: '🎓', color: 'grupos2', roles: ['admin', 'director'] },
+        { id: 'empleados', name: 'Empleados', icon: '👔', color: 'empleados', roles: ['admin', 'director'] },
+        { id: 'profesores', name: 'Profesores', icon: '👩‍🏫', color: 'profesores' },
+        { id: 'asistencia', name: 'Asistencia', icon: '📋', color: 'asistencia' }
+      ]},
+      { id: 'crm', title: 'CRM', icon: '📞', expanded: false, modules: [
+        { id: 'contactos', name: 'Contactos', icon: '📞', color: 'contactos' },
+        { id: 'leads', name: 'Leads', icon: '🎯', color: 'leads' },
+        { id: 'pipeline', name: 'Pipeline', icon: '📈', color: 'pipeline' }
+      ]},
+      { id: 'reportes', title: 'Reportes y Análisis', icon: '📊', expanded: false, modules: [
+        { id: 'reportes', name: 'Reportes', icon: '📊', color: 'reportes', roles: ['admin', 'director'] },
+        { id: 'coats', name: 'COATS', icon: '🏢', color: 'coats', roles: ['admin', 'director'] },
+        { id: 'monitoreo', name: 'Monitoreo', icon: '👀', color: 'monitoreo', roles: ['admin', 'director'] },
+        { id: 'progreso', name: 'Progreso', icon: '📚', color: 'progreso' }
+      ]},
+      { id: 'admin', title: 'Administración', icon: '⚙️', expanded: false, modules: [
+        { id: 'tareas', name: 'Tareas', icon: '📋', color: 'tareas' },
+        { id: 'registro', name: 'Registro', icon: '📝', color: 'registro', roles: ['admin', 'director'] },
+        { id: 'config', name: 'Config', icon: '⚙️', color: 'config', roles: ['admin'] },
+        { id: 'admin', name: 'Admin', icon: '🔐', color: 'admin', roles: ['admin'] },
+        { id: 'social', name: 'Social Media', icon: '💬', color: 'social' }
+      ]}
+    ];
+
+    const $ = id => document.getElementById(id);
+    const showLoading = () => $('loading-overlay').classList.remove('hidden');
+    const hideLoading = () => $('loading-overlay').classList.add('hidden');
+
+    auth.onAuthStateChanged(async user => {
+      hideLoading();
+      if (user) { AppState.user = user; AppState.email = user.email; await loadUserRole(user.uid); showMainApp(); }
+      else { showLoginScreen(); }
+    });
+
+    async function loadUserRole(uid) {
+      try { const snap = await db.ref('users/' + uid + '/profile').once('value'); AppState.role = snap.val()?.rol || 'teacher'; }
+      catch (e) { AppState.role = 'teacher'; }
+    }
+
+    function showLoginScreen() { $('login-screen').classList.remove('hidden'); $('main-app').classList.add('hidden'); }
+    async function showMainApp() { $('login-screen').classList.add('hidden'); $('main-app').classList.remove('hidden'); $('header-subtitle').textContent = 'Hola, ' + AppState.email.split('@')[0]; await loadAllData(); navigateTo('modules'); }
+
+    $('login-btn').addEventListener('click', async () => {
+      const email = $('login-email').value.trim(), password = $('login-password').value, err = $('login-error');
+      if (!email || !password) { err.textContent = 'Completa todos los campos'; err.style.display = 'block'; return; }
+      showLoading();
+      try { await auth.signInWithEmailAndPassword(email, password); } catch (e) { hideLoading(); err.textContent = 'Credenciales incorrectas'; err.style.display = 'block'; }
+    });
+
+    async function loadAllData() {
+      showLoading();
+      const loadResults = [];
+      async function safeLoad(path) {
+        try {
+          const snap = await db.ref(path).once('value');
+          const data = objToArr(snap.val());
+          loadResults.push(path + ': ' + data.length);
+          return data;
+        } catch (e) {
+          loadResults.push(path + ': ERROR (' + e.code + ')');
+          return [];
+        }
+      }
+      AppState.data.students = await safeLoad('students');
+      AppState.data.grupos2 = await safeLoad('grupos2');
+      AppState.data.employees = await safeLoad('employees');
+      AppState.data.teachers = await safeLoad('teachers');
+      AppState.data.contacts = await safeLoad('contacts');
+      AppState.data.leads = await safeLoad('leads');
+      AppState.data.payments = await safeLoad('payments');
+      AppState.data.tasks = await safeLoad('tasks');
+      AppState.data.expenses = await safeLoad('expenses');
+      AppState.data.otrosIngresos = await safeLoad('otrosIngresos');
+      hideLoading();
+    }
+
+    function objToArr(obj) { return obj ? Object.entries(obj).map(([id, d]) => ({ id, ...d })) : []; }
+
+    document.querySelectorAll('.nav-item').forEach(i => i.addEventListener('click', e => { e.preventDefault(); navigateTo(i.dataset.screen); }));
+
+    function navigateTo(screen) {
+      document.querySelectorAll('.nav-item').forEach(i => i.classList.toggle('active', i.dataset.screen === screen));
+      if (screen === 'modules') renderModules();
+      else if (screen === 'search') renderSearch();
+      else if (screen === 'notifications') renderNotifications();
+      else if (screen === 'profile') renderProfile();
+    }
+
+    function canAccess(m) { return !m.roles || m.roles.includes(AppState.role); }
+    function canEdit() { return AppState.role === 'admin' || AppState.role === 'director'; }
+
+    function renderModules() {
+      $('header-title').textContent = 'TutorBox CRM';
+      const activeCount = AppState.data.students.filter(s => s.status === 'active' || !s.status).length;
+      const stats = '<div class="quick-stats">' +
+        '<div class="quick-stat"><div class="quick-stat-value">' + AppState.data.students.length + '</div><div class="quick-stat-label">Total Estudiantes</div></div>' +
+        '<div class="quick-stat"><div class="quick-stat-value">' + activeCount + '</div><div class="quick-stat-label">Activos</div></div>' +
+        '<div class="quick-stat"><div class="quick-stat-value">' + AppState.data.grupos2.length + '</div><div class="quick-stat-label">Grupos</div></div>' +
+        '<div class="quick-stat"><div class="quick-stat-value">' + AppState.data.teachers.length + '</div><div class="quick-stat-label">Profesores</div></div>' +
+      '</div>';
+      const cats = MODULE_CATEGORIES.map(cat => {
+        const mods = cat.modules.filter(canAccess);
+        if (!mods.length) return '';
+        return '<div class="module-category"><div class="category-header ' + (cat.expanded ? '' : 'collapsed') + '" onclick="toggleCat(\'' + cat.id + '\')"><div class="category-title"><span>' + cat.icon + '</span><span>' + cat.title + '</span></div><span class="category-arrow">▼</span></div><div class="category-content ' + (cat.expanded ? '' : 'hidden') + '" id="cat-' + cat.id + '">' + mods.map(m => '<button class="module-btn module-' + m.color + '" onclick="openMod(\'' + m.id + '\',\'' + m.name + '\',\'' + m.icon + '\')"><span class="module-btn-icon">' + m.icon + '</span><span class="module-btn-label">' + m.name + '</span></button>').join('') + '</div></div>';
+      }).join('');
+      $('main-content').innerHTML = stats + cats;
+    }
+
+    function toggleCat(id) {
+      const cat = MODULE_CATEGORIES.find(c => c.id === id);
+      cat.expanded = !cat.expanded;
+      const el = $('cat-' + id);
+      el.classList.toggle('hidden');
+      el.previousElementSibling.classList.toggle('collapsed');
+    }
+
+    function openMod(id, name, icon) {
+      AppState.currentModule = id;
+      AppState.navStack = [{ type: 'list', module: id, name, icon }];
+      $('module-view-title').textContent = icon + ' ' + name;
+      $('module-view').classList.add('active');
+      $('edit-btn').style.display = 'none';
+      renderModContent(id);
+    }
+
+    function goBack() {
+      if (AppState.navStack.length > 1) {
+        AppState.navStack.pop();
+        const prev = AppState.navStack[AppState.navStack.length - 1];
+        $('module-view-title').textContent = prev.icon + ' ' + prev.name;
+        $('edit-btn').style.display = 'none';
+        AppState.editMode = false;
+        if (prev.type === 'list') renderModContent(prev.module);
+        else if (prev.type === 'detail') showDetail(prev.dataType, prev.id);
+      } else {
+        closeModuleView();
+      }
+    }
+
+    function closeModuleView() {
+      $('module-view').classList.remove('active');
+      AppState.navStack = [];
+      AppState.editMode = false;
+    }
+
+    function renderModContent(id) {
+      const c = $('module-view-content');
+      c.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+      setTimeout(() => {
+        if (id === 'estudiantes') renderStudents(c);
+        else if (id === 'grupos' || id === 'grupos2') renderGrupos(c);
+        else if (id === 'profesores') renderTeachers(c);
+        else if (id === 'empleados') renderEmployees(c);
+        else if (id === 'contactos') renderContacts(c);
+        else if (id === 'leads') renderLeads(c);
+        else if (id === 'asistencia') renderAttendance(c);
+        else if (id === 'pagos') renderPayments(c);
+        else if (id === 'tareas') renderTasks(c);
+        else if (id === 'reportes') renderReports(c);
+        else if (id === 'finanzas') renderFinanzas(c);
+        else if (id === 'nomina') renderNomina(c);
+        else c.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🚧</div><h3 class="empty-state-title">Próximamente</h3><p class="empty-state-text">Este módulo estará disponible pronto.</p></div>';
+      }, 50);
+    }
+
+    // STUDENTS MODULE
+    function renderStudents(c) {
+      const all = AppState.data.students;
+      const active = all.filter(s => s.status === 'active' || !s.status);
+      const inactive = all.filter(s => s.status === 'inactive');
+      c.innerHTML = `
+        <button class="btn btn-primary" onclick="showAddStudentForm()" style="width:100%;margin-bottom:16px;display:flex;align-items:center;justify-content:center;gap:8px;">
+          <span style="font-size:20px;">➕</span> Nuevo Estudiante
+        </button>
+        <div class="search-box"><span>🔍</span><input type="text" id="stu-search" placeholder="Buscar estudiante..." oninput="filterStu()"></div>
+        <div class="tabs-container">
+          <button class="tab-btn active" onclick="filterStuTab('all', this)">Todos (${all.length})</button>
+          <button class="tab-btn" onclick="filterStuTab('active', this)">Activos (${active.length})</button>
+          <button class="tab-btn" onclick="filterStuTab('inactive', this)">Inactivos (${inactive.length})</button>
+        </div>
+        <div class="list" id="stu-list">${renderStuItems(all)}</div>`;
+    }
+
+    let stuFilter = 'all';
+    function filterStuTab(tab, btn) {
+      stuFilter = tab;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      filterStu();
+    }
+
+    function filterStu() {
+      const q = ($('stu-search')?.value || '').toLowerCase();
+      let arr = AppState.data.students;
+      if (stuFilter === 'active') arr = arr.filter(s => s.status === 'active' || !s.status);
+      else if (stuFilter === 'inactive') arr = arr.filter(s => s.status === 'inactive');
+      if (q) arr = arr.filter(s => s.nombre?.toLowerCase().includes(q) || s.telefono?.includes(q));
+      $('stu-list').innerHTML = renderStuItems(arr);
+    }
+
+    function renderStuItems(arr) {
+      if (!arr.length) return '<div class="empty-state"><p>No hay estudiantes</p></div>';
+      // Sort alphabetically by name
+      arr = arr.slice().sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
+      return arr.map(s => {
+        const isActive = s.status === 'active' || !s.status;
+        const statusClass = isActive ? 'status-active' : 'status-inactive';
+        const statusText = isActive ? 'Activo' : 'Inactivo';
+        return `<div class="list-item" onclick="showStudentDetail('${s.id}')">
+          <div class="list-item-avatar">${s.nombre?.[0] || '?'}</div>
+          <div class="list-item-content">
+            <div class="list-item-title">${s.nombre || 'Sin nombre'}</div>
+            <div class="list-item-subtitle">${s.telefono || 'Grupo: ' + (s.grupo || 'N/A')}</div>
+          </div>
+          <span class="badge ${statusClass}">${statusText}</span>
+        </div>`;
+      }).join('');
+    }
+
+    function showStudentDetail(id) {
+      const s = AppState.data.students.find(x => x.id === id);
+      if (!s) return;
+      AppState.navStack.push({ type: 'detail', dataType: 'student', id, name: s.nombre, icon: '👤' });
+      $('module-view-title').textContent = '👤 ' + (s.nombre || 'Estudiante');
+      if (canEdit()) $('edit-btn').style.display = 'block';
+      renderStudentDetailView(s);
+    }
+
+    function renderStudentDetailView(s) {
+      const isActive = s.status === 'active' || !s.status;
+      const grupo = AppState.data.grupos2.find(g => String(g.id) === String(s.grupo));
+      const c = $('module-view-content');
+      const phoneNumber = String(s.telefono || '').replace(/\D/g, '');
+
+      if (AppState.editMode) {
+        c.innerHTML = `
+          <div class="detail-card edit-form">
+            <div class="form-group"><label>Nombre Completo *</label><input type="text" id="edit-nombre" value="${s.nombre || ''}"></div>
+            <div class="form-group"><label>Tipo Documento</label>
+              <select id="edit-tipoDoc">
+                <option value="C.C" ${s.tipoDoc === 'C.C' ? 'selected' : ''}>C.C</option>
+                <option value="T.I" ${s.tipoDoc === 'T.I' ? 'selected' : ''}>T.I</option>
+                <option value="C.E" ${s.tipoDoc === 'C.E' ? 'selected' : ''}>C.E</option>
+                <option value="PAS" ${s.tipoDoc === 'PAS' ? 'selected' : ''}>Pasaporte</option>
+                <option value="PPT" ${s.tipoDoc === 'PPT' ? 'selected' : ''}>PPT</option>
+              </select>
+            </div>
+            <div class="form-group"><label>Número Documento *</label><input type="text" id="edit-numDoc" value="${s.numDoc || ''}"></div>
+            <div class="form-group"><label>Edad</label><input type="number" id="edit-edad" value="${s.edad || ''}" min="5" max="100"></div>
+            <div class="form-group"><label>Teléfono *</label><input type="tel" id="edit-telefono" value="${s.telefono || ''}"></div>
+            <div class="form-group"><label>Correo</label><input type="email" id="edit-correo" value="${s.correo || ''}"></div>
+            <div class="form-group"><label>Acudiente</label><input type="text" id="edit-acudiente" value="${s.acudiente || ''}"></div>
+            <div class="form-group"><label>Doc. Acudiente</label><input type="text" id="edit-docAcudiente" value="${s.docAcudiente || ''}"></div>
+            <div class="form-group"><label>Fecha Inicio</label><input type="date" id="edit-fechaInicio" value="${s.fechaInicio || ''}"></div>
+            <div class="form-group"><label>Grupo</label>
+              <select id="edit-grupo">
+                <option value="">Sin grupo</option>
+                ${AppState.data.grupos2.map(g => `<option value="${g.id}" ${String(s.grupo) === String(g.id) ? 'selected' : ''}>${g.nombre || g.id}</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group"><label>Modalidad</label>
+              <select id="edit-modalidad">
+                <option value="">Seleccionar</option>
+                <option value="Presencial" ${s.modalidad === 'Presencial' ? 'selected' : ''}>Presencial</option>
+                <option value="Compañia" ${s.modalidad === 'Compañia' ? 'selected' : ''}>Compañía</option>
+                <option value="Escuela" ${s.modalidad === 'Escuela' ? 'selected' : ''}>Escuela</option>
+                <option value="Online" ${s.modalidad === 'Online' ? 'selected' : ''}>Online</option>
+                <option value="Privadas" ${s.modalidad === 'Privadas' ? 'selected' : ''}>Privadas</option>
+              </select>
+            </div>
+            <div class="form-group"><label>Tipo Pago</label>
+              <select id="edit-tipoPago">
+                <option value="MENSUAL" ${s.tipoPago === 'MENSUAL' ? 'selected' : ''}>Mensual</option>
+                <option value="SEMESTRAL" ${s.tipoPago === 'SEMESTRAL' ? 'selected' : ''}>Semestral</option>
+                <option value="POR_HORAS" ${s.tipoPago === 'POR_HORAS' ? 'selected' : ''}>Por horas</option>
+              </select>
+            </div>
+            <div class="form-group"><label>Valor Mensualidad ($)</label><input type="number" id="edit-valor" value="${s.valor || ''}" min="0"></div>
+            <div class="form-group"><label>Día de Pago</label><input type="number" id="edit-diaPago" value="${s.diaPago || '1'}" min="1" max="31"></div>
+            <div class="form-group"><label>Estado</label>
+              <select id="edit-status">
+                <option value="active" ${isActive ? 'selected' : ''}>Activo</option>
+                <option value="inactive" ${s.status === 'inactive' ? 'selected' : ''}>Inactivo</option>
+              </select>
+            </div>
+            <button class="btn btn-primary" onclick="saveStudent('${s.id}')" style="width:100%;margin-top:16px;">Actualizar Estudiante</button>
+          </div>`;
+      } else {
+        c.innerHTML = `
+          <!-- Action Buttons -->
+          <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+            ${phoneNumber ? `<a href="https://wa.me/57${phoneNumber}" target="_blank" class="btn" style="background:#25d366;color:white;flex:1;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:6px;">
+              <span style="font-size:18px;">📱</span> WhatsApp
+            </a>` : ''}
+            <button class="btn" onclick="toggleEdit()" style="background:#3b82f6;color:white;flex:1;display:flex;align-items:center;justify-content:center;gap:6px;">
+              <span style="font-size:18px;">✏️</span> Editar
+            </button>
+          </div>
+
+          <div class="detail-card">
+            <div class="detail-header">
+              <div class="detail-avatar" style="background:linear-gradient(135deg,#3b82f6,#2563eb);">${s.nombre?.[0] || '?'}</div>
+              <div class="detail-info">
+                <h2>${s.nombre || 'Sin nombre'}</h2>
+                <p><span class="badge ${isActive ? 'status-active' : 'status-inactive'}">${isActive ? 'Activo' : 'Inactivo'}</span></p>
+              </div>
+            </div>
+
+            <h4 style="margin:20px 0 12px;color:#374151;font-size:14px;">📋 Información Personal</h4>
+            <div class="detail-field"><label>🪪 Documento</label><span>${s.tipoDoc || 'C.C'} ${s.numDoc || 'No registrado'}</span></div>
+            <div class="detail-field"><label>🎂 Edad</label><span>${s.edad || 'No registrada'}</span></div>
+            <div class="detail-field"><label>📞 Teléfono</label><span>${s.telefono || 'No registrado'}</span></div>
+            <div class="detail-field"><label>📧 Correo</label><span>${s.correo || 'No registrado'}</span></div>
+
+            <h4 style="margin:20px 0 12px;color:#374151;font-size:14px;">👨‍👩‍👧 Acudiente</h4>
+            <div class="detail-field"><label>👤 Nombre</label><span>${s.acudiente || 'No registrado'}</span></div>
+            <div class="detail-field"><label>🪪 Documento</label><span>${s.docAcudiente || 'No registrado'}</span></div>
+
+            <h4 style="margin:20px 0 12px;color:#374151;font-size:14px;">📚 Información Académica</h4>
+            <div class="detail-field"><label>📅 Fecha Inicio</label><span>${s.fechaInicio || 'No registrada'}</span></div>
+            <div class="detail-field"><label>📚 Grupo</label><span>${grupo?.nombre || s.grupo || 'Sin grupo'}</span></div>
+            <div class="detail-field"><label>🏠 Modalidad</label><span>${s.modalidad || 'No especificada'}${s.modalidadDetalle ? ' - ' + s.modalidadDetalle : ''}</span></div>
+
+            <h4 style="margin:20px 0 12px;color:#374151;font-size:14px;">💰 Información de Pago</h4>
+            <div class="detail-field"><label>💳 Tipo Pago</label><span>${s.tipoPago === 'POR_HORAS' ? 'Por horas' : s.tipoPago || 'MENSUAL'}</span></div>
+            <div class="detail-field"><label>💵 Valor</label><span>${s.tipoPago === 'POR_HORAS' ? '$' + (s.valorHora || 0).toLocaleString() + '/hora' : '$' + (s.valor || 0).toLocaleString()}</span></div>
+            <div class="detail-field"><label>📆 Día de Pago</label><span>${s.diaPago || '1'}</span></div>
+
+            <div class="detail-field" style="margin-top:16px;"><label>🆔 ID</label><span style="font-family:monospace;font-size:12px;">${s.id}</span></div>
+          </div>`;
+      }
+    }
+
+    function toggleEdit() {
+      AppState.editMode = !AppState.editMode;
+      $('edit-btn').textContent = AppState.editMode ? 'Cancelar' : 'Editar';
+      const current = AppState.navStack[AppState.navStack.length - 1];
+      if (current.dataType === 'student') {
+        const s = AppState.data.students.find(x => x.id === current.id);
+        if (s) renderStudentDetailView(s);
+      }
+    }
+
+    async function saveStudent(id) {
+      showLoading();
+      try {
+        const updates = {
+          nombre: $('edit-nombre').value,
+          tipoDoc: $('edit-tipoDoc').value,
+          numDoc: $('edit-numDoc').value,
+          edad: $('edit-edad').value,
+          telefono: $('edit-telefono').value,
+          correo: $('edit-correo').value,
+          acudiente: $('edit-acudiente').value,
+          docAcudiente: $('edit-docAcudiente').value,
+          fechaInicio: $('edit-fechaInicio').value,
+          grupo: $('edit-grupo').value,
+          modalidad: $('edit-modalidad').value,
+          tipoPago: $('edit-tipoPago').value,
+          valor: parseInt($('edit-valor').value) || 0,
+          diaPago: parseInt($('edit-diaPago').value) || 1,
+          status: $('edit-status').value,
+          updatedAt: new Date().toISOString(),
+          updatedBy: AppState.user.uid
+        };
+        await db.ref('students/' + id).update(updates);
+        // Update local data
+        const idx = AppState.data.students.findIndex(s => s.id === id);
+        if (idx >= 0) Object.assign(AppState.data.students[idx], updates);
+        AppState.editMode = false;
+        $('edit-btn').textContent = 'Editar';
+        hideLoading();
+        alert('Guardado correctamente');
+        showStudentDetail(id);
+      } catch (e) {
+        hideLoading();
+        alert('Error: ' + e.message);
+      }
+    }
+
+    // GRUPOS MODULE
+    function renderGrupos(c) {
+      const grupos = AppState.data.grupos2;
+      c.innerHTML = `<p style="color:var(--text-secondary);font-size:13px;margin-bottom:12px;">${grupos.length} grupos</p>
+        <div class="list">${grupos.map(g => {
+          const count = AppState.data.students.filter(s => String(s.grupo) === String(g.id)).length;
+          return `<div class="list-item" onclick="showGrupoDetail('${g.id}')">
+            <div class="list-item-avatar" style="background:linear-gradient(135deg,#667eea,#764ba2);">${g.nombre?.[0] || 'G'}</div>
+            <div class="list-item-content">
+              <div class="list-item-title">${g.nombre || 'Grupo ' + g.id}</div>
+              <div class="list-item-subtitle">${count} estudiantes · ${g.teacher || 'Sin profesor'}</div>
+            </div>
+            <span class="list-item-arrow">›</span>
+          </div>`;
+        }).join('')}</div>`;
+    }
+
+    function showGrupoDetail(id) {
+      const g = AppState.data.grupos2.find(x => x.id === id);
+      if (!g) return;
+      const students = AppState.data.students.filter(s => String(s.grupo) === String(id));
+      AppState.navStack.push({ type: 'detail', dataType: 'grupo', id, name: g.nombre, icon: '🎓' });
+      $('module-view-title').textContent = '🎓 ' + (g.nombre || 'Grupo');
+      const c = $('module-view-content');
+      c.innerHTML = `
+        <div class="detail-card">
+          <div class="detail-header">
+            <div class="detail-avatar" style="background:linear-gradient(135deg,#667eea,#764ba2);">🎓</div>
+            <div class="detail-info">
+              <h2>${g.nombre || 'Grupo ' + g.id}</h2>
+              <p>${students.length} estudiantes</p>
+            </div>
+          </div>
+          <div class="detail-field"><label>👩‍🏫 Profesor</label><span>${g.teacher || 'No asignado'}</span></div>
+          <div class="detail-field"><label>📅 Horario</label><span>${g.schedule || 'No definido'}</span></div>
+          <div class="detail-field"><label>📍 Ubicación</label><span>${g.location || 'No especificada'}</span></div>
+        </div>
+        <h3 style="margin:20px 0 12px;font-size:16px;">👥 Estudiantes del Grupo</h3>
+        <div class="list">${students.length ? students.map(s => `
+          <div class="list-item" onclick="showStudentDetail('${s.id}')">
+            <div class="list-item-avatar">${s.nombre?.[0] || '?'}</div>
+            <div class="list-item-content">
+              <div class="list-item-title">${s.nombre || 'Sin nombre'}</div>
+              <div class="list-item-subtitle">${s.telefono || ''}</div>
+            </div>
+          </div>
+        `).join('') : '<div class="empty-state"><p>No hay estudiantes en este grupo</p></div>'}</div>`;
+    }
+
+    // TEACHERS MODULE
+    function renderTeachers(c) {
+      const teachers = AppState.data.teachers;
+      c.innerHTML = `<p style="color:var(--text-secondary);font-size:13px;margin-bottom:12px;">${teachers.length} profesores</p>
+        <div class="list">${teachers.map(t => `
+          <div class="list-item" onclick="showTeacherDetail('${t.id}')">
+            <div class="list-item-avatar" style="background:linear-gradient(135deg,#f59e0b,#d97706);">${(t.nombre || t.name)?.[0] || '?'}</div>
+            <div class="list-item-content">
+              <div class="list-item-title">${t.nombre || t.name || 'Sin nombre'}</div>
+              <div class="list-item-subtitle">${t.email || t.telefono || ''}</div>
+            </div>
+            <span class="list-item-arrow">›</span>
+          </div>
+        `).join('')}</div>`;
+    }
+
+    function showTeacherDetail(id) {
+      const t = AppState.data.teachers.find(x => x.id === id);
+      if (!t) return;
+      AppState.navStack.push({ type: 'detail', dataType: 'teacher', id, name: t.nombre || t.name, icon: '👩‍🏫' });
+      $('module-view-title').textContent = '👩‍🏫 ' + (t.nombre || t.name || 'Profesor');
+      const c = $('module-view-content');
+      c.innerHTML = `
+        <div class="detail-card">
+          <div class="detail-header">
+            <div class="detail-avatar" style="background:linear-gradient(135deg,#f59e0b,#d97706);">👩‍🏫</div>
+            <div class="detail-info">
+              <h2>${t.nombre || t.name || 'Sin nombre'}</h2>
+              <p>${t.cargo || t.position || 'Profesor'}</p>
+            </div>
+          </div>
+          <div class="detail-field"><label>📞 Teléfono</label><span>${t.telefono || t.phone || 'No registrado'}</span></div>
+          <div class="detail-field"><label>📧 Email</label><span>${t.email || 'No registrado'}</span></div>
+          <div class="detail-field"><label>📅 Horario</label><span>${t.schedule || 'No definido'}</span></div>
+        </div>`;
+    }
+
+    // EMPLOYEES MODULE
+    function renderEmployees(c) {
+      const employees = AppState.data.employees;
+      c.innerHTML = `<p style="color:var(--text-secondary);font-size:13px;margin-bottom:12px;">${employees.length} empleados</p>
+        <div class="list">${employees.map(e => `
+          <div class="list-item">
+            <div class="list-item-avatar" style="background:linear-gradient(135deg,#14b8a6,#0d9488);">${(e.nombre || e.name)?.[0] || '?'}</div>
+            <div class="list-item-content">
+              <div class="list-item-title">${e.nombre || e.name || 'Sin nombre'}</div>
+              <div class="list-item-subtitle">${e.cargo || e.position || ''}</div>
+            </div>
+          </div>
+        `).join('')}</div>`;
+    }
+
+    // CONTACTS MODULE
+    function renderContacts(c) {
+      const contacts = AppState.data.contacts;
+      c.innerHTML = `
+        <button class="btn btn-primary" onclick="showAddContactForm()" style="width:100%;margin-bottom:16px;display:flex;align-items:center;justify-content:center;gap:8px;">
+          <span style="font-size:20px;">➕</span> Nuevo Contacto
+        </button>
+        <div class="search-box"><span>🔍</span><input type="text" id="contact-search" placeholder="Buscar contacto..." oninput="filterContacts()"></div>
+        <p style="color:var(--text-secondary);font-size:13px;margin-bottom:12px;">${contacts.length} contactos</p>
+        <div class="list" id="contact-list">${renderContactItems(contacts)}</div>`;
+    }
+
+    function renderContactItems(arr) {
+      return arr.slice(0, 50).map(x => `
+        <div class="list-item">
+          <div class="list-item-avatar" style="background:linear-gradient(135deg,#06b6d4,#0891b2);">${(x.nombre || x.name)?.[0] || '?'}</div>
+          <div class="list-item-content">
+            <div class="list-item-title">${x.nombre || x.name || 'Sin nombre'}</div>
+            <div class="list-item-subtitle">${x.telefono || x.phone || x.email || ''}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function filterContacts() {
+      const q = $('contact-search').value.toLowerCase();
+      const filtered = AppState.data.contacts.filter(c => (c.nombre || c.name || '').toLowerCase().includes(q));
+      $('contact-list').innerHTML = renderContactItems(filtered);
+    }
+
+    // LEADS MODULE
+    function renderLeads(c) {
+      const leads = AppState.data.leads;
+      c.innerHTML = `
+        <p style="color:var(--text-secondary);font-size:13px;margin-bottom:12px;">${leads.length} leads</p>
+        <div class="list">${leads.length ? leads.map(l => `
+          <div class="list-item">
+            <div class="list-item-avatar" style="background:linear-gradient(135deg,#84cc16,#65a30d);">🎯</div>
+            <div class="list-item-content">
+              <div class="list-item-title">${l.nombre || l.name || 'Sin nombre'}</div>
+              <div class="list-item-subtitle">${l.telefono || l.email || l.source || ''}</div>
+            </div>
+            <span class="badge status-pending">${l.status || 'Nuevo'}</span>
+          </div>
+        `).join('') : '<div class="empty-state"><p>No hay leads registrados</p></div>'}</div>`;
+    }
+
+    // PAYMENTS MODULE - Enhanced with student payment status and filters
+    // Payment Configuration - matching web
+    const PaymentConfig = {
+      holidays: [
+        { year: 2025, month: 'diciembre', label: 'Vacaciones' },
+        { year: 2026, month: 'enero', label: 'Vacaciones' }
+      ],
+      isHoliday: function(year, month) {
+        return this.holidays.some(h => h.year === year && h.month === month.toLowerCase());
+      }
+    };
+
+    // Active filters state
+    let paymentFilters = {
+      search: '',
+      status: '',
+      method: '',
+      bank: '',
+      modalidad: '',
+      month: '',
+      year: '',
+      startDate: null,
+      endDate: null
+    };
+
+    function renderPayments(c) {
+      const payments = AppState.data.payments;
+      const students = AppState.data.students.filter(s => s.status === 'active' || !s.status);
+      const total = payments.reduce((sum, p) => sum + (parseFloat(p.monto || p.amount) || 0), 0);
+
+      // Calculate payment status summary
+      const today = new Date();
+      const currentMonth = today.getMonth();
+      const currentDay = today.getDate();
+      const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+      const currentMonthName = monthNames[currentMonth];
+      const currentYear = today.getFullYear();
+
+      let paidCount = 0, upcomingCount = 0, overdueCount = 0, vacationCount = 0;
+      students.forEach(s => {
+        const status = getStudentPaymentStatus(s, payments, currentMonthName, currentYear, currentDay);
+        if (status.type === 'paid') paidCount++;
+        else if (status.type === 'vacation') vacationCount++;
+        else if (status.type === 'upcoming') upcomingCount++;
+        else if (status.type === 'overdue') overdueCount++;
+      });
+
+      c.innerHTML = `
+        <!-- Summary Cards -->
+        <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:8px;margin-bottom:12px;">
+          <div onclick="setPaymentStatusFilter('paid')" style="background:linear-gradient(135deg,#10b981,#059669);padding:14px;border-radius:12px;color:white;cursor:pointer;">
+            <div style="font-size:24px;font-weight:700;">${paidCount}</div>
+            <div style="font-size:11px;opacity:0.9;">✅ Pagados</div>
+          </div>
+          <div onclick="setPaymentStatusFilter('upcoming')" style="background:linear-gradient(135deg,#f59e0b,#d97706);padding:14px;border-radius:12px;color:white;cursor:pointer;">
+            <div style="font-size:24px;font-weight:700;">${upcomingCount}</div>
+            <div style="font-size:11px;opacity:0.9;">🟡 Próximos</div>
+          </div>
+          <div onclick="setPaymentStatusFilter('overdue')" style="background:linear-gradient(135deg,#ef4444,#dc2626);padding:14px;border-radius:12px;color:white;cursor:pointer;">
+            <div style="font-size:24px;font-weight:700;">${overdueCount}</div>
+            <div style="font-size:11px;opacity:0.9;">🔴 Vencidos</div>
+          </div>
+          <div style="background:linear-gradient(135deg,#3b82f6,#2563eb);padding:14px;border-radius:12px;color:white;">
+            <div style="font-size:24px;font-weight:700;">$${(total/1000000).toFixed(1)}M</div>
+            <div style="font-size:11px;opacity:0.9;">💰 Recaudado</div>
+          </div>
+        </div>
+
+        <!-- Quick Date Filters -->
+        <div style="margin-bottom:12px;overflow-x:auto;white-space:nowrap;padding-bottom:8px;">
+          <div style="display:inline-flex;gap:6px;">
+            <button onclick="setQuickDateFilter('today')" class="quick-filter-btn">Hoy</button>
+            <button onclick="setQuickDateFilter('yesterday')" class="quick-filter-btn">Ayer</button>
+            <button onclick="setQuickDateFilter('last7days')" class="quick-filter-btn">7 días</button>
+            <button onclick="setQuickDateFilter('thisWeek')" class="quick-filter-btn">Semana</button>
+            <button onclick="setQuickDateFilter('thisMonth')" class="quick-filter-btn">Mes</button>
+            <button onclick="setQuickDateFilter('lastMonth')" class="quick-filter-btn">Mes Ant.</button>
+            <button onclick="setQuickDateFilter('last30days')" class="quick-filter-btn">30 días</button>
+            <button onclick="clearPaymentFilters()" class="quick-filter-btn" style="background:#ef4444;color:white;">✕</button>
+          </div>
+        </div>
+
+        <!-- Filters Section -->
+        <div style="background:#f3f4f6;padding:12px;border-radius:10px;margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <span style="font-weight:600;font-size:13px;color:#374151;">🔍 Filtros</span>
+            <span id="filter-count" style="font-size:11px;color:#6b7280;"></span>
+          </div>
+          <div class="search-box" style="margin-bottom:10px;"><span>👤</span><input type="text" id="pay-search" placeholder="Buscar estudiante..." oninput="applyPaymentFilters()"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <select id="pay-status-filter" onchange="applyPaymentFilters()" style="padding:10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;">
+              <option value="">Estado Pago</option>
+              <option value="paid">✅ Pagados</option>
+              <option value="upcoming">🟡 Próximos</option>
+              <option value="overdue">🔴 Vencidos</option>
+              <option value="vacation">🏖️ Vacaciones</option>
+            </select>
+            <select id="pay-method-filter" onchange="applyPaymentFilters()" style="padding:10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;">
+              <option value="">Método Pago</option>
+              <option value="Efectivo">💵 Efectivo</option>
+              <option value="Transferencia">🏦 Transferencia</option>
+              <option value="Nequi">📱 Nequi</option>
+            </select>
+            <select id="pay-bank-filter" onchange="applyPaymentFilters()" style="padding:10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;">
+              <option value="">Banco</option>
+              <option value="Bancolombia">Bancolombia</option>
+              <option value="Nequi">Nequi</option>
+              <option value="Daviplata">Daviplata</option>
+              <option value="Davivienda">Davivienda</option>
+            </select>
+            <select id="pay-modalidad-filter" onchange="applyPaymentFilters()" style="padding:10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;">
+              <option value="">Modalidad</option>
+              <option value="Presencial">Presencial</option>
+              <option value="Compañia">Compañía</option>
+              <option value="Escuela">Escuela</option>
+              <option value="Online">Online</option>
+            </select>
+            <select id="pay-month-filter" onchange="applyPaymentFilters()" style="padding:10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;">
+              <option value="">Mes</option>
+              <option value="enero">Enero</option>
+              <option value="febrero">Febrero</option>
+              <option value="marzo">Marzo</option>
+              <option value="abril">Abril</option>
+              <option value="mayo">Mayo</option>
+              <option value="junio">Junio</option>
+              <option value="julio">Julio</option>
+              <option value="agosto">Agosto</option>
+              <option value="septiembre">Septiembre</option>
+              <option value="octubre">Octubre</option>
+              <option value="noviembre">Noviembre</option>
+              <option value="diciembre">Diciembre</option>
+            </select>
+            <select id="pay-year-filter" onchange="applyPaymentFilters()" style="padding:10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;">
+              <option value="">Año</option>
+              <option value="2024">2024</option>
+              <option value="2025">2025</option>
+              <option value="2026">2026</option>
+            </select>
+          </div>
+          <!-- Date Range -->
+          <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center;">
+            <input type="date" id="pay-start-date" onchange="applyPaymentFilters()" style="padding:10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;">
+            <input type="date" id="pay-end-date" onchange="applyPaymentFilters()" style="padding:10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;">
+            <button onclick="clearPaymentFilters()" style="padding:10px 14px;background:#6b7280;color:white;border:none;border-radius:8px;font-size:12px;">Limpiar</button>
+          </div>
+        </div>
+
+        <!-- Student Payment List -->
+        <div id="payment-student-list" class="list">
+          ${renderPaymentStudentList(students, payments)}
+        </div>
+
+        <style>
+          .quick-filter-btn {
+            padding:8px 12px;background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd;border-radius:20px;font-size:11px;font-weight:500;white-space:nowrap;
+          }
+          .quick-filter-btn:active { background:#bae6fd; }
+        </style>`;
+    }
+
+    // Get payment status for a student - with proper vacation logic
+    function getStudentPaymentStatus(student, payments, currentMonth, currentYear, currentDay) {
+      if (student.tipoPago === 'POR_HORAS') {
+        return { type: 'hourly', icon: '⏱️', text: 'Por horas', color: '#6b7280' };
+      }
+
+      // Check if current month is a holiday - no payment required
+      if (PaymentConfig.isHoliday(currentYear, currentMonth)) {
+        return { type: 'vacation', icon: '🏖️', text: 'Vacaciones', color: '#60a5fa' };
+      }
+
+      // Check if paid this month
+      const payment = payments.find(p =>
+        p.studentId === student.id &&
+        (p.mes || p.month || '').toLowerCase() === currentMonth.toLowerCase() &&
+        (parseInt(p.year) === currentYear || parseInt(p.año) === currentYear)
+      );
+
+      if (payment) {
+        return { type: 'paid', icon: '✅', text: 'Pagado', color: '#10b981' };
+      }
+
+      const payDay = parseInt(student.diaPago) || 1;
+      if (currentDay > payDay) {
+        return { type: 'overdue', icon: '🔴', text: 'Vencido', color: '#ef4444' };
+      } else if (currentDay >= payDay - 5) {
+        return { type: 'upcoming', icon: '🟡', text: 'Próximo', color: '#f59e0b' };
+      }
+      return { type: 'upcoming', icon: '🟡', text: 'Pendiente', color: '#f59e0b' };
+    }
+
+    // Set status filter from summary card click
+    function setPaymentStatusFilter(status) {
+      document.getElementById('pay-status-filter').value = status;
+      applyPaymentFilters();
+    }
+
+    // Quick date filter presets
+    function setQuickDateFilter(preset) {
+      const today = new Date();
+      const year = today.getFullYear();
+      const month = today.getMonth();
+      const day = today.getDate();
+      let startDate, endDate;
+
+      switch (preset) {
+        case 'today':
+          startDate = endDate = new Date(year, month, day);
+          break;
+        case 'yesterday':
+          startDate = endDate = new Date(year, month, day - 1);
+          break;
+        case 'last7days':
+          startDate = new Date(year, month, day - 7);
+          endDate = new Date(year, month, day);
+          break;
+        case 'thisWeek':
+          const dayOfWeek = today.getDay();
+          startDate = new Date(year, month, day - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+          endDate = new Date(year, month, day);
+          break;
+        case 'thisMonth':
+          startDate = new Date(year, month, 1);
+          endDate = new Date(year, month, day);
+          break;
+        case 'lastMonth':
+          startDate = new Date(year, month - 1, 1);
+          endDate = new Date(year, month, 0);
+          break;
+        case 'last30days':
+          startDate = new Date(year, month, day - 30);
+          endDate = new Date(year, month, day);
+          break;
+      }
+
+      const formatDate = d => d.toISOString().split('T')[0];
+      document.getElementById('pay-start-date').value = formatDate(startDate);
+      document.getElementById('pay-end-date').value = formatDate(endDate);
+      applyPaymentFilters();
+    }
+
+    // Clear all payment filters
+    function clearPaymentFilters() {
+      document.getElementById('pay-search').value = '';
+      document.getElementById('pay-status-filter').value = '';
+      document.getElementById('pay-method-filter').value = '';
+      document.getElementById('pay-bank-filter').value = '';
+      document.getElementById('pay-modalidad-filter').value = '';
+      document.getElementById('pay-month-filter').value = '';
+      document.getElementById('pay-year-filter').value = '';
+      document.getElementById('pay-start-date').value = '';
+      document.getElementById('pay-end-date').value = '';
+      paymentFilters = { search: '', status: '', method: '', bank: '', modalidad: '', month: '', year: '', startDate: null, endDate: null };
+      applyPaymentFilters();
+    }
+
+    // Apply all payment filters
+    function applyPaymentFilters() {
+      const search = (document.getElementById('pay-search')?.value || '').toLowerCase();
+      const statusFilter = document.getElementById('pay-status-filter')?.value || '';
+      const methodFilter = document.getElementById('pay-method-filter')?.value || '';
+      const bankFilter = document.getElementById('pay-bank-filter')?.value || '';
+      const modalidadFilter = document.getElementById('pay-modalidad-filter')?.value || '';
+      const monthFilter = document.getElementById('pay-month-filter')?.value || '';
+      const yearFilter = document.getElementById('pay-year-filter')?.value || '';
+      const startDate = document.getElementById('pay-start-date')?.value || '';
+      const endDate = document.getElementById('pay-end-date')?.value || '';
+
+      const payments = AppState.data.payments;
+      let students = AppState.data.students.filter(s => s.status === 'active' || !s.status);
+      const today = new Date();
+      const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+      const currentMonth = monthNames[today.getMonth()];
+      const currentYear = today.getFullYear();
+
+      // Filter by search
+      if (search) {
+        students = students.filter(s => s.nombre?.toLowerCase().includes(search) || s.telefono?.includes(search));
+      }
+
+      // Filter by modalidad
+      if (modalidadFilter) {
+        students = students.filter(s => s.modalidad === modalidadFilter);
+      }
+
+      // Filter by payment status
+      if (statusFilter) {
+        students = students.filter(s => {
+          const status = getStudentPaymentStatus(s, payments, currentMonth, currentYear, today.getDate());
+          return status.type === statusFilter;
+        });
+      }
+
+      // Filter by date range - show students with payments in range
+      if (startDate && endDate) {
+        const studentsWithPayments = new Set();
+        students.forEach(s => {
+          const hasPayment = payments.some(p => {
+            if (p.studentId !== s.id || !p.fecha && !p.date) return false;
+            const payDate = (p.fecha || p.date || '').split('T')[0];
+            return payDate >= startDate && payDate <= endDate;
+          });
+          if (hasPayment) studentsWithPayments.add(s.id);
+        });
+        students = students.filter(s => studentsWithPayments.has(s.id));
+      }
+
+      // Filter by payment method/bank/month/year
+      if (methodFilter || bankFilter || monthFilter || yearFilter) {
+        const studentsWithPayments = new Set();
+        students.forEach(s => {
+          const hasPayment = payments.some(p => {
+            if (p.studentId !== s.id) return false;
+            if (methodFilter && (p.metodo || p.method) !== methodFilter) return false;
+            if (bankFilter && (p.banco || p.bank) !== bankFilter) return false;
+            if (monthFilter && (p.mes || p.month || '').toLowerCase() !== monthFilter) return false;
+            if (yearFilter && String(p.year || p.año) !== yearFilter) return false;
+            return true;
+          });
+          if (hasPayment) studentsWithPayments.add(s.id);
+        });
+        students = students.filter(s => studentsWithPayments.has(s.id));
+      }
+
+      // Update filter count
+      const totalStudents = AppState.data.students.filter(s => s.status === 'active' || !s.status).length;
+      const filterCount = document.getElementById('filter-count');
+      if (filterCount) {
+        filterCount.textContent = `${students.length} de ${totalStudents} estudiantes`;
+      }
+
+      document.getElementById('payment-student-list').innerHTML = renderPaymentStudentList(students, payments);
+    }
+
+    // Alias for backward compatibility
+    function filterPaymentStudents() { applyPaymentFilters(); }
+
+    // Render student list for payments
+    function renderPaymentStudentList(students, payments) {
+      const today = new Date();
+      const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+      const currentMonth = monthNames[today.getMonth()];
+      const currentYear = today.getFullYear();
+
+      // Sort alphabetically
+      const sorted = students.slice().sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
+
+      return sorted.map(s => {
+        const status = getStudentPaymentStatus(s, payments, currentMonth, currentYear, today.getDate());
+        const grupo = AppState.data.grupos2.find(g => String(g.id) === String(s.grupo));
+
+        return `
+          <div class="payment-student-row" style="background:white;border-radius:12px;margin-bottom:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+            <div onclick="togglePaymentHistory('${s.id}')" style="padding:14px;display:flex;align-items:center;gap:12px;cursor:pointer;">
+              <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);display:flex;align-items:center;justify-content:center;color:white;font-weight:600;font-size:18px;">
+                ${(s.nombre || '?')[0]}
+              </div>
+              <div style="flex:1;min-width:0;">
+                <div style="font-weight:600;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.nombre || 'Sin nombre'}</div>
+                <div style="font-size:12px;color:#6b7280;">Grupo ${grupo?.nombre || s.grupo || '-'} · $${(s.valor || 0).toLocaleString()}</div>
+              </div>
+              <div style="text-align:right;">
+                <span style="display:inline-block;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;background:${status.color}22;color:${status.color};">
+                  ${status.icon} ${status.text}
+                </span>
+                <div style="font-size:11px;color:#9ca3af;margin-top:4px;">Día ${s.diaPago || 1}</div>
+              </div>
+              <svg id="arrow-${s.id}" style="width:20px;height:20px;fill:#9ca3af;transition:transform 0.3s;" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+            </div>
+            <div id="history-${s.id}" style="display:none;background:#f9fafb;padding:16px;border-top:1px solid #e5e7eb;">
+              <!-- Payment history loaded on expand -->
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    // Toggle payment history for a student
+    function togglePaymentHistory(studentId) {
+      const historyEl = document.getElementById('history-' + studentId);
+      const arrowEl = document.getElementById('arrow-' + studentId);
+      if (!historyEl) return;
+
+      const isHidden = historyEl.style.display === 'none';
+      historyEl.style.display = isHidden ? 'block' : 'none';
+      if (arrowEl) arrowEl.style.transform = isHidden ? 'rotate(90deg)' : '';
+
+      if (isHidden) {
+        // Load payment history
+        const student = AppState.data.students.find(s => s.id === studentId);
+        if (student) {
+          historyEl.innerHTML = renderPaymentHistoryGrid(student);
+        }
+      }
+    }
+
+    // Render payment history grid (12-month calendar)
+    function renderPaymentHistoryGrid(student) {
+      const payments = AppState.data.payments;
+      const year = new Date().getFullYear();
+      const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+      const monthsLower = months.map(m => m.toLowerCase());
+
+      let totalPaid = 0;
+      let monthsPaid = 0;
+
+      const grid = months.map((monthName, idx) => {
+        const monthLower = monthsLower[idx];
+        // Use proper year-specific holiday logic
+        const isHoliday = PaymentConfig.isHoliday(year, monthLower);
+
+        // Find payment for this month
+        const payment = payments.find(p =>
+          p.studentId === student.id &&
+          (p.mes || p.month || '').toLowerCase() === monthLower &&
+          (parseInt(p.year) === year || parseInt(p.año) === year)
+        );
+
+        let status = 'pending';
+        let statusColor = '#d1d5db';
+        let statusIcon = '-';
+        let amount = 0;
+
+        if (isHoliday) {
+          status = 'holiday';
+          statusColor = '#60a5fa';
+          statusIcon = '🏖️';
+        } else if (payment) {
+          status = 'paid';
+          statusColor = '#10b981';
+          statusIcon = '✅';
+          amount = parseFloat(payment.monto || payment.amount) || 0;
+          totalPaid += amount;
+          monthsPaid++;
+        }
+
+        return `
+          <div style="background:white;border:2px solid ${statusColor};border-radius:8px;padding:10px;text-align:center;position:relative;">
+            <div style="position:absolute;top:6px;right:6px;width:8px;height:8px;background:${statusColor};border-radius:50%;"></div>
+            <div style="font-weight:600;font-size:13px;color:#374151;">${monthName}</div>
+            <div style="font-size:18px;margin:6px 0;">${statusIcon}</div>
+            ${amount > 0 ? `<div style="font-size:11px;color:#10b981;">$${amount.toLocaleString()}</div>` : `<div style="font-size:11px;color:#9ca3af;">${isHoliday ? 'Vacaciones' : '-'}</div>`}
+          </div>`;
+      }).join('');
+
+      return `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <h4 style="margin:0;font-size:14px;color:#374151;">📅 Historial de Pagos ${year}</h4>
+          <button onclick="showStudentPaymentForm('${student.id}')" class="btn" style="background:#10b981;color:white;font-size:12px;padding:6px 12px;">
+            ➕ Registrar Pago
+          </button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:8px;margin-bottom:16px;">
+          ${grid}
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:10px;background:white;padding:12px;border-radius:8px;">
+          <div style="text-align:center;">
+            <div style="font-size:18px;font-weight:700;color:#10b981;">$${totalPaid.toLocaleString()}</div>
+            <div style="font-size:11px;color:#6b7280;">Total Pagado</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:18px;font-weight:700;color:#3b82f6;">${monthsPaid}/12</div>
+            <div style="font-size:11px;color:#6b7280;">Meses Pagados</div>
+          </div>
+        </div>`;
+    }
+
+    // Filter payment students by search
+    function filterPaymentStudents() {
+      const q = (document.getElementById('pay-search')?.value || '').toLowerCase();
+      const students = AppState.data.students.filter(s => s.status === 'active' || !s.status);
+      let filtered = students;
+      if (q) {
+        filtered = students.filter(s => s.nombre?.toLowerCase().includes(q) || s.telefono?.includes(q));
+      }
+      document.getElementById('payment-student-list').innerHTML = renderPaymentStudentList(filtered, AppState.data.payments);
+    }
+
+    // Show payment form for a specific student
+    function showStudentPaymentForm(studentId) {
+      const student = AppState.data.students.find(s => s.id === studentId);
+      if (!student) return;
+
+      AppState.navStack.push({ type: 'form', module: 'pagos', name: 'Pago - ' + student.nombre, icon: '💰' });
+      $('module-view-title').textContent = '💰 Registrar Pago';
+      $('edit-btn').style.display = 'none';
+      const c = $('module-view-content');
+      const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+      const currentMonth = new Date().getMonth();
+      const currentYear = new Date().getFullYear();
+
+      c.innerHTML = `
+        <div class="detail-card">
+          <div style="text-align:center;margin-bottom:20px;">
+            <div style="width:60px;height:60px;margin:0 auto 10px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);display:flex;align-items:center;justify-content:center;color:white;font-size:24px;font-weight:600;">
+              ${(student.nombre || '?')[0]}
+            </div>
+            <h3 style="margin:0;color:#1f2937;">${student.nombre}</h3>
+            <p style="margin:4px 0;color:#6b7280;font-size:14px;">Valor mensualidad: $${(student.valor || 0).toLocaleString()}</p>
+          </div>
+
+          <div class="form-group"><label>Monto *</label><input type="number" id="pay-amount" value="${student.valor || ''}" placeholder="Monto a pagar"></div>
+
+          <div class="form-group"><label>Mes</label>
+            <select id="pay-month">
+              ${months.map((m, i) => `<option value="${m}" ${i === currentMonth ? 'selected' : ''}>${m}</option>`).join('')}
+            </select>
+          </div>
+
+          <div class="form-group"><label>Año</label>
+            <select id="pay-year">
+              <option value="${currentYear}">${currentYear}</option>
+              <option value="${currentYear + 1}">${currentYear + 1}</option>
+            </select>
+          </div>
+
+          <div class="form-group"><label>Método de Pago</label>
+            <select id="pay-method">
+              <option value="Efectivo">💵 Efectivo</option>
+              <option value="Transferencia">🏦 Transferencia</option>
+              <option value="Nequi">📱 Nequi</option>
+            </select>
+          </div>
+
+          <div class="form-group"><label>Banco (si aplica)</label>
+            <select id="pay-bank">
+              <option value="">No aplica</option>
+              <option value="Bancolombia">Bancolombia</option>
+              <option value="Nequi">Nequi</option>
+              <option value="Daviplata">Daviplata</option>
+              <option value="Davivienda">Davivienda</option>
+            </select>
+          </div>
+
+          <div class="form-group"><label>Notas</label><input type="text" id="pay-notes" placeholder="Notas adicionales"></div>
+
+          <button class="btn btn-primary" onclick="saveStudentPayment('${student.id}')" style="width:100%;margin-top:16px;">💰 Registrar Pago</button>
+        </div>`;
+    }
+
+    // Save payment for a student
+    async function saveStudentPayment(studentId) {
+      const amount = document.getElementById('pay-amount').value;
+      if (!amount || parseFloat(amount) <= 0) { alert('Ingresa un monto válido'); return; }
+
+      const student = AppState.data.students.find(s => s.id === studentId);
+      if (!student) { alert('Estudiante no encontrado'); return; }
+
+      showLoading();
+      try {
+        const payment = {
+          studentId: studentId,
+          studentName: student.nombre,
+          monto: parseFloat(amount),
+          amount: parseFloat(amount),
+          mes: document.getElementById('pay-month').value,
+          month: document.getElementById('pay-month').value.toLowerCase(),
+          year: parseInt(document.getElementById('pay-year').value),
+          año: parseInt(document.getElementById('pay-year').value),
+          metodo: document.getElementById('pay-method').value,
+          method: document.getElementById('pay-method').value,
+          banco: document.getElementById('pay-bank').value,
+          bank: document.getElementById('pay-bank').value,
+          notas: document.getElementById('pay-notes').value,
+          fecha: new Date().toISOString().split('T')[0],
+          date: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+          createdBy: AppState.user.uid
+        };
+
+        const ref = await db.ref('payments').push(payment);
+        payment.id = ref.key;
+        AppState.data.payments.push(payment);
+
+        hideLoading();
+        alert('Pago registrado correctamente');
+        goBack();
+      } catch (e) {
+        hideLoading();
+        alert('Error: ' + e.message);
+      }
+    }
+
+    // TASKS MODULE
+    function renderTasks(c) {
+      const tasks = AppState.data.tasks;
+      const pending = tasks.filter(t => t.status !== 'completed');
+      const completed = tasks.filter(t => t.status === 'completed');
+      c.innerHTML = `
+        <div class="tabs-container">
+          <button class="tab-btn active" onclick="filterTasksTab('pending', this)">Pendientes (${pending.length})</button>
+          <button class="tab-btn" onclick="filterTasksTab('completed', this)">Completadas (${completed.length})</button>
+        </div>
+        <div class="list" id="tasks-list">${renderTaskItems(pending)}</div>`;
+    }
+
+    let taskFilter = 'pending';
+    function filterTasksTab(tab, btn) {
+      taskFilter = tab;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const tasks = AppState.data.tasks;
+      const filtered = tab === 'completed' ? tasks.filter(t => t.status === 'completed') : tasks.filter(t => t.status !== 'completed');
+      $('tasks-list').innerHTML = renderTaskItems(filtered);
+    }
+
+    function renderTaskItems(arr) {
+      if (!arr.length) return '<div class="empty-state"><p>No hay tareas</p></div>';
+      return arr.map(t => `
+        <div class="list-item">
+          <div class="list-item-avatar" style="background:linear-gradient(135deg,#fb923c,#f97316);">📋</div>
+          <div class="list-item-content">
+            <div class="list-item-title">${t.title || t.titulo || 'Tarea'}</div>
+            <div class="list-item-subtitle">${t.description || t.descripcion || ''}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // REPORTS MODULE
+    function renderReports(c) {
+      const totalStudents = AppState.data.students.length;
+      const activeStudents = AppState.data.students.filter(s => s.status === 'active' || !s.status).length;
+      const inactiveStudents = totalStudents - activeStudents;
+      const totalPayments = AppState.data.payments.reduce((sum, p) => sum + (parseFloat(p.monto || p.amount) || 0), 0);
+
+      c.innerHTML = `
+        <div class="detail-card">
+          <h3 style="margin:0 0 16px;font-size:16px;">📊 Resumen General</h3>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div style="background:var(--gray-50);padding:16px;border-radius:12px;text-align:center;">
+              <div style="font-size:28px;font-weight:700;color:#3b82f6;">${totalStudents}</div>
+              <div style="font-size:12px;color:var(--text-secondary);">Total Estudiantes</div>
+            </div>
+            <div style="background:var(--gray-50);padding:16px;border-radius:12px;text-align:center;">
+              <div style="font-size:28px;font-weight:700;color:#10b981;">${activeStudents}</div>
+              <div style="font-size:12px;color:var(--text-secondary);">Activos</div>
+            </div>
+            <div style="background:var(--gray-50);padding:16px;border-radius:12px;text-align:center;">
+              <div style="font-size:28px;font-weight:700;color:#ef4444;">${inactiveStudents}</div>
+              <div style="font-size:12px;color:var(--text-secondary);">Inactivos</div>
+            </div>
+            <div style="background:var(--gray-50);padding:16px;border-radius:12px;text-align:center;">
+              <div style="font-size:28px;font-weight:700;color:#6366f1;">$${totalPayments.toLocaleString()}</div>
+              <div style="font-size:12px;color:var(--text-secondary);">Pagos</div>
+            </div>
+          </div>
+        </div>
+        <div class="detail-card">
+          <h3 style="margin:0 0 16px;font-size:16px;">👥 Por Grupo</h3>
+          ${AppState.data.grupos2.slice(0, 10).map(g => {
+            const count = AppState.data.students.filter(s => String(s.grupo) === String(g.id)).length;
+            const pct = totalStudents ? Math.round(count / totalStudents * 100) : 0;
+            return `<div style="margin-bottom:12px;">
+              <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                <span style="font-size:14px;">${g.nombre || g.id}</span>
+                <span style="font-size:14px;color:var(--text-secondary);">${count} (${pct}%)</span>
+              </div>
+              <div style="background:var(--gray-200);height:8px;border-radius:4px;overflow:hidden;">
+                <div style="background:var(--primary);height:100%;width:${pct}%;"></div>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>`;
+    }
+
+    // FINANZAS MODULE
+    // FINANZAS MODULE STATE
+    let finanzasTab = 'dashboard';
+    let finanzasContext = 'business'; // 'business' | 'personal' | 'combined'
+    const BusinessExpenseCategories = {
+      'Arriendo Local': 'Arriendo Local',
+      'Salarios Profesores': 'Salarios Profesores',
+      'Agua Negocio': 'Agua Negocio',
+      'Luz Negocio': 'Luz Negocio',
+      'Internet Negocio': 'Internet Negocio',
+      'Servicios Google': 'Servicios Google',
+      'Hosting': 'Hosting',
+      'Marketing': 'Marketing',
+      'Materiales': 'Materiales',
+      'Mantenimiento': 'Mantenimiento',
+      'Inventario/Compras': 'Inventario/Compras',
+      'Otros Negocio': 'Otros Negocio'
+    };
+    const PersonalExpenseCategories = {
+      'Arriendo Vivienda': 'Arriendo Vivienda',
+      'Alimentación': 'Alimentación',
+      'Transporte': 'Transporte',
+      'Salud': 'Salud',
+      'Educación Personal': 'Educación Personal',
+      'Entretenimiento': 'Entretenimiento',
+      'Agua Hogar': 'Agua Hogar',
+      'Luz Hogar': 'Luz Hogar',
+      'Internet Hogar': 'Internet Hogar',
+      'Gas': 'Gas',
+      'Teléfono/Celular': 'Teléfono/Celular',
+      'Ropa': 'Ropa',
+      'Seguros': 'Seguros',
+      'Ahorro/Inversión': 'Ahorro/Inversión',
+      'Otros Personal': 'Otros Personal'
+    };
+
+    // Custom expense categories cache
+    let customExpenseCategories = { business: [], personal: [] };
+
+    async function loadCustomExpenseCategories() {
+      try {
+        const snapshot = await db.ref('system/customExpenseCategories').once('value');
+        if (snapshot.exists()) {
+          const data = snapshot.val();
+          customExpenseCategories = {
+            business: Array.isArray(data.business) ? data.business : [],
+            personal: Array.isArray(data.personal) ? data.personal : []
+          };
+        }
+        return customExpenseCategories;
+      } catch (error) {
+        console.error('Error loading custom categories:', error);
+        return { business: [], personal: [] };
+      }
+    }
+
+    async function saveCustomExpenseCategories(categories) {
+      try {
+        const dataToSave = {
+          business: Array.isArray(categories.business) ? categories.business : [],
+          personal: Array.isArray(categories.personal) ? categories.personal : []
+        };
+        await db.ref('system/customExpenseCategories').set(dataToSave);
+        customExpenseCategories = dataToSave;
+        return true;
+      } catch (error) {
+        console.error('Error saving custom categories:', error);
+        alert('Error al guardar las categorías personalizadas');
+        return false;
+      }
+    }
+
+    async function showManageCategoriesModal() {
+      await loadCustomExpenseCategories();
+      const modal = document.createElement('div');
+      modal.id = 'manageCategoriesModal';
+      modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:10002;padding:16px;';
+      modal.innerHTML = `
+        <div style="background:white;padding:20px;border-radius:12px;width:100%;max-width:400px;max-height:80vh;overflow-y:auto;">
+          <h3 style="margin:0 0 16px 0;font-size:16px;">Gestionar Categorías de Gastos</h3>
+
+          <div style="margin-bottom:16px;">
+            <p style="font-size:12px;color:#666;margin:0 0 8px 0;">+ Agregar Nueva Categoría</p>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <input type="text" id="newCategoryName" placeholder="Ej: Cafetería, Aseo" style="flex:1;min-width:120px;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;">
+              <select id="newCategoryType" style="padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;">
+                <option value="business">Negocio</option>
+                <option value="personal">Personal</option>
+              </select>
+              <button onclick="addNewCategory()" style="padding:8px 12px;background:#10b981;color:white;border:none;border-radius:6px;font-size:12px;white-space:nowrap;">✓ Agregar</button>
+            </div>
+          </div>
+
+          <div style="margin-bottom:16px;">
+            <p style="font-size:12px;font-weight:600;color:#3b82f6;margin:0 0 8px 0;">Categorías de Negocio Personalizadas</p>
+            <div id="businessCategoriesList" style="display:flex;flex-direction:column;gap:6px;">
+              ${customExpenseCategories.business.length === 0 ?
+                '<p style="color:#9ca3af;font-style:italic;font-size:12px;margin:0;">No hay categorías personalizadas</p>' :
+                customExpenseCategories.business.map((cat, index) => `
+                  <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:#f3f4f6;border-radius:6px;">
+                    <span style="font-size:13px;">${cat}</span>
+                    <button onclick="deleteCategory('business', ${index})" style="padding:4px 8px;background:#ef4444;color:white;border:none;border-radius:4px;font-size:11px;">Eliminar</button>
+                  </div>
+                `).join('')
+              }
+            </div>
+          </div>
+
+          <div style="margin-bottom:16px;">
+            <p style="font-size:12px;font-weight:600;color:#ec4899;margin:0 0 8px 0;">Categorías Personales Personalizadas</p>
+            <div id="personalCategoriesList" style="display:flex;flex-direction:column;gap:6px;">
+              ${customExpenseCategories.personal.length === 0 ?
+                '<p style="color:#9ca3af;font-style:italic;font-size:12px;margin:0;">No hay categorías personalizadas</p>' :
+                customExpenseCategories.personal.map((cat, index) => `
+                  <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:#fce7f3;border-radius:6px;">
+                    <span style="font-size:13px;">${cat}</span>
+                    <button onclick="deleteCategory('personal', ${index})" style="padding:4px 8px;background:#ef4444;color:white;border:none;border-radius:4px;font-size:11px;">Eliminar</button>
+                  </div>
+                `).join('')
+              }
+            </div>
+          </div>
+
+          <button onclick="closeManageCategoriesModal()" style="width:100%;padding:10px;background:#6b7280;color:white;border:none;border-radius:6px;font-size:13px;">Cerrar</button>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+
+    function closeManageCategoriesModal() {
+      const modal = document.getElementById('manageCategoriesModal');
+      if (modal) modal.remove();
+    }
+
+    async function addNewCategory() {
+      const nameInput = document.getElementById('newCategoryName');
+      const typeSelect = document.getElementById('newCategoryType');
+      const categoryName = nameInput.value.trim();
+      const categoryType = typeSelect.value;
+
+      if (!categoryName) {
+        alert('Por favor ingrese un nombre para la categoría');
+        return;
+      }
+
+      await loadCustomExpenseCategories();
+
+      if (customExpenseCategories[categoryType].includes(categoryName)) {
+        alert('Esta categoría ya existe');
+        return;
+      }
+
+      customExpenseCategories[categoryType].push(categoryName);
+      const saved = await saveCustomExpenseCategories(customExpenseCategories);
+
+      if (saved) {
+        closeManageCategoriesModal();
+        showManageCategoriesModal();
+        alert(`Categoría "${categoryName}" agregada exitosamente`);
+        // Update category dropdown if expense form is open
+        if (document.getElementById('new-exp-type')) {
+          updateExpenseCategories();
+        }
+      }
+    }
+
+    async function deleteCategory(type, categoryIndex) {
+      await loadCustomExpenseCategories();
+      const categoryName = customExpenseCategories[type][categoryIndex];
+
+      if (!confirm(`¿Eliminar la categoría "${categoryName}"?`)) {
+        return;
+      }
+
+      customExpenseCategories[type].splice(categoryIndex, 1);
+      const saved = await saveCustomExpenseCategories(customExpenseCategories);
+
+      if (saved) {
+        closeManageCategoriesModal();
+        showManageCategoriesModal();
+        alert(`Categoría "${categoryName}" eliminada`);
+        // Update category dropdown if expense form is open
+        if (document.getElementById('new-exp-type')) {
+          updateExpenseCategories();
+        }
+      }
+    }
+
+    function setFinanzasContext(ctx) {
+      finanzasContext = ctx;
+      renderFinanzas($('module-view-content'));
+    }
+
+    function renderFinanzas(c) {
+      const payments = AppState.data.payments || [];
+      const expenses = AppState.data.expenses || [];
+      const otrosIngresos = AppState.data.otrosIngresos || [];
+      const students = AppState.data.students || [];
+      const thisMonth = new Date().toISOString().slice(0, 7);
+      const today = new Date().toISOString().split('T')[0];
+      const ctx = finanzasContext;
+
+      // Filter expenses by context
+      const businessExpenses = expenses.filter(e => !e.type || e.type === 'business');
+      const personalExpenses = expenses.filter(e => e.type === 'personal');
+      const businessOtros = otrosIngresos.filter(i => !i.type || i.type === 'business');
+      const personalOtros = otrosIngresos.filter(i => i.type === 'personal');
+
+      // Monthly calculations
+      const monthPayments = payments.filter(p => (p.fecha || p.date || '').startsWith(thisMonth));
+      const monthRevenue = monthPayments.reduce((sum, p) => sum + (parseFloat(p.monto || p.amount) || 0), 0);
+
+      const monthBusinessExp = businessExpenses.filter(e => (e.date || '').startsWith(thisMonth)).reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+      const monthPersonalExp = personalExpenses.filter(e => (e.date || '').startsWith(thisMonth)).reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+
+      const monthBusinessOtros = businessOtros.filter(i => (i.fecha || '').startsWith(thisMonth)).reduce((sum, i) => sum + (parseFloat(i.monto) || 0), 0);
+      const monthPersonalOtros = personalOtros.filter(i => (i.fecha || '').startsWith(thisMonth)).reduce((sum, i) => sum + (parseFloat(i.monto) || 0), 0);
+
+      // Today's payments
+      const todayPayments = payments.filter(p => (p.fecha || p.date || '') === today);
+      const todayCash = todayPayments.filter(p => (p.metodo || p.method || '').toLowerCase().includes('efectivo')).reduce((sum, p) => sum + (parseFloat(p.monto || p.amount) || 0), 0);
+      const todayTransfer = todayPayments.filter(p => !(p.metodo || p.method || '').toLowerCase().includes('efectivo')).reduce((sum, p) => sum + (parseFloat(p.monto || p.amount) || 0), 0);
+      const todayTotal = todayCash + todayTransfer;
+
+      // Today's expenses
+      const todayExpenses = expenses.filter(e => (e.date || '') === today);
+      const todayExpTotal = todayExpenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+
+      // MRR calculation (expected monthly revenue from active students)
+      const activeStudents = students.filter(s => s.status === 'active' || !s.status);
+      const mrrExpected = activeStudents.reduce((sum, s) => sum + (parseFloat(s.valorMensual || s.valor || 0)), 0);
+      const collectionRate = mrrExpected > 0 ? ((monthRevenue / mrrExpected) * 100).toFixed(1) : 0;
+
+      // Build tabs based on context
+      const showCierre = ctx !== 'personal';
+      const tabs = [
+        { id: 'dashboard', label: '📊 Dashboard', show: true },
+        { id: 'cierre', label: '📋 Cierre Diario', show: showCierre },
+        { id: 'otros-ingresos', label: '💵 Otros Ingresos', show: true },
+        { id: 'gastos', label: '💸 Gastos', show: true },
+        { id: 'reportes', label: '📈 Reportes', show: true }
+      ];
+
+      c.innerHTML = `
+        <!-- Context Selector -->
+        <div style="display:flex;justify-content:center;gap:6px;margin-bottom:12px;background:#f3f4f6;padding:6px;border-radius:10px;">
+          <button onclick="setFinanzasContext('business')" style="flex:1;padding:10px 8px;border:none;background:${ctx === 'business' ? '#3b82f6' : 'transparent'};color:${ctx === 'business' ? 'white' : '#6b7280'};border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">
+            🏢 Negocio
+          </button>
+          <button onclick="setFinanzasContext('personal')" style="flex:1;padding:10px 8px;border:none;background:${ctx === 'personal' ? '#ec4899' : 'transparent'};color:${ctx === 'personal' ? 'white' : '#6b7280'};border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">
+            🏠 Personal
+          </button>
+          <button onclick="setFinanzasContext('combined')" style="flex:1;padding:10px 8px;border:none;background:${ctx === 'combined' ? '#8b5cf6' : 'transparent'};color:${ctx === 'combined' ? 'white' : '#6b7280'};border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">
+            📊 Combinado
+          </button>
+        </div>
+
+        <!-- Tabs -->
+        <div style="display:flex;gap:4px;overflow-x:auto;margin-bottom:12px;padding-bottom:4px;">
+          ${tabs.filter(t => t.show).map(t => `
+            <button class="tab-btn ${finanzasTab === t.id ? 'active' : ''}" onclick="switchFinanzasTab('${t.id}')" style="white-space:nowrap;font-size:11px;padding:8px 10px;">
+              ${t.label}
+            </button>
+          `).join('')}
+        </div>
+
+        <div id="finanzas-content"></div>`;
+
+      setTimeout(() => renderFinanzasTab(finanzasTab, {
+        ctx, monthRevenue, monthBusinessExp, monthPersonalExp, monthBusinessOtros, monthPersonalOtros,
+        todayCash, todayTransfer, todayTotal, todayPayments, todayExpenses, todayExpTotal,
+        monthPayments, businessExpenses, personalExpenses, businessOtros, personalOtros,
+        expenses, otrosIngresos, payments, mrrExpected, activeStudents, collectionRate
+      }), 50);
+    }
+
+    function switchFinanzasTab(tab) {
+      finanzasTab = tab;
+      renderFinanzas($('module-view-content'));
+    }
+
+    function renderFinanzasTab(tab, data) {
+      const container = document.getElementById('finanzas-content');
+      if (!container) return;
+      const ctx = data.ctx;
+
+      // Calculate context-specific values
+      const monthExpenses = ctx === 'personal' ? data.monthPersonalExp : ctx === 'business' ? data.monthBusinessExp : (data.monthBusinessExp + data.monthPersonalExp);
+      const monthOtros = ctx === 'personal' ? data.monthPersonalOtros : ctx === 'business' ? data.monthBusinessOtros : (data.monthBusinessOtros + data.monthPersonalOtros);
+      const totalIngresos = ctx === 'personal' ? data.monthPersonalOtros : (data.monthRevenue + monthOtros);
+      const utilidadNeta = totalIngresos - monthExpenses;
+      const expensesList = ctx === 'personal' ? data.personalExpenses : ctx === 'business' ? data.businessExpenses : data.expenses;
+      const otrosList = ctx === 'personal' ? data.personalOtros : ctx === 'business' ? data.businessOtros : data.otrosIngresos;
+
+      if (tab === 'dashboard') {
+        if (ctx === 'business') {
+          // BUSINESS DASHBOARD
+          container.innerHTML = `
+            <!-- Today's Summary -->
+            <div style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;padding:14px;border-radius:12px;margin-bottom:14px;">
+              <div style="font-size:12px;opacity:0.9;margin-bottom:6px;">📅 HOY - ${new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
+                <div><div style="font-size:10px;opacity:0.8;">Efectivo</div><div style="font-size:16px;font-weight:700;">$${data.todayCash.toLocaleString()}</div></div>
+                <div><div style="font-size:10px;opacity:0.8;">Transferencia</div><div style="font-size:16px;font-weight:700;">$${data.todayTransfer.toLocaleString()}</div></div>
+                <div><div style="font-size:10px;opacity:0.8;">Total</div><div style="font-size:16px;font-weight:700;">$${data.todayTotal.toLocaleString()}</div></div>
+              </div>
+              <div style="font-size:10px;opacity:0.7;margin-top:6px;">${data.todayPayments.length} pagos hoy</div>
+            </div>
+
+            <!-- Monthly Cards -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
+              <div style="background:white;padding:12px;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+                <div style="font-size:10px;color:#6b7280;">MRR Esperado</div>
+                <div style="font-size:18px;font-weight:700;color:#1f2937;">$${data.mrrExpected.toLocaleString()}</div>
+                <div style="font-size:9px;color:#9ca3af;">${data.activeStudents.length} estudiantes activos</div>
+              </div>
+              <div style="background:white;padding:12px;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+                <div style="font-size:10px;color:#6b7280;">Recaudado Este Mes</div>
+                <div style="font-size:18px;font-weight:700;color:#1f2937;">$${data.monthRevenue.toLocaleString()}</div>
+                <div style="font-size:9px;color:#9ca3af;">${data.collectionRate}% tasa de cobro</div>
+              </div>
+              <div style="background:white;padding:12px;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+                <div style="font-size:10px;color:#6b7280;">Gastos Este Mes</div>
+                <div style="font-size:18px;font-weight:700;color:#ef4444;">$${data.monthBusinessExp.toLocaleString()}</div>
+                <div style="font-size:9px;color:#9ca3af;">Negocio</div>
+              </div>
+              <div style="background:white;padding:12px;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+                <div style="font-size:10px;color:#6b7280;">Utilidad (EBITDA)</div>
+                <div style="font-size:18px;font-weight:700;color:${utilidadNeta >= 0 ? '#10b981' : '#ef4444'};">$${utilidadNeta.toLocaleString()}</div>
+                <div style="font-size:9px;color:#9ca3af;">${totalIngresos > 0 ? ((utilidadNeta / totalIngresos) * 100).toFixed(1) : 0}% margen</div>
+              </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="detail-card" style="padding:12px;">
+              <h4 style="margin:0 0 10px;font-size:13px;">⚡ Acciones Rápidas</h4>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                <button onclick="switchFinanzasTab('cierre')" style="background:#3b82f6;color:white;border:none;padding:10px;border-radius:8px;font-size:11px;cursor:pointer;">📋 Cierre Diario</button>
+                <button onclick="showAddExpenseForm()" style="background:#ef4444;color:white;border:none;padding:10px;border-radius:8px;font-size:11px;cursor:pointer;">➕ Registrar Gasto</button>
+                <button onclick="switchFinanzasTab('reportes')" style="background:#10b981;color:white;border:none;padding:10px;border-radius:8px;font-size:11px;cursor:pointer;">📊 Ver Reportes</button>
+                <button onclick="switchFinanzasTab('otros-ingresos')" style="background:#8b5cf6;color:white;border:none;padding:10px;border-radius:8px;font-size:11px;cursor:pointer;">💵 Otros Ingresos</button>
+              </div>
+            </div>`;
+
+        } else if (ctx === 'personal') {
+          // PERSONAL DASHBOARD
+          container.innerHTML = `
+            <!-- Personal Cards -->
+            <div style="display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:14px;">
+              <div style="background:white;padding:14px;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+                <div style="font-size:11px;color:#6b7280;">Ingresos Personales</div>
+                <div style="font-size:24px;font-weight:700;color:#1f2937;">$${data.monthPersonalOtros.toLocaleString()}</div>
+                <div style="font-size:10px;color:#9ca3af;">Este mes</div>
+              </div>
+              <div style="background:white;padding:14px;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+                <div style="font-size:11px;color:#6b7280;">Gastos Personales</div>
+                <div style="font-size:24px;font-weight:700;color:#ef4444;">$${data.monthPersonalExp.toLocaleString()}</div>
+                <div style="font-size:10px;color:#9ca3af;">Este mes</div>
+              </div>
+              <div style="background:white;padding:14px;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+                <div style="font-size:11px;color:#6b7280;">Balance Personal</div>
+                <div style="font-size:24px;font-weight:700;color:${(data.monthPersonalOtros - data.monthPersonalExp) >= 0 ? '#10b981' : '#ef4444'};">$${(data.monthPersonalOtros - data.monthPersonalExp).toLocaleString()}</div>
+                <div style="font-size:10px;color:#9ca3af;">${data.monthPersonalOtros > 0 ? (((data.monthPersonalOtros - data.monthPersonalExp) / data.monthPersonalOtros) * 100).toFixed(1) : 0}% margen</div>
+              </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="detail-card" style="padding:12px;">
+              <h4 style="margin:0 0 10px;font-size:13px;">⚡ Acciones Rápidas</h4>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                <button onclick="showAddExpenseForm()" style="background:#ef4444;color:white;border:none;padding:10px;border-radius:8px;font-size:11px;cursor:pointer;">➕ Registrar Gasto</button>
+                <button onclick="showAddOtroIngresoForm()" style="background:#10b981;color:white;border:none;padding:10px;border-radius:8px;font-size:11px;cursor:pointer;">💵 Registrar Ingreso</button>
+                <button onclick="switchFinanzasTab('reportes')" style="background:#8b5cf6;color:white;border:none;padding:10px;border-radius:8px;font-size:11px;cursor:pointer;grid-column:span 2;">📊 Ver Reportes Completos</button>
+              </div>
+            </div>`;
+
+        } else {
+          // COMBINED DASHBOARD
+          const businessBalance = data.monthRevenue + data.monthBusinessOtros - data.monthBusinessExp;
+          const personalBalance = data.monthPersonalOtros - data.monthPersonalExp;
+          container.innerHTML = `
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+              <!-- Business Column -->
+              <div>
+                <div style="font-size:12px;font-weight:600;color:#3b82f6;margin-bottom:8px;">🏢 Negocio</div>
+                <div style="background:white;padding:10px;border-radius:8px;margin-bottom:6px;box-shadow:0 1px 2px rgba(0,0,0,0.1);">
+                  <div style="font-size:9px;color:#6b7280;">Ingresos del Mes</div>
+                  <div style="font-size:16px;font-weight:700;color:#10b981;">$${(data.monthRevenue + data.monthBusinessOtros).toLocaleString()}</div>
+                </div>
+                <div style="background:white;padding:10px;border-radius:8px;margin-bottom:6px;box-shadow:0 1px 2px rgba(0,0,0,0.1);">
+                  <div style="font-size:9px;color:#6b7280;">Gastos del Mes</div>
+                  <div style="font-size:16px;font-weight:700;color:#ef4444;">$${data.monthBusinessExp.toLocaleString()}</div>
+                </div>
+                <div style="background:white;padding:10px;border-radius:8px;box-shadow:0 1px 2px rgba(0,0,0,0.1);">
+                  <div style="font-size:9px;color:#6b7280;">Balance Negocio</div>
+                  <div style="font-size:16px;font-weight:700;color:${businessBalance >= 0 ? '#10b981' : '#ef4444'};">$${businessBalance.toLocaleString()}</div>
+                </div>
+              </div>
+              <!-- Personal Column -->
+              <div>
+                <div style="font-size:12px;font-weight:600;color:#ec4899;margin-bottom:8px;">🏠 Personal</div>
+                <div style="background:white;padding:10px;border-radius:8px;margin-bottom:6px;box-shadow:0 1px 2px rgba(0,0,0,0.1);">
+                  <div style="font-size:9px;color:#6b7280;">Ingresos del Mes</div>
+                  <div style="font-size:16px;font-weight:700;color:#10b981;">$${data.monthPersonalOtros.toLocaleString()}</div>
+                </div>
+                <div style="background:white;padding:10px;border-radius:8px;margin-bottom:6px;box-shadow:0 1px 2px rgba(0,0,0,0.1);">
+                  <div style="font-size:9px;color:#6b7280;">Gastos del Mes</div>
+                  <div style="font-size:16px;font-weight:700;color:#ef4444;">$${data.monthPersonalExp.toLocaleString()}</div>
+                </div>
+                <div style="background:white;padding:10px;border-radius:8px;box-shadow:0 1px 2px rgba(0,0,0,0.1);">
+                  <div style="font-size:9px;color:#6b7280;">Balance Personal</div>
+                  <div style="font-size:16px;font-weight:700;color:${personalBalance >= 0 ? '#10b981' : '#ef4444'};">$${personalBalance.toLocaleString()}</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="detail-card" style="padding:12px;">
+              <h4 style="margin:0 0 10px;font-size:13px;">⚡ Acciones Rápidas</h4>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                <button onclick="switchFinanzasTab('cierre')" style="background:#3b82f6;color:white;border:none;padding:10px;border-radius:8px;font-size:11px;cursor:pointer;">📋 Cierre Diario</button>
+                <button onclick="showAddExpenseForm()" style="background:#ef4444;color:white;border:none;padding:10px;border-radius:8px;font-size:11px;cursor:pointer;">➕ Registrar Gasto</button>
+                <button onclick="switchFinanzasTab('reportes')" style="background:#10b981;color:white;border:none;padding:10px;border-radius:8px;font-size:11px;cursor:pointer;">📊 Ver Reportes</button>
+                <button onclick="switchFinanzasTab('otros-ingresos')" style="background:#8b5cf6;color:white;border:none;padding:10px;border-radius:8px;font-size:11px;cursor:pointer;">💵 Otros Ingresos</button>
+              </div>
+            </div>`;
+        }
+
+      } else if (tab === 'cierre') {
+        // CIERRE DIARIO DE CAJA
+        const today = new Date().toISOString().split('T')[0];
+        const expectedClosing = data.todayCash - data.todayExpTotal;
+        container.innerHTML = `
+          <div class="detail-card" style="margin-bottom:12px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+              <div>
+                <h4 style="margin:0;font-size:14px;">📋 Cierre Diario de Caja</h4>
+                <div style="font-size:11px;color:#6b7280;">${new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</div>
+              </div>
+              <div style="background:#10b981;color:white;padding:8px 12px;border-radius:8px;text-align:center;">
+                <div style="font-size:12px;">🔓</div>
+                <div style="font-size:9px;font-weight:600;">DÍA ABIERTO</div>
+              </div>
+            </div>
+
+            <div style="background:#fef3c7;padding:10px;border-radius:8px;margin-bottom:12px;font-size:10px;color:#92400e;">
+              ⚠️ <strong>EFECTIVO:</strong> Solo pagos en efectivo<br>
+              <strong>TRANSFERENCIAS:</strong> Todo lo demás (Nequi, Bancolombia, etc.)
+            </div>
+
+            <!-- Apertura -->
+            <div style="margin-bottom:12px;">
+              <label style="font-size:11px;font-weight:600;color:#374151;">💵 Apertura de Caja (Efectivo inicial)</label>
+              <input type="number" id="cierre-apertura" placeholder="0" style="width:100%;padding:10px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;margin-top:4px;">
+              <div style="font-size:9px;color:#6b7280;">Dinero en efectivo al inicio del día</div>
+            </div>
+
+            <!-- Efectivo Recibido -->
+            <div style="margin-bottom:12px;background:#f0fdf4;padding:12px;border-radius:8px;">
+              <div style="font-size:11px;font-weight:600;color:#166534;">💰 Efectivo Recibido Hoy (Sistema)</div>
+              <div style="font-size:20px;font-weight:700;color:#166534;">$${data.todayCash.toLocaleString()}</div>
+              <div style="font-size:9px;color:#6b7280;">${data.todayPayments.filter(p => (p.metodo || p.method || '').toLowerCase().includes('efectivo')).length} pagos en efectivo registrados</div>
+            </div>
+
+            <!-- Transferencias -->
+            <div style="margin-bottom:12px;background:#eff6ff;padding:12px;border-radius:8px;">
+              <div style="font-size:11px;font-weight:600;color:#1e40af;">🏦 Transferencias Recibidas Hoy (Sistema)</div>
+              <div style="font-size:20px;font-weight:700;color:#1e40af;">$${data.todayTransfer.toLocaleString()}</div>
+              <div style="font-size:9px;color:#6b7280;">${data.todayPayments.filter(p => !(p.metodo || p.method || '').toLowerCase().includes('efectivo')).length} transferencias registradas</div>
+            </div>
+
+            <!-- Gastos del día -->
+            <div style="margin-bottom:12px;background:#fef2f2;padding:12px;border-radius:8px;">
+              <div style="font-size:11px;font-weight:600;color:#991b1b;">💸 Gastos Registrados Hoy</div>
+              <div style="font-size:20px;font-weight:700;color:#dc2626;">-$${data.todayExpTotal.toLocaleString()}</div>
+              <div style="font-size:9px;color:#6b7280;">${data.todayExpenses.length} gastos registrados</div>
+              <button onclick="showAddExpenseForm()" style="margin-top:8px;background:#ef4444;color:white;border:none;padding:6px 12px;border-radius:6px;font-size:10px;cursor:pointer;">➕ Agregar Gasto</button>
+            </div>
+
+            <!-- Cierre de Caja -->
+            <div style="margin-bottom:12px;">
+              <label style="font-size:11px;font-weight:600;color:#374151;">🧮 Cierre de Caja (Conteo real de efectivo)</label>
+              <input type="number" id="cierre-conteo" placeholder="0" style="width:100%;padding:10px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;margin-top:4px;" oninput="calculateCierreDiff()">
+              <div style="font-size:9px;color:#6b7280;">Cuente el efectivo real en caja al final del día</div>
+            </div>
+
+            <!-- Análisis -->
+            <div style="background:linear-gradient(135deg,#8b5cf6,#7c3aed);padding:14px;border-radius:10px;color:white;margin-bottom:12px;">
+              <div style="font-size:12px;font-weight:600;margin-bottom:8px;">📊 Análisis del Director</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div>
+                  <div style="font-size:10px;opacity:0.9;">Cierre Esperado</div>
+                  <div style="font-size:18px;font-weight:700;" id="cierre-esperado">$0</div>
+                  <div style="font-size:8px;opacity:0.7;">Apertura + Efectivo - Gastos</div>
+                </div>
+                <div>
+                  <div style="font-size:10px;opacity:0.9;">Diferencia</div>
+                  <div style="font-size:18px;font-weight:700;" id="cierre-diferencia">✓ $0</div>
+                  <div style="font-size:8px;opacity:0.7;" id="cierre-status">Cuadra perfecto</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Notas -->
+            <div style="margin-bottom:12px;">
+              <label style="font-size:11px;font-weight:600;color:#374151;">📝 Notas / Observaciones</label>
+              <textarea id="cierre-notas" rows="2" placeholder="Observaciones, incidentes, o explicaciones sobre diferencias..." style="width:100%;padding:10px;border:1px solid #d1d5db;border-radius:8px;font-size:12px;margin-top:4px;resize:none;"></textarea>
+            </div>
+
+            <!-- Buttons -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <button onclick="saveCierreDiario()" style="background:#3b82f6;color:white;border:none;padding:12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">💾 Guardar Cierre</button>
+              <button onclick="cerrarDia()" style="background:#ef4444;color:white;border:none;padding:12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">🔒 Cerrar Día</button>
+            </div>
+          </div>
+
+          <!-- Today's Payments Detail -->
+          <div class="detail-card">
+            <h4 style="margin:0 0 10px;font-size:13px;">📋 Detalle de Pagos de Hoy</h4>
+            ${data.todayPayments.length > 0 ? data.todayPayments.map(p => {
+              const student = AppState.data.students.find(s => s.id === p.studentId);
+              const isEfectivo = (p.metodo || p.method || '').toLowerCase().includes('efectivo');
+              return `<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid #e5e7eb;">
+                <div style="width:30px;height:30px;border-radius:6px;background:${isEfectivo ? '#10b981' : '#3b82f6'};display:flex;align-items:center;justify-content:center;color:white;font-size:12px;margin-right:10px;">${isEfectivo ? '💵' : '🏦'}</div>
+                <div style="flex:1;">
+                  <div style="font-size:12px;font-weight:500;">${student?.nombre || p.studentName || 'Pago'}</div>
+                  <div style="font-size:10px;color:#6b7280;">${p.metodo || p.method || ''}</div>
+                </div>
+                <div style="font-size:13px;font-weight:600;color:${isEfectivo ? '#10b981' : '#3b82f6'};">$${(p.monto || p.amount || 0).toLocaleString()}</div>
+              </div>`;
+            }).join('') : '<p style="color:#9ca3af;text-align:center;padding:16px;font-size:12px;">No hay pagos registrados hoy</p>'}
+          </div>`;
+
+        // Initialize calculation
+        setTimeout(() => calculateCierreDiff(), 100);
+
+      } else if (tab === 'gastos') {
+        const filteredExpenses = expensesList.sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 30);
+        container.innerHTML = `
+          <button onclick="showAddExpenseForm()" style="width:100%;background:#ef4444;color:white;border:none;padding:12px;border-radius:10px;font-size:13px;font-weight:600;margin-bottom:12px;cursor:pointer;">
+            ➕ Registrar Gasto
+          </button>
+
+          <div style="background:linear-gradient(135deg,#ef4444,#dc2626);padding:14px;border-radius:10px;color:white;margin-bottom:12px;">
+            <div style="font-size:11px;opacity:0.9;">Total Gastos del Mes ${ctx === 'personal' ? '(Personal)' : ctx === 'business' ? '(Negocio)' : '(Todo)'}</div>
+            <div style="font-size:26px;font-weight:700;">$${monthExpenses.toLocaleString()}</div>
+          </div>
+
+          <div class="detail-card">
+            <h4 style="margin:0 0 10px;font-size:13px;">📋 Historial de Gastos</h4>
+            ${filteredExpenses.length > 0 ? filteredExpenses.map(e => `
+              <div style="display:flex;align-items:center;padding:10px 0;border-bottom:1px solid #e5e7eb;">
+                <div style="width:36px;height:36px;border-radius:8px;background:${e.type === 'personal' ? '#ec4899' : '#ef4444'};display:flex;align-items:center;justify-content:center;color:white;font-size:14px;margin-right:10px;">
+                  ${e.type === 'personal' ? '🏠' : '🏢'}
+                </div>
+                <div style="flex:1;">
+                  <div style="font-size:12px;font-weight:600;">${e.category || 'Sin categoría'}</div>
+                  <div style="font-size:10px;color:#6b7280;">${e.description || '-'}</div>
+                  <div style="font-size:9px;color:#9ca3af;">${e.date || ''}</div>
+                </div>
+                <div style="text-align:right;">
+                  <div style="font-size:13px;font-weight:700;color:#ef4444;">-$${(e.amount || 0).toLocaleString()}</div>
+                  <button onclick="showEditExpenseForm('${e.id}')" style="background:none;border:none;color:#3b82f6;font-size:11px;cursor:pointer;margin-right:4px;">✏️</button>
+                  ${canEdit() ? `<button onclick="deleteExpenseConfirm('${e.id}')" style="background:none;border:none;color:#ef4444;font-size:11px;cursor:pointer;">🗑️</button>` : ''}
+                </div>
+              </div>
+            `).join('') : '<p style="color:#9ca3af;text-align:center;padding:20px;font-size:12px;">No hay gastos registrados</p>'}
+          </div>`;
+
+      } else if (tab === 'otros-ingresos') {
+        const filteredOtros = otrosList.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '')).slice(0, 30);
+        container.innerHTML = `
+          <button onclick="showAddOtroIngresoForm()" style="width:100%;background:#10b981;color:white;border:none;padding:12px;border-radius:10px;font-size:13px;font-weight:600;margin-bottom:12px;cursor:pointer;">
+            ➕ Registrar Otro Ingreso
+          </button>
+
+          <div style="background:linear-gradient(135deg,#10b981,#059669);padding:14px;border-radius:10px;color:white;margin-bottom:12px;">
+            <div style="font-size:11px;opacity:0.9;">Total Otros Ingresos del Mes ${ctx === 'personal' ? '(Personal)' : ctx === 'business' ? '(Negocio)' : '(Todo)'}</div>
+            <div style="font-size:26px;font-weight:700;">$${monthOtros.toLocaleString()}</div>
+          </div>
+
+          <div class="detail-card">
+            <h4 style="margin:0 0 10px;font-size:13px;">📋 Historial de Otros Ingresos</h4>
+            ${filteredOtros.length > 0 ? filteredOtros.map(i => `
+              <div style="display:flex;align-items:center;padding:10px 0;border-bottom:1px solid #e5e7eb;">
+                <div style="width:36px;height:36px;border-radius:8px;background:${i.type === 'personal' ? '#ec4899' : '#3b82f6'};display:flex;align-items:center;justify-content:center;color:white;font-size:14px;margin-right:10px;">
+                  ${i.type === 'personal' ? '🏠' : '🏢'}
+                </div>
+                <div style="flex:1;">
+                  <div style="font-size:12px;font-weight:600;">${i.concepto || 'Ingreso'}</div>
+                  <div style="font-size:10px;color:#6b7280;">${i.descripcion || '-'}</div>
+                  <div style="font-size:9px;color:#9ca3af;">${i.fecha || ''}</div>
+                </div>
+                <div style="text-align:right;">
+                  <div style="font-size:13px;font-weight:700;color:#10b981;">+$${(i.monto || 0).toLocaleString()}</div>
+                  ${canEdit() ? `<button onclick="deleteOtroIngresoConfirm('${i.id}')" style="background:none;border:none;color:#ef4444;font-size:11px;cursor:pointer;">🗑️</button>` : ''}
+                </div>
+              </div>
+            `).join('') : '<p style="color:#9ca3af;text-align:center;padding:20px;font-size:12px;">No hay otros ingresos registrados</p>'}
+          </div>`;
+
+      } else if (tab === 'reportes') {
+        // REPORTES VIEW
+        const totalIngresosReport = ctx === 'personal' ? data.monthPersonalOtros : (data.monthRevenue + monthOtros);
+        const totalEgresosReport = monthExpenses;
+        const utilidadReport = totalIngresosReport - totalEgresosReport;
+        const margenReport = totalIngresosReport > 0 ? ((utilidadReport / totalIngresosReport) * 100).toFixed(1) : 0;
+
+        container.innerHTML = `
+          <div class="detail-card" style="margin-bottom:12px;">
+            <h4 style="margin:0 0 12px;font-size:14px;">📈 Estado de Resultados (P&L) - ${ctx === 'business' ? '🏢 Negocio' : ctx === 'personal' ? '🏠 Personal' : '📊 Combinado'}</h4>
+
+            <!-- Ingresos -->
+            <div style="margin-bottom:16px;">
+              <div style="font-size:12px;font-weight:600;color:#10b981;border-bottom:2px solid #10b981;padding-bottom:4px;margin-bottom:8px;">INGRESOS</div>
+              ${ctx !== 'personal' ? `
+                <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;">
+                  <span>Matrículas/Mensualidades</span>
+                  <span style="font-weight:600;">$${data.monthRevenue.toLocaleString()}</span>
+                </div>
+              ` : ''}
+              <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;">
+                <span>Otros Ingresos</span>
+                <span style="font-weight:600;">$${monthOtros.toLocaleString()}</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;padding:8px 0;font-size:13px;font-weight:700;border-top:1px solid #e5e7eb;margin-top:4px;">
+                <span>TOTAL INGRESOS</span>
+                <span style="color:#10b981;">$${totalIngresosReport.toLocaleString()}</span>
+              </div>
+            </div>
+
+            <!-- Egresos -->
+            <div style="margin-bottom:16px;">
+              <div style="font-size:12px;font-weight:600;color:#ef4444;border-bottom:2px solid #ef4444;padding-bottom:4px;margin-bottom:8px;">EGRESOS</div>
+              <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;">
+                <span>Gastos Operativos</span>
+                <span style="font-weight:600;">$${totalEgresosReport.toLocaleString()}</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;padding:8px 0;font-size:13px;font-weight:700;border-top:1px solid #e5e7eb;margin-top:4px;">
+                <span>TOTAL EGRESOS</span>
+                <span style="color:#ef4444;">$${totalEgresosReport.toLocaleString()}</span>
+              </div>
+            </div>
+
+            <!-- Utilidad -->
+            <div style="background:${utilidadReport >= 0 ? '#f0fdf4' : '#fef2f2'};padding:12px;border-radius:8px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                  <div style="font-size:11px;color:#6b7280;">UTILIDAD NETA</div>
+                  <div style="font-size:22px;font-weight:700;color:${utilidadReport >= 0 ? '#10b981' : '#ef4444'};">$${utilidadReport.toLocaleString()}</div>
+                </div>
+                <div style="text-align:right;">
+                  <div style="font-size:11px;color:#6b7280;">Margen</div>
+                  <div style="font-size:18px;font-weight:700;color:${utilidadReport >= 0 ? '#10b981' : '#ef4444'};">${margenReport}%</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          ${ctx !== 'personal' ? `
+          <!-- Collection Rate -->
+          <div class="detail-card">
+            <h4 style="margin:0 0 10px;font-size:13px;">📊 Tasa de Cobro</h4>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <div style="font-size:11px;color:#6b7280;">Esperado vs Recaudado</div>
+                <div style="font-size:14px;font-weight:600;">$${data.monthRevenue.toLocaleString()} / $${data.mrrExpected.toLocaleString()}</div>
+              </div>
+              <div style="font-size:24px;font-weight:700;color:${parseFloat(data.collectionRate) >= 80 ? '#10b981' : '#f59e0b'};">${data.collectionRate}%</div>
+            </div>
+            <div style="background:#e5e7eb;height:8px;border-radius:4px;margin-top:8px;overflow:hidden;">
+              <div style="background:${parseFloat(data.collectionRate) >= 80 ? '#10b981' : '#f59e0b'};height:100%;width:${Math.min(parseFloat(data.collectionRate), 100)}%;border-radius:4px;"></div>
+            </div>
+          </div>
+          ` : ''}
+        `;
+      }
+    }
+
+    // Cierre Diario functions
+    function calculateCierreDiff() {
+      const apertura = parseFloat(document.getElementById('cierre-apertura')?.value) || 0;
+      const conteo = parseFloat(document.getElementById('cierre-conteo')?.value) || 0;
+      const payments = AppState.data.payments || [];
+      const expenses = AppState.data.expenses || [];
+      const today = new Date().toISOString().split('T')[0];
+
+      const todayPayments = payments.filter(p => (p.fecha || p.date || '') === today);
+      const todayCash = todayPayments.filter(p => (p.metodo || p.method || '').toLowerCase().includes('efectivo')).reduce((sum, p) => sum + (parseFloat(p.monto || p.amount) || 0), 0);
+      const todayExp = expenses.filter(e => (e.date || '') === today).reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+
+      const esperado = apertura + todayCash - todayExp;
+      const diferencia = conteo - esperado;
+
+      document.getElementById('cierre-esperado').textContent = '$' + esperado.toLocaleString();
+      document.getElementById('cierre-diferencia').textContent = (diferencia === 0 ? '✓ ' : (diferencia > 0 ? '+' : '')) + '$' + Math.abs(diferencia).toLocaleString();
+      document.getElementById('cierre-diferencia').style.color = diferencia === 0 ? 'white' : (diferencia > 0 ? '#fbbf24' : '#fca5a5');
+      document.getElementById('cierre-status').textContent = diferencia === 0 ? 'Cuadra perfecto' : (diferencia > 0 ? 'Sobrante' : 'Faltante');
+    }
+
+    async function saveCierreDiario() {
+      const today = new Date().toISOString().split('T')[0];
+      const apertura = parseFloat(document.getElementById('cierre-apertura')?.value) || 0;
+      const conteo = parseFloat(document.getElementById('cierre-conteo')?.value) || 0;
+      const notas = document.getElementById('cierre-notas')?.value || '';
+
+      showLoading();
+      try {
+        await db.ref('dailyReconciliations/' + today).update({
+          openingBalance: apertura,
+          closingCount: conteo,
+          notes: notas,
+          lastUpdatedBy: AppState.email,
+          lastUpdatedAt: new Date().toISOString()
+        });
+        hideLoading();
+        alert('Cierre guardado correctamente');
+      } catch (e) {
+        hideLoading();
+        alert('Error: ' + e.message);
+      }
+    }
+
+    async function cerrarDia() {
+      if (!confirm('¿Cerrar el día? Una vez cerrado no se podrán hacer más cambios.')) return;
+      const today = new Date().toISOString().split('T')[0];
+
+      showLoading();
+      try {
+        await db.ref('dailyReconciliations/' + today).update({
+          isClosed: true,
+          closedBy: AppState.user.uid,
+          closedByName: AppState.email,
+          closedAt: new Date().toISOString()
+        });
+        hideLoading();
+        alert('Día cerrado correctamente');
+        renderFinanzas($('module-view-content'));
+      } catch (e) {
+        hideLoading();
+        alert('Error: ' + e.message);
+      }
+    }
+
+    // ADD EXPENSE FORM
+    async function showAddExpenseForm() {
+      AppState.navStack.push({ type: 'form', module: 'finanzas', name: 'Nuevo Gasto', icon: '💸' });
+      $('module-view-title').textContent = '💸 Nuevo Gasto';
+      $('edit-btn').style.display = 'none';
+      const today = new Date().toISOString().split('T')[0];
+
+      // Load custom categories first
+      await loadCustomExpenseCategories();
+      const defaultCategories = Object.keys(BusinessExpenseCategories).map(k => `<option value="${k}">${k}</option>`).join('');
+      const customCatsHtml = customExpenseCategories.business.length > 0 ?
+        '<optgroup label="Personalizadas">' + customExpenseCategories.business.map(cat => `<option value="${cat}">${cat}</option>`).join('') + '</optgroup>' : '';
+
+      const c = $('module-view-content');
+      c.innerHTML = `
+        <div class="detail-card edit-form">
+          <div class="form-group"><label>Tipo de Gasto *</label>
+            <select id="new-exp-type" onchange="updateExpenseCategories()">
+              <option value="business">🏢 Negocio</option>
+              <option value="personal">🏠 Personal</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <label>Categoría *</label>
+              <button type="button" onclick="showManageCategoriesModal()" style="background:none;border:none;color:#3b82f6;font-size:11px;cursor:pointer;text-decoration:underline;">Gestionar Categorías</button>
+            </div>
+            <select id="new-exp-category">
+              <optgroup label="Predeterminadas">${defaultCategories}</optgroup>
+              ${customCatsHtml}
+            </select>
+          </div>
+          <div class="form-group"><label>Monto *</label>
+            <input type="number" id="new-exp-amount" placeholder="Ej: 50000" min="0">
+          </div>
+          <div class="form-group"><label>Descripción</label>
+            <input type="text" id="new-exp-description" placeholder="Descripción del gasto">
+          </div>
+          <div class="form-group"><label>Fecha *</label>
+            <input type="date" id="new-exp-date" value="${today}">
+          </div>
+          <button class="btn btn-primary" onclick="saveNewExpense()" style="width:100%;margin-top:16px;background:#ef4444;">Guardar Gasto</button>
+        </div>`;
+    }
+
+    async function updateExpenseCategories() {
+      const type = $('new-exp-type').value;
+      await loadCustomExpenseCategories();
+      const categories = type === 'personal' ? PersonalExpenseCategories : BusinessExpenseCategories;
+      const defaultOpts = Object.keys(categories).map(k => `<option value="${k}">${k}</option>`).join('');
+      const customCats = type === 'personal' ? customExpenseCategories.personal : customExpenseCategories.business;
+      const customOpts = customCats.length > 0 ?
+        '<optgroup label="Personalizadas">' + customCats.map(cat => `<option value="${cat}">${cat}</option>`).join('') + '</optgroup>' : '';
+      $('new-exp-category').innerHTML = `<optgroup label="Predeterminadas">${defaultOpts}</optgroup>${customOpts}`;
+    }
+
+    async function saveNewExpense() {
+      const type = $('new-exp-type').value;
+      const category = $('new-exp-category').value;
+      const amount = parseFloat($('new-exp-amount').value);
+      const description = $('new-exp-description').value.trim();
+      const date = $('new-exp-date').value;
+
+      if (!category || !amount || amount <= 0 || !date) {
+        alert('Completa todos los campos requeridos');
+        return;
+      }
+
+      showLoading();
+      try {
+        const id = 'EXP-' + Date.now();
+        const newExpense = {
+          id,
+          type,
+          category,
+          amount,
+          description,
+          date,
+          registeredBy: AppState.user.uid,
+          registeredByName: AppState.email,
+          createdAt: new Date().toISOString()
+        };
+
+        await db.ref('expenses/' + id).set(newExpense);
+        AppState.data.expenses.push(newExpense);
+
+        hideLoading();
+        alert('Gasto registrado correctamente');
+        goBack();
+      } catch (e) {
+        hideLoading();
+        alert('Error: ' + e.message);
+      }
+    }
+
+    async function deleteExpenseConfirm(id) {
+      if (!canEdit()) {
+        alert('No tienes permisos para eliminar gastos');
+        return;
+      }
+      if (!confirm('¿Eliminar este gasto?')) return;
+
+      showLoading();
+      try {
+        await db.ref('expenses/' + id).remove();
+        AppState.data.expenses = AppState.data.expenses.filter(e => e.id !== id);
+        hideLoading();
+        renderFinanzas($('module-view-content'));
+      } catch (e) {
+        hideLoading();
+        alert('Error: ' + e.message);
+      }
+    }
+
+    // EDIT EXPENSE FORM
+    async function showEditExpenseForm(id) {
+      const expense = AppState.data.expenses.find(e => e.id === id);
+      if (!expense) {
+        alert('Gasto no encontrado');
+        return;
+      }
+
+      AppState.navStack.push({ type: 'form', module: 'finanzas', name: 'Editar Gasto', icon: '✏️' });
+      $('module-view-title').textContent = '✏️ Editar Gasto';
+      $('edit-btn').style.display = 'none';
+
+      await loadCustomExpenseCategories();
+      const expenseType = expense.type || 'business';
+      const defaultCategories = expenseType === 'personal' ? PersonalExpenseCategories : BusinessExpenseCategories;
+      const customCats = expenseType === 'personal' ? customExpenseCategories.personal : customExpenseCategories.business;
+
+      const defaultOpts = Object.keys(defaultCategories).map(k =>
+        `<option value="${k}" ${expense.category === k ? 'selected' : ''}>${k}</option>`
+      ).join('');
+      const customOpts = customCats.length > 0 ?
+        '<optgroup label="Personalizadas">' + customCats.map(cat =>
+          `<option value="${cat}" ${expense.category === cat ? 'selected' : ''}>${cat}</option>`
+        ).join('') + '</optgroup>' : '';
+
+      const c = $('module-view-content');
+      c.innerHTML = `
+        <div class="detail-card edit-form">
+          <input type="hidden" id="edit-exp-id" value="${id}">
+          <div class="form-group"><label>Tipo de Gasto *</label>
+            <select id="edit-exp-type" onchange="updateEditExpenseCategories('${id}')">
+              <option value="business" ${expenseType === 'business' ? 'selected' : ''}>🏢 Negocio</option>
+              <option value="personal" ${expenseType === 'personal' ? 'selected' : ''}>🏠 Personal</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <label>Categoría *</label>
+              <button type="button" onclick="showManageCategoriesModal()" style="background:none;border:none;color:#3b82f6;font-size:11px;cursor:pointer;text-decoration:underline;">Gestionar Categorías</button>
+            </div>
+            <select id="edit-exp-category">
+              <optgroup label="Predeterminadas">${defaultOpts}</optgroup>
+              ${customOpts}
+            </select>
+          </div>
+          <div class="form-group"><label>Monto *</label>
+            <input type="number" id="edit-exp-amount" value="${expense.amount || ''}" placeholder="Ej: 50000" min="0">
+          </div>
+          <div class="form-group"><label>Descripción</label>
+            <input type="text" id="edit-exp-description" value="${expense.description || ''}" placeholder="Descripción del gasto">
+          </div>
+          <div class="form-group"><label>Fecha *</label>
+            <input type="date" id="edit-exp-date" value="${expense.date || ''}">
+          </div>
+          <button class="btn btn-primary" onclick="updateExpense('${id}')" style="width:100%;margin-top:16px;background:#3b82f6;">💾 Guardar Cambios</button>
+        </div>`;
+    }
+
+    async function updateEditExpenseCategories(expenseId) {
+      const type = $('edit-exp-type').value;
+      await loadCustomExpenseCategories();
+      const categories = type === 'personal' ? PersonalExpenseCategories : BusinessExpenseCategories;
+      const defaultOpts = Object.keys(categories).map(k => `<option value="${k}">${k}</option>`).join('');
+      const customCats = type === 'personal' ? customExpenseCategories.personal : customExpenseCategories.business;
+      const customOpts = customCats.length > 0 ?
+        '<optgroup label="Personalizadas">' + customCats.map(cat => `<option value="${cat}">${cat}</option>`).join('') + '</optgroup>' : '';
+      $('edit-exp-category').innerHTML = `<optgroup label="Predeterminadas">${defaultOpts}</optgroup>${customOpts}`;
+    }
+
+    async function updateExpense(id) {
+      const type = $('edit-exp-type').value;
+      const category = $('edit-exp-category').value;
+      const amount = parseFloat($('edit-exp-amount').value);
+      const description = $('edit-exp-description').value.trim();
+      const date = $('edit-exp-date').value;
+
+      if (!category || !amount || amount <= 0 || !date) {
+        alert('Completa todos los campos requeridos');
+        return;
+      }
+
+      showLoading();
+      try {
+        const updates = {
+          type,
+          category,
+          amount,
+          description,
+          date,
+          updatedAt: new Date().toISOString(),
+          updatedBy: AppState.user.uid,
+          updatedByName: AppState.email
+        };
+
+        await db.ref('expenses/' + id).update(updates);
+
+        // Update local data
+        const idx = AppState.data.expenses.findIndex(e => e.id === id);
+        if (idx !== -1) {
+          AppState.data.expenses[idx] = { ...AppState.data.expenses[idx], ...updates };
+        }
+
+        hideLoading();
+        alert('Gasto actualizado correctamente');
+        goBack();
+      } catch (e) {
+        hideLoading();
+        alert('Error: ' + e.message);
+      }
+    }
+
+    // ADD OTRO INGRESO FORM
+    function showAddOtroIngresoForm() {
+      AppState.navStack.push({ type: 'form', module: 'finanzas', name: 'Nuevo Ingreso', icon: '💵' });
+      $('module-view-title').textContent = '💵 Nuevo Ingreso';
+      $('edit-btn').style.display = 'none';
+      const today = new Date().toISOString().split('T')[0];
+      const c = $('module-view-content');
+      c.innerHTML = `
+        <div class="detail-card edit-form">
+          <div class="form-group"><label>Tipo *</label>
+            <select id="new-ing-type">
+              <option value="business">🏢 Negocio</option>
+              <option value="personal">🏠 Personal</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Concepto *</label>
+            <input type="text" id="new-ing-concepto" placeholder="Ej: Venta de libro, Consultoría">
+          </div>
+          <div class="form-group"><label>Monto *</label>
+            <input type="number" id="new-ing-monto" placeholder="Ej: 100000" min="0">
+          </div>
+          <div class="form-group"><label>Descripción</label>
+            <input type="text" id="new-ing-descripcion" placeholder="Descripción adicional">
+          </div>
+          <div class="form-group"><label>Fecha *</label>
+            <input type="date" id="new-ing-fecha" value="${today}">
+          </div>
+          <button class="btn btn-primary" onclick="saveNewOtroIngreso()" style="width:100%;margin-top:16px;background:#10b981;">Guardar Ingreso</button>
+        </div>`;
+    }
+
+    async function saveNewOtroIngreso() {
+      const type = $('new-ing-type').value;
+      const concepto = $('new-ing-concepto').value.trim();
+      const monto = parseFloat($('new-ing-monto').value);
+      const descripcion = $('new-ing-descripcion').value.trim();
+      const fecha = $('new-ing-fecha').value;
+
+      if (!concepto || !monto || monto <= 0 || !fecha) {
+        alert('Completa todos los campos requeridos');
+        return;
+      }
+
+      showLoading();
+      try {
+        const id = 'ING-' + Date.now();
+        const newIngreso = {
+          id,
+          type,
+          concepto,
+          monto,
+          descripcion,
+          fecha,
+          registeredBy: AppState.user.uid,
+          registeredByName: AppState.email,
+          createdAt: new Date().toISOString()
+        };
+
+        await db.ref('otrosIngresos/' + id).set(newIngreso);
+        AppState.data.otrosIngresos.push(newIngreso);
+
+        hideLoading();
+        alert('Ingreso registrado correctamente');
+        goBack();
+      } catch (e) {
+        hideLoading();
+        alert('Error: ' + e.message);
+      }
+    }
+
+    async function deleteOtroIngresoConfirm(id) {
+      if (!canEdit()) {
+        alert('No tienes permisos para eliminar ingresos');
+        return;
+      }
+      if (!confirm('¿Eliminar este ingreso?')) return;
+
+      showLoading();
+      try {
+        await db.ref('otrosIngresos/' + id).remove();
+        AppState.data.otrosIngresos = AppState.data.otrosIngresos.filter(i => i.id !== id);
+        hideLoading();
+        renderFinanzas($('module-view-content'));
+      } catch (e) {
+        hideLoading();
+        alert('Error: ' + e.message);
+      }
+    }
+
+    // NOMINA MODULE
+    function renderNomina(c) {
+      const employees = AppState.data.employees;
+      const teachers = AppState.data.teachers;
+      const totalStaff = employees.length + teachers.length;
+
+      c.innerHTML = `
+        <div class="detail-card">
+          <h3 style="margin:0 0 16px;font-size:16px;">💼 Personal</h3>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div style="background:linear-gradient(135deg,#0ea5e9,#0284c7);padding:20px;border-radius:12px;color:white;">
+              <div style="font-size:14px;opacity:0.9;">Empleados</div>
+              <div style="font-size:28px;font-weight:700;">${employees.length}</div>
+            </div>
+            <div style="background:linear-gradient(135deg,#f59e0b,#d97706);padding:20px;border-radius:12px;color:white;">
+              <div style="font-size:14px;opacity:0.9;">Profesores</div>
+              <div style="font-size:28px;font-weight:700;">${teachers.length}</div>
+            </div>
+          </div>
+        </div>
+        <div class="detail-card">
+          <h3 style="margin:0 0 16px;font-size:16px;">👔 Lista de Personal</h3>
+          ${[...employees.map(e => ({...e, tipo: 'Empleado', icon: '👔', color: '#14b8a6'})), ...teachers.map(t => ({...t, tipo: 'Profesor', icon: '👩‍🏫', color: '#f59e0b'}))].map(p => `
+            <div class="list-item">
+              <div class="list-item-avatar" style="background:linear-gradient(135deg,${p.color},${p.color}99);">${p.icon}</div>
+              <div class="list-item-content">
+                <div class="list-item-title">${p.nombre || p.name || 'Sin nombre'}</div>
+                <div class="list-item-subtitle">${p.tipo} · ${p.cargo || p.position || ''}</div>
+              </div>
+            </div>
+          `).join('') || '<p style="color:var(--text-secondary);">No hay personal registrado</p>'}
+        </div>`;
+    }
+
+    // ADD NEW STUDENT FORM
+    function showAddStudentForm() {
+      AppState.navStack.push({ type: 'form', module: 'estudiantes', name: 'Nuevo Estudiante', icon: '➕' });
+      $('module-view-title').textContent = '➕ Nuevo Estudiante';
+      $('edit-btn').style.display = 'none';
+      const c = $('module-view-content');
+      const today = new Date().toISOString().split('T')[0];
+      c.innerHTML = `
+        <div class="detail-card edit-form">
+          <h4 style="margin:0 0 16px;color:#374151;">📋 Información Personal</h4>
+          <div class="form-group"><label>Nombre Completo *</label><input type="text" id="new-stu-nombre" placeholder="Nombre completo"></div>
+          <div class="form-group"><label>Tipo Documento</label>
+            <select id="new-stu-tipoDoc">
+              <option value="C.C">C.C</option>
+              <option value="T.I" selected>T.I</option>
+              <option value="C.E">C.E</option>
+              <option value="PAS">Pasaporte</option>
+              <option value="PPT">PPT</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Número Documento *</label><input type="text" id="new-stu-numDoc" placeholder="Número de documento"></div>
+          <div class="form-group"><label>Edad</label><input type="number" id="new-stu-edad" placeholder="Edad" min="5" max="100"></div>
+          <div class="form-group"><label>Teléfono *</label><input type="tel" id="new-stu-telefono" placeholder="Número de teléfono"></div>
+          <div class="form-group"><label>Correo</label><input type="email" id="new-stu-correo" placeholder="correo@ejemplo.com"></div>
+
+          <h4 style="margin:20px 0 16px;color:#374151;">👨‍👩‍👧 Acudiente</h4>
+          <div class="form-group"><label>Nombre Acudiente</label><input type="text" id="new-stu-acudiente" placeholder="Nombre del acudiente"></div>
+          <div class="form-group"><label>Documento Acudiente</label><input type="text" id="new-stu-docAcudiente" placeholder="Documento del acudiente"></div>
+
+          <h4 style="margin:20px 0 16px;color:#374151;">📚 Información Académica</h4>
+          <div class="form-group"><label>Fecha Inicio *</label><input type="date" id="new-stu-fechaInicio" value="${today}"></div>
+          <div class="form-group"><label>Grupo</label>
+            <select id="new-stu-grupo">
+              <option value="">Sin asignar</option>
+              ${AppState.data.grupos2.map(g => `<option value="${g.id}">${g.nombre || g.id}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group"><label>Modalidad</label>
+            <select id="new-stu-modalidad">
+              <option value="">Seleccionar</option>
+              <option value="Presencial">Presencial</option>
+              <option value="Compañia">Compañía</option>
+              <option value="Escuela">Escuela</option>
+              <option value="Online">Online</option>
+              <option value="Privadas">Privadas</option>
+            </select>
+          </div>
+
+          <h4 style="margin:20px 0 16px;color:#374151;">💰 Información de Pago</h4>
+          <div class="form-group"><label>Tipo Pago</label>
+            <select id="new-stu-tipoPago">
+              <option value="MENSUAL">Mensual</option>
+              <option value="SEMESTRAL">Semestral</option>
+              <option value="POR_HORAS">Por horas</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Valor Mensualidad ($)</label><input type="number" id="new-stu-valor" placeholder="0" min="0"></div>
+          <div class="form-group"><label>Día de Pago</label><input type="number" id="new-stu-diaPago" value="1" min="1" max="31"></div>
+
+          <button class="btn btn-primary" onclick="saveNewStudent()" style="width:100%;margin-top:20px;">Guardar Estudiante</button>
+        </div>`;
+    }
+
+    async function saveNewStudent() {
+      const nombre = $('new-stu-nombre').value.trim();
+      const numDoc = $('new-stu-numDoc').value.trim();
+      const telefono = $('new-stu-telefono').value.trim();
+      const fechaInicio = $('new-stu-fechaInicio').value;
+
+      if (!nombre) { alert('El nombre es obligatorio'); return; }
+      if (!numDoc) { alert('El número de documento es obligatorio'); return; }
+      if (!telefono) { alert('El teléfono es obligatorio'); return; }
+      if (!fechaInicio) { alert('La fecha de inicio es obligatoria'); return; }
+
+      showLoading();
+      try {
+        const studentId = 'STU-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+        const newStudent = {
+          id: studentId,
+          nombre: nombre,
+          tipoDoc: $('new-stu-tipoDoc').value,
+          numDoc: numDoc,
+          edad: $('new-stu-edad').value || '',
+          telefono: telefono,
+          correo: $('new-stu-correo').value.trim(),
+          acudiente: $('new-stu-acudiente').value.trim(),
+          docAcudiente: $('new-stu-docAcudiente').value.trim(),
+          fechaInicio: fechaInicio,
+          grupo: $('new-stu-grupo').value,
+          modalidad: $('new-stu-modalidad').value,
+          tipoPago: $('new-stu-tipoPago').value,
+          valor: parseInt($('new-stu-valor').value) || 0,
+          diaPago: parseInt($('new-stu-diaPago').value) || 1,
+          status: 'active',
+          statusHistory: [],
+          paymentHistory: [],
+          createdAt: new Date().toISOString(),
+          createdBy: AppState.user.uid
+        };
+
+        await db.ref('students/' + studentId).set(newStudent);
+        AppState.data.students.push(newStudent);
+
+        hideLoading();
+        alert('Estudiante creado correctamente');
+        goBack();
+      } catch (e) {
+        hideLoading();
+        alert('Error: ' + e.message);
+      }
+    }
+
+    // ADD NEW PAYMENT FORM
+    function showAddPaymentForm() {
+      AppState.navStack.push({ type: 'form', module: 'pagos', name: 'Nuevo Pago', icon: '➕' });
+      $('module-view-title').textContent = '➕ Nuevo Pago';
+      $('edit-btn').style.display = 'none';
+      const c = $('module-view-content');
+      const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+      const currentMonth = new Date().getMonth();
+      const currentYear = new Date().getFullYear();
+
+      c.innerHTML = `
+        <div class="detail-card edit-form">
+          <div class="form-group"><label>Estudiante *</label>
+            <select id="new-pay-student">
+              <option value="">Seleccionar estudiante...</option>
+              ${AppState.data.students.filter(s => s.status === 'active' || !s.status).map(s => `<option value="${s.id}">${s.nombre || 'Sin nombre'}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group"><label>Monto *</label><input type="number" id="new-pay-monto" placeholder="0"></div>
+          <div class="form-group"><label>Mes</label>
+            <select id="new-pay-mes">
+              ${months.map((m, i) => `<option value="${m}" ${i === currentMonth ? 'selected' : ''}>${m}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group"><label>Año</label>
+            <select id="new-pay-year">
+              <option value="${currentYear - 1}">${currentYear - 1}</option>
+              <option value="${currentYear}" selected>${currentYear}</option>
+              <option value="${currentYear + 1}">${currentYear + 1}</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Método de Pago</label>
+            <select id="new-pay-metodo">
+              <option value="efectivo">Efectivo</option>
+              <option value="transferencia">Transferencia</option>
+              <option value="tarjeta">Tarjeta</option>
+              <option value="nequi">Nequi</option>
+              <option value="daviplata">Daviplata</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Banco (si aplica)</label>
+            <select id="new-pay-banco">
+              <option value="">No aplica</option>
+              <option value="bancolombia">Bancolombia</option>
+              <option value="davivienda">Davivienda</option>
+              <option value="bbva">BBVA</option>
+              <option value="bogota">Banco de Bogotá</option>
+              <option value="otro">Otro</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Notas</label><input type="text" id="new-pay-notas" placeholder="Notas adicionales"></div>
+          <button class="btn btn-primary" onclick="saveNewPayment()" style="width:100%;margin-top:16px;">Registrar Pago</button>
+        </div>`;
+    }
+
+    async function saveNewPayment() {
+      const studentId = $('new-pay-student').value;
+      const monto = $('new-pay-monto').value;
+      if (!studentId) { alert('Selecciona un estudiante'); return; }
+      if (!monto || parseFloat(monto) <= 0) { alert('Ingresa un monto válido'); return; }
+
+      showLoading();
+      try {
+        const student = AppState.data.students.find(s => s.id === studentId);
+        const newPayment = {
+          studentId: studentId,
+          studentName: student?.nombre || '',
+          monto: parseFloat(monto),
+          mes: $('new-pay-mes').value,
+          year: $('new-pay-year').value,
+          metodo: $('new-pay-metodo').value,
+          banco: $('new-pay-metodo').value === 'transferencia' ? $('new-pay-banco').value : '',
+          notas: $('new-pay-notas').value.trim(),
+          fecha: new Date().toISOString().split('T')[0],
+          createdAt: new Date().toISOString(),
+          createdBy: AppState.user.uid
+        };
+
+        const ref = await db.ref('payments').push(newPayment);
+        newPayment.id = ref.key;
+        AppState.data.payments.push(newPayment);
+
+        hideLoading();
+        alert('Pago registrado correctamente');
+        goBack();
+      } catch (e) {
+        hideLoading();
+        alert('Error: ' + e.message);
+      }
+    }
+
+    // ADD NEW CONTACT FORM
+    function showAddContactForm() {
+      AppState.navStack.push({ type: 'form', module: 'contactos', name: 'Nuevo Contacto', icon: '➕' });
+      $('module-view-title').textContent = '➕ Nuevo Contacto';
+      $('edit-btn').style.display = 'none';
+      const c = $('module-view-content');
+      c.innerHTML = `
+        <div class="detail-card edit-form">
+          <div class="form-group"><label>Nombre *</label><input type="text" id="new-con-nombre" placeholder="Nombre completo"></div>
+          <div class="form-group"><label>Teléfono</label><input type="tel" id="new-con-telefono" placeholder="Número de teléfono"></div>
+          <div class="form-group"><label>Email</label><input type="email" id="new-con-email" placeholder="correo@ejemplo.com"></div>
+          <div class="form-group"><label>Fuente</label>
+            <select id="new-con-source">
+              <option value="">Seleccionar...</option>
+              <option value="referido">Referido</option>
+              <option value="redes_sociales">Redes Sociales</option>
+              <option value="google">Google</option>
+              <option value="volante">Volante/Flyer</option>
+              <option value="otro">Otro</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Ubicación</label><input type="text" id="new-con-ubicacion" placeholder="Barrio o zona"></div>
+          <div class="form-group"><label>Estado</label>
+            <select id="new-con-status">
+              <option value="nuevo">Nuevo</option>
+              <option value="contactado">Contactado</option>
+              <option value="interesado">Interesado</option>
+              <option value="no_interesado">No Interesado</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Notas</label><input type="text" id="new-con-notas" placeholder="Notas adicionales"></div>
+          <button class="btn btn-primary" onclick="saveNewContact()" style="width:100%;margin-top:16px;">Guardar Contacto</button>
+        </div>`;
+    }
+
+    async function saveNewContact() {
+      const nombre = $('new-con-nombre').value.trim();
+      if (!nombre) { alert('El nombre es obligatorio'); return; }
+
+      showLoading();
+      try {
+        const newContact = {
+          nombre: nombre,
+          telefono: $('new-con-telefono').value.trim(),
+          email: $('new-con-email').value.trim(),
+          source: $('new-con-source').value,
+          ubicacion: $('new-con-ubicacion').value.trim(),
+          status: $('new-con-status').value,
+          notas: $('new-con-notas').value.trim(),
+          createdAt: new Date().toISOString(),
+          createdBy: AppState.user.uid
+        };
+
+        const ref = await db.ref('contacts').push(newContact);
+        newContact.id = ref.key;
+        AppState.data.contacts.push(newContact);
+
+        hideLoading();
+        alert('Contacto creado correctamente');
+        goBack();
+      } catch (e) {
+        hideLoading();
+        alert('Error: ' + e.message);
+      }
+    }
+
+    // ATTENDANCE MODULE
+    function renderAttendance(c) {
+      const grupos = AppState.data.grupos2;
+      c.innerHTML = `<div class="card"><div class="card-header"><div class="card-icon">📋</div><div><h3 class="card-title">Tomar Asistencia</h3><p class="card-subtitle">Selecciona un grupo</p></div></div></div>
+        <div class="list">${grupos.map(g => {
+          const count = AppState.data.students.filter(s => String(s.grupo) === String(g.id) && (s.status === 'active' || !s.status)).length;
+          return `<div class="list-item" onclick="openAtt('${g.id}','${(g.nombre || 'Grupo').replace(/'/g, '')}')">
+            <div class="list-item-avatar" style="background:linear-gradient(135deg,#ef4444,#dc2626);">${g.nombre?.[0] || 'G'}</div>
+            <div class="list-item-content">
+              <div class="list-item-title">${g.nombre || 'Grupo ' + g.id}</div>
+              <div class="list-item-subtitle">${count} estudiantes activos</div>
+            </div>
+            <span class="list-item-arrow">›</span>
+          </div>`;
+        }).join('')}</div>`;
+    }
+
+    function openAtt(gid, gname) {
+      const stu = AppState.data.students.filter(s => String(s.grupo) === String(gid) && (s.status === 'active' || !s.status));
+      AppState.navStack.push({ type: 'attendance', module: 'asistencia', id: gid, name: gname, icon: '📋' });
+      $('module-view-title').textContent = '📋 ' + gname;
+      const c = $('module-view-content');
+      c.innerHTML = `<div class="card"><div class="card-header"><div class="card-icon">📅</div><div><h3 class="card-title">${gname}</h3><p class="card-subtitle">${new Date().toLocaleDateString('es-ES')} · ${stu.length} estudiantes</p></div></div></div>
+        ${stu.map(s => `<div class="attendance-item" data-student="${s.id}"><div class="list-item-avatar">${s.nombre?.[0] || '?'}</div><div class="list-item-content"><div class="list-item-title">${s.nombre || 'N/A'}</div></div><div class="attendance-status"><button class="status-btn" onclick="markA('${s.id}','present',this)">✓</button><button class="status-btn" onclick="markA('${s.id}','late',this)">⏰</button><button class="status-btn" onclick="markA('${s.id}','absent',this)">✕</button></div></div>`).join('')}
+        <button class="btn btn-success mt-16" onclick="saveA('${gid}')">Guardar Asistencia</button>`;
+    }
+
+    const attD = {};
+    function markA(sid, st, btn) { attD[sid] = st; btn.closest('.attendance-item').querySelectorAll('.status-btn').forEach(b => b.classList.remove('present', 'late', 'absent')); btn.classList.add(st); }
+
+    async function saveA(gid) {
+      if (!Object.keys(attD).length) { alert('Marca al menos uno'); return; }
+      showLoading();
+      try {
+        const d = new Date().toISOString().split('T')[0];
+        for (const [sid, st] of Object.entries(attD)) await db.ref('attendance/' + gid + '/' + d + '/' + sid).set({ status: st, timestamp: new Date().toISOString(), recordedBy: AppState.user.uid });
+        hideLoading(); alert('Asistencia guardada'); goBack();
+      } catch (e) { hideLoading(); alert('Error: ' + e.message); }
+    }
+
+    // SEARCH
+    function renderSearch() {
+      $('header-title').textContent = 'Buscar';
+      $('main-content').innerHTML = '<div class="search-box"><span>🔍</span><input type="text" id="gsearch" placeholder="Buscar en el CRM..." oninput="gSearch()"></div><div id="sres"></div>';
+    }
+
+    function gSearch() {
+      const q = $('gsearch').value.toLowerCase();
+      if (q.length < 2) { $('sres').innerHTML = ''; return; }
+      const r = [];
+      AppState.data.students.filter(s => s.nombre?.toLowerCase().includes(q)).slice(0, 5).forEach(s => r.push({ t: 'Estudiante', i: '👥', n: s.nombre, s: s.telefono || s.grupo, id: s.id, type: 'student' }));
+      AppState.data.teachers.filter(t => (t.nombre || t.name)?.toLowerCase().includes(q)).slice(0, 5).forEach(t => r.push({ t: 'Profesor', i: '👩‍🏫', n: t.nombre || t.name, s: t.email }));
+      AppState.data.contacts.filter(c => (c.nombre || c.name)?.toLowerCase().includes(q)).slice(0, 5).forEach(c => r.push({ t: 'Contacto', i: '📞', n: c.nombre || c.name, s: c.telefono }));
+      $('sres').innerHTML = r.length ? '<div class="list">' + r.map(x => `<div class="list-item" ${x.type === 'student' ? `onclick="openStudentFromSearch('${x.id}')"` : ''}><div class="list-item-avatar">${x.i}</div><div class="list-item-content"><div class="list-item-title">${x.n}</div><div class="list-item-subtitle">${x.t} · ${x.s || ''}</div></div></div>`).join('') + '</div>' : '<p style="text-align:center;padding:20px;color:var(--text-secondary);">Sin resultados</p>';
+    }
+
+    function openStudentFromSearch(id) {
+      openMod('estudiantes', 'Estudiantes', '👥');
+      setTimeout(() => showStudentDetail(id), 100);
+    }
+
+    // NOTIFICATIONS & PROFILE
+    function renderNotifications() { $('header-title').textContent = 'Alertas'; $('main-content').innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔔</div><h3 class="empty-state-title">Sin alertas</h3><p class="empty-state-text">No hay notificaciones</p></div>'; }
+
+    function renderProfile() {
+      $('header-title').textContent = 'Perfil';
+      const rn = { admin: 'Administrador', director: 'Director', teacher: 'Profesor' };
+      const activeCount = AppState.data.students.filter(s => s.status === 'active' || !s.status).length;
+      $('main-content').innerHTML = `<div class="card" style="text-align:center;padding:32px;"><div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,var(--gradient-start),var(--gradient-end));display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:32px;color:white;">${AppState.email?.[0]?.toUpperCase() || '?'}</div><h2 style="margin:0 0 4px;font-size:20px;">${AppState.email?.split('@')[0] || 'Usuario'}</h2><p style="color:var(--text-secondary);margin:0 0 8px;">${AppState.email}</p><span class="badge badge-success">${rn[AppState.role] || 'Usuario'}</span></div>
+        <div class="card"><h3 style="margin:0 0 12px;font-size:16px;">📊 Estadísticas</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;"><div style="background:var(--gray-50);padding:12px;border-radius:8px;text-align:center;"><div style="font-size:24px;font-weight:700;color:var(--primary);">${AppState.data.students.length}</div><div style="font-size:12px;color:var(--text-secondary);">Total Estudiantes</div></div><div style="background:var(--gray-50);padding:12px;border-radius:8px;text-align:center;"><div style="font-size:24px;font-weight:700;color:#10b981;">${activeCount}</div><div style="font-size:12px;color:var(--text-secondary);">Activos</div></div></div></div>
+        <button class="btn btn-secondary mt-16" onclick="loadAllData()">🔄 Actualizar Datos</button>
+        <button class="btn btn-danger mt-16" onclick="logout()">Cerrar Sesión</button>
+        <p style="text-align:center;margin-top:24px;color:var(--text-light);font-size:12px;">TutorBox CRM v1.2.0<br>Ciudad Bilingue</p>`;
+    }
+
+    async function logout() { if (confirm('¿Cerrar sesión?')) { showLoading(); await auth.signOut(); } }
+
+    showLoading();
+  </script>
+</body>
+</html>

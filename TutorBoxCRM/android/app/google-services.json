@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "690594486040",
+    "firebase_url": "https://ciudad-bilingue-crm-default-rtdb.firebaseio.com",
+    "project_id": "ciudad-bilingue-crm",
+    "storage_bucket": "ciudad-bilingue-crm.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:690594486040:android:e0fbea3bc5e872b994f06d",
+        "android_client_info": {
+          "package_name": "com.tutorboxcrm"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "690594486040-u1v4l0dmneututkmeoqdmvb929e4s1dt.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDg4sMUIep9RMpmWv5osbOx746vf6lds6k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "690594486040-u1v4l0dmneututkmeoqdmvb929e4s1dt.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
