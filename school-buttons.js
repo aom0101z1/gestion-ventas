@@ -43,7 +43,7 @@ function addSchoolButtons() {
         { name: 'Tienda', icon: '🏪', color: '#ec4899', func: 'Tienda' },
         { name: 'Finanzas', icon: '💵', color: '#6366f1', func: 'Finance' },
         { name: 'Nómina', icon: '💼', color: '#0ea5e9', func: 'Payroll', adminOnly: true },
-        { name: 'Grupos', icon: '📚', color: '#8b5cf6', func: 'Groups' },
+        // { name: 'Grupos', icon: '📚', color: '#8b5cf6', func: 'Groups' }, // Hidden - replaced by Grupos 2.0, but groups.js still loaded for attendance.js dependency
         { name: 'Grupos 2.0', icon: '🎓', color: '#667eea', func: 'Grupos2', directorOnly: true },
         { name: 'Empleados 2.0', icon: '👔', color: '#14b8a6', func: 'Employees', directorOnly: true },
         { name: 'Profesores 2.0', icon: '👩‍🏫', color: '#f59e0b', func: 'Teachers' },
