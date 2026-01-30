@@ -4834,7 +4834,7 @@ window.saveDailyReconciliation = async function(event) {
 
 window.closeDayConfirm = async function(date) {
     // Show cash delivery modal instead of simple confirm
-    showCashDeliveryModal(date);
+    await showCashDeliveryModal(date);
 };
 
 // ==================================================================================
@@ -4845,10 +4845,10 @@ window.closeDayConfirm = async function(date) {
  * Show cash delivery modal when closing the day
  * @param {string} date - The date being closed
  */
-function showCashDeliveryModal(date) {
+async function showCashDeliveryModal(date) {
     // Calculate cash to deliver
     const reconciliation = window.FinanceManager.dailyReconciliations?.get(date) || {};
-    const dailyRevenue = window.FinanceManager.getDailyRevenue(date) || { cash: 0, transfer: 0 };
+    const dailyRevenue = await window.FinanceManager.calculateDailyRevenue(date) || { cash: 0, transfers: 0 };
     const openingBalance = parseFloat(reconciliation.openingBalance) || 0;
     const closingCount = parseFloat(reconciliation.closingCount) || 0;
     const todayExpenses = window.FinanceManager.getExpenses({ startDate: date, endDate: date });
