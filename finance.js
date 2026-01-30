@@ -1651,10 +1651,28 @@ window.loadFinanceTab = async function(activeTab = 'dashboard') {
                             📈 Reportes Avanzados
                         </button>
                     ` : ''}
+                    ${userEmail === 'admin@ciudadbilingue.com' ? `
+                        <button onclick="loadFinanceTab('entregas')" class="finance-tab ${activeTab === 'entregas' ? 'active' : ''}" id="entregasTabBtn" style="padding: 0.75rem 1.5rem; border: none; background: ${activeTab === 'entregas' ? '#f59e0b' : 'transparent'}; color: ${activeTab === 'entregas' ? 'white' : '#6b7280'}; border-radius: 8px 8px 0 0; cursor: pointer; font-weight: 500; white-space: nowrap; position: relative;">
+                            📥 Entregas
+                            <span id="pendingDeliveriesBadge" style="display: none; position: absolute; top: 2px; right: 2px; background: #ef4444; color: white; font-size: 0.7rem; padding: 0.15rem 0.4rem; border-radius: 10px; font-weight: bold;"></span>
+                        </button>
+                    ` : ''}
                 </div>
             </div>
         </div>
     `;
+
+    // Check for pending deliveries and update badge (admin only)
+    if (userEmail === 'admin@ciudadbilingue.com') {
+        setTimeout(async () => {
+            const pending = await loadPendingDeliveries();
+            const badge = document.getElementById('pendingDeliveriesBadge');
+            if (badge && pending.length > 0) {
+                badge.textContent = pending.length;
+                badge.style.display = 'block';
+            }
+        }, 500);
+    }
 
     // Render content based on active tab
     let content = '';
@@ -1680,6 +1698,13 @@ window.loadFinanceTab = async function(activeTab = 'dashboard') {
                 content = await renderExpensesViewEnhanced();
             } else {
                 content = '<div style="padding: 2rem; text-align: center;">❌ No tienes permisos para ver esta sección</div>';
+            }
+            break;
+        case 'entregas':
+            if (userEmail === 'admin@ciudadbilingue.com') {
+                content = await renderCashDeliveriesView();
+            } else {
+                content = '<div style="padding: 2rem; text-align: center;">❌ Solo el administrador puede ver esta sección</div>';
             }
             break;
         case 'reportes':
@@ -4807,19 +4832,651 @@ window.saveDailyReconciliation = async function(event) {
 };
 
 window.closeDayConfirm = async function(date) {
-    if (!confirm('¿Está seguro de cerrar el día? No podrá modificar los datos después de cerrar.')) {
+    // Show cash delivery modal instead of simple confirm
+    showCashDeliveryModal(date);
+};
+
+// ==================================================================================
+// CASH DELIVERY SYSTEM - Entrega de Efectivo con Aprobación
+// ==================================================================================
+
+/**
+ * Show cash delivery modal when closing the day
+ * @param {string} date - The date being closed
+ */
+function showCashDeliveryModal(date) {
+    // Calculate cash to deliver
+    const reconciliation = window.FinanceManager.dailyReconciliations?.get(date) || {};
+    const dailyRevenue = window.FinanceManager.getDailyRevenue(date) || { cash: 0, transfer: 0 };
+    const openingBalance = parseFloat(reconciliation.openingBalance) || 0;
+    const closingCount = parseFloat(reconciliation.closingCount) || 0;
+    const todayExpenses = window.FinanceManager.getExpenses({ startDate: date, endDate: date });
+    const totalExpenses = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+    // Expected cash = Opening + Cash received - Cash expenses
+    const expectedCash = openingBalance + dailyRevenue.cash - totalExpenses;
+    // Suggested delivery = Expected cash - Base for next day (default 100,000)
+    const defaultBase = 100000;
+    const suggestedDelivery = Math.max(0, expectedCash - defaultBase);
+
+    const modal = document.createElement('div');
+    modal.id = 'cashDeliveryModal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10001;
+    `;
+
+    modal.innerHTML = `
+        <div style="background: white; border-radius: 16px; max-width: 500px; width: 95%; overflow: hidden; box-shadow: 0 25px 50px rgba(0,0,0,0.25);">
+            <!-- Header -->
+            <div style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; padding: 1.5rem; text-align: center;">
+                <h2 style="margin: 0; font-size: 1.5rem;">🔒 Cerrar Día</h2>
+                <p style="margin: 0.5rem 0 0 0; opacity: 0.9;">${new Date(date + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+            </div>
+
+            <!-- Content -->
+            <div style="padding: 1.5rem;">
+                <!-- Summary -->
+                <div style="background: #f3f4f6; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; font-size: 0.9rem;">
+                        <div><strong>Apertura:</strong></div>
+                        <div style="text-align: right;">${formatCurrency(openingBalance)}</div>
+                        <div><strong>+ Efectivo recibido:</strong></div>
+                        <div style="text-align: right; color: #10b981;">${formatCurrency(dailyRevenue.cash)}</div>
+                        <div><strong>- Gastos del día:</strong></div>
+                        <div style="text-align: right; color: #ef4444;">${formatCurrency(totalExpenses)}</div>
+                        <div style="border-top: 2px solid #d1d5db; padding-top: 0.5rem;"><strong>= Efectivo esperado:</strong></div>
+                        <div style="border-top: 2px solid #d1d5db; padding-top: 0.5rem; text-align: right; font-weight: bold; font-size: 1.1rem;">${formatCurrency(expectedCash)}</div>
+                    </div>
+                </div>
+
+                <!-- Question -->
+                <div style="text-align: center; margin-bottom: 1.5rem;">
+                    <p style="font-size: 1.1rem; font-weight: 600; margin: 0 0 0.5rem 0;">💰 ¿Hacer entrega de efectivo?</p>
+                    <p style="color: #6b7280; margin: 0; font-size: 0.9rem;">El efectivo será entregado al administrador para su aprobación</p>
+                </div>
+
+                <!-- Buttons -->
+                <div style="display: flex; gap: 1rem;">
+                    <button onclick="closeDayWithoutDelivery('${date}')" style="flex: 1; padding: 1rem; background: #6b7280; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 500;">
+                        ❌ No, solo cerrar
+                    </button>
+                    <button onclick="showDeliveryForm('${date}', ${expectedCash}, ${suggestedDelivery})" style="flex: 1; padding: 1rem; background: #10b981; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 500;">
+                        ✅ Sí, hacer entrega
+                    </button>
+                </div>
+            </div>
+
+            <!-- Cancel -->
+            <div style="padding: 0 1.5rem 1.5rem; text-align: center;">
+                <button onclick="closeCashDeliveryModal()" style="background: none; border: none; color: #6b7280; cursor: pointer; font-size: 0.9rem;">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+}
+
+/**
+ * Close the cash delivery modal
+ */
+window.closeCashDeliveryModal = function() {
+    const modal = document.getElementById('cashDeliveryModal');
+    if (modal) modal.remove();
+};
+
+/**
+ * Close day without making a cash delivery
+ */
+window.closeDayWithoutDelivery = async function(date) {
+    closeCashDeliveryModal();
+
+    if (!confirm('¿Cerrar el día SIN hacer entrega de efectivo?')) {
         return;
     }
 
     try {
         await window.FinanceManager.closeDay(date);
-        window.showNotification('✅ Día cerrado exitosamente', 'success');
+        window.showNotification('✅ Día cerrado exitosamente (sin entrega)', 'success');
         loadDailyReconciliationView();
     } catch (error) {
         console.error('Error closing day:', error);
         window.showNotification('❌ Error al cerrar día: ' + error.message, 'error');
     }
 };
+
+/**
+ * Show the delivery form
+ */
+window.showDeliveryForm = function(date, expectedCash, suggestedDelivery) {
+    const modal = document.getElementById('cashDeliveryModal');
+    if (!modal) return;
+
+    const userEmail = window.FirebaseData?.currentUser?.email || 'Usuario';
+    const userName = userEmail.split('@')[0];
+
+    modal.querySelector('div > div').innerHTML = `
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 1.5rem; text-align: center;">
+            <h2 style="margin: 0; font-size: 1.5rem;">💰 Entrega de Efectivo</h2>
+            <p style="margin: 0.5rem 0 0 0; opacity: 0.9;">${new Date(date + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+        </div>
+
+        <!-- Form -->
+        <div style="padding: 1.5rem;">
+            <form id="cashDeliveryForm" onsubmit="return false;">
+                <!-- Expected vs Delivery -->
+                <div style="background: #f0fdf4; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border: 1px solid #bbf7d0;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                        <span>Efectivo esperado en caja:</span>
+                        <strong>${formatCurrency(expectedCash)}</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; color: #6b7280; font-size: 0.9rem;">
+                        <span>Base sugerida para mañana:</span>
+                        <span>$100,000</span>
+                    </div>
+                </div>
+
+                <!-- Amount to deliver -->
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label style="font-weight: 600; display: block; margin-bottom: 0.5rem;">
+                        💵 Monto a entregar *
+                    </label>
+                    <input type="text" id="deliveryAmount" required
+                           value="${formatCurrency(suggestedDelivery)}"
+                           oninput="formatCurrencyInput(this)"
+                           style="width: 100%; padding: 0.75rem; border: 2px solid #10b981; border-radius: 8px; font-size: 1.25rem; font-weight: bold; text-align: center;">
+                    <small style="color: #6b7280;">Monto sugerido: ${formatCurrency(suggestedDelivery)}</small>
+                </div>
+
+                <!-- Base for tomorrow -->
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label style="font-weight: 600; display: block; margin-bottom: 0.5rem;">
+                        🏦 Base que queda en caja
+                    </label>
+                    <input type="text" id="deliveryBase"
+                           value="${formatCurrency(expectedCash - suggestedDelivery)}"
+                           oninput="formatCurrencyInput(this)"
+                           style="width: 100%; padding: 0.75rem; border: 1px solid #e5e7eb; border-radius: 8px;">
+                </div>
+
+                <!-- Notes -->
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label style="font-weight: 600; display: block; margin-bottom: 0.5rem;">
+                        📝 Notas (opcional)
+                    </label>
+                    <textarea id="deliveryNotes" rows="2"
+                              style="width: 100%; padding: 0.75rem; border: 1px solid #e5e7eb; border-radius: 8px;"
+                              placeholder="Observaciones sobre la entrega..."></textarea>
+                </div>
+
+                <!-- Who is delivering -->
+                <div style="background: #f3f4f6; padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem;">
+                    <strong>Entregado por:</strong> ${userEmail}
+                </div>
+
+                <!-- Submit -->
+                <div style="display: flex; gap: 1rem;">
+                    <button type="button" onclick="closeCashDeliveryModal()" style="flex: 1; padding: 1rem; background: #6b7280; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 500;">
+                        Cancelar
+                    </button>
+                    <button type="button" onclick="submitCashDelivery('${date}')" style="flex: 1; padding: 1rem; background: #10b981; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 500;">
+                        📤 Enviar Entrega
+                    </button>
+                </div>
+            </form>
+        </div>
+    `;
+};
+
+/**
+ * Submit cash delivery for admin approval
+ */
+window.submitCashDelivery = async function(date) {
+    const amountText = document.getElementById('deliveryAmount').value;
+    const baseText = document.getElementById('deliveryBase').value;
+    const notes = document.getElementById('deliveryNotes').value;
+
+    const amount = parseFloat(amountText.replace(/[^\d]/g, '')) || 0;
+    const base = parseFloat(baseText.replace(/[^\d]/g, '')) || 0;
+
+    if (amount <= 0) {
+        window.showNotification('⚠️ Ingresa un monto válido', 'warning');
+        return;
+    }
+
+    try {
+        const userEmail = window.FirebaseData?.currentUser?.email || 'unknown';
+        const userId = window.FirebaseData?.currentUser?.uid || 'unknown';
+
+        const delivery = {
+            date: date,
+            amount: amount,
+            baseRemaining: base,
+            notes: notes,
+            status: 'pending', // pending, approved, rejected
+            createdBy: userId,
+            createdByEmail: userEmail,
+            createdAt: new Date().toISOString(),
+            approvedBy: null,
+            approvedByEmail: null,
+            approvedAt: null,
+            approvalNotes: null
+        };
+
+        // Save to Firebase
+        const db = window.firebaseModules.database;
+        const deliveryRef = db.push(db.ref(window.FirebaseData.database, 'cashDeliveries'));
+        delivery.id = deliveryRef.key;
+        await db.set(deliveryRef, delivery);
+
+        // Close the day
+        await window.FinanceManager.closeDay(date);
+
+        closeCashDeliveryModal();
+        window.showNotification('✅ Entrega registrada y enviada para aprobación', 'success');
+
+        // Show confirmation
+        alert(`📤 Entrega enviada exitosamente!\n\nMonto: ${formatCurrency(amount)}\nBase en caja: ${formatCurrency(base)}\n\nEl administrador recibirá una notificación para aprobar esta entrega.`);
+
+        loadDailyReconciliationView();
+    } catch (error) {
+        console.error('Error submitting cash delivery:', error);
+        window.showNotification('❌ Error al enviar entrega: ' + error.message, 'error');
+    }
+};
+
+/**
+ * Load pending cash deliveries for admin
+ */
+window.loadPendingDeliveries = async function() {
+    const userEmail = window.FirebaseData?.currentUser?.email || '';
+
+    // Only admin can see pending deliveries
+    if (userEmail !== 'admin@ciudadbilingue.com') {
+        return [];
+    }
+
+    try {
+        const db = window.firebaseModules.database;
+        const ref = db.ref(window.FirebaseData.database, 'cashDeliveries');
+        const snapshot = await db.get(ref);
+
+        if (!snapshot.exists()) return [];
+
+        const deliveries = [];
+        snapshot.forEach(child => {
+            const delivery = child.val();
+            delivery.id = child.key;
+            if (delivery.status === 'pending') {
+                deliveries.push(delivery);
+            }
+        });
+
+        return deliveries.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    } catch (error) {
+        console.error('Error loading pending deliveries:', error);
+        return [];
+    }
+};
+
+/**
+ * Show pending deliveries panel for admin
+ */
+window.showPendingDeliveriesPanel = async function() {
+    const deliveries = await loadPendingDeliveries();
+
+    if (deliveries.length === 0) {
+        window.showNotification('✅ No hay entregas pendientes', 'info');
+        return;
+    }
+
+    const modal = document.createElement('div');
+    modal.id = 'pendingDeliveriesModal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10001;
+    `;
+
+    modal.innerHTML = `
+        <div style="background: white; border-radius: 16px; max-width: 600px; width: 95%; max-height: 85vh; overflow: hidden; display: flex; flex-direction: column;">
+            <!-- Header -->
+            <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 1.5rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h2 style="margin: 0;">📥 Entregas Pendientes de Aprobación</h2>
+                    <span style="background: white; color: #f59e0b; padding: 0.25rem 0.75rem; border-radius: 20px; font-weight: bold;">
+                        ${deliveries.length}
+                    </span>
+                </div>
+            </div>
+
+            <!-- List -->
+            <div style="padding: 1.5rem; overflow-y: auto; flex: 1;">
+                ${deliveries.map(d => `
+                    <div style="background: #fffbeb; border: 1px solid #fcd34d; border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
+                            <div>
+                                <div style="font-weight: bold; font-size: 1.25rem; color: #92400e;">
+                                    ${formatCurrency(d.amount)}
+                                </div>
+                                <div style="color: #6b7280; font-size: 0.9rem;">
+                                    📅 ${new Date(d.date + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}
+                                </div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-size: 0.85rem; color: #6b7280;">Base en caja:</div>
+                                <div style="font-weight: 500;">${formatCurrency(d.baseRemaining)}</div>
+                            </div>
+                        </div>
+
+                        <div style="background: white; padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem;">
+                            <strong>Entregado por:</strong> ${d.createdByEmail}<br>
+                            <strong>Fecha/Hora:</strong> ${new Date(d.createdAt).toLocaleString('es-ES')}
+                            ${d.notes ? `<br><strong>Notas:</strong> ${d.notes}` : ''}
+                        </div>
+
+                        <!-- Approval Form -->
+                        <div style="margin-bottom: 0.75rem;">
+                            <input type="text" id="approvalNotes_${d.id}" placeholder="Notas de aprobación (opcional)..."
+                                   style="width: 100%; padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 0.9rem;">
+                        </div>
+
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button onclick="approveDelivery('${d.id}')" style="flex: 1; padding: 0.75rem; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">
+                                ✅ Aprobar
+                            </button>
+                            <button onclick="rejectDelivery('${d.id}')" style="flex: 1; padding: 0.75rem; background: #ef4444; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">
+                                ❌ Rechazar
+                            </button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+
+            <!-- Footer -->
+            <div style="padding: 1rem 1.5rem; background: #f9fafb; border-top: 1px solid #e5e7eb;">
+                <button onclick="closePendingDeliveriesModal()" style="width: 100%; padding: 0.75rem; background: #6b7280; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 500;">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+};
+
+window.closePendingDeliveriesModal = function() {
+    const modal = document.getElementById('pendingDeliveriesModal');
+    if (modal) modal.remove();
+};
+
+/**
+ * Approve a cash delivery
+ */
+window.approveDelivery = async function(deliveryId) {
+    const notes = document.getElementById(`approvalNotes_${deliveryId}`)?.value || '';
+
+    if (!confirm('¿Aprobar esta entrega de efectivo?')) return;
+
+    try {
+        const db = window.firebaseModules.database;
+        const ref = db.ref(window.FirebaseData.database, `cashDeliveries/${deliveryId}`);
+
+        await db.update(ref, {
+            status: 'approved',
+            approvedBy: window.FirebaseData?.currentUser?.uid,
+            approvedByEmail: window.FirebaseData?.currentUser?.email,
+            approvedAt: new Date().toISOString(),
+            approvalNotes: notes
+        });
+
+        window.showNotification('✅ Entrega aprobada', 'success');
+        closePendingDeliveriesModal();
+
+        // Refresh if there are more pending in modal
+        const remaining = await loadPendingDeliveries();
+        if (remaining.length > 0) {
+            showPendingDeliveriesPanel();
+        }
+
+        // Refresh the entregas tab if it's active
+        if (document.getElementById('entregasTabBtn')?.classList.contains('active') ||
+            document.querySelector('[onclick*="entregas"]')?.style.background?.includes('f59e0b')) {
+            loadFinanceTab('entregas');
+        }
+    } catch (error) {
+        console.error('Error approving delivery:', error);
+        window.showNotification('❌ Error al aprobar entrega', 'error');
+    }
+};
+
+/**
+ * Reject a cash delivery
+ */
+window.rejectDelivery = async function(deliveryId) {
+    const notes = document.getElementById(`approvalNotes_${deliveryId}`)?.value || '';
+
+    if (!notes) {
+        window.showNotification('⚠️ Por favor agrega una nota explicando el rechazo', 'warning');
+        document.getElementById(`approvalNotes_${deliveryId}`).focus();
+        return;
+    }
+
+    if (!confirm('¿Rechazar esta entrega de efectivo?')) return;
+
+    try {
+        const db = window.firebaseModules.database;
+        const ref = db.ref(window.FirebaseData.database, `cashDeliveries/${deliveryId}`);
+
+        await db.update(ref, {
+            status: 'rejected',
+            approvedBy: window.FirebaseData?.currentUser?.uid,
+            approvedByEmail: window.FirebaseData?.currentUser?.email,
+            approvedAt: new Date().toISOString(),
+            approvalNotes: notes
+        });
+
+        window.showNotification('❌ Entrega rechazada', 'info');
+        closePendingDeliveriesModal();
+
+        // Refresh if there are more pending in modal
+        const remaining = await loadPendingDeliveries();
+        if (remaining.length > 0) {
+            showPendingDeliveriesPanel();
+        }
+
+        // Refresh the entregas tab if it's active
+        if (document.getElementById('entregasTabBtn')?.classList.contains('active') ||
+            document.querySelector('[onclick*="entregas"]')?.style.background?.includes('f59e0b')) {
+            loadFinanceTab('entregas');
+        }
+    } catch (error) {
+        console.error('Error rejecting delivery:', error);
+        window.showNotification('❌ Error al rechazar entrega', 'error');
+    }
+};
+
+/**
+ * Check for pending deliveries and show notification badge
+ */
+window.checkPendingDeliveries = async function() {
+    const userEmail = window.FirebaseData?.currentUser?.email || '';
+
+    if (userEmail !== 'admin@ciudadbilingue.com') return;
+
+    const deliveries = await loadPendingDeliveries();
+
+    if (deliveries.length > 0) {
+        // Show notification
+        window.showNotification(`📥 Tienes ${deliveries.length} entrega(s) de efectivo pendiente(s) de aprobación`, 'warning');
+    }
+};
+
+/**
+ * Render the cash deliveries view (admin only)
+ */
+async function renderCashDeliveriesView() {
+    // Load all deliveries
+    let allDeliveries = [];
+    try {
+        const db = window.firebaseModules.database;
+        const ref = db.ref(window.FirebaseData.database, 'cashDeliveries');
+        const snapshot = await db.get(ref);
+
+        if (snapshot.exists()) {
+            snapshot.forEach(child => {
+                const delivery = child.val();
+                delivery.id = child.key;
+                allDeliveries.push(delivery);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading deliveries:', error);
+    }
+
+    // Sort by date descending
+    allDeliveries.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    // Separate by status
+    const pending = allDeliveries.filter(d => d.status === 'pending');
+    const approved = allDeliveries.filter(d => d.status === 'approved');
+    const rejected = allDeliveries.filter(d => d.status === 'rejected');
+
+    // Calculate totals
+    const totalApproved = approved.reduce((sum, d) => sum + (d.amount || 0), 0);
+    const totalPending = pending.reduce((sum, d) => sum + (d.amount || 0), 0);
+
+    return `
+        <div style="padding: 1.5rem;">
+            <h2 style="margin: 0 0 1.5rem 0;">📥 Entregas de Efectivo</h2>
+
+            <!-- Stats -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+                <div style="background: #fef3c7; padding: 1.25rem; border-radius: 12px; text-align: center; border: 1px solid #fcd34d;">
+                    <div style="font-size: 2rem; font-weight: bold; color: #92400e;">${pending.length}</div>
+                    <div style="color: #78350f;">Pendientes</div>
+                    <div style="font-size: 0.9rem; color: #92400e; margin-top: 0.25rem;">${formatCurrency(totalPending)}</div>
+                </div>
+                <div style="background: #d1fae5; padding: 1.25rem; border-radius: 12px; text-align: center; border: 1px solid #6ee7b7;">
+                    <div style="font-size: 2rem; font-weight: bold; color: #065f46;">${approved.length}</div>
+                    <div style="color: #047857;">Aprobadas</div>
+                    <div style="font-size: 0.9rem; color: #065f46; margin-top: 0.25rem;">${formatCurrency(totalApproved)}</div>
+                </div>
+                <div style="background: #fee2e2; padding: 1.25rem; border-radius: 12px; text-align: center; border: 1px solid #fca5a5;">
+                    <div style="font-size: 2rem; font-weight: bold; color: #991b1b;">${rejected.length}</div>
+                    <div style="color: #dc2626;">Rechazadas</div>
+                </div>
+            </div>
+
+            <!-- Pending Section -->
+            ${pending.length > 0 ? `
+                <div style="background: #fffbeb; border: 2px solid #f59e0b; border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem;">
+                    <h3 style="margin: 0 0 1rem 0; color: #92400e;">⏳ Entregas Pendientes de Aprobación (${pending.length})</h3>
+                    <div style="display: flex; flex-direction: column; gap: 1rem;">
+                        ${pending.map(d => renderDeliveryCard(d)).join('')}
+                    </div>
+                </div>
+            ` : ''}
+
+            <!-- History -->
+            <div style="background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                <h3 style="margin: 0 0 1rem 0;">📜 Historial de Entregas</h3>
+                ${allDeliveries.length === 0 ? `
+                    <div style="text-align: center; padding: 2rem; color: #6b7280;">
+                        No hay entregas registradas
+                    </div>
+                ` : `
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead style="background: #f3f4f6;">
+                            <tr>
+                                <th style="padding: 0.75rem; text-align: left;">Fecha</th>
+                                <th style="padding: 0.75rem; text-align: left;">Entregado por</th>
+                                <th style="padding: 0.75rem; text-align: right;">Monto</th>
+                                <th style="padding: 0.75rem; text-align: center;">Estado</th>
+                                <th style="padding: 0.75rem; text-align: left;">Aprobado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${allDeliveries.map(d => `
+                                <tr style="border-top: 1px solid #e5e7eb;">
+                                    <td style="padding: 0.75rem;">
+                                        ${new Date(d.date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                                        <br><small style="color: #6b7280;">${new Date(d.createdAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</small>
+                                    </td>
+                                    <td style="padding: 0.75rem; font-size: 0.9rem;">${d.createdByEmail?.split('@')[0] || 'N/A'}</td>
+                                    <td style="padding: 0.75rem; text-align: right; font-weight: 500;">${formatCurrency(d.amount)}</td>
+                                    <td style="padding: 0.75rem; text-align: center;">
+                                        ${d.status === 'pending' ? '<span style="background: #fef3c7; color: #92400e; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.8rem;">⏳ Pendiente</span>' :
+                                          d.status === 'approved' ? '<span style="background: #d1fae5; color: #065f46; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.8rem;">✅ Aprobada</span>' :
+                                          '<span style="background: #fee2e2; color: #991b1b; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.8rem;">❌ Rechazada</span>'}
+                                    </td>
+                                    <td style="padding: 0.75rem; font-size: 0.85rem; color: #6b7280;">
+                                        ${d.approvedAt ? new Date(d.approvedAt).toLocaleDateString('es-ES') : '-'}
+                                        ${d.approvalNotes ? `<br><small title="${d.approvalNotes}">📝 ${d.approvalNotes.substring(0, 20)}${d.approvalNotes.length > 20 ? '...' : ''}</small>` : ''}
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `}
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Render a single delivery card for approval
+ */
+function renderDeliveryCard(d) {
+    return `
+        <div style="background: white; border-radius: 8px; padding: 1rem; border-left: 4px solid #f59e0b;">
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.75rem;">
+                <div>
+                    <div style="font-weight: bold; font-size: 1.25rem; color: #111827;">
+                        ${formatCurrency(d.amount)}
+                    </div>
+                    <div style="color: #6b7280; font-size: 0.9rem;">
+                        📅 ${new Date(d.date + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}
+                        • Base: ${formatCurrency(d.baseRemaining)}
+                    </div>
+                </div>
+                <div style="text-align: right; font-size: 0.85rem; color: #6b7280;">
+                    <div>${d.createdByEmail}</div>
+                    <div>${new Date(d.createdAt).toLocaleString('es-ES')}</div>
+                </div>
+            </div>
+            ${d.notes ? `<div style="background: #f9fafb; padding: 0.5rem; border-radius: 4px; font-size: 0.9rem; margin-bottom: 0.75rem;"><strong>Nota:</strong> ${d.notes}</div>` : ''}
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <input type="text" id="approvalNotes_${d.id}" placeholder="Notas (opcional)..."
+                       style="flex: 1; padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 0.9rem;">
+                <button onclick="approveDelivery('${d.id}')" style="padding: 0.5rem 1rem; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">
+                    ✅ Aprobar
+                </button>
+                <button onclick="rejectDelivery('${d.id}')" style="padding: 0.5rem 1rem; background: #ef4444; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">
+                    ❌ Rechazar
+                </button>
+            </div>
+        </div>
+    `;
+}
 
 /**
  * ADMIN ONLY: Reopen a closed cash register closure for corrections
