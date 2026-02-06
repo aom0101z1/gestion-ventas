@@ -2559,6 +2559,7 @@ function renderPaymentModal(student) {
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                             <label>Seleccionar Meses <span id="monthCounter">(0 seleccionados)</span></label>
                             <select id="monthYearSelector" onchange="changeMonthYearDisplay()" style="padding: 0.25rem 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.875rem;">
+                                <option value="${currentYear - 1}">${currentYear - 1}</option>
                                 <option value="${currentYear}" selected>${currentYear}</option>
                                 <option value="${nextYear}">${nextYear}</option>
                                 <option value="${currentYear + 2}">${currentYear + 2}</option>
