@@ -463,7 +463,34 @@ function renderStudentForm(student = null) {
                     </button>
                 </div>
                 <form id="studentForm" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                    
+
+                    <!-- Photo Section - spans both columns -->
+                    <div class="form-group" style="grid-column: span 2; display: flex; justify-content: center; padding: 1rem; background: #f9fafb; border-radius: 8px; margin-bottom: 0.5rem;">
+                        <div style="text-align: center;">
+                            <div id="studentPhotoPreview" style="width: 120px; height: 120px; border-radius: 50%; background: #e5e7eb; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; overflow: hidden; border: 3px solid #d1d5db;">
+                                ${student?.photoUrl ?
+                                    `<img src="${student.photoUrl}" style="width: 100%; height: 100%; object-fit: cover;">` :
+                                    `<span style="font-size: 3rem; color: #9ca3af;">👤</span>`
+                                }
+                            </div>
+                            <input type="hidden" id="stuPhotoUrl" value="${student?.photoUrl || ''}">
+                            <div style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;">
+                                <button type="button" onclick="captureStudentPhoto()" style="padding: 0.5rem 1rem; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">
+                                    📷 Tomar Foto
+                                </button>
+                                <button type="button" onclick="uploadStudentPhoto()" style="padding: 0.5rem 1rem; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">
+                                    📁 Subir Archivo
+                                </button>
+                                ${student?.photoUrl ? `
+                                <button type="button" onclick="removeStudentPhoto()" style="padding: 0.5rem 1rem; background: #ef4444; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">
+                                    🗑️ Quitar
+                                </button>
+                                ` : ''}
+                            </div>
+                            <input type="file" id="stuPhotoFile" accept="image/*" style="display: none;" onchange="handlePhotoFileSelect(event)">
+                        </div>
+                    </div>
+
                     <div class="form-group">
                         <label>Nombre Completo*</label>
                         <input type="text" id="stuNombre" value="${student?.nombre || ''}" required>
@@ -660,8 +687,15 @@ function renderStudentTable(students) {
                                 ${index + 1}
                             </td>
                             <td style="padding: 0.75rem;">
-                                ${s.nombre || '-'}
-                                ${s.paymentNotes ? ' 📋' : ''}
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <div style="width: 32px; height: 32px; border-radius: 50%; background: #e5e7eb; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; ${s.photoUrl ? 'cursor: pointer;' : ''}" ${s.photoUrl ? `onclick="viewStudentPhotoFull('${s.photoUrl}', '${(s.nombre || '').replace(/'/g, "\\'")}')"` : ''}>
+                                        ${s.photoUrl ?
+                                            `<img src="${s.photoUrl}" style="width: 100%; height: 100%; object-fit: cover;">` :
+                                            `<span style="font-size: 0.9rem; color: #9ca3af;">👤</span>`
+                                        }
+                                    </div>
+                                    <span>${s.nombre || '-'}${s.paymentNotes ? ' 📋' : ''}</span>
+                                </div>
                             </td>
                             <td style="padding: 0.75rem;">${s.tipoDoc || ''} ${s.numDoc || '-'}</td>
                             <td style="padding: 0.75rem;">
@@ -1196,6 +1230,284 @@ window.closeStudentNotesModal = function() {
     if (modal) modal.remove();
 };
 
+// Close student form modal
+window.closeStudentFormModal = function() {
+    const modal = document.getElementById('studentFormModal');
+    if (modal) modal.remove();
+};
+
+// ============================================
+// STUDENT PHOTO FUNCTIONS
+// ============================================
+
+// Capture photo from camera
+window.captureStudentPhoto = function() {
+    // Remove existing camera modal if any
+    const existingModal = document.getElementById('cameraModal');
+    if (existingModal) existingModal.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'cameraModal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10001;
+    `;
+
+    modal.innerHTML = `
+        <div style="background: white; padding: 1.5rem; border-radius: 12px; max-width: 500px; width: 90%; text-align: center;">
+            <h3 style="margin: 0 0 1rem 0; color: #374151;">📷 Tomar Foto del Estudiante</h3>
+
+            <div style="position: relative; margin-bottom: 1rem;">
+                <video id="cameraVideo" autoplay playsinline style="width: 100%; max-width: 400px; border-radius: 8px; background: #000;"></video>
+                <canvas id="cameraCanvas" style="display: none;"></canvas>
+            </div>
+
+            <div id="cameraError" style="display: none; color: #ef4444; padding: 1rem; background: #fef2f2; border-radius: 8px; margin-bottom: 1rem;">
+                ❌ No se pudo acceder a la cámara. Verifica los permisos del navegador.
+            </div>
+
+            <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+                <button type="button" onclick="takePhoto()" id="takePhotoBtn" style="padding: 0.75rem 1.5rem; background: #10b981; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600;">
+                    📸 Capturar
+                </button>
+                <button type="button" onclick="closeCameraModal()" style="padding: 0.75rem 1.5rem; background: #6b7280; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem;">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Start camera
+    startCamera();
+};
+
+// Start camera stream
+async function startCamera() {
+    const video = document.getElementById('cameraVideo');
+    const errorDiv = document.getElementById('cameraError');
+    const takeBtn = document.getElementById('takePhotoBtn');
+
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: 'user',
+                width: { ideal: 640 },
+                height: { ideal: 480 }
+            }
+        });
+        video.srcObject = stream;
+        window.cameraStream = stream;
+    } catch (error) {
+        console.error('Camera error:', error);
+        errorDiv.style.display = 'block';
+        takeBtn.disabled = true;
+        takeBtn.style.opacity = '0.5';
+    }
+}
+
+// Take photo from video
+window.takePhoto = function() {
+    const video = document.getElementById('cameraVideo');
+    const canvas = document.getElementById('cameraCanvas');
+
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    // Convert to base64 with reduced quality for storage
+    const photoData = canvas.toDataURL('image/jpeg', 0.7);
+
+    // Update preview and hidden input
+    updatePhotoPreview(photoData);
+
+    // Close camera modal
+    closeCameraModal();
+
+    window.showNotification('✅ Foto capturada exitosamente', 'success');
+};
+
+// Close camera modal and stop stream
+window.closeCameraModal = function() {
+    if (window.cameraStream) {
+        window.cameraStream.getTracks().forEach(track => track.stop());
+        window.cameraStream = null;
+    }
+    const modal = document.getElementById('cameraModal');
+    if (modal) modal.remove();
+};
+
+// Upload photo from file
+window.uploadStudentPhoto = function() {
+    const fileInput = document.getElementById('stuPhotoFile');
+    if (fileInput) {
+        fileInput.click();
+    }
+};
+
+// Handle file selection
+window.handlePhotoFileSelect = function(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+        window.showNotification('❌ Por favor selecciona una imagen válida', 'error');
+        return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+        window.showNotification('❌ La imagen es muy grande. Máximo 5MB', 'error');
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        // Resize image before storing
+        resizeImage(e.target.result, 400, 400, function(resizedData) {
+            updatePhotoPreview(resizedData);
+            window.showNotification('✅ Foto cargada exitosamente', 'success');
+        });
+    };
+    reader.readAsDataURL(file);
+
+    // Clear the input so the same file can be selected again
+    event.target.value = '';
+};
+
+// Resize image to reduce storage size
+function resizeImage(dataUrl, maxWidth, maxHeight, callback) {
+    const img = new Image();
+    img.onload = function() {
+        let width = img.width;
+        let height = img.height;
+
+        // Calculate new dimensions
+        if (width > height) {
+            if (width > maxWidth) {
+                height = Math.round((height * maxWidth) / width);
+                width = maxWidth;
+            }
+        } else {
+            if (height > maxHeight) {
+                width = Math.round((width * maxHeight) / height);
+                height = maxHeight;
+            }
+        }
+
+        // Create canvas and resize
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Return resized image as base64
+        callback(canvas.toDataURL('image/jpeg', 0.8));
+    };
+    img.src = dataUrl;
+}
+
+// Update photo preview in form
+function updatePhotoPreview(photoData) {
+    const preview = document.getElementById('studentPhotoPreview');
+    const hiddenInput = document.getElementById('stuPhotoUrl');
+
+    if (preview) {
+        preview.innerHTML = `<img src="${photoData}" style="width: 100%; height: 100%; object-fit: cover;">`;
+    }
+    if (hiddenInput) {
+        hiddenInput.value = photoData;
+    }
+
+    // Show remove button if not already visible
+    const photoSection = preview?.closest('.form-group');
+    if (photoSection && !photoSection.querySelector('.remove-photo-btn')) {
+        const buttonsDiv = photoSection.querySelector('div[style*="display: flex"]');
+        if (buttonsDiv) {
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'remove-photo-btn';
+            removeBtn.onclick = removeStudentPhoto;
+            removeBtn.style.cssText = 'padding: 0.5rem 1rem; background: #ef4444; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85rem;';
+            removeBtn.innerHTML = '🗑️ Quitar';
+            buttonsDiv.appendChild(removeBtn);
+        }
+    }
+}
+
+// Remove student photo
+window.removeStudentPhoto = function() {
+    const preview = document.getElementById('studentPhotoPreview');
+    const hiddenInput = document.getElementById('stuPhotoUrl');
+
+    if (preview) {
+        preview.innerHTML = `<span style="font-size: 3rem; color: #9ca3af;">👤</span>`;
+    }
+    if (hiddenInput) {
+        hiddenInput.value = '';
+    }
+
+    // Remove the remove button
+    const removeBtn = document.querySelector('.remove-photo-btn');
+    if (removeBtn) removeBtn.remove();
+
+    window.showNotification('🗑️ Foto eliminada', 'info');
+};
+
+// View student photo in full size
+window.viewStudentPhotoFull = function(photoUrl, studentName) {
+    if (!photoUrl) return;
+
+    const existingModal = document.getElementById('photoFullModal');
+    if (existingModal) existingModal.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'photoFullModal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.9);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10001;
+        cursor: pointer;
+    `;
+    modal.onclick = function() { modal.remove(); };
+
+    modal.innerHTML = `
+        <div style="text-align: center; max-width: 90%; max-height: 90%;">
+            <img src="${photoUrl}" style="max-width: 100%; max-height: 80vh; border-radius: 12px; box-shadow: 0 10px 50px rgba(0,0,0,0.5);">
+            <p style="color: white; margin-top: 1rem; font-size: 1.1rem;">${studentName}</p>
+            <p style="color: #9ca3af; font-size: 0.9rem;">Click en cualquier lugar para cerrar</p>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+};
+
+// Close student payments modal
+window.closeStudentPaymentsModal = function() {
+    const modal = document.getElementById('studentPaymentsModal');
+    if (modal) modal.remove();
+};
+
 // Helper function to format datetime
 function formatDateTime(dateStr) {
     if (!dateStr) return '-';
@@ -1243,7 +1555,8 @@ async function saveStudentForm(studentId) {
             tipoPago: tipoPago,
             valor: tipoPago === 'POR_HORAS' ? 0 : (parseInt(document.getElementById('stuValor').value) || 0),
             valorHora: tipoPago === 'POR_HORAS' ? (parseFloat(document.getElementById('stuValorHora').value) || 0) : 0,
-            diaPago: parseInt(document.getElementById('stuDiaPago').value) || 1
+            diaPago: parseInt(document.getElementById('stuDiaPago').value) || 1,
+            photoUrl: document.getElementById('stuPhotoUrl')?.value || ''
         };
 
         let savedStudent;
@@ -1391,11 +1704,20 @@ window.viewStudentPayments = async function(studentId) {
                 <!-- Header -->
                 <div style="padding: 1.5rem; border-bottom: 2px solid #e5e7eb; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border-radius: 12px 12px 0 0;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <h3 style="margin: 0 0 0.5rem 0; font-size: 1.25rem;">💰 Pagos de ${student.nombre}</h3>
-                            <div style="font-size: 0.9rem; opacity: 0.9;">
-                                Mensualidad: $${(student.valor || 0).toLocaleString('es-CO')} •
-                                Total pagado: $${totalPaid.toLocaleString('es-CO')}
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <!-- Student Photo -->
+                            <div style="width: 60px; height: 60px; border-radius: 50%; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; overflow: hidden; border: 2px solid rgba(255,255,255,0.5); flex-shrink: 0;">
+                                ${student.photoUrl ?
+                                    `<img src="${student.photoUrl}" style="width: 100%; height: 100%; object-fit: cover;" onclick="viewStudentPhotoFull('${student.photoUrl}', '${student.nombre}')" title="Click para ver foto completa">` :
+                                    `<span style="font-size: 1.8rem;">👤</span>`
+                                }
+                            </div>
+                            <div>
+                                <h3 style="margin: 0 0 0.5rem 0; font-size: 1.25rem;">💰 Pagos de ${student.nombre}</h3>
+                                <div style="font-size: 0.9rem; opacity: 0.9;">
+                                    Mensualidad: $${(student.valor || 0).toLocaleString('es-CO')} •
+                                    Total pagado: $${totalPaid.toLocaleString('es-CO')}
+                                </div>
                             </div>
                         </div>
                         <button onclick="closeStudentPaymentsModal()" style="background: rgba(255,255,255,0.2); border: none; color: white; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 1.2rem;">

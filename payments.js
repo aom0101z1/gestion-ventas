@@ -1548,12 +1548,30 @@ const InvoiceGenerator = {
                             style="background: #E53E3E; color: white; padding: 12px 24px; margin: 0 10px; border: none; cursor: pointer; border-radius: 4px; font-size: 14px;">
                         📄 Imprimir 2 Copias (Media Carta)
                     </button>
-                    <button type="button" onclick="event.preventDefault(); event.stopPropagation(); InvoiceGenerator.saveAsPDF('${invoiceData.number}'); return false;" 
+                    <button type="button" onclick="event.preventDefault(); event.stopPropagation(); InvoiceGenerator.saveAsPDF('${invoiceData.number}'); return false;"
                             style="background: #10b981; color: white; padding: 12px 24px; margin: 0 10px; border: none; cursor: pointer; border-radius: 4px; font-size: 14px;">
                         💾 Guardar como PDF
                     </button>
                     ${downloadButton}
                 </div>
+                ${window.FirebaseData?.currentUser?.email === 'admin@ciudadbilingue.com' && invoiceData.status !== 'ANULADA' ? `
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb; text-align: center;">
+                    <span style="color: #6b7280; font-size: 12px; margin-right: 10px;">🔐 Opciones de Administrador:</span>
+                    <button type="button" onclick="event.preventDefault(); event.stopPropagation(); showVoidInvoiceModal('${invoiceData.number}'); return false;"
+                            style="background: #ef4444; color: white; padding: 8px 16px; border: none; cursor: pointer; border-radius: 4px; font-size: 12px;">
+                        🚫 Anular Factura
+                    </button>
+                </div>
+                ` : ''}
+                ${invoiceData.status === 'ANULADA' ? `
+                <div style="margin-top: 15px; padding: 15px; background: #fef2f2; border: 2px solid #ef4444; border-radius: 8px; text-align: center;">
+                    <span style="color: #ef4444; font-weight: bold; font-size: 16px;">🚫 FACTURA ANULADA</span>
+                    <p style="color: #991b1b; margin: 5px 0 0 0; font-size: 12px;">
+                        Anulada el ${invoiceData.voidedAt ? new Date(invoiceData.voidedAt).toLocaleString('es-CO') : 'N/A'}
+                        ${invoiceData.voidReason ? '<br>Razón: ' + invoiceData.voidReason : ''}
+                    </p>
+                </div>
+                ` : ''}
             </div>
         `;
         
@@ -4807,11 +4825,29 @@ window.closeDeletePaymentModal = function() {
 window.executeDeletePayment = async function(paymentId, studentId) {
     try {
         closeDeletePaymentModal();
-        window.showNotification('🗑️ Eliminando pago...', 'info');
+        window.showNotification('🗑️ Eliminando pago y anulando factura...', 'info');
 
+        // Get payment before deleting to void the invoice
+        const payment = window.PaymentManager.payments.get(paymentId);
+
+        // Void the invoice if it exists
+        if (payment && payment.invoiceNumber) {
+            try {
+                await InvoiceGenerator.voidInvoice(
+                    payment.invoiceNumber,
+                    'Pago eliminado por administrador - duplicado o error',
+                    null
+                );
+                console.log('✅ Invoice voided:', payment.invoiceNumber);
+            } catch (invoiceError) {
+                console.warn('⚠️ Could not void invoice:', invoiceError);
+            }
+        }
+
+        // Delete the payment
         await window.PaymentManager.deletePayment(paymentId);
 
-        window.showNotification('✅ Pago eliminado correctamente', 'success');
+        window.showNotification('✅ Pago eliminado y factura anulada correctamente', 'success');
 
         // Refresh the payment history for this student
         const historyRow = document.querySelector(`#history-${studentId}`);
@@ -5147,6 +5183,142 @@ window.voidInvoice = async function(invoiceNumber, reason, replacementInvoice = 
         window.showNotification(`✅ Factura ${invoiceNumber} anulada correctamente`, 'success');
     } catch (error) {
         window.showNotification(`❌ Error: ${error.message}`, 'error');
+    }
+};
+
+// Show void invoice modal (admin only)
+window.showVoidInvoiceModal = function(invoiceNumber) {
+    // Verify admin access
+    if (window.FirebaseData?.currentUser?.email !== 'admin@ciudadbilingue.com') {
+        window.showNotification('❌ Solo el administrador puede anular facturas', 'error');
+        return;
+    }
+
+    // Remove existing modal if any
+    const existingModal = document.getElementById('voidInvoiceModal');
+    if (existingModal) existingModal.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'voidInvoiceModal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 100000;
+    `;
+
+    modal.innerHTML = `
+        <div style="background: white; padding: 24px; border-radius: 12px; max-width: 450px; width: 90%; box-shadow: 0 10px 50px rgba(0,0,0,0.3);">
+            <div style="text-align: center; margin-bottom: 20px;">
+                <div style="font-size: 48px; margin-bottom: 10px;">🚫</div>
+                <h3 style="margin: 0; color: #dc2626; font-size: 20px;">Anular Factura</h3>
+                <p style="color: #6b7280; margin: 8px 0 0 0; font-size: 14px;">
+                    Factura: <strong>${invoiceNumber}</strong>
+                </p>
+            </div>
+
+            <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 12px; margin-bottom: 20px;">
+                <p style="color: #991b1b; margin: 0; font-size: 13px;">
+                    ⚠️ <strong>Advertencia:</strong> Esta acción no se puede deshacer.
+                    La factura quedará marcada como anulada en el sistema.
+                </p>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #374151;">
+                    Razón de anulación: *
+                </label>
+                <select id="voidReasonSelect" onchange="toggleCustomReason()" style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; margin-bottom: 10px;">
+                    <option value="">Seleccionar razón...</option>
+                    <option value="Pago duplicado">Pago duplicado</option>
+                    <option value="Error en monto">Error en monto</option>
+                    <option value="Error en datos del estudiante">Error en datos del estudiante</option>
+                    <option value="Pago rechazado/devuelto">Pago rechazado/devuelto</option>
+                    <option value="Solicitud del cliente">Solicitud del cliente</option>
+                    <option value="custom">Otra razón (especificar)...</option>
+                </select>
+                <textarea id="voidReasonCustom" placeholder="Escriba la razón detallada..."
+                    style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; min-height: 80px; display: none; box-sizing: border-box;"></textarea>
+            </div>
+
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                <button type="button" onclick="document.getElementById('voidInvoiceModal').remove();"
+                    style="padding: 10px 20px; background: #f3f4f6; color: #374151; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">
+                    Cancelar
+                </button>
+                <button type="button" onclick="confirmVoidInvoice('${invoiceNumber}')"
+                    style="padding: 10px 20px; background: #dc2626; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">
+                    🚫 Anular Factura
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+};
+
+// Toggle custom reason textarea
+window.toggleCustomReason = function() {
+    const select = document.getElementById('voidReasonSelect');
+    const customTextarea = document.getElementById('voidReasonCustom');
+    customTextarea.style.display = select.value === 'custom' ? 'block' : 'none';
+    if (select.value === 'custom') {
+        customTextarea.focus();
+    }
+};
+
+// Confirm and execute void invoice
+window.confirmVoidInvoice = async function(invoiceNumber) {
+    const select = document.getElementById('voidReasonSelect');
+    const customTextarea = document.getElementById('voidReasonCustom');
+
+    let reason = select.value;
+    if (reason === 'custom') {
+        reason = customTextarea.value.trim();
+    }
+
+    if (!reason) {
+        window.showNotification('⚠️ Debe especificar una razón para anular la factura', 'warning');
+        return;
+    }
+
+    try {
+        // Close the void modal
+        document.getElementById('voidInvoiceModal')?.remove();
+
+        // Close the invoice modal if open
+        document.getElementById('invoiceModal')?.remove();
+
+        window.showNotification('🔄 Anulando factura...', 'info');
+
+        // Void the invoice
+        await InvoiceGenerator.voidInvoice(invoiceNumber, reason, null);
+
+        // Log audit trail
+        if (typeof window.logAudit === 'function') {
+            await window.logAudit(
+                'Factura anulada',
+                'invoice',
+                invoiceNumber,
+                `Factura ${invoiceNumber} anulada. Razón: ${reason}`,
+                {
+                    before: { status: 'ACTIVA' },
+                    after: { status: 'ANULADA', voidReason: reason }
+                }
+            );
+        }
+
+        window.showNotification(`✅ Factura ${invoiceNumber} anulada correctamente`, 'success');
+
+    } catch (error) {
+        console.error('Error voiding invoice:', error);
+        window.showNotification(`❌ Error al anular factura: ${error.message}`, 'error');
     }
 };
 
