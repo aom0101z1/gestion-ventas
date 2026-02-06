@@ -1253,40 +1253,19 @@ async function saveStudentForm(studentId) {
         } else {
             savedStudent = await window.StudentManager.saveStudent(studentData);
 
-            // If it's a new student and has enrollment fee, register it as a payment
+            // Check if there's a matrícula value entered - just notify user to register it via Payments
+            // NOTE: We no longer auto-create matrícula payments here because:
+            // 1. It was hardcoding payment method as 'Efectivo'
+            // 2. Users should use the Payments module to select correct method (Transferencia/Nequi/etc)
             const matriculaInput = document.getElementById('stuMatricula');
             const matriculaValue = matriculaInput ? parseInt(matriculaInput.value) || 0 : 0;
 
-            if (matriculaValue > 0 && window.PaymentManager) {
-                try {
-                    console.log('💰 Registering enrollment fee:', matriculaValue);
-
-                    const enrollmentPayment = {
-                        id: `PAY-MATRICULA-${Date.now()}`,
-                        studentId: savedStudent.id,
-                        amount: matriculaValue,
-                        method: 'Efectivo', // Default to cash, can be changed later
-                        bank: '',
-                        month: 'matrícula',
-                        year: new Date().getFullYear(),
-                        date: window.getColombiaDateTime ? window.getColombiaDateTime() : new Date().toISOString(),
-                        registeredBy: window.FirebaseData?.currentUser?.uid || 'Sistema',
-                        notes: 'Matrícula - Pago de inscripción'
-                    };
-
-                    // Save to Firebase
-                    const db = window.firebaseModules.database;
-                    const ref = db.ref(window.FirebaseData.database, `payments/${enrollmentPayment.id}`);
-                    await db.set(ref, enrollmentPayment);
-
-                    // Add to PaymentManager cache
-                    window.PaymentManager.payments.set(enrollmentPayment.id, enrollmentPayment);
-
-                    console.log('✅ Enrollment fee registered:', enrollmentPayment.id);
-                } catch (error) {
-                    console.error('❌ Error registering enrollment fee:', error);
-                    window.showNotification('⚠️ Estudiante guardado pero error al registrar matrícula', 'warning');
-                }
+            if (matriculaValue > 0) {
+                console.log('ℹ️ Matrícula value entered:', matriculaValue, '- User should register via Payments module');
+                window.showNotification(
+                    `📝 Estudiante guardado. Recuerda registrar la matrícula ($${matriculaValue.toLocaleString()}) en el módulo de Pagos con el método de pago correcto.`,
+                    'info'
+                );
             }
         }
 

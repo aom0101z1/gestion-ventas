@@ -2535,7 +2535,6 @@ function renderPaymentModal(student) {
                             <select id="paymentType" required onchange="handlePaymentTypeChange()">
                                 <option value="monthly">Mensual</option>
                                 <option value="trimester">Trimestre (3 meses)</option>
-                                <option value="semester">Semestre (6 meses)</option>
                                 <option value="academicSemester">Semestre Académico (Fechas fijas)</option>
                                 <option value="annual">Anual (12 meses)</option>
                                 <option value="twoSemesters">2 Semestres Académicos</option>
@@ -2557,48 +2556,32 @@ function renderPaymentModal(student) {
                     
                     <!-- Month Selection Grid - Hidden for hourly/Privadas students -->
                     <div class="form-group" id="monthSelectionGroup" style="display: ${(student.tipoPago === 'POR_HORAS' || student.modalidad === 'Privadas') ? 'none' : 'block'};">
-                        <label>Seleccionar Meses <span id="monthCounter">(0 seleccionados)</span></label>
-                        <div style="border: 1px solid #ddd; padding: 10px; border-radius: 5px; max-height: 300px; overflow-y: auto;">
-                            <!-- Current Year -->
-                            <div style="margin-bottom: 15px;">
-                                <strong>${currentYear}</strong>
-                                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px;">
-                                    ${allMonths.map((month, idx) => {
-                                        const monthDate = new Date(currentYear, idx, 1);
-                                        const isPast = monthDate < new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-                                        return `
-                                            <label style="display: flex; align-items: center; padding: 5px; background: ${isPast ? '#f3f4f6' : 'white'}; border: 1px solid #e5e7eb; border-radius: 4px; cursor: pointer;">
-                                                <input type="checkbox" 
-                                                       class="month-checkbox" 
-                                                       data-month="${month}" 
-                                                       data-year="${currentYear}"
-                                                       data-month-index="${idx}"
-                                                       onchange="updateMonthSelection()"
-                                                       style="margin-right: 5px;">
-                                                <span style="font-size: 13px; ${isPast ? 'color: #6b7280;' : ''}">${month.charAt(0).toUpperCase() + month.slice(1)}</span>
-                                            </label>
-                                        `;
-                                    }).join('')}
-                                </div>
-                            </div>
-                            
-                            <!-- Next Year -->
-                            <div>
-                                <strong>${nextYear}</strong>
-                                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px;">
-                                    ${allMonths.map((month, idx) => `
-                                        <label style="display: flex; align-items: center; padding: 5px; background: white; border: 1px solid #e5e7eb; border-radius: 4px; cursor: pointer;">
-                                            <input type="checkbox" 
-                                                   class="month-checkbox" 
-                                                   data-month="${month}" 
-                                                   data-year="${nextYear}"
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <label>Seleccionar Meses <span id="monthCounter">(0 seleccionados)</span></label>
+                            <select id="monthYearSelector" onchange="changeMonthYearDisplay()" style="padding: 0.25rem 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.875rem;">
+                                <option value="${currentYear}" selected>${currentYear}</option>
+                                <option value="${nextYear}">${nextYear}</option>
+                                <option value="${currentYear + 2}">${currentYear + 2}</option>
+                            </select>
+                        </div>
+                        <div id="monthGridContainer" style="border: 1px solid #ddd; padding: 10px; border-radius: 5px;">
+                            <div id="monthGrid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
+                                ${allMonths.map((month, idx) => {
+                                    const monthDate = new Date(currentYear, idx, 1);
+                                    const isPast = monthDate < new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+                                    return `
+                                        <label style="display: flex; align-items: center; padding: 8px; background: ${isPast ? '#f3f4f6' : 'white'}; border: 1px solid #e5e7eb; border-radius: 4px; cursor: pointer;">
+                                            <input type="checkbox"
+                                                   class="month-checkbox"
+                                                   data-month="${month}"
+                                                   data-year="${currentYear}"
                                                    data-month-index="${idx}"
                                                    onchange="updateMonthSelection()"
-                                                   style="margin-right: 5px;">
-                                            <span style="font-size: 13px;">${month.charAt(0).toUpperCase() + month.slice(1)}</span>
+                                                   style="margin-right: 6px;">
+                                            <span style="font-size: 12px; ${isPast ? 'color: #6b7280;' : ''}">${month.charAt(0).toUpperCase() + month.slice(1, 3)}</span>
                                         </label>
-                                    `).join('')}
-                                </div>
+                                    `;
+                                }).join('')}
                             </div>
                         </div>
                     </div>
@@ -2714,9 +2697,10 @@ function renderPaymentModal(student) {
                             <option value="">Seleccionar...</option>
                             <option value="Transferencia">Transferencia</option>
                             <option value="Efectivo">Efectivo en la escuela</option>
+                            <option value="Mixto">Mixto (Efectivo + Transferencia)</option>
                         </select>
                     </div>
-                    
+
                     <div class="form-group" id="bankGroup" style="display: none;">
                         <label>Banco/App</label>
                         <select id="payBank">
@@ -2724,6 +2708,36 @@ function renderPaymentModal(student) {
                             <option value="Bancolombia">Bancolombia</option>
                             <option value="Otro">Otro</option>
                         </select>
+                    </div>
+
+                    <!-- Mixed Payment Section -->
+                    <div id="mixedPaymentGroup" style="display: none; background: #fef3c7; border: 2px solid #f59e0b; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+                        <h4 style="margin: 0 0 1rem 0; color: #92400e;">💵💳 Pago Mixto</h4>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                            <div>
+                                <label style="display: block; font-weight: 500; margin-bottom: 0.25rem;">💵 Monto en Efectivo</label>
+                                <input type="number" id="mixedCashAmount" value="0" min="0"
+                                       oninput="updateMixedPaymentTotal()"
+                                       style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
+                            </div>
+                            <div>
+                                <label style="display: block; font-weight: 500; margin-bottom: 0.25rem;">💳 Monto en Transferencia</label>
+                                <input type="number" id="mixedTransferAmount" value="0" min="0"
+                                       oninput="updateMixedPaymentTotal()"
+                                       style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
+                            </div>
+                        </div>
+                        <div style="margin-top: 0.75rem;">
+                            <label style="display: block; font-weight: 500; margin-bottom: 0.25rem;">🏦 Banco (para la parte de transferencia)</label>
+                            <select id="mixedPayBank" style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
+                                <option value="Nequi">Nequi</option>
+                                <option value="Bancolombia">Bancolombia</option>
+                                <option value="Otro">Otro</option>
+                            </select>
+                        </div>
+                        <div id="mixedPaymentSummary" style="margin-top: 1rem; padding: 0.5rem; background: white; border-radius: 6px; text-align: center; font-weight: 600; color: #92400e;">
+                            Total: $0 (Efectivo: $0 + Transferencia: $0)
+                        </div>
                     </div>
                     
                     <div class="form-group">
@@ -3507,7 +3521,77 @@ window.closePaymentModal = function() {
 window.toggleBankOptions = function() {
     const method = document.getElementById('payMethod').value;
     const bankGroup = document.getElementById('bankGroup');
+    const mixedGroup = document.getElementById('mixedPaymentGroup');
+
+    // Show/hide bank group for transfers
     bankGroup.style.display = method === 'Transferencia' ? 'block' : 'none';
+
+    // Show/hide mixed payment section
+    if (mixedGroup) {
+        mixedGroup.style.display = method === 'Mixto' ? 'block' : 'none';
+
+        // If switching to Mixto, initialize with the total amount split
+        if (method === 'Mixto') {
+            const totalAmount = parseFloat(document.getElementById('payAmount')?.value) || 0;
+            if (totalAmount > 0) {
+                // Default: half cash, half transfer
+                const halfAmount = Math.floor(totalAmount / 2);
+                document.getElementById('mixedCashAmount').value = halfAmount;
+                document.getElementById('mixedTransferAmount').value = totalAmount - halfAmount;
+                updateMixedPaymentTotal();
+            }
+        }
+    }
+};
+
+// Update mixed payment total display
+window.updateMixedPaymentTotal = function() {
+    const cashAmount = parseFloat(document.getElementById('mixedCashAmount')?.value) || 0;
+    const transferAmount = parseFloat(document.getElementById('mixedTransferAmount')?.value) || 0;
+    const total = cashAmount + transferAmount;
+
+    const summaryDiv = document.getElementById('mixedPaymentSummary');
+    if (summaryDiv) {
+        summaryDiv.innerHTML = `Total: $${total.toLocaleString()} (Efectivo: $${cashAmount.toLocaleString()} + Transferencia: $${transferAmount.toLocaleString()})`;
+
+        // Update the hidden payAmount field to match mixed total
+        const payAmountField = document.getElementById('payAmount');
+        if (payAmountField) {
+            payAmountField.value = total;
+        }
+    }
+};
+
+// Change month grid display when year dropdown changes
+window.changeMonthYearDisplay = function() {
+    const selectedYear = parseInt(document.getElementById('monthYearSelector')?.value) || new Date().getFullYear();
+    const monthGrid = document.getElementById('monthGrid');
+    if (!monthGrid) return;
+
+    const allMonths = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+                       'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    const currentYear = new Date().getFullYear();
+    const currentMonth = new Date().getMonth();
+
+    // Rebuild month grid for selected year
+    monthGrid.innerHTML = allMonths.map((month, idx) => {
+        const isPast = selectedYear < currentYear || (selectedYear === currentYear && idx < currentMonth);
+        return `
+            <label style="display: flex; align-items: center; padding: 8px; background: ${isPast ? '#f3f4f6' : 'white'}; border: 1px solid #e5e7eb; border-radius: 4px; cursor: pointer;">
+                <input type="checkbox"
+                       class="month-checkbox"
+                       data-month="${month}"
+                       data-year="${selectedYear}"
+                       data-month-index="${idx}"
+                       onchange="updateMonthSelection()"
+                       style="margin-right: 6px;">
+                <span style="font-size: 12px; ${isPast ? 'color: #6b7280;' : ''}">${month.charAt(0).toUpperCase() + month.slice(1, 3)}</span>
+            </label>
+        `;
+    }).join('');
+
+    // Reset month counter
+    updateMonthSelection();
 };
 
 window.sendPaymentReminder = async function(studentId) {
@@ -4313,6 +4397,22 @@ async function processPayment(studentId) {
             });
         }
 
+        // Handle mixed payment data
+        let mixedCashAmount = 0;
+        let mixedTransferAmount = 0;
+        let mixedBank = '';
+        if (paymentMethod === 'Mixto') {
+            mixedCashAmount = parseFloat(document.getElementById('mixedCashAmount')?.value) || 0;
+            mixedTransferAmount = parseFloat(document.getElementById('mixedTransferAmount')?.value) || 0;
+            mixedBank = document.getElementById('mixedPayBank')?.value || 'Nequi';
+
+            // Validate mixed amounts
+            if (mixedCashAmount === 0 && mixedTransferAmount === 0) {
+                window.showNotification('❌ Para pago mixto, ingrese los montos de efectivo y/o transferencia', 'error');
+                return;
+            }
+        }
+
         const paymentData = {
             selectedMonths: selectedMonths,
             totalAmount: totalAmount,
@@ -4329,7 +4429,12 @@ async function processPayment(studentId) {
             matriculaAmount: matriculaAmount,
             certificadoAmount: certificadoAmount,
             otroConcepto: otroConcepto,
-            otroAmount: otroAmount
+            otroAmount: otroAmount,
+            // Mixed payment data
+            isMixedPayment: paymentMethod === 'Mixto',
+            mixedCashAmount: mixedCashAmount,
+            mixedTransferAmount: mixedTransferAmount,
+            mixedBank: mixedBank
         };
 
         // Add hourly payment data if applicable
@@ -4342,8 +4447,76 @@ async function processPayment(studentId) {
         // Record payment(s)
         let result;
         // student already declared at line 3581, no need to redeclare
-        
-        if (selectedMonths.length === 1 && paymentType === 'monthly') {
+
+        // Handle MIXED payments - create TWO separate records
+        if (paymentData.isMixedPayment) {
+            console.log('💵💳 Processing mixed payment...');
+            const mixedGroupId = `MIXED-${Date.now()}`;
+            const payments = [];
+
+            // Record CASH portion if > 0
+            if (paymentData.mixedCashAmount > 0) {
+                const cashPaymentData = {
+                    amount: paymentData.mixedCashAmount,
+                    baseAmount: paymentData.mixedCashAmount,
+                    method: 'Efectivo',
+                    bank: '',
+                    month: selectedMonths[0].month,
+                    year: selectedMonths[0].year,
+                    notes: `[Pago Mixto - Efectivo] ${paymentData.notes}`,
+                    mixedGroupId: mixedGroupId,
+                    lineItems: [], // Line items go on transfer portion
+                    matriculaAmount: 0,
+                    certificadoAmount: 0,
+                    otroConcepto: '',
+                    otroAmount: 0
+                };
+                const cashPayment = await window.PaymentManager.recordPayment(studentId, cashPaymentData);
+                payments.push(cashPayment);
+            }
+
+            // Record TRANSFER portion if > 0
+            if (paymentData.mixedTransferAmount > 0) {
+                const transferPaymentData = {
+                    amount: paymentData.mixedTransferAmount,
+                    baseAmount: paymentData.mixedTransferAmount,
+                    method: 'Transferencia',
+                    bank: paymentData.mixedBank,
+                    month: selectedMonths[0].month,
+                    year: selectedMonths[0].year,
+                    notes: `[Pago Mixto - Transferencia ${paymentData.mixedBank}] ${paymentData.notes}`,
+                    mixedGroupId: mixedGroupId,
+                    // Additional items go with transfer portion
+                    lineItems: paymentData.lineItems,
+                    matriculaAmount: paymentData.matriculaAmount,
+                    certificadoAmount: paymentData.certificadoAmount,
+                    otroConcepto: paymentData.otroConcepto,
+                    otroAmount: paymentData.otroAmount
+                };
+                const transferPayment = await window.PaymentManager.recordPayment(studentId, transferPaymentData);
+                payments.push(transferPayment);
+            }
+
+            // Generate combined invoice for mixed payment
+            const combinedPayment = {
+                ...payments[0],
+                amount: totalAmount,
+                method: 'Mixto',
+                mixedDetails: {
+                    cashAmount: paymentData.mixedCashAmount,
+                    transferAmount: paymentData.mixedTransferAmount,
+                    bank: paymentData.mixedBank
+                },
+                lineItems: paymentData.lineItems,
+                matriculaAmount: paymentData.matriculaAmount,
+                certificadoAmount: paymentData.certificadoAmount,
+                otroConcepto: paymentData.otroConcepto,
+                otroAmount: paymentData.otroAmount
+            };
+            const invoiceData = await InvoiceGenerator.generateInvoice(combinedPayment, student);
+            result = { invoiceData, payments };
+        }
+        else if (selectedMonths.length === 1 && paymentType === 'monthly') {
             // Single month payment (existing logic)
             const singlePaymentData = {
                 amount: totalAmount,
@@ -4366,7 +4539,7 @@ async function processPayment(studentId) {
         } else {
             // Multi-month payment
             result = await window.PaymentManager.recordMultiMonthPayment(studentId, paymentData);
-            
+
             // Generate consolidated invoice for multi-month payment
             const invoiceData = await InvoiceGenerator.generateMultiMonthInvoice(result, student);
             result.invoiceData = invoiceData;

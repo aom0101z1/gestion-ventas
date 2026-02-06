@@ -190,6 +190,7 @@ class FinanceManager {
                 description: expenseData.description,
                 date: expenseData.date || window.getTodayInColombia(),
                 type: expenseData.type || 'business', // 'business' | 'personal'
+                paidFrom: expenseData.paidFrom || 'caja', // 'caja' (cash box) | 'bolsillo' (pocket)
                 receiptUrl: expenseData.receiptUrl || null,
                 registeredBy: window.FirebaseData.currentUser?.uid,
                 registeredByName: window.FirebaseData.currentUser?.email,
@@ -1082,11 +1083,19 @@ async function renderDailyReconciliationView() {
         startDate: today,
         endDate: today
     });
-    const totalExpenses = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
 
-    // Calculate expected closing
+    // Separate expenses by payment source
+    // Only 'caja' expenses affect the cash reconciliation
+    const cajaExpenses = todayExpenses.filter(e => !e.paidFrom || e.paidFrom === 'caja');
+    const bolsilloExpenses = todayExpenses.filter(e => e.paidFrom === 'bolsillo');
+
+    const totalExpensesCaja = cajaExpenses.reduce((sum, e) => sum + e.amount, 0);
+    const totalExpensesBolsillo = bolsilloExpenses.reduce((sum, e) => sum + e.amount, 0);
+    const totalExpenses = totalExpensesCaja + totalExpensesBolsillo; // Total for display
+
+    // Calculate expected closing - ONLY using caja expenses
     const openingBalance = reconciliation?.openingBalance || 0;
-    const expectedClosing = openingBalance + dailyRevenue.cash - totalExpenses;
+    const expectedClosing = openingBalance + dailyRevenue.cash - totalExpensesCaja; // Only caja expenses!
     const actualClosing = reconciliation?.closingCount || 0;
     const discrepancy = actualClosing - expectedClosing;
 
@@ -1094,7 +1103,8 @@ async function renderDailyReconciliationView() {
     console.log('🎨   - openingBalance:', openingBalance, '(formatted:', formatCurrency(openingBalance) + ')');
     console.log('🎨   - actualClosing:', actualClosing, '(formatted:', formatCurrency(actualClosing) + ')');
     console.log('🎨   - dailyRevenue.cash:', dailyRevenue.cash);
-    console.log('🎨   - totalExpenses:', totalExpenses);
+    console.log('🎨   - totalExpensesCaja:', totalExpensesCaja, '(affects cash reconciliation)');
+    console.log('🎨   - totalExpensesBolsillo:', totalExpensesBolsillo, '(out of pocket, does NOT affect cash)');
 
     const isClosed = reconciliation?.isClosed || false;
     const isDirector = true; // TODO: Check actual user role
@@ -1657,7 +1667,13 @@ window.loadFinanceTab = async function(activeTab = 'dashboard') {
                             📥 Entregas
                             <span id="pendingDeliveriesBadge" style="display: none; position: absolute; top: 2px; right: 2px; background: #ef4444; color: white; font-size: 0.7rem; padding: 0.15rem 0.4rem; border-radius: 10px; font-weight: bold;"></span>
                         </button>
-                    ` : ''}
+                    ` : `
+                        <!-- Non-admin: Button to see my deliveries status -->
+                        <button onclick="showMyDeliveriesModal()" class="finance-tab" id="myDeliveriesBtn" style="padding: 0.75rem 1.5rem; border: none; background: transparent; color: #6b7280; border-radius: 8px 8px 0 0; cursor: pointer; font-weight: 500; white-space: nowrap; position: relative;">
+                            📤 Mis Entregas
+                            <span id="myDeliveriesNotificationBadge" style="display: none; position: absolute; top: 2px; right: 2px; background: #10b981; color: white; font-size: 0.7rem; padding: 0.15rem 0.4rem; border-radius: 10px; font-weight: bold;">!</span>
+                        </button>
+                    `}
                 </div>
             </div>
         </div>
@@ -1670,6 +1686,15 @@ window.loadFinanceTab = async function(activeTab = 'dashboard') {
             const badge = document.getElementById('pendingDeliveriesBadge');
             if (badge && pending.length > 0) {
                 badge.textContent = pending.length;
+                badge.style.display = 'block';
+            }
+        }, 500);
+    } else {
+        // Non-admin: Check for delivery status updates
+        setTimeout(async () => {
+            const unseenUpdates = await window.checkMyDeliveryStatus();
+            const badge = document.getElementById('myDeliveriesNotificationBadge');
+            if (badge && unseenUpdates && unseenUpdates.length > 0) {
                 badge.style.display = 'block';
             }
         }, 500);
@@ -1764,9 +1789,12 @@ window.calculateDiscrepancy = async function() {
     const today = window.getTodayInColombia();
     const dailyRevenue = await window.FinanceManager.calculateDailyRevenue(today);
     const todayExpenses = window.FinanceManager.getExpenses({ startDate: today, endDate: today });
-    const totalExpenses = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
 
-    const expectedClosing = openingBalance + dailyRevenue.cash - totalExpenses;
+    // Only count expenses paid from caja for cash reconciliation
+    const cajaExpenses = todayExpenses.filter(e => !e.paidFrom || e.paidFrom === 'caja');
+    const totalExpensesCaja = cajaExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+    const expectedClosing = openingBalance + dailyRevenue.cash - totalExpensesCaja;
     const discrepancy = closingCount - expectedClosing;
 
     const amountEl = document.getElementById('discrepancyAmount');
@@ -4301,7 +4329,13 @@ window.loadHistoricalClosure = async function(date) {
     // Get daily revenue and payments for this date
     const dailyRevenue = await window.FinanceManager.calculateDailyRevenue(date);
     const todayExpenses = window.FinanceManager.getExpenses({ startDate: date, endDate: date });
-    const totalExpenses = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+    // Separate expenses by payment source for display
+    const cajaExpenses = todayExpenses.filter(e => !e.paidFrom || e.paidFrom === 'caja');
+    const bolsilloExpenses = todayExpenses.filter(e => e.paidFrom === 'bolsillo');
+    const totalExpensesCaja = cajaExpenses.reduce((sum, e) => sum + e.amount, 0);
+    const totalExpensesBolsillo = bolsilloExpenses.reduce((sum, e) => sum + e.amount, 0);
+    const totalExpenses = totalExpensesCaja + totalExpensesBolsillo;
 
     // Get students map for payment details
     // IMPORTANT: Ensure students are loaded from Firebase
@@ -4327,10 +4361,10 @@ window.loadHistoricalClosure = async function(date) {
 
     console.log('📚 Students available for name lookup:', students.size);
 
-    // Calculate values
+    // Calculate values - Only caja expenses affect cash reconciliation
     const openingBalance = reconciliation.openingBalance || 0;
     const closingCount = reconciliation.closingCount || 0;
-    const expectedClosing = openingBalance + dailyRevenue.cash - totalExpenses;
+    const expectedClosing = openingBalance + dailyRevenue.cash - totalExpensesCaja; // Only caja!
     const discrepancy = closingCount - expectedClosing;
 
     // Format times - Use Colombia timezone explicitly
@@ -4650,10 +4684,13 @@ window.closeHistoricalClosure = async function(date) {
         // Get daily revenue
         const dailyRevenue = await window.FinanceManager.calculateDailyRevenue(date);
         const todayExpenses = window.FinanceManager.getExpenses({ startDate: date, endDate: date });
-        const totalExpenses = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+        // Only caja expenses affect cash reconciliation
+        const cajaExpenses = todayExpenses.filter(e => !e.paidFrom || e.paidFrom === 'caja');
+        const totalExpensesCaja = cajaExpenses.reduce((sum, e) => sum + e.amount, 0);
 
         const openingBalance = reconciliation.openingBalance || 0;
-        const expectedClosing = openingBalance + dailyRevenue.cash - totalExpenses;
+        const expectedClosing = openingBalance + dailyRevenue.cash - totalExpensesCaja;
 
         // Prompt for closing count
         const closingCountInput = prompt(
@@ -4661,7 +4698,7 @@ window.closeHistoricalClosure = async function(date) {
             `📊 RESUMEN:\n` +
             `Apertura: $${openingBalance.toLocaleString()}\n` +
             `Efectivo recibido: $${dailyRevenue.cash.toLocaleString()}\n` +
-            `Gastos: $${totalExpenses.toLocaleString()}\n` +
+            `Gastos (de caja): $${totalExpensesCaja.toLocaleString()}\n` +
             `Cierre esperado: $${expectedClosing.toLocaleString()}\n\n` +
             `💵 Ingresa el CONTEO REAL de efectivo en caja:`
         );
@@ -4852,10 +4889,13 @@ async function showCashDeliveryModal(date) {
     const openingBalance = parseFloat(reconciliation.openingBalance) || 0;
     const closingCount = parseFloat(reconciliation.closingCount) || 0;
     const todayExpenses = window.FinanceManager.getExpenses({ startDate: date, endDate: date });
-    const totalExpenses = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
 
-    // Expected cash = Opening + Cash received - Cash expenses
-    const expectedCash = openingBalance + dailyRevenue.cash - totalExpenses;
+    // Only caja expenses affect cash - out of pocket expenses don't reduce cash box
+    const cajaExpenses = todayExpenses.filter(e => !e.paidFrom || e.paidFrom === 'caja');
+    const totalExpensesCaja = cajaExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+    // Expected cash = Opening + Cash received - Cash expenses (caja only)
+    const expectedCash = openingBalance + dailyRevenue.cash - totalExpensesCaja;
     // Suggested delivery = Expected cash - Base for next day (default 100,000)
     const defaultBase = 100000;
     const suggestedDelivery = Math.max(0, expectedCash - defaultBase);
@@ -4892,8 +4932,8 @@ async function showCashDeliveryModal(date) {
                         <div style="text-align: right;">${formatCurrency(openingBalance)}</div>
                         <div><strong>+ Efectivo recibido:</strong></div>
                         <div style="text-align: right; color: #10b981;">${formatCurrency(dailyRevenue.cash)}</div>
-                        <div><strong>- Gastos del día:</strong></div>
-                        <div style="text-align: right; color: #ef4444;">${formatCurrency(totalExpenses)}</div>
+                        <div><strong>- Gastos de caja:</strong></div>
+                        <div style="text-align: right; color: #ef4444;">${formatCurrency(totalExpensesCaja)}</div>
                         <div style="border-top: 2px solid #d1d5db; padding-top: 0.5rem;"><strong>= Efectivo esperado:</strong></div>
                         <div style="border-top: 2px solid #d1d5db; padding-top: 0.5rem; text-align: right; font-weight: bold; font-size: 1.1rem;">${formatCurrency(expectedCash)}</div>
                     </div>
@@ -5329,6 +5369,207 @@ window.checkPendingDeliveries = async function() {
         // Show notification
         window.showNotification(`📥 Tienes ${deliveries.length} entrega(s) de efectivo pendiente(s) de aprobación`, 'warning');
     }
+};
+
+/**
+ * Load user's own deliveries (for non-admin users)
+ */
+window.loadMyDeliveries = async function() {
+    const userId = window.FirebaseData?.currentUser?.uid || '';
+
+    if (!userId) return [];
+
+    try {
+        const db = window.firebaseModules.database;
+        const ref = db.ref(window.FirebaseData.database, 'cashDeliveries');
+        const snapshot = await db.get(ref);
+
+        if (!snapshot.exists()) return [];
+
+        const myDeliveries = [];
+        snapshot.forEach(child => {
+            const delivery = child.val();
+            delivery.id = child.key;
+            if (delivery.createdBy === userId) {
+                myDeliveries.push(delivery);
+            }
+        });
+
+        return myDeliveries.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    } catch (error) {
+        console.error('Error loading my deliveries:', error);
+        return [];
+    }
+};
+
+/**
+ * Check if user has any recently processed deliveries (approved/rejected)
+ * Returns deliveries processed in the last 24 hours that haven't been seen
+ */
+window.checkMyDeliveryStatus = async function() {
+    const userEmail = window.FirebaseData?.currentUser?.email || '';
+
+    // Skip for admin (they see everything already)
+    if (userEmail === 'admin@ciudadbilingue.com') return;
+
+    const myDeliveries = await window.loadMyDeliveries();
+
+    // Check for recently processed deliveries (last 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const recentlyProcessed = myDeliveries.filter(d => {
+        if (d.status === 'pending') return false;
+        if (!d.approvedAt) return false;
+        return new Date(d.approvedAt) > sevenDaysAgo;
+    });
+
+    // Check localStorage for seen notifications
+    const seenDeliveries = JSON.parse(localStorage.getItem('seenDeliveryNotifications') || '[]');
+    const unseenProcessed = recentlyProcessed.filter(d => !seenDeliveries.includes(d.id));
+
+    if (unseenProcessed.length > 0) {
+        const approved = unseenProcessed.filter(d => d.status === 'approved');
+        const rejected = unseenProcessed.filter(d => d.status === 'rejected');
+
+        if (approved.length > 0) {
+            window.showNotification(`✅ ${approved.length} entrega(s) de efectivo aprobada(s)`, 'success');
+        }
+        if (rejected.length > 0) {
+            window.showNotification(`❌ ${rejected.length} entrega(s) de efectivo rechazada(s) - Ver detalles`, 'error');
+        }
+
+        // Show the deliveries modal automatically for rejected ones
+        if (rejected.length > 0) {
+            setTimeout(() => window.showMyDeliveriesModal(), 1500);
+        }
+    }
+
+    return unseenProcessed;
+};
+
+/**
+ * Show modal with user's delivery history
+ */
+window.showMyDeliveriesModal = async function() {
+    const myDeliveries = await window.loadMyDeliveries();
+
+    // Mark all as seen
+    const seenDeliveries = myDeliveries.map(d => d.id);
+    localStorage.setItem('seenDeliveryNotifications', JSON.stringify(seenDeliveries));
+
+    const pending = myDeliveries.filter(d => d.status === 'pending');
+    const approved = myDeliveries.filter(d => d.status === 'approved');
+    const rejected = myDeliveries.filter(d => d.status === 'rejected');
+
+    const modal = document.createElement('div');
+    modal.id = 'myDeliveriesModal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10001;
+    `;
+
+    modal.innerHTML = `
+        <div style="background: white; border-radius: 16px; max-width: 600px; width: 95%; max-height: 80vh; overflow: hidden; display: flex; flex-direction: column;">
+            <!-- Header -->
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1.5rem; text-align: center;">
+                <h2 style="margin: 0; font-size: 1.5rem;">📤 Mis Entregas de Efectivo</h2>
+            </div>
+
+            <!-- Stats -->
+            <div style="display: flex; gap: 0.5rem; padding: 1rem; background: #f9fafb; border-bottom: 1px solid #e5e7eb;">
+                <div style="flex: 1; text-align: center; padding: 0.5rem; background: #fef3c7; border-radius: 8px;">
+                    <div style="font-size: 1.5rem; font-weight: bold; color: #92400e;">${pending.length}</div>
+                    <div style="font-size: 0.8rem; color: #78350f;">Pendientes</div>
+                </div>
+                <div style="flex: 1; text-align: center; padding: 0.5rem; background: #d1fae5; border-radius: 8px;">
+                    <div style="font-size: 1.5rem; font-weight: bold; color: #065f46;">${approved.length}</div>
+                    <div style="font-size: 0.8rem; color: #047857;">Aprobadas</div>
+                </div>
+                <div style="flex: 1; text-align: center; padding: 0.5rem; background: #fee2e2; border-radius: 8px;">
+                    <div style="font-size: 1.5rem; font-weight: bold; color: #991b1b;">${rejected.length}</div>
+                    <div style="font-size: 0.8rem; color: #dc2626;">Rechazadas</div>
+                </div>
+            </div>
+
+            <!-- Content -->
+            <div style="flex: 1; overflow-y: auto; padding: 1rem;">
+                ${myDeliveries.length === 0 ? `
+                    <div style="text-align: center; padding: 3rem; color: #6b7280;">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">📭</div>
+                        <p>No has realizado entregas de efectivo aún</p>
+                    </div>
+                ` : `
+                    ${myDeliveries.map(d => `
+                        <div style="background: ${d.status === 'pending' ? '#fffbeb' : d.status === 'approved' ? '#f0fdf4' : '#fef2f2'};
+                                    border: 1px solid ${d.status === 'pending' ? '#fcd34d' : d.status === 'approved' ? '#86efac' : '#fca5a5'};
+                                    border-radius: 10px; padding: 1rem; margin-bottom: 0.75rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: start;">
+                                <div>
+                                    <div style="font-weight: bold; font-size: 1.1rem; color: #111827;">
+                                        ${formatCurrency(d.amount)}
+                                    </div>
+                                    <div style="color: #6b7280; font-size: 0.85rem; margin-top: 0.25rem;">
+                                        📅 ${new Date(d.date + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+                                    </div>
+                                </div>
+                                <div style="text-align: right;">
+                                    ${d.status === 'pending' ?
+                                        '<span style="background: #fef3c7; color: #92400e; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.8rem; font-weight: 500;">⏳ Pendiente</span>' :
+                                      d.status === 'approved' ?
+                                        '<span style="background: #d1fae5; color: #065f46; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.8rem; font-weight: 500;">✅ Aprobada</span>' :
+                                        '<span style="background: #fee2e2; color: #991b1b; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.8rem; font-weight: 500;">❌ Rechazada</span>'
+                                    }
+                                </div>
+                            </div>
+                            ${d.approvedAt ? `
+                                <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid ${d.status === 'approved' ? '#86efac' : '#fca5a5'}; font-size: 0.85rem; color: #6b7280;">
+                                    <div><strong>${d.status === 'approved' ? 'Aprobado' : 'Rechazado'} por:</strong> ${d.approvedByEmail?.split('@')[0] || 'Admin'}</div>
+                                    <div><strong>Fecha:</strong> ${new Date(d.approvedAt).toLocaleString('es-ES')}</div>
+                                    ${d.approvalNotes ? `<div style="margin-top: 0.5rem; background: white; padding: 0.5rem; border-radius: 6px;"><strong>📝 Nota:</strong> ${d.approvalNotes}</div>` : ''}
+                                </div>
+                            ` : ''}
+                        </div>
+                    `).join('')}
+                `}
+            </div>
+
+            <!-- Footer -->
+            <div style="padding: 1rem; background: #f9fafb; border-top: 1px solid #e5e7eb;">
+                <button onclick="closeMyDeliveriesModal()" style="width: 100%; padding: 0.75rem; background: #6b7280; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; font-size: 1rem;">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Close on backdrop click
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeMyDeliveriesModal();
+    });
+};
+
+window.closeMyDeliveriesModal = function() {
+    const modal = document.getElementById('myDeliveriesModal');
+    if (modal) modal.remove();
+};
+
+/**
+ * Get count of user's pending deliveries (for badge display)
+ */
+window.getMyPendingDeliveriesCount = async function() {
+    const myDeliveries = await window.loadMyDeliveries();
+    return myDeliveries.filter(d => d.status === 'pending').length;
 };
 
 /**
@@ -5792,6 +6033,23 @@ window.showAddExpenseModal = async function() {
                            style="width: 100%; padding: 0.75rem; border: 1px solid #e5e7eb; border-radius: 6px;">
                 </div>
 
+                <!-- Payment Source - Important for cash reconciliation -->
+                <div class="form-group">
+                    <label style="font-weight: 600; display: block; margin-bottom: 0.5rem;">💰 Pagado Desde*</label>
+                    <div style="display: flex; gap: 0.5rem; background: #f3f4f6; padding: 0.25rem; border-radius: 6px;">
+                        <button type="button" onclick="togglePaidFrom('caja')" id="paidFromCaja" style="flex: 1; padding: 0.5rem; border: none; background: #3b82f6; color: white; border-radius: 4px; cursor: pointer; font-weight: 500;">
+                            💵 Caja del Negocio
+                        </button>
+                        <button type="button" onclick="togglePaidFrom('bolsillo')" id="paidFromBolsillo" style="flex: 1; padding: 0.5rem; border: none; background: transparent; color: #6b7280; border-radius: 4px; cursor: pointer; font-weight: 500;">
+                            👛 Mi Bolsillo
+                        </button>
+                    </div>
+                    <input type="hidden" id="expensePaidFrom" value="caja">
+                    <small style="color: #6b7280; display: block; margin-top: 0.5rem;">
+                        ⚠️ Si pagaste de tu bolsillo, NO afectará el cierre de caja
+                    </small>
+                </div>
+
                 <div class="form-group">
                     <label style="font-weight: 600; display: block; margin-bottom: 0.5rem;">Fecha*</label>
                     <input type="date"
@@ -5829,6 +6087,27 @@ window.showAddExpenseModal = async function() {
 window.closeExpenseModal = function() {
     const modal = document.getElementById('expenseModal');
     if (modal) modal.remove();
+};
+
+// Toggle expense payment source (caja vs bolsillo)
+window.togglePaidFrom = function(source) {
+    const cajaBtn = document.getElementById('paidFromCaja');
+    const bolsilloBtn = document.getElementById('paidFromBolsillo');
+    const hiddenInput = document.getElementById('expensePaidFrom');
+
+    if (source === 'caja') {
+        cajaBtn.style.background = '#3b82f6';
+        cajaBtn.style.color = 'white';
+        bolsilloBtn.style.background = 'transparent';
+        bolsilloBtn.style.color = '#6b7280';
+        hiddenInput.value = 'caja';
+    } else {
+        bolsilloBtn.style.background = '#f59e0b';
+        bolsilloBtn.style.color = 'white';
+        cajaBtn.style.background = 'transparent';
+        cajaBtn.style.color = '#6b7280';
+        hiddenInput.value = 'bolsillo';
+    }
 };
 
 // Load custom expense categories from Firebase
@@ -6099,12 +6378,14 @@ window.saveExpense = async function(event) {
         amount: document.getElementById('expenseAmount').value,
         date: document.getElementById('expenseDate').value,
         description: document.getElementById('expenseDescription').value,
-        type: document.getElementById('expenseType').value // Add type field
+        type: document.getElementById('expenseType').value, // Add type field
+        paidFrom: document.getElementById('expensePaidFrom')?.value || 'caja' // 'caja' or 'bolsillo'
     };
 
     try {
         await window.FinanceManager.addExpense(expenseData);
-        window.showNotification('✅ Gasto registrado exitosamente', 'success');
+        const paidFromLabel = expenseData.paidFrom === 'bolsillo' ? '(pagado de bolsillo)' : '(de caja)';
+        window.showNotification(`✅ Gasto registrado exitosamente ${paidFromLabel}`, 'success');
         closeExpenseModal();
         loadExpensesView();
     } catch (error) {
