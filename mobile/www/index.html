@@ -2123,6 +2123,19 @@
           <div class="form-group"><label>Monto *</label>
             <input type="number" id="new-exp-amount" placeholder="Ej: 50000" min="0">
           </div>
+          <div class="form-group">
+            <label>💰 Pagado Desde *</label>
+            <div style="display:flex;gap:8px;margin-top:4px;">
+              <button type="button" id="paidFromCaja" onclick="togglePaidFromMobile('caja')" style="flex:1;padding:10px;border:2px solid #3b82f6;background:#3b82f6;color:white;border-radius:8px;font-weight:600;cursor:pointer;">
+                💵 Caja del Negocio
+              </button>
+              <button type="button" id="paidFromBolsillo" onclick="togglePaidFromMobile('bolsillo')" style="flex:1;padding:10px;border:2px solid #e5e7eb;background:white;color:#6b7280;border-radius:8px;font-weight:600;cursor:pointer;">
+                👛 Mi Bolsillo
+              </button>
+            </div>
+            <input type="hidden" id="new-exp-paidFrom" value="caja">
+            <small style="color:#6b7280;font-size:11px;display:block;margin-top:6px;">⚠️ Si pagaste de tu bolsillo, NO afectará el cierre de caja</small>
+          </div>
           <div class="form-group"><label>Descripción</label>
             <input type="text" id="new-exp-description" placeholder="Descripción del gasto">
           </div>
@@ -2144,12 +2157,38 @@
       $('new-exp-category').innerHTML = `<optgroup label="Predeterminadas">${defaultOpts}</optgroup>${customOpts}`;
     }
 
+    // Toggle paidFrom selection in mobile expense form
+    function togglePaidFromMobile(source) {
+      const cajaBtn = $('paidFromCaja');
+      const bolsilloBtn = $('paidFromBolsillo');
+      const hiddenInput = $('new-exp-paidFrom');
+
+      if (source === 'caja') {
+        cajaBtn.style.background = '#3b82f6';
+        cajaBtn.style.color = 'white';
+        cajaBtn.style.borderColor = '#3b82f6';
+        bolsilloBtn.style.background = 'white';
+        bolsilloBtn.style.color = '#6b7280';
+        bolsilloBtn.style.borderColor = '#e5e7eb';
+        hiddenInput.value = 'caja';
+      } else {
+        bolsilloBtn.style.background = '#f59e0b';
+        bolsilloBtn.style.color = 'white';
+        bolsilloBtn.style.borderColor = '#f59e0b';
+        cajaBtn.style.background = 'white';
+        cajaBtn.style.color = '#6b7280';
+        cajaBtn.style.borderColor = '#e5e7eb';
+        hiddenInput.value = 'bolsillo';
+      }
+    }
+
     async function saveNewExpense() {
       const type = $('new-exp-type').value;
       const category = $('new-exp-category').value;
       const amount = parseFloat($('new-exp-amount').value);
       const description = $('new-exp-description').value.trim();
       const date = $('new-exp-date').value;
+      const paidFrom = $('new-exp-paidFrom')?.value || 'caja';
 
       if (!category || !amount || amount <= 0 || !date) {
         alert('Completa todos los campos requeridos');
@@ -2166,6 +2205,7 @@
           amount,
           description,
           date,
+          paidFrom,
           registeredBy: AppState.user.uid,
           registeredByName: AppState.email,
           createdAt: new Date().toISOString()
@@ -2175,7 +2215,8 @@
         AppState.data.expenses.push(newExpense);
 
         hideLoading();
-        alert('Gasto registrado correctamente');
+        const paidFromLabel = paidFrom === 'bolsillo' ? '(pagado de bolsillo - no afecta caja)' : '(de caja)';
+        alert('Gasto registrado correctamente ' + paidFromLabel);
         goBack();
       } catch (e) {
         hideLoading();
