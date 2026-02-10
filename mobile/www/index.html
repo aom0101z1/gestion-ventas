@@ -1818,8 +1818,14 @@
             <!-- Gastos del día -->
             <div style="margin-bottom:12px;background:#fef2f2;padding:12px;border-radius:8px;">
               <div style="font-size:11px;font-weight:600;color:#991b1b;">💸 Gastos Registrados Hoy</div>
-              <div style="font-size:20px;font-weight:700;color:#dc2626;">-$${data.todayExpTotal.toLocaleString()}</div>
-              <div style="font-size:9px;color:#6b7280;">${data.todayExpenses.length} gastos registrados</div>
+              <div id="cierre-gastos-display">
+                <div style="font-size:20px;font-weight:700;color:#dc2626;">-$${data.todayExpTotal.toLocaleString()}</div>
+              </div>
+              <div style="font-size:9px;color:#6b7280;margin-top:2px;">${data.todayExpenses.length} gastos registrados</div>
+              <div style="display:flex;gap:4px;margin-top:8px;flex-wrap:wrap;">
+                <span style="background:#dc2626;color:white;padding:2px 6px;border-radius:4px;font-size:9px;">💵 Caja: $${data.todayExpenses.filter(e => !e.paidFrom || e.paidFrom === 'caja').reduce((s,e) => s + (e.amount||0), 0).toLocaleString()}</span>
+                <span style="background:#f59e0b;color:white;padding:2px 6px;border-radius:4px;font-size:9px;">👛 Bolsillo: $${data.todayExpenses.filter(e => e.paidFrom === 'bolsillo').reduce((s,e) => s + (e.amount||0), 0).toLocaleString()}</span>
+              </div>
               <button onclick="showAddExpenseForm()" style="margin-top:8px;background:#ef4444;color:white;border:none;padding:6px 12px;border-radius:6px;font-size:10px;cursor:pointer;">➕ Agregar Gasto</button>
             </div>
 
@@ -2033,15 +2039,31 @@
 
       const todayPayments = payments.filter(p => (p.fecha || p.date || '') === today);
       const todayCash = todayPayments.filter(p => (p.metodo || p.method || '').toLowerCase().includes('efectivo')).reduce((sum, p) => sum + (parseFloat(p.monto || p.amount) || 0), 0);
-      const todayExp = expenses.filter(e => (e.date || '') === today).reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
 
-      const esperado = apertura + todayCash - todayExp;
+      // IMPORTANT: Only count expenses from 'caja' (cash box) - not 'bolsillo' (pocket)
+      // Expenses without paidFrom field default to 'caja' for backwards compatibility
+      const todayExpenses = expenses.filter(e => (e.date || '') === today);
+      const todayExpCaja = todayExpenses.filter(e => !e.paidFrom || e.paidFrom === 'caja').reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+      const todayExpBolsillo = todayExpenses.filter(e => e.paidFrom === 'bolsillo').reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+      const todayExpTotal = todayExpCaja + todayExpBolsillo;
+
+      // Only caja expenses affect cash reconciliation
+      const esperado = apertura + todayCash - todayExpCaja;
       const diferencia = conteo - esperado;
 
       document.getElementById('cierre-esperado').textContent = '$' + esperado.toLocaleString();
       document.getElementById('cierre-diferencia').textContent = (diferencia === 0 ? '✓ ' : (diferencia > 0 ? '+' : '')) + '$' + Math.abs(diferencia).toLocaleString();
       document.getElementById('cierre-diferencia').style.color = diferencia === 0 ? 'white' : (diferencia > 0 ? '#fbbf24' : '#fca5a5');
       document.getElementById('cierre-status').textContent = diferencia === 0 ? 'Cuadra perfecto' : (diferencia > 0 ? 'Sobrante' : 'Faltante');
+
+      // Update gastos display to show breakdown
+      const gastosDisplay = document.getElementById('cierre-gastos-display');
+      if (gastosDisplay) {
+        gastosDisplay.innerHTML = `
+          <div style="font-size:20px;font-weight:700;color:#dc2626;">-$${todayExpTotal.toLocaleString()}</div>
+          ${todayExpBolsillo > 0 ? `<div style="font-size:9px;color:#f59e0b;margin-top:2px;">⚠️ $${todayExpBolsillo.toLocaleString()} de bolsillo (no afecta caja)</div>` : ''}
+        `;
+      }
     }
 
     async function saveCierreDiario() {
