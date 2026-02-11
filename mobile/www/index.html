@@ -73,6 +73,17 @@
     .status-active { background: rgba(72, 187, 120, 0.15); color: #22c55e; }
     .status-inactive { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
     .status-pending { background: rgba(251, 146, 60, 0.15); color: #f97316; }
+    /* Student Photo Styles */
+    .photo-upload-section { text-align: center; margin-bottom: 20px; }
+    .photo-preview-container { position: relative; width: 120px; height: 120px; margin: 0 auto 12px; }
+    .photo-preview { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 4px solid var(--primary); background: var(--gray-100); }
+    .photo-preview-placeholder { width: 120px; height: 120px; border-radius: 50%; background: linear-gradient(135deg, #e2e8f0, #cbd5e1); display: flex; align-items: center; justify-content: center; font-size: 48px; color: #94a3b8; border: 4px dashed var(--gray-300); }
+    .photo-remove-btn { position: absolute; top: 0; right: 0; width: 28px; height: 28px; border-radius: 50%; background: #ef4444; color: white; border: none; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .photo-buttons { display: flex; gap: 8px; justify-content: center; }
+    .photo-btn { flex: 1; max-width: 140px; padding: 10px 12px; border: none; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .photo-btn-camera { background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; }
+    .photo-btn-gallery { background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; }
+    .photo-btn:active { transform: scale(0.95); }
   </style>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
@@ -360,7 +371,9 @@
         const statusClass = isActive ? 'status-active' : 'status-inactive';
         const statusText = isActive ? 'Activo' : 'Inactivo';
         return `<div class="list-item" onclick="showStudentDetail('${s.id}')">
-          <div class="list-item-avatar">${s.nombre?.[0] || '?'}</div>
+          ${s.photoUrl
+            ? `<img src="${s.photoUrl}" class="list-item-avatar" style="object-fit:cover;border-radius:50%;">`
+            : `<div class="list-item-avatar">${s.nombre?.[0] || '?'}</div>`}
           <div class="list-item-content">
             <div class="list-item-title">${s.nombre || 'Sin nombre'}</div>
             <div class="list-item-subtitle">${s.telefono || 'Grupo: ' + (s.grupo || 'N/A')}</div>
@@ -388,6 +401,21 @@
       if (AppState.editMode) {
         c.innerHTML = `
           <div class="detail-card edit-form">
+            <!-- Photo Upload Section -->
+            <div class="photo-upload-section">
+              <div class="photo-preview-container">
+                ${s.photoUrl
+                  ? `<img src="${s.photoUrl}" class="photo-preview" id="edit-photo-preview">
+                     <button type="button" class="photo-remove-btn" onclick="removeStudentPhotoMobile('edit')">×</button>`
+                  : `<div class="photo-preview-placeholder" id="edit-photo-preview">📷</div>`}
+              </div>
+              <input type="hidden" id="edit-photoUrl" value="${s.photoUrl || ''}">
+              <div class="photo-buttons">
+                <button type="button" class="photo-btn photo-btn-camera" onclick="captureStudentPhotoMobile('edit')">📸 Cámara</button>
+                <button type="button" class="photo-btn photo-btn-gallery" onclick="uploadStudentPhotoMobile('edit')">🖼️ Galería</button>
+              </div>
+            </div>
+
             <div class="form-group"><label>Nombre Completo *</label><input type="text" id="edit-nombre" value="${s.nombre || ''}"></div>
             <div class="form-group"><label>Tipo Documento</label>
               <select id="edit-tipoDoc">
@@ -452,7 +480,9 @@
 
           <div class="detail-card">
             <div class="detail-header">
-              <div class="detail-avatar" style="background:linear-gradient(135deg,#3b82f6,#2563eb);">${s.nombre?.[0] || '?'}</div>
+              ${s.photoUrl
+                ? `<img src="${s.photoUrl}" class="detail-avatar" style="object-fit:cover;cursor:pointer;" onclick="viewStudentPhotoFull('${s.photoUrl}', '${(s.nombre || '').replace(/'/g, "\\'")}')">`
+                : `<div class="detail-avatar" style="background:linear-gradient(135deg,#3b82f6,#2563eb);">${s.nombre?.[0] || '?'}</div>`}
               <div class="detail-info">
                 <h2>${s.nombre || 'Sin nombre'}</h2>
                 <p><span class="badge ${isActive ? 'status-active' : 'status-inactive'}">${isActive ? 'Activo' : 'Inactivo'}</span></p>
@@ -497,6 +527,7 @@
     async function saveStudent(id) {
       showLoading();
       try {
+        const photoUrl = $('edit-photoUrl')?.value || '';
         const updates = {
           nombre: $('edit-nombre').value,
           tipoDoc: $('edit-tipoDoc').value,
@@ -513,6 +544,7 @@
           valor: parseInt($('edit-valor').value) || 0,
           diaPago: parseInt($('edit-diaPago').value) || 1,
           status: $('edit-status').value,
+          photoUrl: photoUrl,
           updatedAt: new Date().toISOString(),
           updatedBy: AppState.user.uid
         };
@@ -571,7 +603,9 @@
         <h3 style="margin:20px 0 12px;font-size:16px;">👥 Estudiantes del Grupo</h3>
         <div class="list">${students.length ? students.map(s => `
           <div class="list-item" onclick="showStudentDetail('${s.id}')">
-            <div class="list-item-avatar">${s.nombre?.[0] || '?'}</div>
+            ${s.photoUrl
+              ? `<img src="${s.photoUrl}" class="list-item-avatar" style="object-fit:cover;border-radius:50%;">`
+              : `<div class="list-item-avatar">${s.nombre?.[0] || '?'}</div>`}
             <div class="list-item-content">
               <div class="list-item-title">${s.nombre || 'Sin nombre'}</div>
               <div class="list-item-subtitle">${s.telefono || ''}</div>
@@ -2508,6 +2542,18 @@
       const today = new Date().toISOString().split('T')[0];
       c.innerHTML = `
         <div class="detail-card edit-form">
+          <!-- Photo Upload Section -->
+          <div class="photo-upload-section">
+            <div class="photo-preview-container">
+              <div class="photo-preview-placeholder" id="new-stu-photo-preview">📷</div>
+            </div>
+            <input type="hidden" id="new-stu-photoUrl" value="">
+            <div class="photo-buttons">
+              <button type="button" class="photo-btn photo-btn-camera" onclick="captureStudentPhotoMobile('new-stu')">📸 Cámara</button>
+              <button type="button" class="photo-btn photo-btn-gallery" onclick="uploadStudentPhotoMobile('new-stu')">🖼️ Galería</button>
+            </div>
+          </div>
+
           <h4 style="margin:0 0 16px;color:#374151;">📋 Información Personal</h4>
           <div class="form-group"><label>Nombre Completo *</label><input type="text" id="new-stu-nombre" placeholder="Nombre completo"></div>
           <div class="form-group"><label>Tipo Documento</label>
@@ -2576,6 +2622,7 @@
       showLoading();
       try {
         const studentId = 'STU-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+        const photoUrl = $('new-stu-photoUrl')?.value || '';
         const newStudent = {
           id: studentId,
           nombre: nombre,
@@ -2595,6 +2642,7 @@
           status: 'active',
           statusHistory: [],
           paymentHistory: [],
+          photoUrl: photoUrl,
           createdAt: new Date().toISOString(),
           createdBy: AppState.user.uid
         };
@@ -2791,7 +2839,7 @@
       $('module-view-title').textContent = '📋 ' + gname;
       const c = $('module-view-content');
       c.innerHTML = `<div class="card"><div class="card-header"><div class="card-icon">📅</div><div><h3 class="card-title">${gname}</h3><p class="card-subtitle">${new Date().toLocaleDateString('es-ES')} · ${stu.length} estudiantes</p></div></div></div>
-        ${stu.map(s => `<div class="attendance-item" data-student="${s.id}"><div class="list-item-avatar">${s.nombre?.[0] || '?'}</div><div class="list-item-content"><div class="list-item-title">${s.nombre || 'N/A'}</div></div><div class="attendance-status"><button class="status-btn" onclick="markA('${s.id}','present',this)">✓</button><button class="status-btn" onclick="markA('${s.id}','late',this)">⏰</button><button class="status-btn" onclick="markA('${s.id}','absent',this)">✕</button></div></div>`).join('')}
+        ${stu.map(s => `<div class="attendance-item" data-student="${s.id}">${s.photoUrl ? `<img src="${s.photoUrl}" class="list-item-avatar" style="object-fit:cover;border-radius:50%;">` : `<div class="list-item-avatar">${s.nombre?.[0] || '?'}</div>`}<div class="list-item-content"><div class="list-item-title">${s.nombre || 'N/A'}</div></div><div class="attendance-status"><button class="status-btn" onclick="markA('${s.id}','present',this)">✓</button><button class="status-btn" onclick="markA('${s.id}','late',this)">⏰</button><button class="status-btn" onclick="markA('${s.id}','absent',this)">✕</button></div></div>`).join('')}
         <button class="btn btn-success mt-16" onclick="saveA('${gid}')">Guardar Asistencia</button>`;
     }
 
@@ -2840,10 +2888,172 @@
         <div class="card"><h3 style="margin:0 0 12px;font-size:16px;">📊 Estadísticas</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;"><div style="background:var(--gray-50);padding:12px;border-radius:8px;text-align:center;"><div style="font-size:24px;font-weight:700;color:var(--primary);">${AppState.data.students.length}</div><div style="font-size:12px;color:var(--text-secondary);">Total Estudiantes</div></div><div style="background:var(--gray-50);padding:12px;border-radius:8px;text-align:center;"><div style="font-size:24px;font-weight:700;color:#10b981;">${activeCount}</div><div style="font-size:12px;color:var(--text-secondary);">Activos</div></div></div></div>
         <button class="btn btn-secondary mt-16" onclick="loadAllData()">🔄 Actualizar Datos</button>
         <button class="btn btn-danger mt-16" onclick="logout()">Cerrar Sesión</button>
-        <p style="text-align:center;margin-top:24px;color:var(--text-light);font-size:12px;">TutorBox CRM v1.2.0<br>Ciudad Bilingue</p>`;
+        <p style="text-align:center;margin-top:24px;color:var(--text-light);font-size:12px;">TutorBox CRM v1.2.0<br>Ciudad Bilingüe</p>`;
     }
 
     async function logout() { if (confirm('¿Cerrar sesión?')) { showLoading(); await auth.signOut(); } }
+
+    // ===== STUDENT PHOTO FUNCTIONS =====
+
+    // Capture photo using Capacitor Camera (for native app)
+    async function captureStudentPhotoMobile(prefix) {
+      // Check if running in Capacitor native environment
+      if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+        try {
+          const image = await Capacitor.Plugins.Camera.getPhoto({
+            quality: 80,
+            allowEditing: false,
+            resultType: 'base64', // CameraResultType.Base64
+            source: 'CAMERA', // CameraSource.Camera
+            width: 400,
+            height: 400
+          });
+          const base64Data = 'data:image/jpeg;base64,' + image.base64String;
+          setStudentPhotoPreview(prefix, base64Data);
+        } catch (err) {
+          console.error('Camera error:', err);
+          if (err.message && !err.message.includes('cancel')) {
+            alert('Error de cámara: ' + err.message);
+          }
+        }
+      } else {
+        // Fallback to file input for web
+        uploadStudentPhotoMobile(prefix);
+      }
+    }
+
+    // Upload photo from gallery
+    async function uploadStudentPhotoMobile(prefix) {
+      // Check if running in Capacitor native environment
+      if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+        try {
+          const image = await Capacitor.Plugins.Camera.getPhoto({
+            quality: 80,
+            allowEditing: false,
+            resultType: 'base64', // CameraResultType.Base64
+            source: 'PHOTOS', // CameraSource.Photos (gallery)
+            width: 400,
+            height: 400
+          });
+          const base64Data = 'data:image/jpeg;base64,' + image.base64String;
+          setStudentPhotoPreview(prefix, base64Data);
+        } catch (err) {
+          console.error('Gallery error:', err);
+          if (err.message && !err.message.includes('cancel')) {
+            alert('Error de galería: ' + err.message);
+          }
+        }
+      } else {
+        // Fallback to file input for web
+        let fileInput = document.getElementById('photo-file-input');
+        if (!fileInput) {
+          fileInput = document.createElement('input');
+          fileInput.type = 'file';
+          fileInput.id = 'photo-file-input';
+          fileInput.accept = 'image/*';
+          fileInput.style.display = 'none';
+          document.body.appendChild(fileInput);
+        }
+
+        fileInput.onchange = function(e) {
+          const file = e.target.files[0];
+          if (file) {
+            processPhotoFile(file, prefix);
+          }
+          fileInput.value = ''; // Reset for next use
+        };
+
+        fileInput.click();
+      }
+    }
+
+    // Process uploaded file
+    function processPhotoFile(file, prefix) {
+      if (!file.type.startsWith('image/')) {
+        alert('Por favor selecciona una imagen');
+        return;
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        alert('La imagen es muy grande (máx 5MB)');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        // Resize image before saving
+        const img = new Image();
+        img.onload = function() {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+
+          // Create square crop
+          const size = Math.min(img.width, img.height);
+          canvas.width = 400;
+          canvas.height = 400;
+
+          const sx = (img.width - size) / 2;
+          const sy = (img.height - size) / 2;
+
+          ctx.drawImage(img, sx, sy, size, size, 0, 0, 400, 400);
+
+          const base64Data = canvas.toDataURL('image/jpeg', 0.8);
+          setStudentPhotoPreview(prefix, base64Data);
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Set photo preview and hidden input value
+    function setStudentPhotoPreview(prefix, base64Data) {
+      const previewEl = document.getElementById(prefix + '-photo-preview');
+      const hiddenInput = document.getElementById(prefix + '-photoUrl');
+
+      if (previewEl) {
+        // Replace placeholder with actual image
+        const container = previewEl.parentElement;
+        container.innerHTML = `
+          <img src="${base64Data}" class="photo-preview" id="${prefix}-photo-preview">
+          <button type="button" class="photo-remove-btn" onclick="removeStudentPhotoMobile('${prefix}')">×</button>
+        `;
+      }
+
+      if (hiddenInput) {
+        hiddenInput.value = base64Data;
+      }
+    }
+
+    // Remove student photo
+    function removeStudentPhotoMobile(prefix) {
+      const previewEl = document.getElementById(prefix + '-photo-preview');
+      const hiddenInput = document.getElementById(prefix + '-photoUrl');
+
+      if (previewEl) {
+        const container = previewEl.parentElement;
+        container.innerHTML = `<div class="photo-preview-placeholder" id="${prefix}-photo-preview">📷</div>`;
+      }
+
+      if (hiddenInput) {
+        hiddenInput.value = '';
+      }
+    }
+
+    // View student photo fullscreen
+    function viewStudentPhotoFull(photoUrl, studentName) {
+      const modal = document.createElement('div');
+      modal.id = 'photo-view-modal';
+      modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.95);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;';
+      modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
+      modal.innerHTML = `
+        <div style="text-align:center;max-width:90vw;">
+          <img src="${photoUrl}" style="max-width:100%;max-height:70vh;border-radius:12px;object-fit:contain;">
+          <p style="color:white;margin-top:16px;font-size:18px;font-weight:600;">${studentName}</p>
+          <button onclick="this.closest('#photo-view-modal').remove()" style="margin-top:16px;background:#3b82f6;border:none;color:white;padding:12px 32px;border-radius:8px;font-size:14px;cursor:pointer;">Cerrar</button>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
 
     showLoading();
   </script>
