@@ -2259,6 +2259,8 @@
       showLoading();
       try {
         const id = 'EXP-' + Date.now();
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         const newExpense = {
           id,
           type,
@@ -2266,10 +2268,11 @@
           amount,
           description,
           date,
+          time: timeStr,
           paidFrom,
           registeredBy: AppState.user.uid,
           registeredByName: AppState.email,
-          createdAt: new Date().toISOString()
+          createdAt: now.toISOString()
         };
 
         await db.ref('expenses/' + id).set(newExpense);
@@ -2728,6 +2731,8 @@
       showLoading();
       try {
         const student = AppState.data.students.find(s => s.id === studentId);
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         const newPayment = {
           studentId: studentId,
           studentName: student?.nombre || '',
@@ -2737,9 +2742,11 @@
           metodo: $('new-pay-metodo').value,
           banco: $('new-pay-metodo').value === 'transferencia' ? $('new-pay-banco').value : '',
           notas: $('new-pay-notas').value.trim(),
-          fecha: new Date().toISOString().split('T')[0],
-          createdAt: new Date().toISOString(),
-          createdBy: AppState.user.uid
+          fecha: now.toISOString().split('T')[0],
+          time: timeStr,
+          createdAt: now.toISOString(),
+          createdBy: AppState.user.uid,
+          createdByEmail: AppState.email
         };
 
         const ref = await db.ref('payments').push(newPayment);
@@ -2839,25 +2846,162 @@
     }
 
     function openAtt(gid, gname) {
+      // Reset attendance data for this session
+      Object.keys(attD).forEach(k => delete attD[k]);
+
       const stu = AppState.data.students.filter(s => String(s.grupo) === String(gid) && (s.status === 'active' || !s.status));
+      // Sort alphabetically
+      stu.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
+
       AppState.navStack.push({ type: 'attendance', module: 'asistencia', id: gid, name: gname, icon: '📋' });
       $('module-view-title').textContent = '📋 ' + gname;
       const c = $('module-view-content');
-      c.innerHTML = `<div class="card"><div class="card-header"><div class="card-icon">📅</div><div><h3 class="card-title">${gname}</h3><p class="card-subtitle">${new Date().toLocaleDateString('es-ES')} · ${stu.length} estudiantes</p></div></div></div>
-        ${stu.map(s => `<div class="attendance-item" data-student="${s.id}">${s.photoUrl ? `<img src="${s.photoUrl}" class="list-item-avatar" style="object-fit:cover;border-radius:50%;">` : `<div class="list-item-avatar">${s.nombre?.[0] || '?'}</div>`}<div class="list-item-content"><div class="list-item-title">${s.nombre || 'N/A'}</div></div><div class="attendance-status"><button class="status-btn" onclick="markA('${s.id}','present',this)">✓</button><button class="status-btn" onclick="markA('${s.id}','late',this)">⏰</button><button class="status-btn" onclick="markA('${s.id}','absent',this)">✕</button></div></div>`).join('')}
-        <button class="btn btn-success mt-16" onclick="saveA('${gid}')">Guardar Asistencia</button>`;
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+      const dateStr = now.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+
+      c.innerHTML = `
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon">📅</div>
+            <div>
+              <h3 class="card-title">${gname}</h3>
+              <p class="card-subtitle">${dateStr} · ${timeStr}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Summary Counter -->
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;">
+          <div style="background:#dcfce7;padding:12px;border-radius:10px;text-align:center;">
+            <div id="att-present" style="font-size:24px;font-weight:700;color:#16a34a;">0</div>
+            <div style="font-size:11px;color:#166534;">✓ Presentes</div>
+          </div>
+          <div style="background:#fef3c7;padding:12px;border-radius:10px;text-align:center;">
+            <div id="att-late" style="font-size:24px;font-weight:700;color:#d97706;">0</div>
+            <div style="font-size:11px;color:#92400e;">⏰ Tarde</div>
+          </div>
+          <div style="background:#fee2e2;padding:12px;border-radius:10px;text-align:center;">
+            <div id="att-absent" style="font-size:24px;font-weight:700;color:#dc2626;">0</div>
+            <div style="font-size:11px;color:#991b1b;">✕ Ausentes</div>
+          </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div style="display:flex;gap:8px;margin-bottom:16px;">
+          <button onclick="markAllAtt('present')" style="flex:1;padding:10px;border:none;border-radius:8px;background:#22c55e;color:white;font-weight:600;font-size:12px;cursor:pointer;">✓ Marcar Todos Presentes</button>
+          <button onclick="markAllAtt('absent')" style="flex:1;padding:10px;border:none;border-radius:8px;background:#ef4444;color:white;font-weight:600;font-size:12px;cursor:pointer;">✕ Marcar Todos Ausentes</button>
+        </div>
+
+        <!-- Student List -->
+        <div style="background:white;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+          ${stu.map((s, i) => `
+            <div class="attendance-item" data-student="${s.id}" style="display:flex;align-items:center;padding:12px 16px;${i < stu.length - 1 ? 'border-bottom:1px solid #f3f4f6;' : ''}">
+              <div style="width:24px;height:24px;background:#e5e7eb;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#6b7280;margin-right:10px;">${i + 1}</div>
+              ${s.photoUrl
+                ? `<img src="${s.photoUrl}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;margin-right:12px;">`
+                : `<div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#2563eb);display:flex;align-items:center;justify-content:center;color:white;font-weight:600;margin-right:12px;">${s.nombre?.[0] || '?'}</div>`}
+              <div style="flex:1;min-width:0;">
+                <div style="font-weight:600;font-size:14px;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.nombre || 'N/A'}</div>
+              </div>
+              <div class="attendance-status" style="display:flex;gap:6px;">
+                <button class="status-btn" onclick="markA('${s.id}','present',this)" style="width:36px;height:36px;border-radius:50%;border:2px solid #22c55e;background:transparent;color:#22c55e;font-size:16px;cursor:pointer;transition:all 0.2s;">✓</button>
+                <button class="status-btn" onclick="markA('${s.id}','late',this)" style="width:36px;height:36px;border-radius:50%;border:2px solid #f59e0b;background:transparent;color:#f59e0b;font-size:14px;cursor:pointer;transition:all 0.2s;">⏰</button>
+                <button class="status-btn" onclick="markA('${s.id}','absent',this)" style="width:36px;height:36px;border-radius:50%;border:2px solid #ef4444;background:transparent;color:#ef4444;font-size:16px;cursor:pointer;transition:all 0.2s;">✕</button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+
+        <div style="margin-top:16px;padding:12px;background:#f0f9ff;border-radius:10px;text-align:center;">
+          <span style="font-size:12px;color:#0369a1;">📊 ${stu.length} estudiantes en este grupo</span>
+        </div>
+
+        <button class="btn btn-success mt-16" onclick="saveA('${gid}')" style="width:100%;padding:16px;font-size:16px;font-weight:600;">💾 Guardar Asistencia</button>
+      `;
+
+      // Store student IDs for this group
+      window.currentAttStudents = stu.map(s => s.id);
     }
 
     const attD = {};
-    function markA(sid, st, btn) { attD[sid] = st; btn.closest('.attendance-item').querySelectorAll('.status-btn').forEach(b => b.classList.remove('present', 'late', 'absent')); btn.classList.add(st); }
+
+    function markA(sid, st, btn) {
+      attD[sid] = st;
+      btn.closest('.attendance-item').querySelectorAll('.status-btn').forEach(b => {
+        b.classList.remove('present', 'late', 'absent');
+        b.style.background = 'transparent';
+        b.style.color = b.textContent === '✓' ? '#22c55e' : b.textContent === '⏰' ? '#f59e0b' : '#ef4444';
+      });
+      btn.classList.add(st);
+      // Style the selected button
+      if (st === 'present') {
+        btn.style.background = '#22c55e';
+        btn.style.color = 'white';
+      } else if (st === 'late') {
+        btn.style.background = '#f59e0b';
+        btn.style.color = 'white';
+      } else {
+        btn.style.background = '#ef4444';
+        btn.style.color = 'white';
+      }
+      updateAttCounter();
+    }
+
+    function markAllAtt(status) {
+      if (!window.currentAttStudents) return;
+      window.currentAttStudents.forEach(sid => {
+        attD[sid] = status;
+        const item = document.querySelector(`.attendance-item[data-student="${sid}"]`);
+        if (item) {
+          const btns = item.querySelectorAll('.status-btn');
+          btns.forEach(b => {
+            b.classList.remove('present', 'late', 'absent');
+            b.style.background = 'transparent';
+            b.style.color = b.textContent === '✓' ? '#22c55e' : b.textContent === '⏰' ? '#f59e0b' : '#ef4444';
+          });
+          const targetBtn = status === 'present' ? btns[0] : status === 'late' ? btns[1] : btns[2];
+          targetBtn.classList.add(status);
+          targetBtn.style.background = status === 'present' ? '#22c55e' : status === 'late' ? '#f59e0b' : '#ef4444';
+          targetBtn.style.color = 'white';
+        }
+      });
+      updateAttCounter();
+    }
+
+    function updateAttCounter() {
+      const present = Object.values(attD).filter(s => s === 'present').length;
+      const late = Object.values(attD).filter(s => s === 'late').length;
+      const absent = Object.values(attD).filter(s => s === 'absent').length;
+      if ($('att-present')) $('att-present').textContent = present;
+      if ($('att-late')) $('att-late').textContent = late;
+      if ($('att-absent')) $('att-absent').textContent = absent;
+    }
 
     async function saveA(gid) {
-      if (!Object.keys(attD).length) { alert('Marca al menos uno'); return; }
+      if (!Object.keys(attD).length) { alert('Marca al menos un estudiante'); return; }
       showLoading();
       try {
-        const d = new Date().toISOString().split('T')[0];
-        for (const [sid, st] of Object.entries(attD)) await db.ref('attendance/' + gid + '/' + d + '/' + sid).set({ status: st, timestamp: new Date().toISOString(), recordedBy: AppState.user.uid });
-        hideLoading(); alert('Asistencia guardada'); goBack();
+        const now = new Date();
+        const d = now.toISOString().split('T')[0];
+        const timeStr = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+        for (const [sid, st] of Object.entries(attD)) {
+          await db.ref('attendance/' + gid + '/' + d + '/' + sid).set({
+            status: st,
+            timestamp: now.toISOString(),
+            time: timeStr,
+            recordedBy: AppState.user.uid,
+            recordedByEmail: AppState.email
+          });
+        }
+
+        // Clear the attendance data
+        Object.keys(attD).forEach(k => delete attD[k]);
+
+        hideLoading();
+        alert('✅ Asistencia guardada correctamente\n\nFecha: ' + d + '\nHora: ' + timeStr);
+        goBack();
       } catch (e) { hideLoading(); alert('Error: ' + e.message); }
     }
 
