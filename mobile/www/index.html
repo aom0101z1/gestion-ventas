@@ -2898,11 +2898,18 @@
           ${stu.map((s, i) => `
             <div class="attendance-item" data-student="${s.id}" style="display:flex;align-items:center;padding:12px 16px;${i < stu.length - 1 ? 'border-bottom:1px solid #f3f4f6;' : ''}">
               <div style="width:24px;height:24px;background:#e5e7eb;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#6b7280;margin-right:10px;">${i + 1}</div>
-              ${s.photoUrl
-                ? `<img src="${s.photoUrl}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;margin-right:12px;">`
-                : `<div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#2563eb);display:flex;align-items:center;justify-content:center;color:white;font-weight:600;margin-right:12px;">${s.nombre?.[0] || '?'}</div>`}
+
+              <!-- Photo with camera overlay -->
+              <div style="position:relative;margin-right:12px;" id="att-photo-${s.id}">
+                ${s.photoUrl
+                  ? `<img src="${s.photoUrl}" style="width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid #e5e7eb;" onclick="viewStudentPhotoFull('${s.photoUrl}', '${(s.nombre || '').replace(/'/g, "\\'")}')">
+                     <button onclick="takeAttendancePhoto('${s.id}')" style="position:absolute;bottom:-2px;right:-2px;width:20px;height:20px;border-radius:50%;background:#3b82f6;border:2px solid white;color:white;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;">📷</button>`
+                  : `<div onclick="takeAttendancePhoto('${s.id}')" style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#94a3b8,#64748b);display:flex;align-items:center;justify-content:center;color:white;font-size:20px;cursor:pointer;border:2px dashed #cbd5e1;">📷</div>`}
+              </div>
+
               <div style="flex:1;min-width:0;">
                 <div style="font-weight:600;font-size:14px;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.nombre || 'N/A'}</div>
+                ${!s.photoUrl ? `<div style="font-size:10px;color:#9ca3af;">Toca para agregar foto</div>` : ''}
               </div>
               <div class="attendance-status" style="display:flex;gap:6px;">
                 <button class="status-btn" onclick="markA('${s.id}','present',this)" style="width:36px;height:36px;border-radius:50%;border:2px solid #22c55e;background:transparent;color:#22c55e;font-size:16px;cursor:pointer;transition:all 0.2s;">✓</button>
@@ -3003,6 +3010,74 @@
         alert('✅ Asistencia guardada correctamente\n\nFecha: ' + d + '\nHora: ' + timeStr);
         goBack();
       } catch (e) { hideLoading(); alert('Error: ' + e.message); }
+    }
+
+    // Take photo from attendance view and save to student profile
+    async function takeAttendancePhoto(studentId) {
+      if (!window.Capacitor || !window.Capacitor.isNativePlatform || !window.Capacitor.isNativePlatform()) {
+        alert('La cámara solo funciona en la app nativa');
+        return;
+      }
+
+      try {
+        const image = await Capacitor.Plugins.Camera.getPhoto({
+          quality: 80,
+          allowEditing: false,
+          resultType: 'base64',
+          source: 'PROMPT', // Let user choose camera or gallery
+          width: 400,
+          height: 400,
+          promptLabelHeader: 'Foto del Estudiante',
+          promptLabelPhoto: '📷 Tomar Foto',
+          promptLabelPicture: '🖼️ Elegir de Galería'
+        });
+
+        const base64Data = 'data:image/jpeg;base64,' + image.base64String;
+
+        // Show loading
+        showLoading();
+
+        // Save to Firebase
+        await db.ref('students/' + studentId).update({
+          photoUrl: base64Data,
+          photoUpdatedAt: new Date().toISOString(),
+          photoUpdatedBy: AppState.user.uid,
+          photoUpdatedByEmail: AppState.email
+        });
+
+        // Update local data
+        const student = AppState.data.students.find(s => s.id === studentId);
+        if (student) {
+          student.photoUrl = base64Data;
+        }
+
+        // Update the UI in attendance view
+        const photoContainer = document.getElementById('att-photo-' + studentId);
+        if (photoContainer) {
+          const studentName = student?.nombre || '';
+          photoContainer.innerHTML = `
+            <img src="${base64Data}" style="width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid #22c55e;" onclick="viewStudentPhotoFull('${base64Data}', '${studentName.replace(/'/g, "\\'")}')">
+            <button onclick="takeAttendancePhoto('${studentId}')" style="position:absolute;bottom:-2px;right:-2px;width:20px;height:20px;border-radius:50%;background:#3b82f6;border:2px solid white;color:white;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;">📷</button>
+          `;
+          // Remove the "tap to add photo" text if it exists
+          const parentItem = photoContainer.closest('.attendance-item');
+          if (parentItem) {
+            const hintText = parentItem.querySelector('div[style*="font-size:10px"]');
+            if (hintText && hintText.textContent.includes('Toca para agregar')) {
+              hintText.remove();
+            }
+          }
+        }
+
+        hideLoading();
+
+      } catch (err) {
+        hideLoading();
+        if (err.message && !err.message.includes('cancel')) {
+          console.error('Camera error:', err);
+          alert('Error al tomar foto: ' + err.message);
+        }
+      }
     }
 
     // SEARCH
