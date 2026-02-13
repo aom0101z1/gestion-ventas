@@ -303,9 +303,10 @@ function renderTeachersStats(teachers) {
     const inactive = teachers.filter(t => t.status === 'inactive').length;
     const totalGroups = teachers.reduce((sum, t) => sum + t.groupCount, 0);
     const totalStudents = teachers.reduce((sum, t) => sum + t.studentCount, 0);
+    const withAppAccount = teachers.filter(t => t.hasAppAccount).length;
 
     return `
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
             <div style="background: white; padding: 1.25rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); text-align: center; border-left: 4px solid #f59e0b;">
                 <div style="font-size: 2rem; font-weight: bold; color: #f59e0b;">${teachers.length}</div>
                 <div style="color: #6b7280; font-size: 0.875rem;">Total Profesores</div>
@@ -321,6 +322,10 @@ function renderTeachersStats(teachers) {
             <div style="background: white; padding: 1.25rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); text-align: center; border-left: 4px solid #8b5cf6;">
                 <div style="font-size: 2rem; font-weight: bold; color: #8b5cf6;">${totalStudents}</div>
                 <div style="color: #6b7280; font-size: 0.875rem;">Estudiantes Total</div>
+            </div>
+            <div style="background: white; padding: 1.25rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); text-align: center; border-left: 4px solid #06b6d4;">
+                <div style="font-size: 2rem; font-weight: bold; color: #06b6d4;">${withAppAccount}</div>
+                <div style="color: #6b7280; font-size: 0.875rem;">📱 Con App</div>
             </div>
         </div>
     `;
@@ -465,7 +470,19 @@ function renderTeacherRow(teacher) {
                 </button>
             </td>
             <td style="padding: 1rem; text-align: center;">
-                <div style="display: flex; gap: 0.5rem; justify-content: center;">
+                <div style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;">
+                    ${teacher.hasAppAccount ? `
+                        <span title="Ya tiene cuenta de app" style="background: #d1fae5; color: #065f46; padding: 0.4rem 0.6rem;
+                               border-radius: 6px; font-size: 0.75rem; font-weight: 600;">
+                            ✓ App
+                        </span>
+                    ` : `
+                        <button onclick="showCreateAccountModal('${teacher.id}')" title="Crear cuenta para app móvil"
+                                style="background: #10b981; color: white; border: none; padding: 0.4rem 0.6rem;
+                                       border-radius: 6px; cursor: pointer; font-size: 0.75rem; font-weight: 600;">
+                            📱 Crear Cuenta
+                        </button>
+                    `}
                     <button onclick="showTeacherModal('${teacher.id}')" title="Editar profesor"
                             style="background: #3b82f6; color: white; border: none; width: 36px; height: 36px;
                                    border-radius: 8px; cursor: pointer; font-size: 1rem;">
@@ -976,6 +993,228 @@ window.refreshTeachersGrid = async function() {
 
     if (gridEl) {
         gridEl.innerHTML = renderTeachersTable(filteredTeachers);
+    }
+};
+
+// ============================================
+// CREATE TEACHER APP ACCOUNT
+// ============================================
+
+// Secondary Firebase app for creating users without signing out admin
+let secondaryApp = null;
+
+function getSecondaryAuth() {
+    if (!secondaryApp) {
+        const config = {
+            apiKey: "AIzaSyCuq1z8eTo9rufdEDXQFfvoxOkce-kBWOY",
+            authDomain: "ciudad-bilingue-crm.firebaseapp.com",
+            databaseURL: "https://ciudad-bilingue-crm-default-rtdb.firebaseio.com",
+            projectId: "ciudad-bilingue-crm"
+        };
+        // Use compat API for secondary app
+        secondaryApp = firebase.initializeApp(config, 'Secondary');
+    }
+    return secondaryApp.auth();
+}
+
+// Show modal to create teacher app account
+window.showCreateAccountModal = function(teacherId) {
+    const teacher = window.TeacherManager.teachers.get(teacherId);
+    if (!teacher) {
+        alert('Profesor no encontrado');
+        return;
+    }
+
+    if (!teacher.email) {
+        alert('El profesor no tiene correo electrónico registrado. Por favor agregue uno primero.');
+        return;
+    }
+
+    const modalHTML = `
+        <div id="createAccountModal" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5);
+                display: flex; align-items: center; justify-content: center; z-index: 10002; padding: 1rem;">
+            <div style="background: white; border-radius: 16px; max-width: 450px; width: 100%; box-shadow: 0 20px 50px rgba(0,0,0,0.3);">
+                <!-- Modal Header -->
+                <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 1.5rem; border-radius: 16px 16px 0 0;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h2 style="margin: 0; color: white; font-size: 1.25rem;">
+                            🔐 Crear Cuenta de App
+                        </h2>
+                        <button onclick="closeCreateAccountModal()" style="background: rgba(255,255,255,0.2); border: none;
+                                color: white; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; font-size: 1.25rem;">
+                            ✕
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Modal Body -->
+                <div style="padding: 1.5rem;">
+                    <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem;">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <div style="width: 50px; height: 50px; background: linear-gradient(135deg, #f59e0b, #d97706);
+                                        border-radius: 50%; display: flex; align-items: center; justify-content: center;
+                                        color: white; font-weight: bold; font-size: 1.25rem;">
+                                ${(teacher.name || 'P').charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                                <div style="font-weight: 600; color: #111827;">${teacher.name}</div>
+                                <div style="font-size: 0.875rem; color: #6b7280;">✉️ ${teacher.email}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p style="color: #6b7280; font-size: 0.9rem; margin-bottom: 1rem;">
+                        Esta cuenta permitirá al profesor acceder a la <strong>app móvil</strong> con permisos limitados
+                        (solo asistencia y sus grupos asignados).
+                    </p>
+
+                    <div style="margin-bottom: 1rem;">
+                        <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #374151;">
+                            Contraseña para el profesor *
+                        </label>
+                        <input type="password" id="teacherPassword" required minlength="6"
+                               placeholder="Mínimo 6 caracteres"
+                               style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1rem;">
+                    </div>
+
+                    <div style="margin-bottom: 1.5rem;">
+                        <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #374151;">
+                            Confirmar Contraseña *
+                        </label>
+                        <input type="password" id="teacherPasswordConfirm" required minlength="6"
+                               placeholder="Repite la contraseña"
+                               style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1rem;">
+                    </div>
+
+                    <div id="createAccountError" style="display: none; background: #fee2e2; color: #dc2626; padding: 0.75rem;
+                            border-radius: 8px; margin-bottom: 1rem; font-size: 0.875rem;"></div>
+
+                    <div id="createAccountSuccess" style="display: none; background: #d1fae5; color: #065f46; padding: 0.75rem;
+                            border-radius: 8px; margin-bottom: 1rem; font-size: 0.875rem;"></div>
+
+                    <div style="display: flex; gap: 1rem;">
+                        <button onclick="closeCreateAccountModal()" style="flex: 1; padding: 0.75rem; border: 2px solid #d1d5db;
+                                background: white; border-radius: 8px; cursor: pointer; font-weight: 600; color: #6b7280;">
+                            Cancelar
+                        </button>
+                        <button onclick="createTeacherAccount('${teacherId}')" id="createAccountBtn"
+                                style="flex: 1; padding: 0.75rem; border: none; background: linear-gradient(135deg, #10b981, #059669);
+                                color: white; border-radius: 8px; cursor: pointer; font-weight: 600;">
+                            🔐 Crear Cuenta
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    document.getElementById('teacherPassword').focus();
+};
+
+window.closeCreateAccountModal = function() {
+    const modal = document.getElementById('createAccountModal');
+    if (modal) modal.remove();
+};
+
+window.createTeacherAccount = async function(teacherId) {
+    const teacher = window.TeacherManager.teachers.get(teacherId);
+    if (!teacher) return;
+
+    const password = document.getElementById('teacherPassword').value;
+    const passwordConfirm = document.getElementById('teacherPasswordConfirm').value;
+    const errorDiv = document.getElementById('createAccountError');
+    const successDiv = document.getElementById('createAccountSuccess');
+    const btn = document.getElementById('createAccountBtn');
+
+    // Reset messages
+    errorDiv.style.display = 'none';
+    successDiv.style.display = 'none';
+
+    // Validations
+    if (!password || password.length < 6) {
+        errorDiv.textContent = 'La contraseña debe tener al menos 6 caracteres';
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    if (password !== passwordConfirm) {
+        errorDiv.textContent = 'Las contraseñas no coinciden';
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    // Disable button and show loading
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Creando...';
+
+    try {
+        // Create user with secondary auth (won't affect current admin session)
+        const secondaryAuth = getSecondaryAuth();
+        const userCredential = await secondaryAuth.createUserWithEmailAndPassword(teacher.email, password);
+        const uid = userCredential.user.uid;
+
+        // Sign out from secondary auth immediately
+        await secondaryAuth.signOut();
+
+        // Now save the user profile with role 'teacher' in database
+        const db = window.firebaseModules.database;
+        const userRef = db.ref(window.FirebaseData.database, `users/${uid}/profile`);
+        await db.set(userRef, {
+            email: teacher.email,
+            nombre: teacher.name,
+            rol: 'teacher',
+            teacherId: teacherId,
+            createdAt: new Date().toISOString(),
+            createdBy: window.currentUser?.uid || 'admin'
+        });
+
+        // Update teacher record with the auth UID
+        await window.TeacherManager.saveTeacher({
+            ...teacher,
+            authUid: uid,
+            hasAppAccount: true
+        });
+
+        // Show success
+        successDiv.innerHTML = `
+            ✅ <strong>Cuenta creada exitosamente!</strong><br>
+            <span style="font-size: 0.8rem;">
+                El profesor puede acceder a la app con:<br>
+                📧 ${teacher.email}<br>
+                🔑 La contraseña que configuraste
+            </span>
+        `;
+        successDiv.style.display = 'block';
+
+        btn.innerHTML = '✓ Cuenta Creada';
+        btn.style.background = '#6b7280';
+
+        // Refresh the grid to show updated status
+        await refreshTeachersGrid();
+
+        // Close modal after 3 seconds
+        setTimeout(() => {
+            closeCreateAccountModal();
+        }, 3000);
+
+    } catch (error) {
+        console.error('Error creating account:', error);
+
+        let errorMessage = 'Error al crear la cuenta';
+        if (error.code === 'auth/email-already-in-use') {
+            errorMessage = 'Ya existe una cuenta con este correo electrónico';
+        } else if (error.code === 'auth/invalid-email') {
+            errorMessage = 'El correo electrónico no es válido';
+        } else if (error.code === 'auth/weak-password') {
+            errorMessage = 'La contraseña es muy débil';
+        }
+
+        errorDiv.textContent = errorMessage;
+        errorDiv.style.display = 'block';
+
+        btn.disabled = false;
+        btn.innerHTML = '🔐 Crear Cuenta';
     }
 };
 

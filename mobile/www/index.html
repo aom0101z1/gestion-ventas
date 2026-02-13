@@ -152,12 +152,26 @@
 
     const AppState = {
       user: null, role: null, email: null,
+      isTeacherMode: false, // Restricted mode for teachers
+      teacherId: null, // Teacher's ID in the teachers collection
+      teacherData: null, // Teacher's profile data
+      assignedGroups: [], // Groups assigned to this teacher
       navStack: [],
       currentModule: null,
       editMode: false,
       data: { students: [], grupos2: [], employees: [], teachers: [], contacts: [], leads: [], payments: [], tasks: [] }
     };
 
+    // Teacher-specific modules (restricted view)
+    const TEACHER_MODULE_CATEGORIES = [
+      { id: 'profesor', title: 'Mis Clases', icon: '👩‍🏫', expanded: true, modules: [
+        { id: 'asistencia', name: 'Asistencia', icon: '📋', color: 'asistencia' },
+        { id: 'mis-grupos', name: 'Mis Grupos', icon: '🎓', color: 'grupos2' },
+        { id: 'progreso', name: 'Progreso', icon: '📚', color: 'progreso' }
+      ]}
+    ];
+
+    // Full admin/director modules
     const MODULE_CATEGORIES = [
       { id: 'escolares', title: 'Módulos Escolares', icon: '🏫', expanded: true, modules: [
         { id: 'estudiantes', name: 'Estudiantes', icon: '👥', color: 'estudiantes' },
@@ -202,12 +216,92 @@
     });
 
     async function loadUserRole(uid) {
-      try { const snap = await db.ref('users/' + uid + '/profile').once('value'); AppState.role = snap.val()?.rol || 'teacher'; }
-      catch (e) { AppState.role = 'teacher'; }
+      try {
+        const snap = await db.ref('users/' + uid + '/profile').once('value');
+        AppState.role = snap.val()?.rol || 'teacher';
+
+        // Check if user is in teacher mode (role is 'teacher' or 'profesor')
+        if (AppState.role === 'teacher' || AppState.role === 'profesor') {
+          AppState.isTeacherMode = true;
+          await loadTeacherData();
+        } else {
+          AppState.isTeacherMode = false;
+        }
+      }
+      catch (e) {
+        AppState.role = 'teacher';
+        AppState.isTeacherMode = true;
+        await loadTeacherData();
+      }
+    }
+
+    // Load teacher's profile and assigned groups
+    async function loadTeacherData() {
+      try {
+        // Find teacher by email
+        const teachersSnap = await db.ref('teachers').orderByChild('email').equalTo(AppState.email).once('value');
+        if (teachersSnap.exists()) {
+          const teachers = teachersSnap.val();
+          const teacherKey = Object.keys(teachers)[0];
+          AppState.teacherId = teacherKey;
+          AppState.teacherData = teachers[teacherKey];
+        }
+
+        // Also try to find by payroll/teachers path
+        if (!AppState.teacherId) {
+          const payrollSnap = await db.ref('payroll/teachers').orderByChild('personalInfo/email').equalTo(AppState.email).once('value');
+          if (payrollSnap.exists()) {
+            const payrollTeachers = payrollSnap.val();
+            const teacherKey = Object.keys(payrollTeachers)[0];
+            AppState.teacherId = teacherKey;
+            AppState.teacherData = payrollTeachers[teacherKey];
+          }
+        }
+
+        // Load groups assigned to this teacher
+        const groupsSnap = await db.ref('grupos2').once('value');
+        if (groupsSnap.exists()) {
+          const allGroups = groupsSnap.val();
+          AppState.assignedGroups = [];
+          for (const [gid, group] of Object.entries(allGroups)) {
+            // Check if teacher is assigned to this group
+            if (group.teacherId === AppState.teacherId ||
+                group.teacherEmail === AppState.email ||
+                (group.teacherName && AppState.teacherData?.nombre &&
+                 group.teacherName.toLowerCase().includes(AppState.teacherData.nombre.toLowerCase()))) {
+              AppState.assignedGroups.push({ id: gid, ...group });
+            }
+          }
+        }
+        console.log('Teacher mode loaded:', AppState.teacherId, 'Groups:', AppState.assignedGroups.length);
+      } catch (e) {
+        console.error('Error loading teacher data:', e);
+      }
     }
 
     function showLoginScreen() { $('login-screen').classList.remove('hidden'); $('main-app').classList.add('hidden'); }
-    async function showMainApp() { $('login-screen').classList.add('hidden'); $('main-app').classList.remove('hidden'); $('header-subtitle').textContent = 'Hola, ' + AppState.email.split('@')[0]; await loadAllData(); navigateTo('modules'); }
+    async function showMainApp() {
+      $('login-screen').classList.add('hidden');
+      $('main-app').classList.remove('hidden');
+
+      // Show different header for teacher mode
+      if (AppState.isTeacherMode) {
+        $('header-title').textContent = 'TutorBox Profesor';
+        $('header-subtitle').textContent = '👩‍🏫 ' + (AppState.teacherData?.nombre || AppState.email.split('@')[0]);
+        // Hide extra nav items for teachers
+        document.querySelectorAll('.nav-item').forEach(item => {
+          const screen = item.dataset.screen;
+          if (screen === 'notifications' || screen === 'search') {
+            item.style.display = 'none';
+          }
+        });
+      } else {
+        $('header-subtitle').textContent = 'Hola, ' + AppState.email.split('@')[0];
+      }
+
+      await loadAllData();
+      navigateTo('modules');
+    }
 
     $('login-btn').addEventListener('click', async () => {
       const email = $('login-email').value.trim(), password = $('login-password').value, err = $('login-error');
@@ -256,9 +350,44 @@
     }
 
     function canAccess(m) { return !m.roles || m.roles.includes(AppState.role); }
-    function canEdit() { return AppState.role === 'admin' || AppState.role === 'director'; }
+    function canEdit() { return !AppState.isTeacherMode && (AppState.role === 'admin' || AppState.role === 'director'); }
+    function canViewSensitiveData() { return !AppState.isTeacherMode; } // Teachers can't see phone/documents
 
     function renderModules() {
+      // Teacher Mode - Show restricted interface
+      if (AppState.isTeacherMode) {
+        $('header-title').textContent = 'TutorBox Profesor';
+
+        // Count students in teacher's groups only
+        const myStudentIds = new Set();
+        AppState.assignedGroups.forEach(g => {
+          AppState.data.students.filter(s => String(s.grupo) === String(g.id) && (s.status === 'active' || !s.status))
+            .forEach(s => myStudentIds.add(s.id));
+        });
+        const myStudentCount = myStudentIds.size;
+
+        const teacherStats = '<div class="quick-stats">' +
+          '<div class="quick-stat"><div class="quick-stat-value">' + AppState.assignedGroups.length + '</div><div class="quick-stat-label">Mis Grupos</div></div>' +
+          '<div class="quick-stat"><div class="quick-stat-value">' + myStudentCount + '</div><div class="quick-stat-label">Mis Estudiantes</div></div>' +
+        '</div>';
+
+        // Welcome message for teachers
+        const welcomeCard = `
+          <div style="background:linear-gradient(135deg,#667eea,#764ba2);padding:20px;border-radius:16px;margin-bottom:16px;color:white;">
+            <div style="font-size:24px;margin-bottom:8px;">👋 Hola, ${AppState.teacherData?.nombre || AppState.email.split('@')[0]}</div>
+            <div style="font-size:14px;opacity:0.9;">Bienvenido al modo profesor. Aquí puedes tomar asistencia y ver el progreso de tus estudiantes.</div>
+          </div>
+        `;
+
+        const teacherCats = TEACHER_MODULE_CATEGORIES.map(cat => {
+          return '<div class="module-category"><div class="category-header" onclick="toggleCat(\'' + cat.id + '\')"><div class="category-title"><span>' + cat.icon + '</span><span>' + cat.title + '</span></div><span class="category-arrow">▼</span></div><div class="category-content" id="cat-' + cat.id + '">' + cat.modules.map(m => '<button class="module-btn module-' + m.color + '" onclick="openMod(\'' + m.id + '\',\'' + m.name + '\',\'' + m.icon + '\')"><span class="module-btn-icon">' + m.icon + '</span><span class="module-btn-label">' + m.name + '</span></button>').join('') + '</div></div>';
+        }).join('');
+
+        $('main-content').innerHTML = welcomeCard + teacherStats + teacherCats;
+        return;
+      }
+
+      // Admin/Director Mode - Show full interface
       $('header-title').textContent = 'TutorBox CRM';
       const activeCount = AppState.data.students.filter(s => s.status === 'active' || !s.status).length;
       const stats = '<div class="quick-stats">' +
@@ -276,11 +405,16 @@
     }
 
     function toggleCat(id) {
-      const cat = MODULE_CATEGORIES.find(c => c.id === id);
-      cat.expanded = !cat.expanded;
-      const el = $('cat-' + id);
-      el.classList.toggle('hidden');
-      el.previousElementSibling.classList.toggle('collapsed');
+      // Find category in either admin or teacher categories
+      const cat = MODULE_CATEGORIES.find(c => c.id === id) || TEACHER_MODULE_CATEGORIES.find(c => c.id === id);
+      if (cat) {
+        cat.expanded = !cat.expanded;
+        const el = $('cat-' + id);
+        if (el) {
+          el.classList.toggle('hidden');
+          el.previousElementSibling?.classList.toggle('collapsed');
+        }
+      }
     }
 
     function openMod(id, name, icon) {
@@ -318,6 +452,7 @@
       setTimeout(() => {
         if (id === 'estudiantes') renderStudents(c);
         else if (id === 'grupos' || id === 'grupos2') renderGrupos(c);
+        else if (id === 'mis-grupos') renderTeacherGroups(c); // Teacher's assigned groups
         else if (id === 'profesores') renderTeachers(c);
         else if (id === 'empleados') renderEmployees(c);
         else if (id === 'contactos') renderContacts(c);
@@ -2830,8 +2965,20 @@
 
     // ATTENDANCE MODULE
     function renderAttendance(c) {
-      const grupos = AppState.data.grupos2;
-      c.innerHTML = `<div class="card"><div class="card-header"><div class="card-icon">📋</div><div><h3 class="card-title">Tomar Asistencia</h3><p class="card-subtitle">Selecciona un grupo</p></div></div></div>
+      // In teacher mode, only show assigned groups
+      const grupos = AppState.isTeacherMode ? AppState.assignedGroups : AppState.data.grupos2;
+
+      if (AppState.isTeacherMode && grupos.length === 0) {
+        c.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">📋</div>
+            <h3 class="empty-state-title">Sin grupos asignados</h3>
+            <p class="empty-state-text">No tienes grupos asignados actualmente. Contacta al administrador para que te asigne grupos.</p>
+          </div>`;
+        return;
+      }
+
+      c.innerHTML = `<div class="card"><div class="card-header"><div class="card-icon">📋</div><div><h3 class="card-title">Tomar Asistencia</h3><p class="card-subtitle">${AppState.isTeacherMode ? 'Mis grupos asignados' : 'Selecciona un grupo'}</p></div></div></div>
         <div class="list">${grupos.map(g => {
           const count = AppState.data.students.filter(s => String(s.grupo) === String(g.id) && (s.status === 'active' || !s.status)).length;
           return `<div class="list-item" onclick="openAtt('${g.id}','${(g.nombre || 'Grupo').replace(/'/g, '')}')">
@@ -2843,6 +2990,94 @@
             <span class="list-item-arrow">›</span>
           </div>`;
         }).join('')}</div>`;
+    }
+
+    // TEACHER'S GROUPS MODULE - View assigned groups with students
+    function renderTeacherGroups(c) {
+      const grupos = AppState.assignedGroups;
+
+      if (grupos.length === 0) {
+        c.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">🎓</div>
+            <h3 class="empty-state-title">Sin grupos asignados</h3>
+            <p class="empty-state-text">No tienes grupos asignados actualmente.</p>
+          </div>`;
+        return;
+      }
+
+      c.innerHTML = `
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon">🎓</div>
+            <div>
+              <h3 class="card-title">Mis Grupos</h3>
+              <p class="card-subtitle">${grupos.length} grupo${grupos.length > 1 ? 's' : ''} asignado${grupos.length > 1 ? 's' : ''}</p>
+            </div>
+          </div>
+        </div>
+        <div class="list">
+          ${grupos.map(g => {
+            const students = AppState.data.students.filter(s => String(s.grupo) === String(g.id) && (s.status === 'active' || !s.status));
+            const schedule = g.days ? g.days.join(', ') : 'Sin horario';
+            return `
+              <div class="list-item" onclick="showTeacherGroupDetail('${g.id}')">
+                <div class="list-item-avatar" style="background:linear-gradient(135deg,#667eea,#764ba2);">${g.nombre?.[0] || 'G'}</div>
+                <div class="list-item-content">
+                  <div class="list-item-title">${g.nombre || 'Grupo ' + g.id}</div>
+                  <div class="list-item-subtitle">${students.length} estudiantes · ${schedule}</div>
+                </div>
+                <span class="list-item-arrow">›</span>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    // Show teacher's group detail with student list (no sensitive info)
+    function showTeacherGroupDetail(groupId) {
+      const group = AppState.assignedGroups.find(g => g.id === groupId);
+      if (!group) return;
+
+      const students = AppState.data.students.filter(s => String(s.grupo) === String(groupId) && (s.status === 'active' || !s.status));
+      students.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
+
+      AppState.navStack.push({ type: 'detail', module: 'mis-grupos', id: groupId, name: group.nombre, icon: '🎓' });
+      $('module-view-title').textContent = '🎓 ' + (group.nombre || 'Grupo');
+      $('edit-btn').style.display = 'none';
+
+      const c = $('module-view-content');
+      c.innerHTML = `
+        <div class="detail-card">
+          <h3 style="margin:0 0 16px;font-size:18px;">${group.nombre || 'Grupo'}</h3>
+          <div class="detail-field"><label>Horario</label><span>${group.days ? group.days.join(', ') : 'No definido'}</span></div>
+          <div class="detail-field"><label>Hora</label><span>${group.startTime || ''} - ${group.endTime || ''}</span></div>
+          <div class="detail-field"><label>Libro</label><span>${group.book || 'No asignado'}</span></div>
+          <div class="detail-field"><label>Unidad</label><span>${group.unit || '-'}</span></div>
+        </div>
+
+        <div class="detail-card">
+          <h3 style="margin:0 0 16px;font-size:16px;">👥 Estudiantes (${students.length})</h3>
+          ${students.length ? students.map((s, i) => `
+            <div style="display:flex;align-items:center;padding:12px 0;${i < students.length - 1 ? 'border-bottom:1px solid #f3f4f6;' : ''}">
+              ${s.photoUrl
+                ? `<img src="${s.photoUrl}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;margin-right:12px;" onclick="viewStudentPhotoFull('${s.photoUrl}', '${(s.nombre || '').replace(/'/g, "\\'")}')"/>`
+                : `<div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#2563eb);display:flex;align-items:center;justify-content:center;color:white;font-weight:600;margin-right:12px;">${(s.nombre || '?')[0]}</div>`
+              }
+              <div style="flex:1;">
+                <div style="font-weight:600;color:#1f2937;">${s.nombre || 'Sin nombre'}</div>
+                <div style="font-size:12px;color:#6b7280;">${s.edad ? s.edad + ' años' : ''}</div>
+              </div>
+              <button onclick="takeAttendancePhoto('${s.id}')" style="background:#3b82f6;border:none;color:white;padding:8px 12px;border-radius:8px;font-size:12px;cursor:pointer;">📷</button>
+            </div>
+          `).join('') : '<p style="color:#6b7280;text-align:center;">No hay estudiantes en este grupo</p>'}
+        </div>
+
+        <button class="btn btn-primary" onclick="openAtt('${groupId}', '${(group.nombre || 'Grupo').replace(/'/g, '')}')" style="width:100%;margin-top:16px;">
+          📋 Tomar Asistencia
+        </button>
+      `;
     }
 
     function openAtt(gid, gname) {
@@ -3106,13 +3341,59 @@
 
     function renderProfile() {
       $('header-title').textContent = 'Perfil';
-      const rn = { admin: 'Administrador', director: 'Director', teacher: 'Profesor' };
+      const rn = { admin: 'Administrador', director: 'Director', teacher: 'Profesor', profesor: 'Profesor' };
+
+      // Teacher Mode Profile
+      if (AppState.isTeacherMode) {
+        const myStudentIds = new Set();
+        AppState.assignedGroups.forEach(g => {
+          AppState.data.students.filter(s => String(s.grupo) === String(g.id) && (s.status === 'active' || !s.status))
+            .forEach(s => myStudentIds.add(s.id));
+        });
+
+        $('main-content').innerHTML = `
+          <div class="card" style="text-align:center;padding:32px;">
+            <div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,#f59e0b,#d97706);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:32px;color:white;">👩‍🏫</div>
+            <h2 style="margin:0 0 4px;font-size:20px;">${AppState.teacherData?.nombre || AppState.email?.split('@')[0] || 'Profesor'}</h2>
+            <p style="color:var(--text-secondary);margin:0 0 8px;">${AppState.email}</p>
+            <span class="badge" style="background:#fef3c7;color:#92400e;">👩‍🏫 Profesor</span>
+          </div>
+          <div class="card">
+            <h3 style="margin:0 0 12px;font-size:16px;">📊 Mis Estadísticas</h3>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+              <div style="background:linear-gradient(135deg,#667eea15,#764ba215);padding:12px;border-radius:8px;text-align:center;">
+                <div style="font-size:24px;font-weight:700;color:#667eea;">${AppState.assignedGroups.length}</div>
+                <div style="font-size:12px;color:var(--text-secondary);">Mis Grupos</div>
+              </div>
+              <div style="background:linear-gradient(135deg,#10b98115,#05966915);padding:12px;border-radius:8px;text-align:center;">
+                <div style="font-size:24px;font-weight:700;color:#10b981;">${myStudentIds.size}</div>
+                <div style="font-size:12px;color:var(--text-secondary);">Mis Estudiantes</div>
+              </div>
+            </div>
+          </div>
+          ${AppState.assignedGroups.length ? `
+          <div class="card">
+            <h3 style="margin:0 0 12px;font-size:16px;">🎓 Mis Grupos</h3>
+            ${AppState.assignedGroups.map(g => `
+              <div style="padding:8px 0;border-bottom:1px solid #f3f4f6;">
+                <div style="font-weight:600;">${g.nombre || 'Grupo'}</div>
+                <div style="font-size:12px;color:#6b7280;">${g.days ? g.days.join(', ') : ''} ${g.startTime ? '· ' + g.startTime : ''}</div>
+              </div>
+            `).join('')}
+          </div>` : ''}
+          <button class="btn btn-secondary mt-16" onclick="loadAllData()">🔄 Actualizar Datos</button>
+          <button class="btn btn-danger mt-16" onclick="logout()">Cerrar Sesión</button>
+          <p style="text-align:center;margin-top:24px;color:var(--text-light);font-size:12px;">TutorBox Profesor v1.3.0<br>Ciudad Bilingüe</p>`;
+        return;
+      }
+
+      // Admin/Director Profile
       const activeCount = AppState.data.students.filter(s => s.status === 'active' || !s.status).length;
       $('main-content').innerHTML = `<div class="card" style="text-align:center;padding:32px;"><div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,var(--gradient-start),var(--gradient-end));display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:32px;color:white;">${AppState.email?.[0]?.toUpperCase() || '?'}</div><h2 style="margin:0 0 4px;font-size:20px;">${AppState.email?.split('@')[0] || 'Usuario'}</h2><p style="color:var(--text-secondary);margin:0 0 8px;">${AppState.email}</p><span class="badge badge-success">${rn[AppState.role] || 'Usuario'}</span></div>
         <div class="card"><h3 style="margin:0 0 12px;font-size:16px;">📊 Estadísticas</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;"><div style="background:var(--gray-50);padding:12px;border-radius:8px;text-align:center;"><div style="font-size:24px;font-weight:700;color:var(--primary);">${AppState.data.students.length}</div><div style="font-size:12px;color:var(--text-secondary);">Total Estudiantes</div></div><div style="background:var(--gray-50);padding:12px;border-radius:8px;text-align:center;"><div style="font-size:24px;font-weight:700;color:#10b981;">${activeCount}</div><div style="font-size:12px;color:var(--text-secondary);">Activos</div></div></div></div>
         <button class="btn btn-secondary mt-16" onclick="loadAllData()">🔄 Actualizar Datos</button>
         <button class="btn btn-danger mt-16" onclick="logout()">Cerrar Sesión</button>
-        <p style="text-align:center;margin-top:24px;color:var(--text-light);font-size:12px;">TutorBox CRM v1.2.0<br>Ciudad Bilingüe</p>`;
+        <p style="text-align:center;margin-top:24px;color:var(--text-light);font-size:12px;">TutorBox CRM v1.3.0<br>Ciudad Bilingüe</p>`;
     }
 
     async function logout() { if (confirm('¿Cerrar sesión?')) { showLoading(); await auth.signOut(); } }
