@@ -6415,20 +6415,28 @@ window.deleteExpenseConfirm = async function(id) {
 
 // Show edit expense modal
 window.showEditExpenseModal = async function(id) {
-    // Check if user is admin or director
-    if (window.userRole !== 'admin' && window.userRole !== 'director') {
+    // Check if user is admin or director (also check email for super admin)
+    const currentEmail = window.currentUser?.email || window.FirebaseData?.currentUser?.email || '';
+    const isSuperAdmin = currentEmail === 'admin@ciudadbilingue.com';
+    if (!isSuperAdmin && window.userRole !== 'admin' && window.userRole !== 'director') {
         window.showNotification('🚫 No tienes permisos para editar gastos', 'error');
         return;
     }
 
-    // Find the expense
-    const expense = window.FinanceManager.expenses.find(e => e.id === id);
+    // Find the expense (expenses is a Map, not an array)
+    let expense = null;
+    if (window.FinanceManager.expenses instanceof Map) {
+        expense = window.FinanceManager.expenses.get(id);
+        if (expense) expense = { id, ...expense };
+    } else if (Array.isArray(window.FinanceManager.expenses)) {
+        expense = window.FinanceManager.expenses.find(e => e.id === id);
+    }
     if (!expense) {
         window.showNotification('❌ Gasto no encontrado', 'error');
         return;
     }
 
-    const isAdmin = window.userRole === 'admin' || window.userRole === 'director';
+    const isAdmin = window.userRole === 'admin' || window.userRole === 'director' || isSuperAdmin;
     const customCategories = await window.loadCustomExpenseCategories();
     const expenseType = expense.type || 'business';
 
@@ -6628,13 +6636,20 @@ window.updateExpense = async function(event, id) {
 
         await db.update(expenseRef, updates);
 
-        // Update local data
-        const expenseIndex = window.FinanceManager.expenses.findIndex(e => e.id === id);
-        if (expenseIndex !== -1) {
-            window.FinanceManager.expenses[expenseIndex] = {
-                ...window.FinanceManager.expenses[expenseIndex],
-                ...updates
-            };
+        // Update local data (expenses is a Map)
+        if (window.FinanceManager.expenses instanceof Map) {
+            const existing = window.FinanceManager.expenses.get(id);
+            if (existing) {
+                window.FinanceManager.expenses.set(id, { ...existing, ...updates });
+            }
+        } else if (Array.isArray(window.FinanceManager.expenses)) {
+            const expenseIndex = window.FinanceManager.expenses.findIndex(e => e.id === id);
+            if (expenseIndex !== -1) {
+                window.FinanceManager.expenses[expenseIndex] = {
+                    ...window.FinanceManager.expenses[expenseIndex],
+                    ...updates
+                };
+            }
         }
 
         window.closeEditExpenseModal();

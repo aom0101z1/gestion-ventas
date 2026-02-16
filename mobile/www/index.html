@@ -217,6 +217,21 @@
 
     async function loadUserRole(uid) {
       try {
+        // Super admin override - always full access regardless of DB role
+        if (AppState.email === 'admin@ciudadbilingue.com') {
+          AppState.role = 'admin';
+          AppState.isTeacherMode = false;
+          return;
+        }
+
+        // Force teacher mode for specific accounts
+        if (AppState.email === 'aom0101z1@gmail.com') {
+          AppState.role = 'teacher';
+          AppState.isTeacherMode = true;
+          await loadTeacherData();
+          return;
+        }
+
         const snap = await db.ref('users/' + uid + '/profile').once('value');
         AppState.role = snap.val()?.rol || 'teacher';
 
@@ -229,6 +244,12 @@
         }
       }
       catch (e) {
+        // Super admin fallback - never lock out admin even on error
+        if (AppState.email === 'admin@ciudadbilingue.com') {
+          AppState.role = 'admin';
+          AppState.isTeacherMode = false;
+          return;
+        }
         AppState.role = 'teacher';
         AppState.isTeacherMode = true;
         await loadTeacherData();

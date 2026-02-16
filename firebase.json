@@ -1,0 +1,13 @@
+{
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**",
+      "mobile/**",
+      "TutorBoxCRM/**",
+      "PROJECT_SUMMARY_CRM.md"
+    ]
+  }
+}

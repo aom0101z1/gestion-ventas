@@ -2538,7 +2538,9 @@ onAuthStateChanged(auth, async (user) => {
                     const profile = await window.FirebaseData.loadUserProfile();
                     
                     if (profile) {
-                        window.userRole = profile.role;
+                        window.userRole = profile.role || profile.rol || null;
+                        // Super admin override
+                        if (user.email === 'admin@ciudadbilingue.com') window.userRole = 'admin';
                         
                         // Hide login, show app
                         loginScreen.classList.add('hidden');
@@ -2599,8 +2601,10 @@ onAuthStateChanged(auth, async (user) => {
                     throw new Error('User profile not found. Contact administrator.');
                 }
 
-                window.userRole = profile.role;
-                userRole = profile.role;
+                window.userRole = profile.role || profile.rol || null;
+                // Super admin override
+                if (email === 'admin@ciudadbilingue.com') window.userRole = 'admin';
+                userRole = window.userRole;
                 console.log('👤 User role loaded:', userRole);
                 
                 document.getElementById('loginError').classList.add('hidden');
