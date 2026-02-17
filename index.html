@@ -2014,13 +2014,6 @@
                     <!-- Commission Config Bar -->
                     <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; padding: 1rem; background: #fffbeb; border: 1px solid #f59e0b40; border-radius: 10px; flex-wrap: wrap;">
                         <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <label style="font-weight: 600; color: #92400e; white-space: nowrap;">💰 Comisión por estudiante:</label>
-                            <input type="number" id="commissionAmount" value="50000" min="0" step="1000" style="
-                                width: 130px; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 1rem; text-align: right;
-                            ">
-                            <span style="color: #92400e; font-weight: 500;">COP</span>
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
                             <label style="font-weight: 600; color: #92400e; white-space: nowrap;">📅 Año:</label>
                             <select id="commissionYear" onchange="loadComisiones()" style="padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
                                 <option value="2026" selected>2026</option>
@@ -2043,14 +2036,13 @@
                                     <th>Fecha Conversión</th>
                                     <th>Estudiante</th>
                                     <th>Pago Verificado</th>
-                                    <th>Comisión</th>
                                     <th>Estado Comisión</th>
                                     <th>Acciones</th>
                                 </tr>
                             </thead>
                             <tbody id="comisionesTable">
                                 <tr>
-                                    <td colspan="8" style="text-align: center; color: #666; padding: 2rem;">
+                                    <td colspan="7" style="text-align: center; color: #666; padding: 2rem;">
                                         <div class="loading-spinner"></div><br>
                                         Cargando comisiones...
                                     </td>
@@ -4741,13 +4733,11 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
             const tbody = document.getElementById('comisionesTable');
             if (!tbody) return;
 
-            tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 2rem;"><div class="loading-spinner"></div><br>Cargando comisiones...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 2rem;"><div class="loading-spinner"></div><br>Cargando comisiones...</td></tr>';
 
             try {
                 const db = window.firebaseModules.database;
                 const year = document.getElementById('commissionYear')?.value || '2026';
-                const commissionAmountInput = document.getElementById('commissionAmount');
-                const commissionAmount = commissionAmountInput ? parseInt(commissionAmountInput.value) || 50000 : 50000;
 
                 // Load converted contacts for selected year
                 const allContacts = await window.FirebaseData.getFilteredContacts();
@@ -4780,8 +4770,8 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
                 const comisionesData = comSnap.exists() ? comSnap.val() : {};
 
                 if (converted.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #666; padding: 2rem;">No hay leads convertidos en ${year}</td></tr>`;
-                    renderCommissionStats([], commissionAmount);
+                    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #666; padding: 2rem;">No hay leads convertidos en ${year}</td></tr>`;
+                    renderCommissionStats([]);
                     return;
                 }
 
@@ -4863,7 +4853,6 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
                             <td style="font-size: 0.9rem;">${formatDate(lead.date)}</td>
                             <td>${studentCell}</td>
                             <td>${paymentCell}</td>
-                            <td style="font-weight: 600; color: #059669;">$${commissionAmount.toLocaleString('es-CO')}</td>
                             <td>
                                 <span style="background: ${sc.bg}; color: ${sc.text}; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.8rem; font-weight: 500;">${sc.label}</span>
                             </td>
@@ -4880,11 +4869,11 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
                 }
 
                 tbody.innerHTML = rows.join('');
-                renderCommissionStats(converted.map(c => ({ ...c, comData: comisionesData[c.id] || {} })), commissionAmount);
+                renderCommissionStats(converted.map(c => ({ ...c, comData: comisionesData[c.id] || {} })));
 
             } catch (error) {
                 console.error('❌ Error loading comisiones:', error);
-                tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #dc2626; padding: 2rem;">❌ Error: ${error.message}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #dc2626; padding: 2rem;">❌ Error: ${error.message}</td></tr>`;
             }
         }
 
@@ -4932,7 +4921,7 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
             return { paid: false, amount: 0, count: 0 };
         }
 
-        function renderCommissionStats(convertedLeads, commissionAmount) {
+        function renderCommissionStats(convertedLeads) {
             const statsDiv = document.getElementById('commissionStats');
             if (!statsDiv) return;
 
@@ -4940,8 +4929,6 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
             const verified = convertedLeads.filter(c => (c.comData?.status || 'pendiente') === 'verificado').length;
             const paid = convertedLeads.filter(c => (c.comData?.status || 'pendiente') === 'pagado').length;
             const pending = total - verified - paid;
-            const totalOwed = (total - paid) * commissionAmount;
-            const totalPaid = paid * commissionAmount;
 
             statsDiv.innerHTML = `
                 <div style="background: white; border: 1px solid #e5e7eb; border-radius: 10px; padding: 1rem; text-align: center;">
@@ -4953,16 +4940,12 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
                     <div style="font-size: 0.85rem; color: #6b7280;">Pendientes</div>
                 </div>
                 <div style="background: white; border: 1px solid #e5e7eb; border-radius: 10px; padding: 1rem; text-align: center;">
+                    <div style="font-size: 1.75rem; font-weight: bold; color: #3b82f6;">${verified}</div>
+                    <div style="font-size: 0.85rem; color: #6b7280;">Verificados</div>
+                </div>
+                <div style="background: white; border: 1px solid #e5e7eb; border-radius: 10px; padding: 1rem; text-align: center;">
                     <div style="font-size: 1.75rem; font-weight: bold; color: #10b981;">${paid}</div>
-                    <div style="font-size: 0.85rem; color: #6b7280;">Pagados</div>
-                </div>
-                <div style="background: white; border: 1px solid #e5e7eb; border-radius: 10px; padding: 1rem; text-align: center;">
-                    <div style="font-size: 1.75rem; font-weight: bold; color: #dc2626;">$${totalOwed.toLocaleString('es-CO')}</div>
-                    <div style="font-size: 0.85rem; color: #6b7280;">Por Pagar</div>
-                </div>
-                <div style="background: white; border: 1px solid #e5e7eb; border-radius: 10px; padding: 1rem; text-align: center;">
-                    <div style="font-size: 1.75rem; font-weight: bold; color: #059669;">$${totalPaid.toLocaleString('es-CO')}</div>
-                    <div style="font-size: 0.85rem; color: #6b7280;">Total Pagado</div>
+                    <div style="font-size: 0.85rem; color: #6b7280;">Comisión Pagada</div>
                 </div>
             `;
         }
