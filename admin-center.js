@@ -543,7 +543,17 @@ function renderUserCards() {
         </div>
         
         <!-- Action Buttons -->
-        <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+        <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
+          <button onclick="showEditUserModal('${user.id}')" style="
+            flex: 1;
+            padding: 0.5rem;
+            background: #e0e7ff;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.875rem;
+          ">✏️ Editar</button>
+
           <button onclick="toggleUserPermissions('${user.id}')" style="
             flex: 1;
             padding: 0.5rem;
@@ -553,7 +563,7 @@ function renderUserCards() {
             cursor: pointer;
             font-size: 0.875rem;
           ">👁️ Ver Permisos</button>
-          
+
           <button onclick="toggleUserStatus('${user.id}')" style="
             flex: 1;
             padding: 0.5rem;
@@ -563,7 +573,7 @@ function renderUserCards() {
             cursor: pointer;
             font-size: 0.875rem;
           ">${user.status === 'active' ? '🔒 Bloquear' : '🔓 Activar'}</button>
-          
+
           <button onclick="resetUserPassword('${user.email}')" style="
             flex: 1;
             padding: 0.5rem;
@@ -573,7 +583,7 @@ function renderUserCards() {
             cursor: pointer;
             font-size: 0.875rem;
           ">🔑 Reset Pass</button>
-          
+
           <button onclick="deleteUser('${user.id}')" style="
             padding: 0.5rem 1rem;
             background: #fee2e2;
@@ -912,6 +922,185 @@ function closeModal() {
   }
 }
 
+// Edit User Modal
+function showEditUserModal(userId) {
+  const user = window.AdminCenter.users.get(userId);
+  if (!user) {
+    if (window.showNotification) {
+      window.showNotification('❌ Usuario no encontrado', 'error');
+    }
+    return;
+  }
+
+  const modal = document.getElementById('adminModal');
+  if (!modal) {
+    console.error('Modal container not found');
+    return;
+  }
+
+  const currentName = user.name || '';
+  const currentRole = user.role || user.rol || 'custom';
+
+  modal.innerHTML = `
+    <div style="
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+    ">
+      <div style="
+        background: white;
+        padding: 2rem;
+        border-radius: 12px;
+        width: 90%;
+        max-width: 450px;
+      ">
+        <h2 style="margin-bottom: 1.5rem; color: #1f2937;">✏️ Editar Usuario</h2>
+
+        <div style="
+          background: #f9fafb;
+          padding: 0.75rem 1rem;
+          border-radius: 8px;
+          margin-bottom: 1.5rem;
+          font-size: 0.875rem;
+          color: #6b7280;
+        ">
+          <strong>Email:</strong> ${user.email || 'Sin email'}
+        </div>
+
+        <form id="editUserForm" onsubmit="handleEditUser(event, '${userId}')">
+          <div style="margin-bottom: 1rem;">
+            <label style="display: block; margin-bottom: 0.5rem; color: #374151; font-weight: 500;">
+              Nombre Completo
+            </label>
+            <input type="text" id="editUserName" value="${currentName}" required style="
+              width: 100%;
+              padding: 0.75rem;
+              border: 1px solid #d1d5db;
+              border-radius: 6px;
+              font-size: 1rem;
+              box-sizing: border-box;
+            ">
+          </div>
+
+          <div style="margin-bottom: 1.5rem;">
+            <label style="display: block; margin-bottom: 0.5rem; color: #374151; font-weight: 500;">
+              Rol
+            </label>
+            <select id="editUserRole" style="
+              width: 100%;
+              padding: 0.75rem;
+              border: 1px solid #d1d5db;
+              border-radius: 6px;
+              font-size: 1rem;
+              box-sizing: border-box;
+              background: white;
+            ">
+              <option value="admin" ${currentRole === 'admin' ? 'selected' : ''}>Admin</option>
+              <option value="director" ${currentRole === 'director' ? 'selected' : ''}>Director</option>
+              <option value="teacher" ${currentRole === 'teacher' ? 'selected' : ''}>Profesor</option>
+              <option value="vendedor" ${currentRole === 'vendedor' ? 'selected' : ''}>Vendedor</option>
+              <option value="custom" ${currentRole === 'custom' ? 'selected' : ''}>Custom</option>
+            </select>
+          </div>
+
+          <div style="display: flex; gap: 1rem;">
+            <button type="button" onclick="closeModal()" style="
+              flex: 1;
+              padding: 0.75rem;
+              background: #f3f4f6;
+              border: none;
+              border-radius: 6px;
+              cursor: pointer;
+              font-weight: 500;
+            ">Cancelar</button>
+            <button type="submit" style="
+              flex: 1;
+              padding: 0.75rem;
+              background: #3b82f6;
+              color: white;
+              border: none;
+              border-radius: 6px;
+              cursor: pointer;
+              font-weight: 500;
+            ">💾 Guardar Cambios</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+}
+
+// Handle Edit User Form Submission
+async function handleEditUser(event, userId) {
+  event.preventDefault();
+
+  const newName = document.getElementById('editUserName').value.trim();
+  const newRole = document.getElementById('editUserRole').value;
+
+  if (!newName) {
+    if (window.showNotification) {
+      window.showNotification('❌ El nombre no puede estar vacío', 'error');
+    }
+    return;
+  }
+
+  const user = window.AdminCenter.users.get(userId);
+  const oldName = user ? (user.name || '') : '';
+  const oldRole = user ? (user.role || user.rol || 'custom') : '';
+
+  try {
+    await window.AdminCenter.updateUser(userId, {
+      'profile/name': newName,
+      'profile/role': newRole,
+      'profile/updatedAt': new Date().toISOString(),
+      'profile/updatedBy': window.AdminCenter.currentAdmin.email
+    });
+
+    // Update local cache to reflect changes immediately
+    if (user) {
+      user.name = newName;
+      user.role = newRole;
+    }
+
+    // Audit log
+    if (typeof window.logAudit === 'function') {
+      await window.logAudit(
+        'Usuario editado - Nombre/Rol',
+        'user',
+        userId,
+        `${oldName} → ${newName} | Rol: ${oldRole} → ${newRole}`,
+        {
+          before: { name: oldName, role: oldRole },
+          after: { name: newName, role: newRole }
+        }
+      );
+    }
+
+    if (window.showNotification) {
+      window.showNotification(`✅ Usuario actualizado: ${newName}`, 'success');
+    } else {
+      alert(`✅ Usuario actualizado: ${newName}`);
+    }
+
+    closeModal();
+    renderAdminCenter();
+  } catch (error) {
+    console.error('Error updating user:', error);
+    if (window.showNotification) {
+      window.showNotification('❌ Error: ' + error.message, 'error');
+    } else {
+      alert('❌ Error: ' + error.message);
+    }
+  }
+}
+
 // Initialize Admin Center
 window.AdminCenter = new AdminCenterManager();
 
@@ -919,6 +1108,8 @@ window.AdminCenter = new AdminCenterManager();
 window.renderAdminCenter = renderAdminCenter;
 window.showCreateUserModal = showCreateUserModal;
 window.handleCreateUser = handleCreateUser;
+window.showEditUserModal = showEditUserModal;
+window.handleEditUser = handleEditUser;
 window.toggleUserPermissions = toggleUserPermissions;
 window.updatePermission = updatePermission;
 window.toggleUserStatus = toggleUserStatus;
