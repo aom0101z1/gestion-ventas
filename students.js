@@ -1954,8 +1954,9 @@ window.showCreateStudentAccountModal = function(studentId) {
         return;
     }
 
-    // Ensure phone has country code
-    const phone = student.telefono.startsWith('+') ? student.telefono : `+57${student.telefono.replace(/\D/g, '')}`;
+    // Take only the first phone number (students may have "3207180698/3137734605")
+    const rawPhone = String(student.telefono).split(/[\/,;]+/)[0].trim();
+    const phone = rawPhone.startsWith('+') ? rawPhone : `+57${rawPhone.replace(/\D/g, '')}`;
 
     const modalHTML = `
         <div id="createStudentAccountModal" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5);
@@ -2057,7 +2058,9 @@ window.createStudentTutorBoxAccount = async function(studentId) {
     successDiv.style.display = 'none';
 
     const enrolledBooks = bookSelect.value.split(',').map(Number);
-    const phone = student.telefono.startsWith('+') ? student.telefono : `+57${student.telefono.replace(/\\D/g, '')}`;
+    // Take only the first phone number (students may have "3207180698/3137734605")
+    const rawPhone = String(student.telefono).split(/[\/,;]+/)[0].trim();
+    const phone = rawPhone.startsWith('+') ? rawPhone : `+57${rawPhone.replace(/\D/g, '')}`;
 
     btn.disabled = true;
     btn.innerHTML = '⏳ Creando cuenta...';

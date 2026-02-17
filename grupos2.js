@@ -1131,7 +1131,9 @@ window.batchCreateTutorBoxAccounts = async function(groupId) {
     for (const id of studentIds) {
         const student = window.StudentManager?.students?.get(id);
         if (student && !student.hasAppAccount && student.telefono && student.nombre) {
-            const phone = student.telefono.startsWith('+') ? student.telefono : `+57${student.telefono.replace(/\\D/g, '')}`;
+            // Take only the first phone number (students may have "3207180698/3137734605")
+            const rawPhone = String(student.telefono).split(/[\/,;]+/)[0].trim();
+            const phone = rawPhone.startsWith('+') ? rawPhone : `+57${rawPhone.replace(/\D/g, '')}`;
             studentsToProvision.push({
                 fullName: student.nombre,
                 phoneNumber: phone,
