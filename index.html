@@ -1921,6 +1921,18 @@
                     ">
                         🏢 Empresas
                     </button>
+                    <button class="lead-type-tab" onclick="switchLeadType('comisiones')" id="comisionesLeadTab" style="
+                        padding: 0.75rem 2rem;
+                        border: 2px solid #f59e0b;
+                        background: white;
+                        color: #f59e0b;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-weight: 600;
+                        transition: all 0.2s ease;
+                    ">
+                        💰 Comisiones
+                    </button>
                 </div>
 
                 <!-- GENERAL LEADS VIEW -->
@@ -1996,6 +2008,60 @@
                         </tbody>
                     </table>
                 </div>
+
+                <!-- COMISIONES VIEW -->
+                <div id="comisionesView" style="display: none;">
+                    <!-- Commission Config Bar -->
+                    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; padding: 1rem; background: #fffbeb; border: 1px solid #f59e0b40; border-radius: 10px; flex-wrap: wrap;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <label style="font-weight: 600; color: #92400e; white-space: nowrap;">💰 Comisión por estudiante:</label>
+                            <input type="number" id="commissionAmount" value="50000" min="0" step="1000" style="
+                                width: 130px; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 1rem; text-align: right;
+                            ">
+                            <span style="color: #92400e; font-weight: 500;">COP</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <label style="font-weight: 600; color: #92400e; white-space: nowrap;">📅 Año:</label>
+                            <select id="commissionYear" onchange="loadComisiones()" style="padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
+                                <option value="2026" selected>2026</option>
+                                <option value="2025">2025</option>
+                            </select>
+                        </div>
+                        <button onclick="loadComisiones()" class="btn btn-primary" style="margin-left: auto;">🔄 Actualizar</button>
+                    </div>
+
+                    <!-- Commission Stats -->
+                    <div id="commissionStats" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;"></div>
+
+                    <!-- Commissions Table -->
+                    <div style="overflow-x: auto;">
+                        <table class="table">
+                            <thead>
+                                <tr style="background: #fffbeb;">
+                                    <th>Lead Convertido</th>
+                                    <th>Vendedor</th>
+                                    <th>Fecha Conversión</th>
+                                    <th>Estudiante</th>
+                                    <th>Pago Verificado</th>
+                                    <th>Comisión</th>
+                                    <th>Estado Comisión</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="comisionesTable">
+                                <tr>
+                                    <td colspan="8" style="text-align: center; color: #666; padding: 2rem;">
+                                        <div class="loading-spinner"></div><br>
+                                        Cargando comisiones...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Lead Details Modal Container -->
+                <div id="leadDetailModal"></div>
             </div>
 
             <!-- ========== SECTION 9: TAB CONTENT - PIPELINE ========== -->
@@ -3030,42 +3096,51 @@ onAuthStateChanged(auth, async (user) => {
 
             const generalTab = document.getElementById('generalLeadTab');
             const companyTab = document.getElementById('companyLeadTab');
+            const comisionesTab = document.getElementById('comisionesLeadTab');
             const generalView = document.getElementById('generalLeadsView');
             const companyView = document.getElementById('companyLeadsView');
+            const comisionesView = document.getElementById('comisionesView');
+
+            // Hide all views
+            generalView.style.display = 'none';
+            companyView.style.display = 'none';
+            if (comisionesView) comisionesView.style.display = 'none';
+
+            // Reset all tab styles
+            generalTab.style.background = 'white';
+            generalTab.style.color = '#667eea';
+            generalTab.classList.remove('active');
+            companyTab.style.background = 'white';
+            companyTab.style.color = '#667eea';
+            companyTab.classList.remove('active');
+            if (comisionesTab) {
+                comisionesTab.style.background = 'white';
+                comisionesTab.style.color = '#f59e0b';
+                comisionesTab.classList.remove('active');
+            }
 
             if (type === 'general') {
-                // Show general leads, hide company leads
                 generalView.style.display = 'block';
-                companyView.style.display = 'none';
-
-                // Update tab styles
                 generalTab.style.background = '#667eea';
                 generalTab.style.color = 'white';
                 generalTab.classList.add('active');
-
-                companyTab.style.background = 'white';
-                companyTab.style.color = '#667eea';
-                companyTab.classList.remove('active');
-
-                // Load individual leads
                 updateLeadsTable('individual');
 
             } else if (type === 'company') {
-                // Show company leads, hide general leads
-                generalView.style.display = 'none';
                 companyView.style.display = 'block';
-
-                // Update tab styles
                 companyTab.style.background = '#667eea';
                 companyTab.style.color = 'white';
                 companyTab.classList.add('active');
-
-                generalTab.style.background = 'white';
-                generalTab.style.color = '#667eea';
-                generalTab.classList.remove('active');
-
-                // Load company leads
                 updateLeadsTable('company');
+
+            } else if (type === 'comisiones') {
+                if (comisionesView) comisionesView.style.display = 'block';
+                if (comisionesTab) {
+                    comisionesTab.style.background = '#f59e0b';
+                    comisionesTab.style.color = 'white';
+                    comisionesTab.classList.add('active');
+                }
+                loadComisiones();
             }
 
             console.log('✅ Lead type switched successfully');
@@ -4518,8 +4593,452 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
         }
 
         // ========== SECTION 16.18: ACTION HANDLERS ==========
-        function showLeadDetails(leadId) {
-            alert(`📋 Ver detalles del lead: ${leadId}\n\n✅ Sistema funcionando correctamente`);
+        // ========== LEAD DETAILS MODAL ==========
+        async function showLeadDetails(leadId) {
+            try {
+                const allContacts = await window.FirebaseData.getAllContacts();
+                const lead = allContacts.find(c => c.id === leadId);
+                if (!lead) {
+                    alert('❌ Lead no encontrado');
+                    return;
+                }
+
+                const modal = document.getElementById('leadDetailModal');
+                if (!modal) return;
+
+                const statuses = ['Nuevo', 'Contactado', 'Interesado', 'Negociación', 'Convertido', 'Perdido'];
+                const statusOptions = statuses.map(s =>
+                    `<option value="${s}" ${lead.status === s ? 'selected' : ''}>${s}</option>`
+                ).join('');
+
+                const sources = ['Facebook', 'Instagram', 'Google', 'Referido', 'Volante', 'Pasando por la sede', 'CONVENIO'];
+                const currentSource = (lead.source || '').startsWith('CONVENIO:') ? 'CONVENIO' : lead.source;
+                const sourceOptions = sources.map(s =>
+                    `<option value="${s}" ${currentSource === s ? 'selected' : ''}>${s}</option>`
+                ).join('');
+
+                const locations = ['Pereira', 'Dosquebradas', 'Santa Rosa', 'Otro'];
+                const locationOptions = locations.map(l =>
+                    `<option value="${l}" ${lead.location === l ? 'selected' : ''}>${l}</option>`
+                ).join('');
+
+                let salespersonName = 'No asignado';
+                if (lead.salespersonId) {
+                    try { salespersonName = await getUserDisplayName(lead.salespersonId); } catch(e) {}
+                }
+                if (lead.salespersonName) salespersonName = lead.salespersonName;
+
+                modal.innerHTML = `
+                    <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10000;" onclick="if(event.target===this) closeLeadModal()">
+                        <div style="background: white; padding: 2rem; border-radius: 12px; width: 95%; max-width: 550px; max-height: 90vh; overflow-y: auto;" onclick="event.stopPropagation()">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                                <h2 style="margin: 0; color: #1f2937;">📋 Detalle del Lead</h2>
+                                <button onclick="closeLeadModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #6b7280;">✕</button>
+                            </div>
+
+                            <form id="editLeadForm" onsubmit="handleEditLead(event, '${leadId}')">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                                    <div style="grid-column: 1 / -1;">
+                                        <label style="display: block; margin-bottom: 0.25rem; font-weight: 500; color: #374151;">Nombre *</label>
+                                        <input type="text" id="editLeadName" value="${lead.name || ''}" required style="width: 100%; padding: 0.6rem; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;">
+                                    </div>
+                                    <div>
+                                        <label style="display: block; margin-bottom: 0.25rem; font-weight: 500; color: #374151;">Teléfono *</label>
+                                        <input type="text" id="editLeadPhone" value="${lead.phone || ''}" required style="width: 100%; padding: 0.6rem; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;">
+                                    </div>
+                                    <div>
+                                        <label style="display: block; margin-bottom: 0.25rem; font-weight: 500; color: #374151;">Email</label>
+                                        <input type="email" id="editLeadEmail" value="${lead.email || ''}" style="width: 100%; padding: 0.6rem; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;">
+                                    </div>
+                                    <div>
+                                        <label style="display: block; margin-bottom: 0.25rem; font-weight: 500; color: #374151;">Estado</label>
+                                        <select id="editLeadStatus" style="width: 100%; padding: 0.6rem; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;">
+                                            ${statusOptions}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label style="display: block; margin-bottom: 0.25rem; font-weight: 500; color: #374151;">Fuente</label>
+                                        <select id="editLeadSource" style="width: 100%; padding: 0.6rem; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;">
+                                            ${sourceOptions}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label style="display: block; margin-bottom: 0.25rem; font-weight: 500; color: #374151;">Ubicación</label>
+                                        <select id="editLeadLocation" style="width: 100%; padding: 0.6rem; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;">
+                                            ${locationOptions}
+                                        </select>
+                                    </div>
+                                    <div style="grid-column: 1 / -1;">
+                                        <label style="display: block; margin-bottom: 0.25rem; font-weight: 500; color: #374151;">Notas</label>
+                                        <textarea id="editLeadNotes" rows="3" style="width: 100%; padding: 0.6rem; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box; resize: vertical;">${lead.notes || ''}</textarea>
+                                    </div>
+                                </div>
+
+                                <div style="margin-top: 1rem; padding: 0.75rem; background: #f9fafb; border-radius: 8px; font-size: 0.85rem; color: #6b7280;">
+                                    <div>👤 <strong>Vendedor:</strong> ${salespersonName}</div>
+                                    <div>📅 <strong>Creado:</strong> ${formatDate(lead.date)} ${lead.time || ''}</div>
+                                    ${lead.updatedAt ? `<div>✏️ <strong>Última edición:</strong> ${new Date(lead.updatedAt).toLocaleString('es-CO')}</div>` : ''}
+                                </div>
+
+                                <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
+                                    <button type="button" onclick="openWhatsApp('${lead.phone || ''}', '${(lead.name || '').replace(/'/g, "\\'")}')" style="padding: 0.6rem 1rem; background: #25d366; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">📱 WhatsApp</button>
+                                    <div style="flex: 1;"></div>
+                                    <button type="button" onclick="closeLeadModal()" style="padding: 0.6rem 1.5rem; background: #f3f4f6; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">Cancelar</button>
+                                    <button type="submit" style="padding: 0.6rem 1.5rem; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">💾 Guardar</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('❌ Error showing lead details:', error);
+                alert('❌ Error al cargar detalles del lead');
+            }
+        }
+
+        function closeLeadModal() {
+            const modal = document.getElementById('leadDetailModal');
+            if (modal) modal.innerHTML = '';
+        }
+
+        async function handleEditLead(event, leadId) {
+            event.preventDefault();
+            try {
+                const updates = {
+                    name: document.getElementById('editLeadName').value.trim(),
+                    phone: document.getElementById('editLeadPhone').value.trim(),
+                    email: document.getElementById('editLeadEmail').value.trim(),
+                    status: document.getElementById('editLeadStatus').value,
+                    source: document.getElementById('editLeadSource').value,
+                    location: document.getElementById('editLeadLocation').value,
+                    notes: document.getElementById('editLeadNotes').value.trim()
+                };
+
+                if (!updates.name || !updates.phone) {
+                    alert('⚠️ Nombre y teléfono son obligatorios');
+                    return;
+                }
+
+                await window.FirebaseData.updateContact(leadId, updates);
+
+                if (typeof showNotification === 'function') {
+                    showNotification('✅ Lead actualizado correctamente', 'success');
+                } else {
+                    alert('✅ Lead actualizado');
+                }
+
+                closeLeadModal();
+                updateLeadsTable();
+                if (typeof updateStats === 'function') updateStats();
+            } catch (error) {
+                console.error('❌ Error updating lead:', error);
+                alert('❌ Error: ' + error.message);
+            }
+        }
+
+        // ========== COMISIONES FUNCTIONS ==========
+        async function loadComisiones() {
+            const tbody = document.getElementById('comisionesTable');
+            if (!tbody) return;
+
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 2rem;"><div class="loading-spinner"></div><br>Cargando comisiones...</td></tr>';
+
+            try {
+                const db = window.firebaseModules.database;
+                const year = document.getElementById('commissionYear')?.value || '2026';
+                const commissionAmountInput = document.getElementById('commissionAmount');
+                const commissionAmount = commissionAmountInput ? parseInt(commissionAmountInput.value) || 50000 : 50000;
+
+                // Load converted contacts for selected year
+                const allContacts = await window.FirebaseData.getFilteredContacts();
+                const converted = allContacts.filter(c => {
+                    if (c.status !== 'Convertido') return false;
+                    const contactYear = (c.date || '').substring(0, 4);
+                    return contactYear === year;
+                });
+
+                // Load students
+                const studentsSnap = await db.get(db.ref(window.FirebaseData.database, 'students'));
+                const students = [];
+                if (studentsSnap.exists()) {
+                    studentsSnap.forEach(child => {
+                        students.push({ id: child.key, ...child.val() });
+                    });
+                }
+
+                // Load payments
+                const paymentsSnap = await db.get(db.ref(window.FirebaseData.database, 'payments'));
+                const payments = [];
+                if (paymentsSnap.exists()) {
+                    paymentsSnap.forEach(child => {
+                        payments.push({ id: child.key, ...child.val() });
+                    });
+                }
+
+                // Load existing commission data
+                const comSnap = await db.get(db.ref(window.FirebaseData.database, 'comisiones'));
+                const comisionesData = comSnap.exists() ? comSnap.val() : {};
+
+                if (converted.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #666; padding: 2rem;">No hay leads convertidos en ${year}</td></tr>`;
+                    renderCommissionStats([], commissionAmount);
+                    return;
+                }
+
+                // Sort by date newest first
+                converted.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+                const rows = [];
+                for (const lead of converted) {
+                    const comData = comisionesData[lead.id] || {};
+                    const linkedStudentId = comData.linkedStudentId || null;
+
+                    // Try to find matching student
+                    let studentMatch = null;
+                    if (linkedStudentId) {
+                        studentMatch = students.find(s => s.id === linkedStudentId);
+                    }
+                    if (!studentMatch) {
+                        studentMatch = findStudentMatch(lead, students);
+                    }
+
+                    // Check payment status
+                    let paymentStatus = { paid: false, amount: 0, date: null };
+                    if (studentMatch) {
+                        paymentStatus = checkStudentPayments(studentMatch.id, payments);
+                    }
+
+                    // Commission status
+                    const comStatus = comData.status || 'pendiente';
+
+                    // Salesperson name
+                    let spName = lead.salespersonName || 'No asignado';
+                    if (!lead.salespersonName && lead.salespersonId) {
+                        try { spName = await getUserDisplayName(lead.salespersonId); } catch(e) {}
+                    }
+
+                    // Student cell
+                    let studentCell;
+                    if (studentMatch) {
+                        studentCell = `
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <span style="color: #10b981; font-weight: 500;">✅ ${studentMatch.nombre || studentMatch.name || 'Sin nombre'}</span>
+                                <button onclick="switchTab('students'); setTimeout(() => { const s = document.getElementById('searchStudent'); if(s){ s.value='${(studentMatch.nombre || '').replace(/'/g, "\\'")}'; s.dispatchEvent(new Event('input')); }}, 500);" style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 0.15rem 0.4rem; border-radius: 4px; cursor: pointer; font-size: 0.75rem;" title="Ver en Estudiantes">👁️</button>
+                            </div>`;
+                    } else {
+                        studentCell = `<span style="color: #ef4444;">❌ No encontrado</span>
+                            <button onclick="linkStudentManual('${lead.id}')" style="background: #fef3c7; border: 1px solid #fcd34d; padding: 0.15rem 0.4rem; border-radius: 4px; cursor: pointer; font-size: 0.75rem; margin-left: 0.25rem;" title="Vincular manualmente">🔗</button>`;
+                    }
+
+                    // Payment cell
+                    let paymentCell;
+                    if (!studentMatch) {
+                        paymentCell = '<span style="color: #9ca3af;">-</span>';
+                    } else if (paymentStatus.paid) {
+                        paymentCell = `
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <span style="color: #10b981; font-weight: 500;">✅ $${paymentStatus.amount.toLocaleString('es-CO')}</span>
+                                <button onclick="switchTab('payments')" style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 0.15rem 0.4rem; border-radius: 4px; cursor: pointer; font-size: 0.75rem;" title="Ver en Pagos">👁️</button>
+                            </div>`;
+                    } else {
+                        paymentCell = `<span style="color: #ef4444; font-weight: 500;">⏳ Sin pago</span>
+                            <button onclick="switchTab('payments')" style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 0.15rem 0.4rem; border-radius: 4px; cursor: pointer; font-size: 0.75rem; margin-left: 0.25rem;" title="Ver Pagos">👁️</button>`;
+                    }
+
+                    // Commission status badge
+                    const statusColors = {
+                        pendiente: { bg: '#fef3c7', text: '#92400e', label: '⏳ Pendiente' },
+                        verificado: { bg: '#dbeafe', text: '#1e40af', label: '✅ Verificado' },
+                        pagado: { bg: '#d1fae5', text: '#065f46', label: '💰 Pagado' }
+                    };
+                    const sc = statusColors[comStatus] || statusColors.pendiente;
+
+                    rows.push(`
+                        <tr>
+                            <td>
+                                <div style="font-weight: 500;">${lead.name || 'Sin nombre'}</div>
+                                <div style="font-size: 0.8rem; color: #6b7280;">${lead.phone || ''}</div>
+                            </td>
+                            <td><span style="background: #667eea20; color: #667eea; padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.8rem; font-weight: 500;">${spName}</span></td>
+                            <td style="font-size: 0.9rem;">${formatDate(lead.date)}</td>
+                            <td>${studentCell}</td>
+                            <td>${paymentCell}</td>
+                            <td style="font-weight: 600; color: #059669;">$${commissionAmount.toLocaleString('es-CO')}</td>
+                            <td>
+                                <span style="background: ${sc.bg}; color: ${sc.text}; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.8rem; font-weight: 500;">${sc.label}</span>
+                            </td>
+                            <td>
+                                <select onchange="updateCommissionStatus('${lead.id}', this.value)" style="padding: 0.3rem; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.8rem;">
+                                    <option value="pendiente" ${comStatus === 'pendiente' ? 'selected' : ''}>⏳ Pendiente</option>
+                                    <option value="verificado" ${comStatus === 'verificado' ? 'selected' : ''}>✅ Verificado</option>
+                                    <option value="pagado" ${comStatus === 'pagado' ? 'selected' : ''}>💰 Pagado</option>
+                                </select>
+                                <button onclick="showLeadDetails('${lead.id}')" style="background: #f3f4f6; border: none; padding: 0.3rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem; margin-left: 0.25rem;" title="Ver lead">📋</button>
+                            </td>
+                        </tr>
+                    `);
+                }
+
+                tbody.innerHTML = rows.join('');
+                renderCommissionStats(converted.map(c => ({ ...c, comData: comisionesData[c.id] || {} })), commissionAmount);
+
+            } catch (error) {
+                console.error('❌ Error loading comisiones:', error);
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #dc2626; padding: 2rem;">❌ Error: ${error.message}</td></tr>`;
+            }
+        }
+
+        function findStudentMatch(lead, students) {
+            if (!lead || !students.length) return null;
+            const leadName = (lead.name || '').toLowerCase().trim();
+            const leadPhone = (lead.phone || '').replace(/\D/g, '');
+
+            // Exact phone match first
+            if (leadPhone.length >= 7) {
+                const phoneMatch = students.find(s => {
+                    const sPhone = (s.telefono || '').replace(/\D/g, '');
+                    return sPhone && sPhone === leadPhone;
+                });
+                if (phoneMatch) return phoneMatch;
+            }
+
+            // Name match
+            if (leadName.length >= 3) {
+                const nameMatch = students.find(s => {
+                    const sName = (s.nombre || '').toLowerCase().trim();
+                    return sName && sName === leadName;
+                });
+                if (nameMatch) return nameMatch;
+
+                // Partial name match
+                const partialMatch = students.find(s => {
+                    const sName = (s.nombre || '').toLowerCase().trim();
+                    return sName && (sName.includes(leadName) || leadName.includes(sName));
+                });
+                if (partialMatch) return partialMatch;
+            }
+
+            return null;
+        }
+
+        function checkStudentPayments(studentId, payments) {
+            const studentPayments = payments.filter(p =>
+                p.studentId === studentId && (p.status === 'Pagado' || p.status === 'paid')
+            );
+            if (studentPayments.length > 0) {
+                const totalPaid = studentPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+                return { paid: true, amount: totalPaid, count: studentPayments.length };
+            }
+            return { paid: false, amount: 0, count: 0 };
+        }
+
+        function renderCommissionStats(convertedLeads, commissionAmount) {
+            const statsDiv = document.getElementById('commissionStats');
+            if (!statsDiv) return;
+
+            const total = convertedLeads.length;
+            const verified = convertedLeads.filter(c => (c.comData?.status || 'pendiente') === 'verificado').length;
+            const paid = convertedLeads.filter(c => (c.comData?.status || 'pendiente') === 'pagado').length;
+            const pending = total - verified - paid;
+            const totalOwed = (total - paid) * commissionAmount;
+            const totalPaid = paid * commissionAmount;
+
+            statsDiv.innerHTML = `
+                <div style="background: white; border: 1px solid #e5e7eb; border-radius: 10px; padding: 1rem; text-align: center;">
+                    <div style="font-size: 1.75rem; font-weight: bold; color: #3b82f6;">${total}</div>
+                    <div style="font-size: 0.85rem; color: #6b7280;">Total Convertidos</div>
+                </div>
+                <div style="background: white; border: 1px solid #e5e7eb; border-radius: 10px; padding: 1rem; text-align: center;">
+                    <div style="font-size: 1.75rem; font-weight: bold; color: #f59e0b;">${pending}</div>
+                    <div style="font-size: 0.85rem; color: #6b7280;">Pendientes</div>
+                </div>
+                <div style="background: white; border: 1px solid #e5e7eb; border-radius: 10px; padding: 1rem; text-align: center;">
+                    <div style="font-size: 1.75rem; font-weight: bold; color: #10b981;">${paid}</div>
+                    <div style="font-size: 0.85rem; color: #6b7280;">Pagados</div>
+                </div>
+                <div style="background: white; border: 1px solid #e5e7eb; border-radius: 10px; padding: 1rem; text-align: center;">
+                    <div style="font-size: 1.75rem; font-weight: bold; color: #dc2626;">$${totalOwed.toLocaleString('es-CO')}</div>
+                    <div style="font-size: 0.85rem; color: #6b7280;">Por Pagar</div>
+                </div>
+                <div style="background: white; border: 1px solid #e5e7eb; border-radius: 10px; padding: 1rem; text-align: center;">
+                    <div style="font-size: 1.75rem; font-weight: bold; color: #059669;">$${totalPaid.toLocaleString('es-CO')}</div>
+                    <div style="font-size: 0.85rem; color: #6b7280;">Total Pagado</div>
+                </div>
+            `;
+        }
+
+        async function updateCommissionStatus(leadId, newStatus) {
+            try {
+                const db = window.firebaseModules.database;
+                const comRef = db.ref(window.FirebaseData.database, `comisiones/${leadId}`);
+                const updates = {
+                    status: newStatus,
+                    updatedAt: new Date().toISOString(),
+                    updatedBy: window.FirebaseData.currentUser.email
+                };
+
+                if (newStatus === 'pagado') {
+                    updates.paidDate = new Date().toISOString();
+                    updates.paidBy = window.FirebaseData.currentUser.email;
+                }
+
+                await db.update(comRef, updates);
+
+                if (typeof window.logAudit === 'function') {
+                    await window.logAudit('Comisión actualizada', 'comision', leadId, `Estado → ${newStatus}`, { after: updates });
+                }
+
+                if (typeof showNotification === 'function') {
+                    showNotification(`✅ Comisión: ${newStatus}`, 'success');
+                }
+
+                // Refresh stats
+                loadComisiones();
+            } catch (error) {
+                console.error('❌ Error updating commission:', error);
+                alert('❌ Error: ' + error.message);
+            }
+        }
+
+        async function linkStudentManual(leadId) {
+            const studentName = prompt('Ingresa el nombre exacto del estudiante a vincular:');
+            if (!studentName || !studentName.trim()) return;
+
+            try {
+                const db = window.firebaseModules.database;
+                const studentsSnap = await db.get(db.ref(window.FirebaseData.database, 'students'));
+                const students = [];
+                if (studentsSnap.exists()) {
+                    studentsSnap.forEach(child => { students.push({ id: child.key, ...child.val() }); });
+                }
+
+                const searchTerm = studentName.toLowerCase().trim();
+                const match = students.find(s => {
+                    const sName = (s.nombre || '').toLowerCase().trim();
+                    return sName.includes(searchTerm) || searchTerm.includes(sName);
+                });
+
+                if (!match) {
+                    alert(`❌ No se encontró ningún estudiante con "${studentName}"\n\nVerifica que el nombre esté registrado en el módulo de Estudiantes.`);
+                    return;
+                }
+
+                const comRef = db.ref(window.FirebaseData.database, `comisiones/${leadId}`);
+                await db.update(comRef, {
+                    linkedStudentId: match.id,
+                    linkedStudentName: match.nombre || match.name,
+                    linkedAt: new Date().toISOString(),
+                    linkedBy: window.FirebaseData.currentUser.email
+                });
+
+                if (typeof showNotification === 'function') {
+                    showNotification(`✅ Vinculado a: ${match.nombre || match.name}`, 'success');
+                }
+                loadComisiones();
+            } catch (error) {
+                console.error('❌ Error linking student:', error);
+                alert('❌ Error: ' + error.message);
+            }
         }
 
         async function deleteLead(leadId) {
