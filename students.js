@@ -752,6 +752,18 @@ function renderStudentTable(students) {
                                             aria-label="Notas" title="${s.notes && s.notes.length > 0 ? 'Ver Notas (' + s.notes.length + ')' : 'Notas del Estudiante'}">
                                         📝
                                     </button>
+                                    ${s.hasAppAccount ? `
+                                    <span title="Cuenta TutorBox: ${s.tutorboxEmail || 'creada'}"
+                                          style="background: #d1fae5; color: #065f46; padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; display: inline-flex; align-items: center; height: 36px;">
+                                        ✓ App
+                                    </span>
+                                    ` : `
+                                    <button onclick="showCreateStudentAccountModal('${s.id}')" class="btn btn-sm"
+                                            style="background: #7c3aed; color: white; padding: 0.5rem 0.75rem; font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif; font-size: 1.2rem; min-width: 42px; height: 36px; line-height: 1;"
+                                            aria-label="Crear Cuenta TutorBox" title="Crear Cuenta TutorBox">
+                                        📱
+                                    </button>
+                                    `}
                                     ${(window.userRole === 'admin' || window.userRole === 'director') ? `
                                     <button onclick="deleteStudent('${s.id}')" class="btn btn-sm"
                                             style="background: #ef4444; color: white; padding: 0.5rem 0.75rem; font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif; font-size: 1.2rem; min-width: 42px; height: 36px; line-height: 1;"
@@ -1914,5 +1926,215 @@ function refreshStudentTable() {
 
     document.getElementById('studentResultsCounter').textContent = counterText;
 }
+
+// ============================================
+// SECTION: TUTORBOX APP ACCOUNT PROVISIONING
+// ============================================
+
+const TUTORBOX_CLOUD_FUNCTION_BASE = 'https://us-central1-tutorbox-4d7c9.cloudfunctions.net';
+const TUTORBOX_ADMIN_KEY = 'tbx-admin-2026-cb-provision-k9x7m';
+
+/**
+ * Show modal to create a TutorBox app account for a student
+ */
+window.showCreateStudentAccountModal = function(studentId) {
+    const student = window.StudentManager.students.get(studentId);
+    if (!student) {
+        window.showNotification('❌ Estudiante no encontrado', 'error');
+        return;
+    }
+
+    if (student.hasAppAccount) {
+        window.showNotification('Este estudiante ya tiene cuenta TutorBox', 'info');
+        return;
+    }
+
+    if (!student.telefono) {
+        window.showNotification('❌ El estudiante no tiene teléfono registrado. Agrégalo primero para poder crear la cuenta.', 'error');
+        return;
+    }
+
+    // Ensure phone has country code
+    const phone = student.telefono.startsWith('+') ? student.telefono : `+57${student.telefono.replace(/\D/g, '')}`;
+
+    const modalHTML = `
+        <div id="createStudentAccountModal" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5);
+                display: flex; align-items: center; justify-content: center; z-index: 10002; padding: 1rem;">
+            <div style="background: white; border-radius: 16px; max-width: 500px; width: 100%; box-shadow: 0 20px 50px rgba(0,0,0,0.3);">
+                <!-- Header -->
+                <div style="background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%); padding: 1.5rem; border-radius: 16px 16px 0 0;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h2 style="margin: 0; color: white; font-size: 1.25rem;">
+                            📱 Crear Cuenta TutorBox
+                        </h2>
+                        <button onclick="closeCreateStudentAccountModal()" style="background: rgba(255,255,255,0.2); border: none;
+                                color: white; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; font-size: 1.25rem;">
+                            ✕
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Body -->
+                <div style="padding: 1.5rem;">
+                    <!-- Student info -->
+                    <div style="background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 8px; padding: 1rem; margin-bottom: 1.25rem;">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <div style="width: 50px; height: 50px; background: linear-gradient(135deg, #7c3aed, #5b21b6);
+                                        border-radius: 50%; display: flex; align-items: center; justify-content: center;
+                                        color: white; font-weight: bold; font-size: 1.25rem;">
+                                ${(student.nombre || 'E').charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                                <div style="font-weight: 600; color: #111827;">${student.nombre || 'Sin nombre'}</div>
+                                <div style="font-size: 0.85rem; color: #6b7280;">📞 ${phone}</div>
+                                ${student.grupo ? `<div style="font-size: 0.85rem; color: #6b7280;">📚 Grupo ${student.grupo}</div>` : ''}
+                            </div>
+                        </div>
+                    </div>
+
+                    <p style="color: #6b7280; font-size: 0.9rem; margin-bottom: 1.25rem;">
+                        Se creará una cuenta <strong>@tutorbox.app</strong> con contraseña temporal.
+                        El estudiante podrá recuperar su contraseña por SMS.
+                    </p>
+
+                    <!-- Book selection -->
+                    <div style="margin-bottom: 1.25rem;">
+                        <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #374151;">
+                            Libros asignados
+                        </label>
+                        <select id="studentBookSelect" style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1rem;">
+                            <option value="1">Book 1 (PreA1-A1)</option>
+                            <option value="1,2">Books 1-2 (A1)</option>
+                            <option value="1,2,3">Books 1-3 (A1-A2)</option>
+                            <option value="1,2,3,4,5">Books 1-5 (A1-A2)</option>
+                            <option value="1,2,3,4,5,6,7,8,9,10">Todos los libros (1-10)</option>
+                        </select>
+                    </div>
+
+                    <div id="studentAccountError" style="display: none; background: #fee2e2; color: #dc2626; padding: 0.75rem;
+                            border-radius: 8px; margin-bottom: 1rem; font-size: 0.875rem;"></div>
+
+                    <div id="studentAccountSuccess" style="display: none; background: #d1fae5; color: #065f46; padding: 1rem;
+                            border-radius: 8px; margin-bottom: 1rem; font-size: 0.9rem;"></div>
+
+                    <div id="studentAccountButtons" style="display: flex; gap: 1rem;">
+                        <button onclick="closeCreateStudentAccountModal()" style="flex: 1; padding: 0.75rem; border: 2px solid #d1d5db;
+                                background: white; border-radius: 8px; cursor: pointer; font-weight: 600; color: #6b7280;">
+                            Cancelar
+                        </button>
+                        <button onclick="createStudentTutorBoxAccount('${studentId}')" id="createStudentAccountBtn"
+                                style="flex: 1; padding: 0.75rem; border: none; background: linear-gradient(135deg, #7c3aed, #5b21b6);
+                                color: white; border-radius: 8px; cursor: pointer; font-weight: 600;">
+                            📱 Crear Cuenta
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+};
+
+window.closeCreateStudentAccountModal = function() {
+    const modal = document.getElementById('createStudentAccountModal');
+    if (modal) modal.remove();
+};
+
+/**
+ * Call Cloud Function to create TutorBox app account
+ */
+window.createStudentTutorBoxAccount = async function(studentId) {
+    const student = window.StudentManager.students.get(studentId);
+    if (!student) return;
+
+    const errorDiv = document.getElementById('studentAccountError');
+    const successDiv = document.getElementById('studentAccountSuccess');
+    const btn = document.getElementById('createStudentAccountBtn');
+    const bookSelect = document.getElementById('studentBookSelect');
+
+    errorDiv.style.display = 'none';
+    successDiv.style.display = 'none';
+
+    const enrolledBooks = bookSelect.value.split(',').map(Number);
+    const phone = student.telefono.startsWith('+') ? student.telefono : `+57${student.telefono.replace(/\\D/g, '')}`;
+
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Creando cuenta...';
+
+    try {
+        const response = await fetch(
+            `${TUTORBOX_CLOUD_FUNCTION_BASE}/provisionStudentAccount`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-admin-key': TUTORBOX_ADMIN_KEY
+                },
+                body: JSON.stringify({
+                    fullName: student.nombre,
+                    phoneNumber: phone,
+                    schoolName: 'Ciudad Bilingue',
+                    grupo: student.grupo || '',
+                    enrolledBooks: enrolledBooks,
+                    crmStudentId: studentId
+                })
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || 'Error al crear la cuenta');
+        }
+
+        // Update student record in CRM database
+        await window.StudentManager.saveStudent({
+            ...student,
+            hasAppAccount: true,
+            tutorboxUid: data.uid,
+            tutorboxEmail: data.email,
+            appCreatedAt: new Date().toISOString(),
+            appCreatedBy: window.currentUser?.uid || 'admin'
+        });
+
+        // Show credentials
+        successDiv.innerHTML = `
+            <div style="font-weight: 600; margin-bottom: 0.5rem;">✅ Cuenta creada exitosamente</div>
+            <div style="background: white; border: 1px solid #a7f3d0; border-radius: 6px; padding: 0.75rem; margin-top: 0.5rem;">
+                <div style="margin-bottom: 0.5rem;">
+                    <span style="font-weight: 600;">📧 Email:</span>
+                    <span style="font-family: monospace; background: #ecfdf5; padding: 0.2rem 0.5rem; border-radius: 4px;">${data.email}</span>
+                </div>
+                <div>
+                    <span style="font-weight: 600;">🔑 Contraseña:</span>
+                    <span style="font-family: monospace; background: #ecfdf5; padding: 0.2rem 0.5rem; border-radius: 4px;">${data.temporaryPassword}</span>
+                </div>
+            </div>
+            <div style="font-size: 0.8rem; color: #059669; margin-top: 0.5rem;">
+                Comparta estas credenciales con el estudiante. Puede cambiar la contraseña desde la app.
+            </div>
+        `;
+        successDiv.style.display = 'block';
+
+        // Hide the create button, show close
+        document.getElementById('studentAccountButtons').innerHTML = `
+            <button onclick="closeCreateStudentAccountModal()" style="width: 100%; padding: 0.75rem; border: none;
+                    background: #6b7280; color: white; border-radius: 8px; cursor: pointer; font-weight: 600;">
+                Cerrar
+            </button>
+        `;
+
+        // Refresh student table
+        refreshStudentTable();
+
+    } catch (error) {
+        console.error('Error creating TutorBox account:', error);
+        errorDiv.textContent = error.message || 'Error al crear la cuenta. Intente nuevamente.';
+        errorDiv.style.display = 'block';
+        btn.disabled = false;
+        btn.innerHTML = '📱 Crear Cuenta';
+    }
+};
 
 console.log('✅ Students module loaded successfully');

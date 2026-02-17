@@ -883,7 +883,25 @@ window.viewGrupo2Students = async function(groupId) {
             </div>
 
             <!-- Footer -->
-            <div style="padding: 1rem 1.25rem; background: #f9fafb; border-top: 1px solid #e5e7eb; display: flex; justify-content: flex-end;">
+            <div style="padding: 1rem 1.25rem; background: #f9fafb; border-top: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                ${(() => {
+                    const withoutAccount = assignedStudents.filter(s => !s.notFound && !s.hasAppAccount && s.telefono);
+                    const withAccount = assignedStudents.filter(s => s.hasAppAccount);
+                    if (withoutAccount.length > 0) {
+                        return `
+                            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                <button onclick="batchCreateTutorBoxAccounts(${groupId})" id="batchCreateBtn-${groupId}"
+                                        style="background: linear-gradient(135deg, #7c3aed, #5b21b6); color: white; border: none; padding: 0.75rem 1.25rem; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.9rem;">
+                                    📱 Crear Cuentas TutorBox (${withoutAccount.length} pendientes)
+                                </button>
+                                ${withAccount.length > 0 ? `<span style="font-size: 0.8rem; color: #059669;">✓ ${withAccount.length} ya tienen cuenta</span>` : ''}
+                            </div>
+                        `;
+                    } else if (withAccount.length > 0) {
+                        return `<span style="font-size: 0.85rem; color: #059669; font-weight: 500;">✓ Todos tienen cuenta TutorBox</span>`;
+                    }
+                    return '<div></div>';
+                })()}
                 <button onclick="closeGrupo2StudentsModal()" style="background: #6b7280; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 6px; cursor: pointer; font-weight: 500;">
                     Cerrar
                 </button>
@@ -1091,6 +1109,170 @@ function renderGrupos2Grid(groups) {
             ${groups.map(group => renderGrupo2Card(group)).join('')}
         </div>
     `;
+}
+
+// ============================================
+// TUTORBOX BATCH ACCOUNT PROVISIONING
+// ============================================
+
+const TUTORBOX_CF_BASE = 'https://us-central1-tutorbox-4d7c9.cloudfunctions.net';
+const TUTORBOX_KEY = 'tbx-admin-2026-cb-provision-k9x7m';
+
+/**
+ * Batch create TutorBox accounts for all students in a group
+ */
+window.batchCreateTutorBoxAccounts = async function(groupId) {
+    const group = window.GroupsManager2.groups.get(groupId);
+    if (!group) return;
+
+    const studentIds = group.studentIds || [];
+    const studentsToProvision = [];
+
+    for (const id of studentIds) {
+        const student = window.StudentManager?.students?.get(id);
+        if (student && !student.hasAppAccount && student.telefono && student.nombre) {
+            const phone = student.telefono.startsWith('+') ? student.telefono : `+57${student.telefono.replace(/\\D/g, '')}`;
+            studentsToProvision.push({
+                fullName: student.nombre,
+                phoneNumber: phone,
+                grupo: String(groupId),
+                enrolledBooks: [1],
+                crmStudentId: id
+            });
+        }
+    }
+
+    if (studentsToProvision.length === 0) {
+        window.showNotification('No hay estudiantes pendientes para crear cuenta', 'info');
+        return;
+    }
+
+    if (!confirm(`¿Crear cuentas TutorBox para ${studentsToProvision.length} estudiantes del Grupo ${groupId}?`)) {
+        return;
+    }
+
+    const btn = document.getElementById(`batchCreateBtn-${groupId}`);
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `⏳ Creando ${studentsToProvision.length} cuentas...`;
+    }
+
+    try {
+        const response = await fetch(
+            `${TUTORBOX_CF_BASE}/batchProvisionStudents`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-admin-key': TUTORBOX_KEY
+                },
+                body: JSON.stringify({
+                    students: studentsToProvision,
+                    schoolName: 'Ciudad Bilingue'
+                })
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Error en provisión masiva');
+        }
+
+        // Update each successfully provisioned student in CRM
+        for (const result of (data.results || [])) {
+            if (result.success && result.uid) {
+                const crmId = studentsToProvision.find(s => s.fullName === result.fullName)?.crmStudentId;
+                if (crmId) {
+                    const student = window.StudentManager.students.get(crmId);
+                    if (student) {
+                        await window.StudentManager.saveStudent({
+                            ...student,
+                            hasAppAccount: true,
+                            tutorboxUid: result.uid,
+                            tutorboxEmail: result.email,
+                            appCreatedAt: new Date().toISOString(),
+                            appCreatedBy: window.currentUser?.uid || 'admin'
+                        });
+                    }
+                }
+            }
+        }
+
+        // Show results modal
+        showBatchResultsModal(data, groupId);
+
+    } catch (error) {
+        console.error('Error in batch provisioning:', error);
+        window.showNotification(`❌ Error: ${error.message}`, 'error');
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `📱 Crear Cuentas TutorBox (${studentsToProvision.length} pendientes)`;
+        }
+    }
+};
+
+/**
+ * Show results modal after batch provisioning
+ */
+function showBatchResultsModal(data, groupId) {
+    const results = data.results || [];
+    const succeeded = results.filter(r => r.success);
+    const failed = results.filter(r => !r.success);
+
+    const modal = document.createElement('div');
+    modal.id = 'batchResultsModal';
+    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:10003;padding:1rem;';
+
+    modal.innerHTML = `
+        <div style="background:white;border-radius:16px;max-width:600px;width:100%;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,0.3);">
+            <div style="background:linear-gradient(135deg,#7c3aed,#5b21b6);padding:1.5rem;border-radius:16px 16px 0 0;">
+                <h2 style="margin:0;color:white;font-size:1.25rem;">
+                    📱 Resultado - Grupo ${groupId}
+                </h2>
+                <p style="margin:0.5rem 0 0;color:rgba(255,255,255,0.9);font-size:0.9rem;">
+                    ${succeeded.length} creadas, ${failed.length} fallidas de ${results.length} total
+                </p>
+            </div>
+            <div style="padding:1.5rem;overflow-y:auto;flex:1;">
+                ${succeeded.length > 0 ? `
+                    <h3 style="margin:0 0 0.75rem;color:#059669;font-size:1rem;">✅ Cuentas Creadas (${succeeded.length})</h3>
+                    <div style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:1.5rem;">
+                        ${succeeded.map(r => `
+                            <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:0.75rem;">
+                                <div style="font-weight:600;color:#111827;margin-bottom:0.25rem;">${r.fullName}</div>
+                                <div style="font-size:0.85rem;color:#374151;">
+                                    📧 <span style="font-family:monospace;">${r.email}</span>
+                                </div>
+                                <div style="font-size:0.85rem;color:#374151;">
+                                    🔑 <span style="font-family:monospace;">${r.temporaryPassword}</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : ''}
+                ${failed.length > 0 ? `
+                    <h3 style="margin:0 0 0.75rem;color:#dc2626;font-size:1rem;">❌ Fallidos (${failed.length})</h3>
+                    <div style="display:flex;flex-direction:column;gap:0.5rem;">
+                        ${failed.map(r => `
+                            <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:0.75rem;">
+                                <div style="font-weight:600;color:#111827;">${r.fullName}</div>
+                                <div style="font-size:0.85rem;color:#dc2626;">${r.error}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : ''}
+            </div>
+            <div style="padding:1rem 1.5rem;background:#f9fafb;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;">
+                <button onclick="document.getElementById('batchResultsModal').remove(); closeGrupo2StudentsModal(); viewGrupo2Students(${groupId});"
+                        style="background:#7c3aed;color:white;border:none;padding:0.75rem 1.5rem;border-radius:6px;cursor:pointer;font-weight:600;">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
 }
 
 console.log('✅ Grupos2 module loaded successfully');
