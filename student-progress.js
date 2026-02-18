@@ -192,8 +192,8 @@ const SP_ADMIN_KEY = 'tbx-admin-2026-cb-provision-k9x7m';
 window.loadStudentProgressTab = function() {
     const container = document.getElementById('studentProgressContainer');
     if (!container) return;
-    // Render inside the module container
-    container.innerHTML = '<div id="studentProgress"></div>';
+    // Render inside the module container (use unique id to avoid collision with tab content div)
+    container.innerHTML = '<div id="spModuleContent"></div>';
     renderStudentProgressTab();
 };
 
@@ -205,15 +205,9 @@ let spCurrentView = 'overview';
 let spInitialized = false;
 
 async function renderStudentProgressTab() {
-    // Works both as standalone tab and inside module container
-    let container = document.getElementById('studentProgress');
-    if (!container) {
-        const moduleContainer = document.getElementById('studentProgressContainer');
-        if (moduleContainer) {
-            moduleContainer.innerHTML = '<div id="studentProgress"></div>';
-            container = document.getElementById('studentProgress');
-        }
-    }
+    // Check module container first, then fall back to tab content div
+    let container = document.getElementById('spModuleContent')
+                 || document.getElementById('studentProgress');
     if (!container) return;
 
     // Show loading state
