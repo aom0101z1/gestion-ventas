@@ -214,19 +214,34 @@ class FirebaseDataManager {
         if (!this.currentUser) throw new Error('User not authenticated');
 
         try {
-            // RESTRICTION: Only admin/director can update leads
             const userProfile = await this.loadUserProfile();
-            if (!userProfile || (userProfile.role !== 'director' && userProfile.role !== 'admin')) {
-                throw new Error('Solo administradores pueden modificar leads');
-            }
+            if (!userProfile) throw new Error('Perfil de usuario no encontrado');
 
-            // Get contact details for audit log
+            // Get contact details
             const contactSnapshot = await get(ref(this.database, `contacts/${contactId}`));
             const contact = contactSnapshot.val();
+            if (!contact) throw new Error('Contacto no encontrado');
+
+            const isAdmin = userProfile.role === 'director' || userProfile.role === 'admin';
+            const isOwnLead = contact.salespersonId === this.currentUser.uid;
+
+            if (!isAdmin) {
+                if (!isOwnLead) {
+                    throw new Error('Solo puedes modificar tus propios leads');
+                }
+                // Vendedores can only update status on their own leads
+                const allowedFields = ['status'];
+                const attemptedFields = Object.keys(updates);
+                const hasDisallowed = attemptedFields.some(f => !allowedFields.includes(f));
+                if (hasDisallowed) {
+                    throw new Error('Solo puedes cambiar el estado de tus leads');
+                }
+            }
 
             await update(ref(this.database, `contacts/${contactId}`), {
                 ...updates,
-                updatedAt: new Date().toISOString()
+                updatedAt: new Date().toISOString(),
+                updatedBy: this.currentUser.email
             });
 
             console.log('✅ Contact updated in Firebase:', contactId);
@@ -237,7 +252,7 @@ class FirebaseDataManager {
                     'Contacto editado',
                     'contact',
                     contactId,
-                    `${contact.name} - Campos actualizados`,
+                    `${contact.name} - ${isAdmin ? 'Admin edit' : 'Status → ' + (updates.status || 'updated')}`,
                     {
                         after: updates
                     }

@@ -4598,20 +4598,13 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
                 const modal = document.getElementById('leadDetailModal');
                 if (!modal) return;
 
+                const userProfile = await window.FirebaseData.loadUserProfile();
+                const isAdmin = userProfile && (userProfile.role === 'admin' || userProfile.role === 'director');
+                const isOwnLead = lead.salespersonId === window.FirebaseData.currentUser.uid;
+
                 const statuses = ['Nuevo', 'Contactado', 'Interesado', 'Negociación', 'Convertido', 'Perdido'];
                 const statusOptions = statuses.map(s =>
                     `<option value="${s}" ${lead.status === s ? 'selected' : ''}>${s}</option>`
-                ).join('');
-
-                const sources = ['Facebook', 'Instagram', 'Google', 'Referido', 'Volante', 'Pasando por la sede', 'CONVENIO'];
-                const currentSource = (lead.source || '').startsWith('CONVENIO:') ? 'CONVENIO' : lead.source;
-                const sourceOptions = sources.map(s =>
-                    `<option value="${s}" ${currentSource === s ? 'selected' : ''}>${s}</option>`
-                ).join('');
-
-                const locations = ['Pereira', 'Dosquebradas', 'Santa Rosa', 'Otro'];
-                const locationOptions = locations.map(l =>
-                    `<option value="${l}" ${lead.location === l ? 'selected' : ''}>${l}</option>`
                 ).join('');
 
                 let salespersonName = 'No asignado';
@@ -4619,6 +4612,109 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
                     try { salespersonName = await getUserDisplayName(lead.salespersonId); } catch(e) {}
                 }
                 if (lead.salespersonName) salespersonName = lead.salespersonName;
+
+                let formContent;
+                if (isAdmin) {
+                    // ADMIN: Full edit form
+                    const sources = ['Facebook', 'Instagram', 'Google', 'Referido', 'Volante', 'Pasando por la sede', 'CONVENIO'];
+                    const currentSource = (lead.source || '').startsWith('CONVENIO:') ? 'CONVENIO' : lead.source;
+                    const sourceOptions = sources.map(s =>
+                        `<option value="${s}" ${currentSource === s ? 'selected' : ''}>${s}</option>`
+                    ).join('');
+                    const locations = ['Pereira', 'Dosquebradas', 'Santa Rosa', 'Otro'];
+                    const locationOptions = locations.map(l =>
+                        `<option value="${l}" ${lead.location === l ? 'selected' : ''}>${l}</option>`
+                    ).join('');
+
+                    formContent = `
+                        <form id="editLeadForm" onsubmit="handleEditLead(event, '${leadId}', true)">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                                <div style="grid-column: 1 / -1;">
+                                    <label style="display: block; margin-bottom: 0.25rem; font-weight: 500; color: #374151;">Nombre *</label>
+                                    <input type="text" id="editLeadName" value="${lead.name || ''}" required style="width: 100%; padding: 0.6rem; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;">
+                                </div>
+                                <div>
+                                    <label style="display: block; margin-bottom: 0.25rem; font-weight: 500; color: #374151;">Teléfono *</label>
+                                    <input type="text" id="editLeadPhone" value="${lead.phone || ''}" required style="width: 100%; padding: 0.6rem; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;">
+                                </div>
+                                <div>
+                                    <label style="display: block; margin-bottom: 0.25rem; font-weight: 500; color: #374151;">Email</label>
+                                    <input type="email" id="editLeadEmail" value="${lead.email || ''}" style="width: 100%; padding: 0.6rem; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;">
+                                </div>
+                                <div>
+                                    <label style="display: block; margin-bottom: 0.25rem; font-weight: 500; color: #374151;">Estado</label>
+                                    <select id="editLeadStatus" style="width: 100%; padding: 0.6rem; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;">
+                                        ${statusOptions}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="display: block; margin-bottom: 0.25rem; font-weight: 500; color: #374151;">Fuente</label>
+                                    <select id="editLeadSource" style="width: 100%; padding: 0.6rem; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;">
+                                        ${sourceOptions}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="display: block; margin-bottom: 0.25rem; font-weight: 500; color: #374151;">Ubicación</label>
+                                    <select id="editLeadLocation" style="width: 100%; padding: 0.6rem; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;">
+                                        ${locationOptions}
+                                    </select>
+                                </div>
+                                <div style="grid-column: 1 / -1;">
+                                    <label style="display: block; margin-bottom: 0.25rem; font-weight: 500; color: #374151;">Notas</label>
+                                    <textarea id="editLeadNotes" rows="3" style="width: 100%; padding: 0.6rem; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box; resize: vertical;">${lead.notes || ''}</textarea>
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
+                                <button type="button" onclick="openWhatsApp('${lead.phone || ''}', '${(lead.name || '').replace(/'/g, "\\'")}')" style="padding: 0.6rem 1rem; background: #25d366; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">📱 WhatsApp</button>
+                                <div style="flex: 1;"></div>
+                                <button type="button" onclick="closeLeadModal()" style="padding: 0.6rem 1.5rem; background: #f3f4f6; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">Cancelar</button>
+                                <button type="submit" style="padding: 0.6rem 1.5rem; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">💾 Guardar</button>
+                            </div>
+                        </form>`;
+                } else if (isOwnLead) {
+                    // VENDEDOR: Read-only info + status change only
+                    formContent = `
+                        <form id="editLeadForm" onsubmit="handleEditLead(event, '${leadId}', false)">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
+                                <div><span style="font-weight: 500; color: #6b7280;">Nombre:</span><br><strong>${lead.name || '-'}</strong></div>
+                                <div><span style="font-weight: 500; color: #6b7280;">Teléfono:</span><br><strong>${lead.phone || '-'}</strong></div>
+                                <div><span style="font-weight: 500; color: #6b7280;">Email:</span><br><strong>${lead.email || '-'}</strong></div>
+                                <div><span style="font-weight: 500; color: #6b7280;">Fuente:</span><br><strong>${lead.source || '-'}</strong></div>
+                                <div><span style="font-weight: 500; color: #6b7280;">Ubicación:</span><br><strong>${lead.location || '-'}</strong></div>
+                                <div><span style="font-weight: 500; color: #6b7280;">Fecha:</span><br><strong>${formatDate(lead.date)}</strong></div>
+                                ${lead.notes ? `<div style="grid-column: 1 / -1;"><span style="font-weight: 500; color: #6b7280;">Notas:</span><br>${lead.notes}</div>` : ''}
+                            </div>
+
+                            <div style="padding: 1rem; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; margin-bottom: 1rem;">
+                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #1e40af;">Cambiar Estado</label>
+                                <select id="editLeadStatus" style="width: 100%; padding: 0.75rem; border: 2px solid #3b82f6; border-radius: 6px; box-sizing: border-box; font-size: 1rem; font-weight: 500;">
+                                    ${statusOptions}
+                                </select>
+                            </div>
+
+                            <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
+                                <button type="button" onclick="openWhatsApp('${lead.phone || ''}', '${(lead.name || '').replace(/'/g, "\\'")}')" style="padding: 0.6rem 1rem; background: #25d366; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">📱 WhatsApp</button>
+                                <div style="flex: 1;"></div>
+                                <button type="button" onclick="closeLeadModal()" style="padding: 0.6rem 1.5rem; background: #f3f4f6; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">Cancelar</button>
+                                <button type="submit" style="padding: 0.6rem 1.5rem; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">💾 Cambiar Estado</button>
+                            </div>
+                        </form>`;
+                } else {
+                    // OTHER USER: Read-only view
+                    formContent = `
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                            <div><span style="font-weight: 500; color: #6b7280;">Nombre:</span><br><strong>${lead.name || '-'}</strong></div>
+                            <div><span style="font-weight: 500; color: #6b7280;">Teléfono:</span><br><strong>${lead.phone || '-'}</strong></div>
+                            <div><span style="font-weight: 500; color: #6b7280;">Email:</span><br><strong>${lead.email || '-'}</strong></div>
+                            <div><span style="font-weight: 500; color: #6b7280;">Fuente:</span><br><strong>${lead.source || '-'}</strong></div>
+                            <div><span style="font-weight: 500; color: #6b7280;">Ubicación:</span><br><strong>${lead.location || '-'}</strong></div>
+                            <div><span style="font-weight: 500; color: #6b7280;">Fecha:</span><br><strong>${formatDate(lead.date)}</strong></div>
+                            <div><span style="font-weight: 500; color: #6b7280;">Estado:</span><br><span class="status-badge status-${(lead.status || 'nuevo').toLowerCase()}">${lead.status || 'Nuevo'}</span></div>
+                        </div>
+                        <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem; justify-content: flex-end;">
+                            <button type="button" onclick="closeLeadModal()" style="padding: 0.6rem 1.5rem; background: #f3f4f6; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">Cerrar</button>
+                        </div>`;
+                }
 
                 modal.innerHTML = `
                     <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10000;" onclick="if(event.target===this) closeLeadModal()">
@@ -4628,57 +4724,13 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
                                 <button onclick="closeLeadModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #6b7280;">✕</button>
                             </div>
 
-                            <form id="editLeadForm" onsubmit="handleEditLead(event, '${leadId}')">
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                                    <div style="grid-column: 1 / -1;">
-                                        <label style="display: block; margin-bottom: 0.25rem; font-weight: 500; color: #374151;">Nombre *</label>
-                                        <input type="text" id="editLeadName" value="${lead.name || ''}" required style="width: 100%; padding: 0.6rem; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;">
-                                    </div>
-                                    <div>
-                                        <label style="display: block; margin-bottom: 0.25rem; font-weight: 500; color: #374151;">Teléfono *</label>
-                                        <input type="text" id="editLeadPhone" value="${lead.phone || ''}" required style="width: 100%; padding: 0.6rem; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;">
-                                    </div>
-                                    <div>
-                                        <label style="display: block; margin-bottom: 0.25rem; font-weight: 500; color: #374151;">Email</label>
-                                        <input type="email" id="editLeadEmail" value="${lead.email || ''}" style="width: 100%; padding: 0.6rem; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;">
-                                    </div>
-                                    <div>
-                                        <label style="display: block; margin-bottom: 0.25rem; font-weight: 500; color: #374151;">Estado</label>
-                                        <select id="editLeadStatus" style="width: 100%; padding: 0.6rem; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;">
-                                            ${statusOptions}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label style="display: block; margin-bottom: 0.25rem; font-weight: 500; color: #374151;">Fuente</label>
-                                        <select id="editLeadSource" style="width: 100%; padding: 0.6rem; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;">
-                                            ${sourceOptions}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label style="display: block; margin-bottom: 0.25rem; font-weight: 500; color: #374151;">Ubicación</label>
-                                        <select id="editLeadLocation" style="width: 100%; padding: 0.6rem; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;">
-                                            ${locationOptions}
-                                        </select>
-                                    </div>
-                                    <div style="grid-column: 1 / -1;">
-                                        <label style="display: block; margin-bottom: 0.25rem; font-weight: 500; color: #374151;">Notas</label>
-                                        <textarea id="editLeadNotes" rows="3" style="width: 100%; padding: 0.6rem; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box; resize: vertical;">${lead.notes || ''}</textarea>
-                                    </div>
-                                </div>
+                            <div style="margin-bottom: 1rem; padding: 0.75rem; background: #f9fafb; border-radius: 8px; font-size: 0.85rem; color: #6b7280;">
+                                <div>👤 <strong>Vendedor:</strong> ${salespersonName}</div>
+                                <div>📅 <strong>Creado:</strong> ${formatDate(lead.date)} ${lead.time || ''}</div>
+                                ${lead.updatedAt ? `<div>✏️ <strong>Última edición:</strong> ${new Date(lead.updatedAt).toLocaleString('es-CO')}</div>` : ''}
+                            </div>
 
-                                <div style="margin-top: 1rem; padding: 0.75rem; background: #f9fafb; border-radius: 8px; font-size: 0.85rem; color: #6b7280;">
-                                    <div>👤 <strong>Vendedor:</strong> ${salespersonName}</div>
-                                    <div>📅 <strong>Creado:</strong> ${formatDate(lead.date)} ${lead.time || ''}</div>
-                                    ${lead.updatedAt ? `<div>✏️ <strong>Última edición:</strong> ${new Date(lead.updatedAt).toLocaleString('es-CO')}</div>` : ''}
-                                </div>
-
-                                <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
-                                    <button type="button" onclick="openWhatsApp('${lead.phone || ''}', '${(lead.name || '').replace(/'/g, "\\'")}')" style="padding: 0.6rem 1rem; background: #25d366; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">📱 WhatsApp</button>
-                                    <div style="flex: 1;"></div>
-                                    <button type="button" onclick="closeLeadModal()" style="padding: 0.6rem 1.5rem; background: #f3f4f6; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">Cancelar</button>
-                                    <button type="submit" style="padding: 0.6rem 1.5rem; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">💾 Guardar</button>
-                                </div>
-                            </form>
+                            ${formContent}
                         </div>
                     </div>
                 `;
@@ -4693,22 +4745,30 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
             if (modal) modal.innerHTML = '';
         }
 
-        async function handleEditLead(event, leadId) {
+        async function handleEditLead(event, leadId, isFullEdit) {
             event.preventDefault();
             try {
-                const updates = {
-                    name: document.getElementById('editLeadName').value.trim(),
-                    phone: document.getElementById('editLeadPhone').value.trim(),
-                    email: document.getElementById('editLeadEmail').value.trim(),
-                    status: document.getElementById('editLeadStatus').value,
-                    source: document.getElementById('editLeadSource').value,
-                    location: document.getElementById('editLeadLocation').value,
-                    notes: document.getElementById('editLeadNotes').value.trim()
-                };
-
-                if (!updates.name || !updates.phone) {
-                    alert('⚠️ Nombre y teléfono son obligatorios');
-                    return;
+                let updates;
+                if (isFullEdit) {
+                    // Admin: full edit
+                    updates = {
+                        name: document.getElementById('editLeadName').value.trim(),
+                        phone: document.getElementById('editLeadPhone').value.trim(),
+                        email: document.getElementById('editLeadEmail').value.trim(),
+                        status: document.getElementById('editLeadStatus').value,
+                        source: document.getElementById('editLeadSource').value,
+                        location: document.getElementById('editLeadLocation').value,
+                        notes: document.getElementById('editLeadNotes').value.trim()
+                    };
+                    if (!updates.name || !updates.phone) {
+                        alert('⚠️ Nombre y teléfono son obligatorios');
+                        return;
+                    }
+                } else {
+                    // Vendedor: status only
+                    updates = {
+                        status: document.getElementById('editLeadStatus').value
+                    };
                 }
 
                 await window.FirebaseData.updateContact(leadId, updates);
@@ -4722,6 +4782,7 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
                 closeLeadModal();
                 updateLeadsTable();
                 if (typeof updateStats === 'function') updateStats();
+                if (typeof loadPipelineData === 'function') loadPipelineData();
             } catch (error) {
                 console.error('❌ Error updating lead:', error);
                 alert('❌ Error: ' + error.message);
