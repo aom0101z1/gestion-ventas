@@ -753,10 +753,11 @@ function renderStudentTable(students) {
                                         📝
                                     </button>
                                     ${s.hasAppAccount ? `
-                                    <span title="Cuenta TutorBox: ${s.tutorboxEmail || 'creada'}"
-                                          style="background: #d1fae5; color: #065f46; padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; display: inline-flex; align-items: center; height: 36px;">
+                                    <button onclick="spShowStudentDetailModal('${s.tutorboxUid}')"
+                                          title="Ver progreso: ${s.tutorboxEmail || ''}"
+                                          style="background: #d1fae5; color: #065f46; padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; display: inline-flex; align-items: center; height: 36px; border: 1px solid #a7f3d0; cursor: pointer;">
                                         ✓ App
-                                    </span>
+                                    </button>
                                     ` : `
                                     <button onclick="showCreateStudentAccountModal('${s.id}')" class="btn btn-sm"
                                             style="background: #7c3aed; color: white; padding: 0.5rem 0.75rem; font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif; font-size: 1.2rem; min-width: 42px; height: 36px; line-height: 1;"

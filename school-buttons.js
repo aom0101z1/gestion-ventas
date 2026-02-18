@@ -47,7 +47,8 @@ function addSchoolButtons() {
         { name: 'Grupos 2.0', icon: '🎓', color: '#667eea', func: 'Grupos2', directorOnly: true },
         { name: 'Empleados 2.0', icon: '👔', color: '#14b8a6', func: 'Employees', directorOnly: true },
         { name: 'Profesores 2.0', icon: '👩‍🏫', color: '#f59e0b', func: 'Teachers' },
-        { name: 'Asistencia', icon: '📋', color: '#ef4444', func: 'Attendance' }
+        { name: 'Asistencia', icon: '📋', color: '#ef4444', func: 'Attendance' },
+        { name: 'App', icon: '📱', color: '#7c3aed', func: 'StudentProgress', directorOnly: true }
     ];
     
     modules.forEach(module => {

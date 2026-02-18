@@ -1533,6 +1533,114 @@
     .cp-teacher-stats { grid-template-columns: repeat(2, 1fr); }
 }
 
+/* ===== STUDENT PROGRESS MODULE STYLES ===== */
+.sp-container { padding: 1rem; }
+.sp-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }
+.sp-header h2 { margin: 0; color: #333; }
+.sp-header-actions { display: flex; gap: 0.5rem; }
+
+.sp-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+.sp-stat-card { background: white; border-radius: 12px; padding: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+.sp-stat-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; }
+.sp-stat-number { font-size: 2rem; font-weight: 700; color: #333; }
+.sp-stat-label { font-size: 0.85rem; color: #666; text-align: center; }
+
+.sp-subtabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; border-bottom: 2px solid #e5e7eb; padding-bottom: 0; }
+.sp-subtab { padding: 0.6rem 1.2rem; border: none; background: none; cursor: pointer; font-size: 0.9rem; font-weight: 500; color: #6b7280; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.2s; }
+.sp-subtab:hover { color: #667eea; }
+.sp-subtab.active { color: #667eea; border-bottom-color: #667eea; font-weight: 600; }
+
+.sp-content { min-height: 200px; }
+.sp-section { background: white; border-radius: 12px; padding: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+
+.sp-table-wrapper { overflow-x: auto; }
+.sp-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.sp-table th { background: #f9fafb; padding: 0.75rem 0.6rem; text-align: left; font-weight: 600; color: #374151; border-bottom: 2px solid #e5e7eb; white-space: nowrap; }
+.sp-table td { padding: 0.6rem; border-bottom: 1px solid #f3f4f6; }
+.sp-clickable-row:hover { background: #f0f4ff; }
+
+.sp-progress-bar { height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden; }
+.sp-progress-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+
+.sp-filters { display: flex; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; }
+.sp-filter-input { padding: 0.5rem 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.9rem; min-width: 200px; }
+.sp-filter-input:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 2px rgba(102,126,234,0.2); }
+.sp-filter-select { padding: 0.5rem 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.9rem; background: white; }
+.sp-result-count { font-size: 0.85rem; color: #6b7280; margin-left: auto; }
+
+.sp-btn { padding: 0.5rem 1rem; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+.sp-btn-sm { padding: 0.3rem 0.6rem; font-size: 0.8rem; }
+.sp-btn-primary { background: #667eea; color: white; }
+.sp-btn-primary:hover { background: #5a6fd6; }
+.sp-btn-secondary { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
+.sp-btn-secondary:hover { background: #e5e7eb; }
+.sp-btn-warning { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+.sp-btn-warning:hover { background: #fde68a; }
+.sp-btn-danger { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+.sp-btn-danger:hover { background: #fecaca; }
+
+.sp-report-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; }
+.sp-report-card { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 1.25rem; }
+.sp-report-card h4 { margin: 0 0 0.5rem 0; }
+.sp-report-card p { margin: 0 0 0.75rem 0; font-size: 0.85rem; color: #666; }
+
+/* Modal */
+.sp-modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 10000; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; }
+.sp-modal-overlay.visible { opacity: 1; }
+.sp-modal { background: white; border-radius: 16px; width: 90%; max-width: 700px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3); transform: scale(0.95); transition: transform 0.2s; }
+.sp-modal-overlay.visible .sp-modal { transform: scale(1); }
+.sp-modal-header { display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 1.5rem; border-bottom: 1px solid #e5e7eb; position: sticky; top: 0; background: white; border-radius: 16px 16px 0 0; z-index: 1; }
+.sp-modal-header h2 { margin: 0; font-size: 1.2rem; }
+.sp-modal-close { background: none; border: none; font-size: 1.8rem; cursor: pointer; color: #6b7280; padding: 0 0.25rem; line-height: 1; }
+.sp-modal-close:hover { color: #111; }
+.sp-modal-body { padding: 1.5rem; }
+
+.sp-detail-section { margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid #f3f4f6; }
+.sp-detail-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+.sp-detail-section h4 { margin: 0 0 0.75rem 0; color: #374151; }
+
+.sp-profile-card { display: flex; align-items: center; gap: 1rem; }
+.sp-avatar { width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, #667eea, #764ba2); color: white; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: 700; flex-shrink: 0; }
+.sp-profile-info h3 { margin: 0; }
+.sp-profile-info p { margin: 0.15rem 0; }
+
+.sp-detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem; }
+.sp-detail-item { display: flex; flex-direction: column; }
+.sp-detail-label { font-size: 0.8rem; color: #6b7280; margin-bottom: 0.15rem; }
+.sp-detail-value { font-weight: 600; color: #111; }
+
+.sp-engagement-score { font-size: 1.5rem; font-weight: 700; padding: 0.5rem 1rem; border-radius: 10px; }
+.sp-engagement-green { background: #d1fae5; color: #065f46; }
+.sp-engagement-yellow { background: #fef3c7; color: #92400e; }
+.sp-engagement-red { background: #fee2e2; color: #991b1b; }
+
+.sp-engagement-breakdown { display: flex; flex-direction: column; gap: 0.4rem; }
+.sp-engagement-bar-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; }
+.sp-engagement-bar-row span:first-child { width: 80px; color: #555; }
+.sp-engagement-bar-row span:last-child { width: 40px; text-align: right; color: #888; font-size: 0.8rem; }
+
+.sp-sessions-list { max-height: 300px; overflow-y: auto; }
+.sp-session-item { display: flex; gap: 0.75rem; padding: 0.4rem 0; border-bottom: 1px solid #f9fafb; font-size: 0.85rem; }
+.sp-session-date { color: #6b7280; min-width: 120px; }
+.sp-session-type { min-width: 24px; }
+.sp-session-detail { color: #374151; }
+
+.sp-action-buttons { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+.sp-actions-section { background: #fefce8; border-radius: 10px; padding: 1rem; border: 1px solid #fde68a; }
+
+.sp-loading { text-align: center; padding: 3rem; color: #6b7280; }
+.sp-spinner { width: 40px; height: 40px; border: 3px solid #e5e7eb; border-top-color: #667eea; border-radius: 50%; animation: spSpin 0.8s linear infinite; margin: 0 auto 1rem; }
+@keyframes spSpin { to { transform: rotate(360deg); } }
+.sp-error { text-align: center; padding: 3rem; color: #dc2626; }
+
+@media (max-width: 768px) {
+    .sp-subtabs { flex-wrap: wrap; }
+    .sp-subtab { flex: 1 1 45%; text-align: center; }
+    .sp-detail-grid { grid-template-columns: 1fr 1fr; }
+    .sp-profile-card { flex-direction: column; text-align: center; }
+    .sp-stats-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
     </style>
 
     <!-- Twemoji for emoji fallback on older systems (Windows 7, etc.) -->
@@ -2394,6 +2502,11 @@
                 <!-- Content loaded dynamically by class-progress.js -->
             </div>
 
+            <!-- ========== SECTION 15.4: TAB CONTENT - STUDENT PROGRESS ========== -->
+            <div id="studentProgress" class="tab-content hidden">
+                <!-- Content loaded dynamically by student-progress.js -->
+            </div>
+
         </div> <!-- End of container -->
     </div> <!-- End of mainApp -->
 
@@ -2426,6 +2539,21 @@ window.firebaseModules = {
         window.firebaseApp = app;
         window.firebaseDb = database;
         window.firebaseAuth = auth;
+
+        // TutorBox Firebase - second app for reading student progress
+        const tutorboxConfig = {
+            apiKey: "AIzaSyC1sfWvRDJ-SLHXiCPxEmF7os9Sweh9JCA",
+            authDomain: "tutorbox-4d7c9.firebaseapp.com",
+            databaseURL: "https://tutorbox-4d7c9-default-rtdb.firebaseio.com",
+            projectId: "tutorbox-4d7c9",
+            storageBucket: "tutorbox-4d7c9.firebasestorage.app",
+            messagingSenderId: "146726598125",
+            appId: "1:146726598125:android:acf894f7c0f6fcde54a3e4"
+        };
+        const tutorboxApp = initializeApp(tutorboxConfig, 'tutorbox');
+        const tutorboxDb = getDatabase(tutorboxApp);
+        window.tutorboxDb = tutorboxDb;
+        console.log('✅ TutorBox Firebase initialized (second app)');
 
         const statusEl = document.getElementById('firebaseStatus');
         statusEl.className = 'firebase-status';
@@ -3201,6 +3329,10 @@ onAuthStateChanged(auth, async (user) => {
                         refreshClassProgressData();
                     } else if (typeof renderClassProgressTab === 'function') {
                         renderClassProgressTab();
+                    }
+                } else if (tabName === 'studentProgress') {
+                    if (typeof renderStudentProgressTab === 'function') {
+                        renderStudentProgressTab();
                     }
                 }
 
@@ -5497,7 +5629,7 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
     <script src="grupos2.js"></script>
     <script src="teachers.js"></script>
     <script src="attendance.js"></script>
-    <script src="school-buttons.js"></script>
+    <script src="school-buttons.js?v=20260218"></script>
     <script src="import-students.js"></script>
     <script src="invoice-integration.js"></script>
     <script src="reports.js"></script>
@@ -5510,6 +5642,7 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
     <script src="auditlog.js"></script>
     <script src="permission-enforcer.js"></script>
     <script src="class-progress.js"></script>
+    <script src="student-progress.js?v=20260218"></script>
 
     <!-- ========== SECTION 18: MODULE CHECK SCRIPT ========== -->
     <script>
@@ -5525,6 +5658,7 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
             console.log('Teachers:', !!window.TeacherManager);
             console.log('Admin Center:', !!window.AdminCenter);
             console.log('Class Progress:', !!window.ClassProgressManager);
+            console.log('Student Progress:', !!window.StudentProgressManager);
         }, 5000);
     </script>
 
