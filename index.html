@@ -4790,6 +4790,9 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
         }
 
         // ========== COMISIONES FUNCTIONS ==========
+        // Cache for comisiones data loading
+        let _comisionesCache = { students: [], payments: [], comisionesData: {} };
+
         async function loadComisiones() {
             const tbody = document.getElementById('comisionesTable');
             if (!tbody) return;
@@ -4799,10 +4802,14 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
             try {
                 const db = window.firebaseModules.database;
                 const year = document.getElementById('commissionYear')?.value || '2026';
+                const userProfile = await window.FirebaseData.loadUserProfile();
+                const currentUid = window.FirebaseData.currentUser.uid;
+                const isSuperAdmin = window.FirebaseData.currentUser.email === 'admin@ciudadbilingue.com';
+                const isAdmin = userProfile && (userProfile.role === 'admin' || userProfile.role === 'director');
 
                 // Load converted contacts for selected year
                 const allContacts = await window.FirebaseData.getFilteredContacts();
-                const converted = allContacts.filter(c => {
+                let converted = allContacts.filter(c => {
                     if (c.status !== 'Convertido') return false;
                     const contactYear = (c.date || '').substring(0, 4);
                     return contactYear === year;
@@ -4812,62 +4819,114 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
                 const studentsSnap = await db.get(db.ref(window.FirebaseData.database, 'students'));
                 const students = [];
                 if (studentsSnap.exists()) {
-                    studentsSnap.forEach(child => {
-                        students.push({ id: child.key, ...child.val() });
-                    });
+                    studentsSnap.forEach(child => { students.push({ id: child.key, ...child.val() }); });
                 }
 
                 // Load payments
                 const paymentsSnap = await db.get(db.ref(window.FirebaseData.database, 'payments'));
                 const payments = [];
                 if (paymentsSnap.exists()) {
-                    paymentsSnap.forEach(child => {
-                        payments.push({ id: child.key, ...child.val() });
-                    });
+                    paymentsSnap.forEach(child => { payments.push({ id: child.key, ...child.val() }); });
                 }
 
-                // Load existing commission data (may not exist yet in DB)
+                // Load existing commission data
                 let comisionesData = {};
                 try {
                     const comSnap = await db.get(db.ref(window.FirebaseData.database, 'comisiones'));
                     comisionesData = comSnap.exists() ? comSnap.val() : {};
                 } catch (comErr) {
-                    console.log('ℹ️ Comisiones node not available yet, using empty data');
+                    console.log('ℹ️ Comisiones node not available yet');
                 }
 
-                if (converted.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #666; padding: 2rem;">No hay leads convertidos en ${year}</td></tr>`;
+                // Save to cache for verification modal
+                _comisionesCache = { students, payments, comisionesData };
+
+                // VENDEDOR VIEW: show only own leads, split into claimed/unclaimed
+                if (!isAdmin) {
+                    const myConverted = converted.filter(c => c.salespersonId === currentUid);
+                    const unclaimed = myConverted.filter(c => !comisionesData[c.id]?.status || comisionesData[c.id]?.status === 'none');
+                    const claimed = myConverted.filter(c => comisionesData[c.id]?.status && comisionesData[c.id]?.status !== 'none');
+
+                    if (myConverted.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #666; padding: 2rem;">No tienes leads convertidos en ${year}.<br>Marca tus leads como "Convertido" para reclamar comisiones.</td></tr>`;
+                        renderCommissionStats([]);
+                        return;
+                    }
+
+                    const rows = [];
+                    // Unclaimed leads
+                    for (const lead of unclaimed) {
+                        rows.push(`
+                            <tr style="background: #fffbeb;">
+                                <td>
+                                    <div style="font-weight: 500;">${lead.name || 'Sin nombre'}</div>
+                                    <div style="font-size: 0.8rem; color: #6b7280;">${lead.phone || ''}</div>
+                                </td>
+                                <td style="font-size: 0.9rem;">${formatDate(lead.date)}</td>
+                                <td colspan="3" style="text-align: center;">
+                                    <span style="color: #92400e; font-size: 0.85rem;">Sin reclamar</span>
+                                </td>
+                                <td colspan="2" style="text-align: center;">
+                                    <button onclick="claimCommission('${lead.id}', '${(lead.name || '').replace(/'/g, "\\'")}')" style="padding: 0.5rem 1.25rem; background: #f59e0b; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.9rem;">💰 Reclamar Comisión</button>
+                                </td>
+                            </tr>
+                        `);
+                    }
+                    // Claimed leads
+                    for (const lead of claimed) {
+                        const comData = comisionesData[lead.id] || {};
+                        const sc = getCommissionStatusStyle(comData.status);
+                        rows.push(`
+                            <tr>
+                                <td>
+                                    <div style="font-weight: 500;">${lead.name || 'Sin nombre'}</div>
+                                    <div style="font-size: 0.8rem; color: #6b7280;">${lead.phone || ''}</div>
+                                </td>
+                                <td style="font-size: 0.9rem;">${formatDate(lead.date)}</td>
+                                <td style="font-size: 0.85rem;">${formatDate(comData.claimedAt)}</td>
+                                <td colspan="2"><span style="background: ${sc.bg}; color: ${sc.text}; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.85rem; font-weight: 500;">${sc.label}</span></td>
+                                <td colspan="2" style="font-size: 0.85rem; color: #6b7280;">${comData.adminNote || ''}</td>
+                            </tr>
+                        `);
+                    }
+                    tbody.innerHTML = rows.join('');
+                    renderCommissionStats(myConverted.map(c => ({ ...c, comData: comisionesData[c.id] || {} })));
+                    return;
+                }
+
+                // ADMIN VIEW: show only claimed commissions (reclamadas)
+                const claimedLeadIds = Object.keys(comisionesData).filter(id => comisionesData[id].status && comisionesData[id].status !== 'none');
+                const claimedLeads = [];
+                for (const id of claimedLeadIds) {
+                    const lead = allContacts.find(c => c.id === id);
+                    if (lead) {
+                        const contactYear = (lead.date || '').substring(0, 4);
+                        if (contactYear === year) claimedLeads.push(lead);
+                    }
+                }
+
+                if (claimedLeads.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #666; padding: 2rem;">No hay comisiones reclamadas en ${year}</td></tr>`;
                     renderCommissionStats([]);
                     return;
                 }
 
-                // Sort by date newest first
-                converted.sort((a, b) => new Date(b.date) - new Date(a.date));
+                claimedLeads.sort((a, b) => new Date(b.date) - new Date(a.date));
 
                 const rows = [];
-                for (const lead of converted) {
+                for (const lead of claimedLeads) {
                     const comData = comisionesData[lead.id] || {};
                     const linkedStudentId = comData.linkedStudentId || null;
 
-                    // Try to find matching student
                     let studentMatch = null;
-                    if (linkedStudentId) {
-                        studentMatch = students.find(s => s.id === linkedStudentId);
-                    }
-                    if (!studentMatch) {
-                        studentMatch = findStudentMatch(lead, students);
-                    }
+                    if (linkedStudentId) studentMatch = students.find(s => s.id === linkedStudentId);
+                    if (!studentMatch) studentMatch = findStudentMatch(lead, students);
 
-                    // Check payment status
-                    let paymentStatus = { paid: false, amount: 0, date: null };
-                    if (studentMatch) {
-                        paymentStatus = checkStudentPayments(studentMatch.id, payments);
-                    }
+                    let paymentStatus = { paid: false, amount: 0, count: 0 };
+                    if (studentMatch) paymentStatus = checkStudentPayments(studentMatch.id, payments);
 
-                    // Commission status
-                    const comStatus = comData.status || 'pendiente';
+                    const comStatus = comData.status || 'reclamado';
 
-                    // Salesperson name
                     let spName = lead.salespersonName || 'No asignado';
                     if (!lead.salespersonName && lead.salespersonId) {
                         try { spName = await getUserDisplayName(lead.salespersonId); } catch(e) {}
@@ -4876,14 +4935,10 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
                     // Student cell
                     let studentCell;
                     if (studentMatch) {
-                        studentCell = `
-                            <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                <span style="color: #10b981; font-weight: 500;">✅ ${studentMatch.nombre || studentMatch.name || 'Sin nombre'}</span>
-                                <button onclick="switchTab('students'); setTimeout(() => { const s = document.getElementById('searchStudent'); if(s){ s.value='${(studentMatch.nombre || '').replace(/'/g, "\\'")}'; s.dispatchEvent(new Event('input')); }}, 500);" style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 0.15rem 0.4rem; border-radius: 4px; cursor: pointer; font-size: 0.75rem;" title="Ver en Estudiantes">👁️</button>
-                            </div>`;
+                        studentCell = `<span style="color: #10b981; font-weight: 500;">✅ ${studentMatch.nombre || studentMatch.name || ''}</span>`;
                     } else {
                         studentCell = `<span style="color: #ef4444;">❌ No encontrado</span>
-                            <button onclick="linkStudentManual('${lead.id}')" style="background: #fef3c7; border: 1px solid #fcd34d; padding: 0.15rem 0.4rem; border-radius: 4px; cursor: pointer; font-size: 0.75rem; margin-left: 0.25rem;" title="Vincular manualmente">🔗</button>`;
+                            <button onclick="linkStudentManual('${lead.id}')" style="background: #fef3c7; border: 1px solid #fcd34d; padding: 0.15rem 0.4rem; border-radius: 4px; cursor: pointer; font-size: 0.75rem; margin-left: 0.25rem;">🔗</button>`;
                     }
 
                     // Payment cell
@@ -4891,23 +4946,27 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
                     if (!studentMatch) {
                         paymentCell = '<span style="color: #9ca3af;">-</span>';
                     } else if (paymentStatus.paid) {
-                        paymentCell = `
-                            <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                <span style="color: #10b981; font-weight: 500;">✅ $${paymentStatus.amount.toLocaleString('es-CO')}</span>
-                                <button onclick="switchTab('payments')" style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 0.15rem 0.4rem; border-radius: 4px; cursor: pointer; font-size: 0.75rem;" title="Ver en Pagos">👁️</button>
-                            </div>`;
+                        paymentCell = `<span style="color: #10b981; font-weight: 500;">✅ $${paymentStatus.amount.toLocaleString('es-CO')}</span> <span style="font-size:0.75rem; color:#6b7280;">(${paymentStatus.count})</span>`;
                     } else {
-                        paymentCell = `<span style="color: #ef4444; font-weight: 500;">⏳ Sin pago</span>
-                            <button onclick="switchTab('payments')" style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 0.15rem 0.4rem; border-radius: 4px; cursor: pointer; font-size: 0.75rem; margin-left: 0.25rem;" title="Ver Pagos">👁️</button>`;
+                        paymentCell = `<span style="color: #ef4444; font-weight: 500;">⏳ Sin pago</span>`;
                     }
 
-                    // Commission status badge
-                    const statusColors = {
-                        pendiente: { bg: '#fef3c7', text: '#92400e', label: '⏳ Pendiente' },
-                        verificado: { bg: '#dbeafe', text: '#1e40af', label: '✅ Verificado' },
-                        pagado: { bg: '#d1fae5', text: '#065f46', label: '💰 Pagado' }
-                    };
-                    const sc = statusColors[comStatus] || statusColors.pendiente;
+                    const sc = getCommissionStatusStyle(comStatus);
+
+                    // Actions: only superadmin can change status
+                    let actionsCell;
+                    if (isSuperAdmin) {
+                        actionsCell = `
+                            <button onclick="showVerificationModal('${lead.id}')" style="padding: 0.35rem 0.6rem; background: #3b82f6; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 0.8rem; font-weight: 500;" title="Verificar detalles">🔍 Verificar</button>
+                            <select onchange="updateCommissionStatus('${lead.id}', this.value)" style="padding: 0.3rem; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.8rem; margin-left: 0.25rem;">
+                                <option value="reclamado" ${comStatus === 'reclamado' ? 'selected' : ''}>📋 Reclamado</option>
+                                <option value="verificado" ${comStatus === 'verificado' ? 'selected' : ''}>✅ Verificado</option>
+                                <option value="pagado" ${comStatus === 'pagado' ? 'selected' : ''}>💰 Pagado</option>
+                                <option value="rechazado" ${comStatus === 'rechazado' ? 'selected' : ''}>❌ Rechazado</option>
+                            </select>`;
+                    } else {
+                        actionsCell = `<span style="background: ${sc.bg}; color: ${sc.text}; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.8rem;">${sc.label}</span>`;
+                    }
 
                     rows.push(`
                         <tr>
@@ -4919,23 +4978,14 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
                             <td style="font-size: 0.9rem;">${formatDate(lead.date)}</td>
                             <td>${studentCell}</td>
                             <td>${paymentCell}</td>
-                            <td>
-                                <span style="background: ${sc.bg}; color: ${sc.text}; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.8rem; font-weight: 500;">${sc.label}</span>
-                            </td>
-                            <td>
-                                <select onchange="updateCommissionStatus('${lead.id}', this.value)" style="padding: 0.3rem; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.8rem;">
-                                    <option value="pendiente" ${comStatus === 'pendiente' ? 'selected' : ''}>⏳ Pendiente</option>
-                                    <option value="verificado" ${comStatus === 'verificado' ? 'selected' : ''}>✅ Verificado</option>
-                                    <option value="pagado" ${comStatus === 'pagado' ? 'selected' : ''}>💰 Pagado</option>
-                                </select>
-                                <button onclick="showLeadDetails('${lead.id}')" style="background: #f3f4f6; border: none; padding: 0.3rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem; margin-left: 0.25rem;" title="Ver lead">📋</button>
-                            </td>
+                            <td><span style="background: ${sc.bg}; color: ${sc.text}; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.8rem; font-weight: 500;">${sc.label}</span></td>
+                            <td>${actionsCell}</td>
                         </tr>
                     `);
                 }
 
                 tbody.innerHTML = rows.join('');
-                renderCommissionStats(converted.map(c => ({ ...c, comData: comisionesData[c.id] || {} })));
+                renderCommissionStats(claimedLeads.map(c => ({ ...c, comData: comisionesData[c.id] || {} })));
 
             } catch (error) {
                 console.error('❌ Error loading comisiones:', error);
@@ -4943,12 +4993,210 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
             }
         }
 
+        function getCommissionStatusStyle(status) {
+            const styles = {
+                reclamado: { bg: '#fef3c7', text: '#92400e', label: '📋 Reclamado' },
+                verificado: { bg: '#dbeafe', text: '#1e40af', label: '✅ Verificado' },
+                pagado: { bg: '#d1fae5', text: '#065f46', label: '💰 Pagado' },
+                rechazado: { bg: '#fee2e2', text: '#991b1b', label: '❌ Rechazado' },
+                pendiente: { bg: '#f3f4f6', text: '#6b7280', label: '⏳ Pendiente' }
+            };
+            return styles[status] || styles.reclamado;
+        }
+
+        async function claimCommission(leadId, leadName) {
+            if (!confirm(`¿Reclamar comisión por: ${leadName}?`)) return;
+            try {
+                const db = window.firebaseModules.database;
+                const comRef = db.ref(window.FirebaseData.database, `comisiones/${leadId}`);
+                await db.set(comRef, {
+                    status: 'reclamado',
+                    claimedBy: window.FirebaseData.currentUser.uid,
+                    claimedByEmail: window.FirebaseData.currentUser.email,
+                    claimedAt: new Date().toISOString()
+                });
+                if (typeof window.logAudit === 'function') {
+                    await window.logAudit('Comisión reclamada', 'comision', leadId, leadName, { after: { status: 'reclamado' } });
+                }
+                if (typeof showNotification === 'function') showNotification('✅ Comisión reclamada', 'success');
+                loadComisiones();
+            } catch (error) {
+                console.error('❌ Error claiming commission:', error);
+                alert('❌ Error: ' + error.message);
+            }
+        }
+
+        // ========== ADMIN VERIFICATION MODAL ==========
+        async function showVerificationModal(leadId) {
+            const modal = document.getElementById('leadDetailModal');
+            if (!modal) return;
+
+            try {
+                const allContacts = await window.FirebaseData.getAllContacts();
+                const lead = allContacts.find(c => c.id === leadId);
+                if (!lead) { alert('❌ Lead no encontrado'); return; }
+
+                const { students, payments, comisionesData } = _comisionesCache;
+                const comData = comisionesData[leadId] || {};
+
+                // Find student
+                let student = null;
+                if (comData.linkedStudentId) student = students.find(s => s.id === comData.linkedStudentId);
+                if (!student) student = findStudentMatch(lead, students);
+
+                // Get ALL payments for this student
+                let studentPayments = [];
+                if (student) {
+                    studentPayments = payments
+                        .filter(p => p.studentId === student.id)
+                        .sort((a, b) => new Date(b.paymentDate || b.date || 0) - new Date(a.paymentDate || a.date || 0));
+                }
+
+                let spName = lead.salespersonName || '';
+                if (!spName && lead.salespersonId) {
+                    try { spName = await getUserDisplayName(lead.salespersonId); } catch(e) { spName = 'Desconocido'; }
+                }
+
+                // Build student info section
+                let studentSection;
+                if (student) {
+                    studentSection = `
+                        <div style="background: #d1fae5; border: 1px solid #6ee7b7; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+                            <div style="font-weight: 600; color: #065f46; margin-bottom: 0.5rem;">✅ Estudiante Encontrado</div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.9rem;">
+                                <div><strong>Nombre:</strong> ${student.nombre || '-'}</div>
+                                <div><strong>Teléfono:</strong> ${student.telefono || '-'}</div>
+                                <div><strong>Email:</strong> ${student.correo || '-'}</div>
+                                <div><strong>Documento:</strong> ${student.tipoDoc || ''} ${student.numDoc || '-'}</div>
+                                <div><strong>Grupo:</strong> ${student.grupo || '-'}</div>
+                                <div><strong>Modalidad:</strong> ${student.modalidad || '-'}</div>
+                                <div><strong>Tipo Pago:</strong> ${student.tipoPago || '-'}</div>
+                                <div><strong>Valor:</strong> $${(student.valor || 0).toLocaleString('es-CO')} COP</div>
+                                <div><strong>Estado:</strong> ${student.status === 'active' ? '🟢 Activo' : '🔴 Inactivo'}</div>
+                                <div><strong>Fecha Inicio:</strong> ${student.fechaInicio || '-'}</div>
+                            </div>
+                        </div>`;
+                } else {
+                    studentSection = `
+                        <div style="background: #fee2e2; border: 1px solid #fca5a5; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+                            <div style="font-weight: 600; color: #991b1b;">❌ Estudiante NO encontrado en el sistema</div>
+                            <div style="font-size: 0.85rem; color: #991b1b; margin-top: 0.5rem;">Este lead no coincide con ningún estudiante registrado.</div>
+                            <button onclick="linkStudentManual('${leadId}'); closeLeadModal();" style="margin-top: 0.5rem; padding: 0.4rem 1rem; background: #f59e0b; color: white; border: none; border-radius: 6px; cursor: pointer;">🔗 Vincular Manualmente</button>
+                        </div>`;
+                }
+
+                // Build payment history section
+                let paymentSection;
+                if (studentPayments.length > 0) {
+                    const totalPaid = studentPayments.filter(p => p.status === 'Pagado' || p.status === 'paid').reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+                    paymentSection = `
+                        <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+                            <div style="font-weight: 600; color: #1e40af; margin-bottom: 0.75rem;">💳 Historial de Pagos (${studentPayments.length} registros — Total: $${totalPaid.toLocaleString('es-CO')} COP)</div>
+                            <div style="max-height: 200px; overflow-y: auto;">
+                                <table style="width: 100%; font-size: 0.85rem; border-collapse: collapse;">
+                                    <thead><tr style="border-bottom: 2px solid #bfdbfe;">
+                                        <th style="text-align: left; padding: 0.3rem;">Fecha</th>
+                                        <th style="text-align: right; padding: 0.3rem;">Monto</th>
+                                        <th style="text-align: center; padding: 0.3rem;">Estado</th>
+                                        <th style="text-align: left; padding: 0.3rem;">Método</th>
+                                    </tr></thead>
+                                    <tbody>
+                                        ${studentPayments.map(p => `
+                                            <tr style="border-bottom: 1px solid #e5e7eb;">
+                                                <td style="padding: 0.3rem;">${formatDate(p.paymentDate || p.date)}</td>
+                                                <td style="padding: 0.3rem; text-align: right; font-weight: 500;">$${(parseFloat(p.amount) || 0).toLocaleString('es-CO')}</td>
+                                                <td style="padding: 0.3rem; text-align: center;">${(p.status === 'Pagado' || p.status === 'paid') ? '✅' : '⏳'} ${p.status || '-'}</td>
+                                                <td style="padding: 0.3rem;">${p.method || '-'}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>`;
+                } else {
+                    paymentSection = `
+                        <div style="background: #fee2e2; border: 1px solid #fca5a5; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+                            <div style="font-weight: 600; color: #991b1b;">⏳ Sin pagos registrados</div>
+                            <div style="font-size: 0.85rem; color: #991b1b; margin-top: 0.25rem;">${student ? 'El estudiante existe pero no tiene pagos.' : 'No se puede verificar pagos sin estudiante vinculado.'}</div>
+                        </div>`;
+                }
+
+                // Admin note input
+                const currentNote = comData.adminNote || '';
+
+                modal.innerHTML = `
+                    <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10000;" onclick="if(event.target===this) closeLeadModal()">
+                        <div style="background: white; padding: 2rem; border-radius: 12px; width: 95%; max-width: 650px; max-height: 90vh; overflow-y: auto;" onclick="event.stopPropagation()">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                <h2 style="margin: 0; color: #1f2937;">🔍 Verificación de Comisión</h2>
+                                <button onclick="closeLeadModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #6b7280;">✕</button>
+                            </div>
+
+                            <!-- Lead Info -->
+                            <div style="background: #f9fafb; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.9rem;">
+                                <div><strong>Lead:</strong> ${lead.name || '-'}</div>
+                                <div><strong>Teléfono:</strong> ${lead.phone || '-'}</div>
+                                <div><strong>Vendedor:</strong> <span style="color: #667eea; font-weight: 500;">${spName}</span></div>
+                                <div><strong>Reclamado:</strong> ${comData.claimedAt ? new Date(comData.claimedAt).toLocaleString('es-CO') : '-'}</div>
+                                <div><strong>Fuente:</strong> ${lead.source || '-'}</div>
+                                <div><strong>Fecha Lead:</strong> ${formatDate(lead.date)}</div>
+                            </div>
+
+                            ${studentSection}
+                            ${paymentSection}
+
+                            <!-- Admin Decision -->
+                            <div style="background: #f3f4f6; border-radius: 8px; padding: 1rem;">
+                                <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">📝 Nota del Admin (opcional)</label>
+                                <input type="text" id="verifyAdminNote" value="${currentNote}" placeholder="Ej: Verificado, pagó primer mes..." style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box; margin-bottom: 1rem;">
+                                <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+                                    <button onclick="approveCommission('${leadId}', 'rechazado')" style="padding: 0.6rem 1.25rem; background: #ef4444; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">❌ Rechazar</button>
+                                    <div style="flex:1;"></div>
+                                    <button onclick="approveCommission('${leadId}', 'verificado')" style="padding: 0.6rem 1.25rem; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">✅ Verificar</button>
+                                    <button onclick="approveCommission('${leadId}', 'pagado')" style="padding: 0.6rem 1.25rem; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">💰 Marcar Pagado</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('❌ Error showing verification modal:', error);
+                alert('❌ Error: ' + error.message);
+            }
+        }
+
+        async function approveCommission(leadId, newStatus) {
+            try {
+                const db = window.firebaseModules.database;
+                const note = document.getElementById('verifyAdminNote')?.value || '';
+                const comRef = db.ref(window.FirebaseData.database, `comisiones/${leadId}`);
+                const updates = {
+                    status: newStatus,
+                    adminNote: note,
+                    reviewedBy: window.FirebaseData.currentUser.email,
+                    reviewedAt: new Date().toISOString()
+                };
+                if (newStatus === 'pagado') {
+                    updates.paidDate = new Date().toISOString();
+                    updates.paidBy = window.FirebaseData.currentUser.email;
+                }
+                await db.update(comRef, updates);
+                if (typeof window.logAudit === 'function') {
+                    await window.logAudit('Comisión revisada', 'comision', leadId, `${newStatus} - ${note}`, { after: updates });
+                }
+                if (typeof showNotification === 'function') showNotification(`✅ Comisión: ${newStatus}`, 'success');
+                closeLeadModal();
+                loadComisiones();
+            } catch (error) {
+                console.error('❌ Error:', error);
+                alert('❌ Error: ' + error.message);
+            }
+        }
+
         function findStudentMatch(lead, students) {
             if (!lead || !students.length) return null;
             const leadName = (lead.name || '').toLowerCase().trim();
             const leadPhone = (lead.phone || '').replace(/\D/g, '');
-
-            // Exact phone match first
             if (leadPhone.length >= 7) {
                 const phoneMatch = students.find(s => {
                     const sPhone = (s.telefono || '').replace(/\D/g, '');
@@ -4956,23 +5204,15 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
                 });
                 if (phoneMatch) return phoneMatch;
             }
-
-            // Name match
             if (leadName.length >= 3) {
-                const nameMatch = students.find(s => {
-                    const sName = (s.nombre || '').toLowerCase().trim();
-                    return sName && sName === leadName;
-                });
+                const nameMatch = students.find(s => (s.nombre || '').toLowerCase().trim() === leadName);
                 if (nameMatch) return nameMatch;
-
-                // Partial name match
                 const partialMatch = students.find(s => {
                     const sName = (s.nombre || '').toLowerCase().trim();
                     return sName && (sName.includes(leadName) || leadName.includes(sName));
                 });
                 if (partialMatch) return partialMatch;
             }
-
             return null;
         }
 
@@ -4987,23 +5227,22 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
             return { paid: false, amount: 0, count: 0 };
         }
 
-        function renderCommissionStats(convertedLeads) {
+        function renderCommissionStats(items) {
             const statsDiv = document.getElementById('commissionStats');
             if (!statsDiv) return;
-
-            const total = convertedLeads.length;
-            const verified = convertedLeads.filter(c => (c.comData?.status || 'pendiente') === 'verificado').length;
-            const paid = convertedLeads.filter(c => (c.comData?.status || 'pendiente') === 'pagado').length;
-            const pending = total - verified - paid;
-
+            const total = items.length;
+            const reclamado = items.filter(c => (c.comData?.status) === 'reclamado').length;
+            const verified = items.filter(c => (c.comData?.status) === 'verificado').length;
+            const paid = items.filter(c => (c.comData?.status) === 'pagado').length;
+            const rejected = items.filter(c => (c.comData?.status) === 'rechazado').length;
             statsDiv.innerHTML = `
                 <div style="background: white; border: 1px solid #e5e7eb; border-radius: 10px; padding: 1rem; text-align: center;">
                     <div style="font-size: 1.75rem; font-weight: bold; color: #3b82f6;">${total}</div>
-                    <div style="font-size: 0.85rem; color: #6b7280;">Total Convertidos</div>
+                    <div style="font-size: 0.85rem; color: #6b7280;">Total</div>
                 </div>
                 <div style="background: white; border: 1px solid #e5e7eb; border-radius: 10px; padding: 1rem; text-align: center;">
-                    <div style="font-size: 1.75rem; font-weight: bold; color: #f59e0b;">${pending}</div>
-                    <div style="font-size: 0.85rem; color: #6b7280;">Pendientes</div>
+                    <div style="font-size: 1.75rem; font-weight: bold; color: #f59e0b;">${reclamado}</div>
+                    <div style="font-size: 0.85rem; color: #6b7280;">Reclamados</div>
                 </div>
                 <div style="background: white; border: 1px solid #e5e7eb; border-radius: 10px; padding: 1rem; text-align: center;">
                     <div style="font-size: 1.75rem; font-weight: bold; color: #3b82f6;">${verified}</div>
@@ -5011,12 +5250,22 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
                 </div>
                 <div style="background: white; border: 1px solid #e5e7eb; border-radius: 10px; padding: 1rem; text-align: center;">
                     <div style="font-size: 1.75rem; font-weight: bold; color: #10b981;">${paid}</div>
-                    <div style="font-size: 0.85rem; color: #6b7280;">Comisión Pagada</div>
+                    <div style="font-size: 0.85rem; color: #6b7280;">Pagados</div>
                 </div>
+                ${rejected > 0 ? `<div style="background: white; border: 1px solid #e5e7eb; border-radius: 10px; padding: 1rem; text-align: center;">
+                    <div style="font-size: 1.75rem; font-weight: bold; color: #ef4444;">${rejected}</div>
+                    <div style="font-size: 0.85rem; color: #6b7280;">Rechazados</div>
+                </div>` : ''}
             `;
         }
 
         async function updateCommissionStatus(leadId, newStatus) {
+            // Only superadmin can change status
+            if (window.FirebaseData.currentUser.email !== 'admin@ciudadbilingue.com') {
+                alert('❌ Solo el administrador puede cambiar el estado de comisiones');
+                loadComisiones();
+                return;
+            }
             try {
                 const db = window.firebaseModules.database;
                 const comRef = db.ref(window.FirebaseData.database, `comisiones/${leadId}`);
@@ -5025,23 +5274,15 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
                     updatedAt: new Date().toISOString(),
                     updatedBy: window.FirebaseData.currentUser.email
                 };
-
                 if (newStatus === 'pagado') {
                     updates.paidDate = new Date().toISOString();
                     updates.paidBy = window.FirebaseData.currentUser.email;
                 }
-
                 await db.update(comRef, updates);
-
                 if (typeof window.logAudit === 'function') {
                     await window.logAudit('Comisión actualizada', 'comision', leadId, `Estado → ${newStatus}`, { after: updates });
                 }
-
-                if (typeof showNotification === 'function') {
-                    showNotification(`✅ Comisión: ${newStatus}`, 'success');
-                }
-
-                // Refresh stats
+                if (typeof showNotification === 'function') showNotification(`✅ Comisión: ${newStatus}`, 'success');
                 loadComisiones();
             } catch (error) {
                 console.error('❌ Error updating commission:', error);
