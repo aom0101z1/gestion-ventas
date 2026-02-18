@@ -4826,9 +4826,14 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
                     });
                 }
 
-                // Load existing commission data
-                const comSnap = await db.get(db.ref(window.FirebaseData.database, 'comisiones'));
-                const comisionesData = comSnap.exists() ? comSnap.val() : {};
+                // Load existing commission data (may not exist yet in DB)
+                let comisionesData = {};
+                try {
+                    const comSnap = await db.get(db.ref(window.FirebaseData.database, 'comisiones'));
+                    comisionesData = comSnap.exists() ? comSnap.val() : {};
+                } catch (comErr) {
+                    console.log('ℹ️ Comisiones node not available yet, using empty data');
+                }
 
                 if (converted.length === 0) {
                     tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #666; padding: 2rem;">No hay leads convertidos en ${year}</td></tr>`;
