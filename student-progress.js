@@ -28,30 +28,30 @@ class StudentProgressManager {
     }
 
     async loadAllStudents() {
-        const db = window.firebaseModules?.database;
-        const tutorboxDb = window.tutorboxDb;
-        if (!db || !tutorboxDb) {
-            console.warn('⚠️ TutorBox Firebase not initialized yet');
-            return;
-        }
-
         try {
-            const usersRef = db.ref(tutorboxDb, 'users');
-            const snapshot = await db.get(usersRef);
-            if (!snapshot.exists()) {
-                console.log('ℹ️ No users found in TutorBox DB');
+            const response = await fetch(`${SP_CLOUD_FUNCTION_BASE}/getB2BStudents`, {
+                method: 'GET',
+                headers: {
+                    'x-admin-key': SP_ADMIN_KEY
+                }
+            });
+
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.error || `HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+            if (!data.success || !data.students) {
+                console.log('ℹ️ No B2B students found in TutorBox');
                 return;
             }
 
             this.students.clear();
-            const data = snapshot.val();
-            for (const [uid, userData] of Object.entries(data)) {
-                // Only include B2B (provisioned) students
-                if (userData.accountChannel === 'b2b') {
-                    this.students.set(uid, { uid, ...userData });
-                }
+            for (const student of data.students) {
+                this.students.set(student.uid, student);
             }
-            console.log(`✅ Loaded ${this.students.size} B2B students from TutorBox`);
+            console.log(`✅ Loaded ${this.students.size} B2B students from TutorBox Cloud Function`);
         } catch (err) {
             console.error('❌ Error loading TutorBox students:', err);
             throw err;
