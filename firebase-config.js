@@ -246,6 +246,26 @@ class FirebaseDataManager {
 
             console.log('✅ Contact updated in Firebase:', contactId);
 
+            // Auto-create commission when status changes to Convertido
+            if (updates.status === 'Convertido') {
+                try {
+                    const comRef = ref(this.database, `comisiones/${contactId}`);
+                    const comSnap = await get(comRef);
+                    if (!comSnap.exists()) {
+                        await set(comRef, {
+                            status: 'pendiente',
+                            createdAt: new Date().toISOString(),
+                            createdBy: 'auto',
+                            salespersonId: contact.salespersonId || null,
+                            salespersonEmail: contact.salespersonEmail || null
+                        });
+                        console.log('✅ Auto-created commission for lead:', contactId);
+                    }
+                } catch (comError) {
+                    console.error('⚠️ Error auto-creating commission:', comError);
+                }
+            }
+
             // Audit log
             if (typeof window.logAudit === 'function' && contact) {
                 await window.logAudit(
