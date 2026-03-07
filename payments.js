@@ -2096,6 +2096,7 @@ function renderPaymentTable(students) {
                     <th style="padding: 0.75rem; text-align: left;">Grupo</th>
                     <th style="padding: 0.75rem; text-align: left;">Modalidad</th>
                     <th style="padding: 0.75rem; text-align: right;">Valor</th>
+                    <th style="padding: 0.75rem; text-align: center;">Método</th>
                     <th style="padding: 0.75rem; text-align: center;">Día Pago</th>
                     <th style="padding: 0.75rem; text-align: center;">Acciones</th>
                 </tr>
@@ -2175,6 +2176,39 @@ function renderPaymentTable(students) {
                                 <strong>$${(s.valor || 0).toLocaleString()}</strong>
                             </td>
                             <td style="padding: 0.75rem; text-align: center;">
+                                ${(() => {
+                                    // Get payments for this student
+                                    const studentPayments = window.PaymentManager?.payments
+                                        ? Array.from(window.PaymentManager.payments.values()).filter(p => p.studentId === s.id)
+                                        : [];
+                                    if (studentPayments.length === 0) return '<span style="color:#9ca3af;">-</span>';
+
+                                    // If date range active, show methods from payments in range
+                                    let relevant = studentPayments;
+                                    if (window.activeDateRangeFilter?.startDate && window.activeDateRangeFilter?.endDate) {
+                                        relevant = studentPayments.filter(p => {
+                                            if (!p.date) return false;
+                                            const d = p.date.split('T')[0];
+                                            return d >= window.activeDateRangeFilter.startDate && d <= window.activeDateRangeFilter.endDate;
+                                        });
+                                    } else {
+                                        // No date filter: show most recent payment method
+                                        relevant = studentPayments.sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 1);
+                                    }
+                                    if (relevant.length === 0) return '<span style="color:#9ca3af;">-</span>';
+
+                                    const methods = [...new Set(relevant.map(p => p.method).filter(Boolean))];
+                                    return methods.map(m => {
+                                        const isEfectivo = m === 'Efectivo' || m === 'Efectivo en la escuela';
+                                        const color = isEfectivo ? '#059669' : '#2563eb';
+                                        const bg = isEfectivo ? '#ecfdf5' : '#eff6ff';
+                                        const icon = isEfectivo ? '💵' : '🏦';
+                                        const label = isEfectivo ? 'Efectivo' : (m === 'Transferencia' || m === 'Transferencia bancaria' ? 'Transferencia' : m);
+                                        return \`<span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:12px;font-weight:500;color:\${color};background:\${bg};">\${icon} \${label}</span>\`;
+                                    }).join(' ');
+                                })()}
+                            </td>
+                            <td style="padding: 0.75rem; text-align: center;">
                                 ${s.diaPago || '-'}
                             </td>
                             <td style="padding: 0.75rem; text-align: center;">
@@ -2211,7 +2245,7 @@ function renderPaymentTable(students) {
                     // Hidden history row (will be populated on expand)
                     let historyRow = `
                         <tr id="history-${s.id}" class="payment-history-row" style="display: none;">
-                            <td colspan="10" style="padding: 20px; background: #f9fafb; text-align: center;">
+                            <td colspan="11" style="padding: 20px; background: #f9fafb; text-align: center;">
                                 <div style="color: #6b7280;">Cargando historial...</div>
                             </td>
                         </tr>
@@ -4257,7 +4291,19 @@ window.exportPaymentReport = async function() {
 
 // Enhanced processPayment function with FIXED timing for invoice modal
 // Enhanced processPayment function for multi-month payments
+let _isProcessingPayment = false;
 async function processPayment(studentId) {
+    // Double-click protection
+    if (_isProcessingPayment) {
+        console.warn('⚠️ Payment already processing, ignoring duplicate click');
+        return;
+    }
+    _isProcessingPayment = true;
+    const submitBtn = document.querySelector('#paymentForm button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Procesando...';
+    }
     try {
         window.currentStudentId = studentId; // Store for reference
 
@@ -4583,6 +4629,12 @@ async function processPayment(studentId) {
     } catch (error) {
         console.error('❌ Error processing payment:', error);
         window.showNotification('❌ Error al registrar pago', 'error');
+    } finally {
+        _isProcessingPayment = false;
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = '💰 Registrar Pago';
+        }
     }
 }
 
@@ -4966,24 +5018,24 @@ window.openEditPaymentModal = async function(paymentId, studentId) {
                         <label style="display: block; font-weight: 500; margin-bottom: 6px; color: #374151;">
                             Método de Pago
                         </label>
-                        <select id="editPaymentMethod" style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px;">
-                            <option value="Efectivo en la escuela" ${payment.method === 'Efectivo en la escuela' ? 'selected' : ''}>Efectivo en la escuela</option>
-                            <option value="Transferencia bancaria" ${payment.method === 'Transferencia bancaria' ? 'selected' : ''}>Transferencia bancaria</option>
-                            <option value="Nequi" ${payment.method === 'Nequi' ? 'selected' : ''}>Nequi</option>
-                            <option value="Daviplata" ${payment.method === 'Daviplata' ? 'selected' : ''}>Daviplata</option>
-                            <option value="Tarjeta de crédito" ${payment.method === 'Tarjeta de crédito' ? 'selected' : ''}>Tarjeta de crédito</option>
-                            <option value="Tarjeta débito" ${payment.method === 'Tarjeta débito' ? 'selected' : ''}>Tarjeta débito</option>
-                            <option value="Consignación" ${payment.method === 'Consignación' ? 'selected' : ''}>Consignación</option>
+                        <select id="editPaymentMethod" style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px;"
+                            onchange="document.getElementById('editBankGroup').style.display = this.value === 'Transferencia' ? 'block' : 'none'">
+                            <option value="Efectivo" ${(payment.method === 'Efectivo' || payment.method === 'Efectivo en la escuela') ? 'selected' : ''}>Efectivo</option>
+                            <option value="Transferencia" ${(payment.method === 'Transferencia' || payment.method === 'Transferencia bancaria' || payment.method === 'Nequi' || payment.method === 'Daviplata' || payment.method === 'Consignación' || payment.method === 'Tarjeta de crédito' || payment.method === 'Tarjeta débito') ? 'selected' : ''}>Transferencia</option>
                         </select>
                     </div>
 
-                    <div>
+                    <div id="editBankGroup" style="display: ${(payment.method !== 'Efectivo' && payment.method !== 'Efectivo en la escuela') ? 'block' : 'none'}">
                         <label style="display: block; font-weight: 500; margin-bottom: 6px; color: #374151;">
-                            Banco (opcional)
+                            Banco
                         </label>
-                        <input type="text" id="editPaymentBank" value="${payment.bank || ''}"
-                            style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px;"
-                            placeholder="Ej: Bancolombia, Davivienda...">
+                        <select id="editPaymentBank" style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px;">
+                            <option value="Nequi" ${(payment.bank === 'Nequi' || payment.method === 'Nequi') ? 'selected' : ''}>Nequi</option>
+                            <option value="Bancolombia" ${payment.bank === 'Bancolombia' ? 'selected' : ''}>Bancolombia</option>
+                            <option value="Daviplata" ${(payment.bank === 'Daviplata' || payment.method === 'Daviplata') ? 'selected' : ''}>Daviplata</option>
+                            <option value="Davivienda" ${payment.bank === 'Davivienda' ? 'selected' : ''}>Davivienda</option>
+                            <option value="Otro" ${(payment.bank && !['Nequi','Bancolombia','Daviplata','Davivienda'].includes(payment.bank) && payment.bank !== '') ? 'selected' : ''}>Otro</option>
+                        </select>
                     </div>
 
                     <div>
@@ -5063,7 +5115,7 @@ window.saveEditedPayment = async function() {
         const newMonth = document.getElementById('editPaymentMonth').value;
         const newYear = parseInt(document.getElementById('editPaymentYear').value);
         const newMethod = document.getElementById('editPaymentMethod').value;
-        const newBank = document.getElementById('editPaymentBank').value.trim();
+        const newBank = newMethod === 'Transferencia' ? (document.getElementById('editPaymentBank').value || '') : '';
         const newNotes = document.getElementById('editPaymentNotes').value.trim();
 
         // Validation
