@@ -121,6 +121,8 @@ async loadPayments() {
         if (snapshot.exists()) {
             const data = snapshot.val();
             Object.entries(data).forEach(([id, payment]) => {
+                // Skip cancelled payments
+                if (payment.status === 'cancelled') return;
                 // Ensure month is lowercase for consistency
                 if (payment.month) {
                     payment.month = payment.month.toLowerCase();
@@ -372,7 +374,8 @@ async recordPayment(studentId, paymentData) {
     }
 }
 
-// Delete payment (admin only)
+// Delete payment (admin only) — marks as cancelled instead of hard-deleting
+// so that Finance/Cierre correctly excludes it even if cache is stale
 async deletePayment(paymentId) {
     try {
         // Verify admin access
@@ -387,12 +390,19 @@ async deletePayment(paymentId) {
         }
 
         const db = window.firebaseModules.database;
-        const ref = db.ref(window.FirebaseData.database, `payments/${paymentId}`);
-        await db.remove(ref);
 
+        // Mark as cancelled in Firebase (instead of hard delete)
+        const ref = db.ref(window.FirebaseData.database, `payments/${paymentId}`);
+        await db.update(ref, {
+            status: 'cancelled',
+            cancelledAt: window.getColombiaDateTime ? window.getColombiaDateTime() : new Date().toISOString(),
+            cancelledBy: window.FirebaseData.currentUser?.email || 'admin'
+        });
+
+        // Remove from in-memory Map so Pagos tab doesn't show it
         this.payments.delete(paymentId);
 
-        console.log('🗑️ Payment deleted:', paymentId);
+        console.log('🗑️ Payment cancelled:', paymentId);
 
         // Audit log
         if (typeof window.logAudit === 'function') {

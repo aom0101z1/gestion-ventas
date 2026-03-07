@@ -440,6 +440,8 @@ class FinanceManager {
             payments = Object.entries(paymentsData)
                 .map(([id, payment]) => ({ id, ...payment }))
                 .filter(p => {
+                    // Skip cancelled payments
+                    if (p.status === 'cancelled') return false;
                     const paymentDate = p.date ? p.date.split('T')[0] : null;
                     return paymentDate === date;
                 });
@@ -3811,7 +3813,7 @@ window.diagnosticHistoricalClosures = async function() {
         ]);
 
         const closures = closuresSnap.exists() ? closuresSnap.val() : {};
-        const allPayments = paymentsSnap.exists() ? Object.values(paymentsSnap.val()) : [];
+        const allPayments = paymentsSnap.exists() ? Object.values(paymentsSnap.val()).filter(p => p.status !== 'cancelled') : [];
         const allExpenses = expensesSnap.exists() ? Object.values(expensesSnap.val()) : [];
         const allSales = salesSnap.exists() ? Object.values(salesSnap.val()) : [];
 
@@ -7037,6 +7039,8 @@ window.loadTodayMovementsView = async function() {
         todayPayments = Object.entries(paymentsData)
             .map(([id, payment]) => ({ id, ...payment }))
             .filter(payment => {
+                // Skip cancelled payments
+                if (payment.status === 'cancelled') return false;
                 const paymentDate = payment.date ? payment.date.split('T')[0] : null;
                 return paymentDate === today;
             })
