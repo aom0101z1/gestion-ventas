@@ -2078,6 +2078,40 @@ function renderPaymentDashboard() {
     `;
 }
 
+// Helper: get payment method badge HTML for a student row
+function getPaymentMethodBadge(studentId) {
+    var studentPayments = window.PaymentManager && window.PaymentManager.payments
+        ? Array.from(window.PaymentManager.payments.values()).filter(function(p) { return p.studentId === studentId; })
+        : [];
+    if (studentPayments.length === 0) return '<span style="color:#9ca3af;">-</span>';
+
+    var relevant = studentPayments;
+    if (window.activeDateRangeFilter && window.activeDateRangeFilter.startDate && window.activeDateRangeFilter.endDate) {
+        relevant = studentPayments.filter(function(p) {
+            if (!p.date) return false;
+            var d = p.date.split('T')[0];
+            return d >= window.activeDateRangeFilter.startDate && d <= window.activeDateRangeFilter.endDate;
+        });
+    } else {
+        relevant = studentPayments.sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); }).slice(0, 1);
+    }
+    if (relevant.length === 0) return '<span style="color:#9ca3af;">-</span>';
+
+    var methods = [];
+    relevant.forEach(function(p) {
+        if (p.method && methods.indexOf(p.method) === -1) methods.push(p.method);
+    });
+
+    return methods.map(function(m) {
+        var isEfectivo = m === 'Efectivo' || m === 'Efectivo en la escuela';
+        var color = isEfectivo ? '#059669' : '#2563eb';
+        var bg = isEfectivo ? '#ecfdf5' : '#eff6ff';
+        var icon = isEfectivo ? '💵' : '🏦';
+        var label = isEfectivo ? 'Efectivo' : (m === 'Transferencia' || m === 'Transferencia bancaria' ? 'Transferencia' : m);
+        return '<span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:12px;font-weight:500;color:' + color + ';background:' + bg + ';">' + icon + ' ' + label + '</span>';
+    }).join(' ');
+}
+
 // UPDATED: Render payment table with expandable history rows
 function renderPaymentTable(students) {
     if (!students.length) {
@@ -2176,37 +2210,7 @@ function renderPaymentTable(students) {
                                 <strong>$${(s.valor || 0).toLocaleString()}</strong>
                             </td>
                             <td style="padding: 0.75rem; text-align: center;">
-                                ${(() => {
-                                    // Get payments for this student
-                                    const studentPayments = window.PaymentManager?.payments
-                                        ? Array.from(window.PaymentManager.payments.values()).filter(p => p.studentId === s.id)
-                                        : [];
-                                    if (studentPayments.length === 0) return '<span style="color:#9ca3af;">-</span>';
-
-                                    // If date range active, show methods from payments in range
-                                    let relevant = studentPayments;
-                                    if (window.activeDateRangeFilter?.startDate && window.activeDateRangeFilter?.endDate) {
-                                        relevant = studentPayments.filter(p => {
-                                            if (!p.date) return false;
-                                            const d = p.date.split('T')[0];
-                                            return d >= window.activeDateRangeFilter.startDate && d <= window.activeDateRangeFilter.endDate;
-                                        });
-                                    } else {
-                                        // No date filter: show most recent payment method
-                                        relevant = studentPayments.sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 1);
-                                    }
-                                    if (relevant.length === 0) return '<span style="color:#9ca3af;">-</span>';
-
-                                    const methods = [...new Set(relevant.map(p => p.method).filter(Boolean))];
-                                    return methods.map(m => {
-                                        const isEfectivo = m === 'Efectivo' || m === 'Efectivo en la escuela';
-                                        const color = isEfectivo ? '#059669' : '#2563eb';
-                                        const bg = isEfectivo ? '#ecfdf5' : '#eff6ff';
-                                        const icon = isEfectivo ? '💵' : '🏦';
-                                        const label = isEfectivo ? 'Efectivo' : (m === 'Transferencia' || m === 'Transferencia bancaria' ? 'Transferencia' : m);
-                                        return \`<span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:12px;font-weight:500;color:\${color};background:\${bg};">\${icon} \${label}</span>\`;
-                                    }).join(' ');
-                                })()}
+                                ${getPaymentMethodBadge(s.id)}
                             </td>
                             <td style="padding: 0.75rem; text-align: center;">
                                 ${s.diaPago || '-'}
