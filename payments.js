@@ -5428,6 +5428,58 @@ window.deletePaymentWithInvoice = async function(paymentId, studentId, voidInvoi
 
 // ==================== END VOIDED INVOICES FUNCTIONS ====================
 
+// Admin utility: find and cancel orphaned/stale payments that weren't properly soft-deleted
+// Run from console: cancelStalePayments()
+window.cancelStalePayments = async function() {
+    if (window.FirebaseData?.currentUser?.email !== 'admin@ciudadbilingue.com') {
+        console.error('Admin only');
+        return;
+    }
+
+    const db = window.firebaseModules.database;
+    const ref = db.ref(window.FirebaseData.database, 'payments');
+    const snapshot = await db.get(ref);
+    if (!snapshot.exists()) { console.log('No payments found'); return; }
+
+    const allPayments = snapshot.val();
+    const activeIds = new Set(window.PaymentManager.payments.keys());
+    var orphaned = [];
+
+    Object.entries(allPayments).forEach(function(entry) {
+        var id = entry[0];
+        var p = entry[1];
+        // Payment exists in Firebase but NOT in the in-memory Map (was "deleted" by old code but remove failed)
+        if (!activeIds.has(id) && p.status !== 'cancelled') {
+            orphaned.push({ id: id, student: p.studentId, amount: p.amount, date: p.date, method: p.method });
+        }
+    });
+
+    if (orphaned.length === 0) {
+        console.log('No orphaned payments found. All clean.');
+        return;
+    }
+
+    console.log('Found ' + orphaned.length + ' orphaned payment(s):');
+    console.table(orphaned);
+
+    // Mark them as cancelled
+    var cancelled = 0;
+    for (var i = 0; i < orphaned.length; i++) {
+        var p = orphaned[i];
+        var payRef = db.ref(window.FirebaseData.database, 'payments/' + p.id);
+        await db.update(payRef, {
+            status: 'cancelled',
+            cancelledAt: window.getColombiaDateTime ? window.getColombiaDateTime() : new Date().toISOString(),
+            cancelledBy: 'admin-cleanup'
+        });
+        cancelled++;
+        console.log('Cancelled: ' + p.id + ' ($' + p.amount + ')');
+    }
+
+    console.log('Done! Cancelled ' + cancelled + ' orphaned payments. Refresh Finance to verify.');
+    window.showNotification('Limpieza completada: ' + cancelled + ' pago(s) huérfano(s) cancelados', 'success');
+};
+
 window.toggleAllStudentsBulk = function() {
     const selectAll = document.getElementById('selectAllStudents');
     const checkboxes = document.querySelectorAll('.bulk-student-checkbox');
