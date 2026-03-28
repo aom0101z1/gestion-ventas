@@ -629,7 +629,7 @@ function renderStudentForm(student = null) {
                         <button type="button" onclick="closeStudentFormModal()" class="btn btn-secondary">
                             Cancelar
                         </button>
-                        <button type="submit" class="btn btn-primary">
+                        <button type="submit" id="stuSubmitBtn" class="btn btn-primary">
                             ${isEdit ? 'Actualizar' : 'Guardar'} Estudiante
                         </button>
                     </div>
@@ -925,7 +925,16 @@ window.showStudentForm = async function(studentId = null) {
 
     document.getElementById('studentForm').onsubmit = async (e) => {
         e.preventDefault();
-        await saveStudentForm(studentId);
+        const submitBtn = document.getElementById('stuSubmitBtn');
+        if (submitBtn.disabled) return;
+        submitBtn.disabled = true;
+        submitBtn.textContent = '⏳ Guardando...';
+        try {
+            await saveStudentForm(studentId);
+        } catch (err) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = studentId ? 'Actualizar Estudiante' : 'Guardar Estudiante';
+        }
     };
 };
 

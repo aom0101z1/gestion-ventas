@@ -5174,6 +5174,53 @@ window.saveEditedPayment = async function() {
         // Update local cache
         window.PaymentManager.payments.set(paymentId, updatedPayment);
 
+        // Update linked invoice if month, year, or amount changed
+        if (updatedPayment.invoiceNumber &&
+            (originalPayment.month !== newMonth || originalPayment.year !== newYear || originalPayment.amount !== newAmount)) {
+            try {
+                const invoiceRef = db.ref(window.FirebaseData.database, `invoices/${updatedPayment.invoiceNumber}`);
+                const invoiceSnap = await db.get(invoiceRef);
+                if (invoiceSnap.exists()) {
+                    const invoiceData = invoiceSnap.val();
+                    const student = window.StudentManager?.students.get(studentId);
+                    const grupo = student?.grupo || 'Curso de Inglés';
+                    const newDescription = `${newMonth.charAt(0).toUpperCase() + newMonth.slice(1)} ${newYear} - ${grupo}`;
+
+                    // Update invoice items descriptions
+                    if (invoiceData.items && invoiceData.items.length > 0) {
+                        invoiceData.items.forEach(item => {
+                            // Update mensualidad description items (not additional items like Matrícula)
+                            if (item.description && item.description.match(/^\w+ \d{4} - /)) {
+                                item.description = newDescription;
+                            }
+                        });
+                    }
+
+                    // Update amount if changed
+                    if (originalPayment.amount !== newAmount) {
+                        invoiceData.subtotal = newAmount;
+                        invoiceData.total = newAmount;
+                        if (invoiceData.items && invoiceData.items.length === 1) {
+                            invoiceData.items[0].unitPrice = newAmount;
+                            invoiceData.items[0].total = newAmount;
+                        }
+                    }
+
+                    // Update payment method info on invoice
+                    invoiceData.paymentMethod = newMethod;
+                    invoiceData.bank = newBank;
+                    invoiceData.observations = newNotes || invoiceData.observations;
+                    invoiceData.lastEditedAt = window.getColombiaDateTime ? window.getColombiaDateTime() : new Date().toISOString();
+                    invoiceData.lastEditedBy = window.FirebaseData.currentUser?.email;
+
+                    await db.set(invoiceRef, invoiceData);
+                    console.log('✅ Invoice updated:', updatedPayment.invoiceNumber);
+                }
+            } catch (invoiceError) {
+                console.error('⚠️ Error updating linked invoice:', invoiceError);
+            }
+        }
+
         // Audit log
         if (typeof window.logAudit === 'function') {
             const student = window.StudentManager?.students.get(studentId);
@@ -5229,6 +5276,39 @@ window.saveEditedPayment = async function() {
 };
 
 // ==================== END EDIT PAYMENT FUNCTIONS ====================
+
+// Fix invoice description (admin utility - run from console: fixInvoiceDescription('CB-20260328-049-583', 'Abril 2026 - 123'))
+window.fixInvoiceDescription = async function(invoiceNumber, newDescription) {
+    if (window.FirebaseData?.currentUser?.email !== 'admin@ciudadbilingue.com') {
+        window.showNotification('❌ Solo el administrador', 'error');
+        return;
+    }
+    try {
+        const db = window.firebaseModules.database;
+        const invoiceRef = db.ref(window.FirebaseData.database, `invoices/${invoiceNumber}`);
+        const snap = await db.get(invoiceRef);
+        if (!snap.exists()) {
+            window.showNotification('❌ Factura no encontrada: ' + invoiceNumber, 'error');
+            return;
+        }
+        const data = snap.val();
+        if (data.items) {
+            data.items.forEach(item => {
+                if (item.description && item.description.match(/^\w+ \d{4} - /)) {
+                    item.description = newDescription;
+                }
+            });
+        }
+        data.lastEditedAt = window.getColombiaDateTime ? window.getColombiaDateTime() : new Date().toISOString();
+        data.lastEditedBy = window.FirebaseData.currentUser?.email;
+        await db.set(invoiceRef, data);
+        window.showNotification('✅ Factura actualizada: ' + invoiceNumber, 'success');
+        console.log('✅ Invoice fixed:', invoiceNumber, '→', newDescription);
+    } catch (e) {
+        console.error('Error:', e);
+        window.showNotification('❌ Error: ' + e.message, 'error');
+    }
+};
 
 // ==================== VOIDED INVOICES WINDOW FUNCTIONS ====================
 
