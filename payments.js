@@ -2619,6 +2619,20 @@ function renderPaymentModal(student) {
                             <option value="2026-2">Semestre 2 2026 (Jul-Dic)</option>
                         </select>
                     </div>
+
+                    <!-- Two Semesters Year Selection (hidden by default) -->
+                    <div class="form-group" id="twoSemestersGroup" style="display: none;">
+                        <label>Seleccionar Año (2 Semestres Completos)</label>
+                        <select id="twoSemestersYearSelect" onchange="selectTwoSemesters()">
+                            <option value="">Seleccionar año...</option>
+                            <option value="2025">2025 - Semestre 1 (Feb-Jun) + Semestre 2 (Jul-Nov)</option>
+                            <option value="2026">2026 - Semestre 1 (Feb-Jun) + Semestre 2 (Jul-Nov)</option>
+                        </select>
+                        <div id="twoSemestersSummary" style="display: none; margin-top: 8px; padding: 10px; background: #f0fdf4; border: 1px solid #86efac; border-radius: 6px; font-size: 0.875rem;">
+                            <strong style="color: #166534;">✅ Meses incluidos:</strong>
+                            <div id="twoSemestersMonthsList" style="margin-top: 4px; color: #15803d;"></div>
+                        </div>
+                    </div>
                     
                     <!-- Month Selection Grid - Hidden for hourly/Privadas students -->
                     <div class="form-group" id="monthSelectionGroup" style="display: ${(student.tipoPago === 'POR_HORAS' || student.modalidad === 'Privadas') ? 'none' : 'block'};">
@@ -3107,11 +3121,25 @@ window.handlePaymentTypeChange = function() {
         cb.disabled = false;
     });
     
-    if (paymentType === 'academicSemester' || paymentType === 'twoSemesters') {
+    const twoSemestersGroup = document.getElementById('twoSemestersGroup');
+
+    if (paymentType === 'twoSemesters') {
+        monthSelectionGroup.style.display = 'none';
+        academicSemesterGroup.style.display = 'none';
+        twoSemestersGroup.style.display = 'block';
+        installmentGroup.style.display = 'block';
+        // Reset year selector
+        const yearSelect = document.getElementById('twoSemestersYearSelect');
+        if (yearSelect) yearSelect.value = '';
+        const summary = document.getElementById('twoSemestersSummary');
+        if (summary) summary.style.display = 'none';
+    } else if (paymentType === 'academicSemester') {
         monthSelectionGroup.style.display = 'none';
         academicSemesterGroup.style.display = 'block';
+        twoSemestersGroup.style.display = 'none';
         installmentGroup.style.display = 'block';
     } else {
+        twoSemestersGroup.style.display = 'none';
         academicSemesterGroup.style.display = 'none';
         monthSelectionGroup.style.display = 'block';
         installmentGroup.style.display = paymentType !== 'monthly' ? 'block' : 'none';
@@ -3299,6 +3327,50 @@ window.selectAcademicSemester = function() {
 
         updateMonthSelection();
     }
+};
+
+// Select two academic semesters (full year)
+window.selectTwoSemesters = function() {
+    const year = document.getElementById('twoSemestersYearSelect').value;
+    if (!year) {
+        document.getElementById('twoSemestersSummary').style.display = 'none';
+        document.querySelectorAll('.month-checkbox').forEach(cb => cb.checked = false);
+        updateMonthSelection();
+        return;
+    }
+
+    const sem1 = PaymentConfig.semesters[year]?.semester1;
+    const sem2 = PaymentConfig.semesters[year]?.semester2;
+
+    if (!sem1 || !sem2) {
+        window.showNotification('❌ No hay datos de semestres para el año ' + year, 'error');
+        return;
+    }
+
+    // Switch the month grid year selector to match and rebuild grid
+    const yearSelector = document.getElementById('monthYearSelector');
+    if (yearSelector) {
+        yearSelector.value = year;
+        changeMonthYearDisplay();
+    }
+
+    // Now select all months from both semesters
+    const allSemesterMonths = [...sem1.months, ...sem2.months];
+    document.querySelectorAll('.month-checkbox').forEach(cb => cb.checked = false);
+    allSemesterMonths.forEach(month => {
+        const checkbox = document.querySelector(`.month-checkbox[data-month="${month}"][data-year="${year}"]`);
+        if (checkbox) checkbox.checked = true;
+    });
+
+    // Show summary
+    const summary = document.getElementById('twoSemestersSummary');
+    const monthsList = document.getElementById('twoSemestersMonthsList');
+    monthsList.innerHTML = `<div>📚 Semestre 1: ${sem1.months.map(m => m.charAt(0).toUpperCase() + m.slice(1)).join(', ')}</div>
+        <div style="margin-top: 4px;">📚 Semestre 2: ${sem2.months.map(m => m.charAt(0).toUpperCase() + m.slice(1)).join(', ')}</div>
+        <div style="margin-top: 4px; font-weight: bold;">Total: ${allSemesterMonths.length} meses</div>`;
+    summary.style.display = 'block';
+
+    updateMonthSelection();
 };
 
 // Update installment amounts display
@@ -4356,7 +4428,13 @@ async function processPayment(studentId) {
                 }));
 
             if (selectedMonths.length === 0) {
-                window.showNotification('❌ Por favor seleccione al menos un mes', 'error');
+                if (paymentType === 'twoSemesters') {
+                    window.showNotification('❌ Por favor seleccione un año para los 2 semestres', 'error');
+                } else if (paymentType === 'academicSemester') {
+                    window.showNotification('❌ Por favor seleccione un semestre académico', 'error');
+                } else {
+                    window.showNotification('❌ Por favor seleccione al menos un mes', 'error');
+                }
                 return;
             }
         } else {
@@ -4412,7 +4490,12 @@ async function processPayment(studentId) {
         
         // Get semester info if academic semester
         let paymentPeriod = '';
-        if (paymentType === 'academicSemester' || paymentType === 'twoSemesters') {
+        if (paymentType === 'twoSemesters') {
+            const year = document.getElementById('twoSemestersYearSelect').value;
+            if (year) {
+                paymentPeriod = `Semestres 1 y 2 ${year}`;
+            }
+        } else if (paymentType === 'academicSemester') {
             const selection = document.getElementById('academicSemesterSelect').value;
             if (selection) {
                 const [year, semesterNum] = selection.split('-');
