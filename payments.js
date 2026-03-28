@@ -2625,8 +2625,8 @@ function renderPaymentModal(student) {
                         <label>Seleccionar Año (2 Semestres Completos)</label>
                         <select id="twoSemestersYearSelect" onchange="selectTwoSemesters()">
                             <option value="">Seleccionar año...</option>
-                            <option value="2025">2025 - Semestre 1 (Feb-Jun) + Semestre 2 (Jul-Nov)</option>
-                            <option value="2026">2026 - Semestre 1 (Feb-Jun) + Semestre 2 (Jul-Nov)</option>
+                            <option value="2025">2025 - Semestre 1 (Feb-Jun) + Semestre 2 (Jul-Dic)</option>
+                            <option value="2026">2026 - Semestre 1 (Feb-Jun) + Semestre 2 (Jul-Dic)</option>
                         </select>
                         <div id="twoSemestersSummary" style="display: none; margin-top: 8px; padding: 10px; background: #f0fdf4; border: 1px solid #86efac; border-radius: 6px; font-size: 0.875rem;">
                             <strong style="color: #166534;">✅ Meses incluidos:</strong>
@@ -2680,10 +2680,10 @@ function renderPaymentModal(student) {
                     <!-- Amount Section - Only for regular students (not hourly/Privadas) -->
                     ${(student.tipoPago !== 'POR_HORAS' && student.modalidad !== 'Privadas') ? `
                         <div class="form-group">
-                            <label>Monto Mensualidad/Semestre ($)</label>
-                            <input type="number" id="payAmountBase" value="" required min="0" onchange="updatePaymentTotal()" placeholder="Ingrese el monto a pagar">
+                            <label>Monto a pagar</label>
+                            <input type="text" id="payAmountBase" inputmode="numeric" value="" required onchange="updatePaymentTotal()" oninput="formatCurrencyInput(this); updatePaymentTotal()" placeholder="$0" style="font-size: 1.1rem; font-weight: 600;">
                             <small id="amountHelp" style="color: #6b7280; display: block; margin-top: 5px;">
-                                Ingrese el monto total de la mensualidad o semestre
+                                Ingrese el monto total a pagar
                             </small>
                         </div>
 
@@ -3178,7 +3178,7 @@ window.updateMonthSelection = function() {
     } else {
         const amountHelp = document.getElementById('amountHelp');
         if (amountHelp) {
-            amountHelp.innerHTML = `Ingrese el monto total de la mensualidad o semestre`;
+            amountHelp.innerHTML = `Ingrese el monto total a pagar`;
         }
     }
 
@@ -3209,10 +3209,29 @@ window.calculateHourlyTotal = function() {
     }
 };
 
+// Currency input formatting - formats number as $1,234,567 while typing
+window.formatCurrencyInput = function(input) {
+    // Strip everything except digits
+    let raw = input.value.replace(/[^0-9]/g, '');
+    if (!raw) {
+        input.value = '';
+        return;
+    }
+    const num = parseInt(raw, 10);
+    input.value = '$' + num.toLocaleString('es-CO');
+};
+
+// Parse formatted currency string back to number
+window.parseCurrencyValue = function(value) {
+    if (typeof value === 'number') return value;
+    if (!value) return 0;
+    return parseFloat(String(value).replace(/[^0-9]/g, '')) || 0;
+};
+
 // Update payment total with additional items (Matrícula, Certificado, etc.)
 window.updatePaymentTotal = function() {
-    // Get base amount
-    const baseAmount = parseFloat(document.getElementById('payAmountBase')?.value) || 0;
+    // Get base amount (parse formatted currency)
+    const baseAmount = parseCurrencyValue(document.getElementById('payAmountBase')?.value);
 
     // Handle checkbox enable/disable for inputs
     const matriculaCheck = document.getElementById('includeMatricula');
@@ -4523,7 +4542,7 @@ async function processPayment(studentId) {
         // IMPORTANT: Allow 0 as a valid value (for payments that are only Matrícula/Certificado)
         const payAmountBaseField = document.getElementById('payAmountBase');
         const baseAmount = payAmountBaseField
-            ? (parseFloat(payAmountBaseField.value) || 0)  // Allow 0 as valid
+            ? (parseCurrencyValue(payAmountBaseField.value) || 0)  // Allow 0 as valid
             : totalAmount; // Only use totalAmount as fallback if field doesn't exist
 
         // Build line items array
