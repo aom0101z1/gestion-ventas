@@ -1,51 +1,35 @@
 /**
  * TutorBox Admin — Web admin panel for TutorBox app user management.
- * Reads/writes to TutorBox Firebase (tutorbox-4d7c9) via window.tutorboxDb.
+ * Uses Firebase REST API to read/write TutorBox DB (no auth prompt needed).
  *
  * Features:
  * - User list with search, filter, sort
  * - Per-user access control (languages, features, maxBooks)
  * - Grant All / Revoke All quick actions
  * - Analytics overview (total users, by tier, by language, active)
- * - B2B provisioning link
  */
 
-// TutorBox Firebase authentication — must sign in as admin to read/write users
-let tbAuthenticated = false;
+const TB_DB_URL = 'https://tutorbox-4d7c9-default-rtdb.firebaseio.com';
+const TB_API_KEY = 'AIzaSyC1sfWvRDJ-SLHXiCPxEmF7os9Sweh9JCA';
 
-async function tbEnsureAuth() {
-    if (tbAuthenticated) return true;
-    try {
-        const { getAuth, signInWithEmailAndPassword } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
-        const { initializeApp, getApp } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js');
+// Read from TutorBox Firebase via REST API
+async function tbDbRead(path) {
+    const url = `${TB_DB_URL}/${path}.json?auth=${TB_API_KEY}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`DB read failed: ${res.status}`);
+    return res.json();
+}
 
-        let tutorboxApp;
-        try { tutorboxApp = getApp('tutorbox'); } catch(e) { return false; }
-
-        const tutorboxAuth = getAuth(tutorboxApp);
-
-        // Check if already signed in
-        if (tutorboxAuth.currentUser) {
-            tbAuthenticated = true;
-            console.log('✅ TutorBox auth: already signed in as', tutorboxAuth.currentUser.email);
-            return true;
-        }
-
-        // Prompt for admin credentials
-        const email = prompt('TutorBox Admin Email:', 'admin@ciudadbilingue.com');
-        if (!email) return false;
-        const password = prompt('TutorBox Admin Password:');
-        if (!password) return false;
-
-        await signInWithEmailAndPassword(tutorboxAuth, email, password);
-        tbAuthenticated = true;
-        console.log('✅ TutorBox auth: signed in as', email);
-        return true;
-    } catch (error) {
-        console.error('❌ TutorBox auth failed:', error);
-        alert('TutorBox login failed: ' + error.message);
-        return false;
-    }
+// Write to TutorBox Firebase via REST API
+async function tbDbUpdate(path, data) {
+    const url = `${TB_DB_URL}/${path}.json?auth=${TB_API_KEY}`;
+    const res = await fetch(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error(`DB write failed: ${res.status}`);
+    return res.json();
 }
 
 // ====================================================================
@@ -153,29 +137,11 @@ async function loadTutorBoxAdmin() {
 
 async function tbRefreshUsers() {
     try {
-        // Authenticate with TutorBox Firebase first
-        const authed = await tbEnsureAuth();
-        if (!authed) {
-            document.getElementById('tbUserList').innerHTML = `
-                <div style="padding: 40px; text-align: center; color: #ef4444;">
-                    Authentication required. Click Refresh to try again.
-                </div>`;
-            return;
-        }
+        const data = await tbDbRead('users');
 
-        const db = window.tutorboxDb;
-        if (!db) {
-            console.error('TutorBox DB not available');
-            return;
-        }
-
-        const { ref, get } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js');
-        const snapshot = await get(ref(db, 'users'));
-
-        if (!snapshot.exists()) {
+        if (!data) {
             tbUsers = [];
         } else {
-            const data = snapshot.val();
             tbUsers = Object.entries(data).map(([uid, userData]) => ({
                 uid,
                 ...userData,
@@ -535,23 +501,22 @@ async function tbSaveAccess() {
     if (!tbSelectedUser) return;
 
     try {
-        const { ref, update } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js');
-        const db = window.tutorboxDb;
         const access = tbSelectedUser.access || {};
 
-        const updates = {};
-        updates['access/languages'] = access.languages || [];
-        updates['access/features/smartLearning'] = access.features?.smartLearning || false;
-        updates['access/features/speakingPractice'] = access.features?.speakingPractice || false;
-        updates['access/features/callTutorbox'] = access.features?.callTutorbox || false;
-        updates['access/features/professionalEnglish'] = access.features?.professionalEnglish || false;
-        updates['access/features/kidsMode'] = access.features?.kidsMode || false;
-        updates['access/features/community'] = access.features?.community || false;
-        updates['access/maxBooks'] = access.maxBooks || 0;
-        updates['access/grantedBy'] = 'admin@ciudadbilingue.com';
-        updates['access/grantedAt'] = new Date().toISOString();
+        const updates = {
+            'access/languages': access.languages || [],
+            'access/features/smartLearning': access.features?.smartLearning || false,
+            'access/features/speakingPractice': access.features?.speakingPractice || false,
+            'access/features/callTutorbox': access.features?.callTutorbox || false,
+            'access/features/professionalEnglish': access.features?.professionalEnglish || false,
+            'access/features/kidsMode': access.features?.kidsMode || false,
+            'access/features/community': access.features?.community || false,
+            'access/maxBooks': access.maxBooks || 0,
+            'access/grantedBy': 'admin@ciudadbilingue.com',
+            'access/grantedAt': new Date().toISOString(),
+        };
 
-        await update(ref(db, `users/${tbSelectedUser.uid}`), updates);
+        await tbDbUpdate(`users/${tbSelectedUser.uid}`, updates);
 
         // Update local state
         const localUser = tbUsers.find(u => u.uid === tbSelectedUser.uid);
