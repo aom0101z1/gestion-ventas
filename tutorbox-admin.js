@@ -9,26 +9,36 @@
  * - Analytics overview (total users, by tier, by language, active)
  */
 
-const TB_DB_URL = 'https://tutorbox-4d7c9-default-rtdb.firebaseio.com';
-const TB_API_KEY = 'AIzaSyC1sfWvRDJ-SLHXiCPxEmF7os9Sweh9JCA';
+const TB_CF_BASE = 'https://us-central1-tutorbox-4d7c9.cloudfunctions.net';
+const TB_ADMIN_KEY = 'tbx-admin-2026-cb-provision-k9x7m';
 
-// Read from TutorBox Firebase via REST API
-async function tbDbRead(path) {
-    const url = `${TB_DB_URL}/${path}.json?auth=${TB_API_KEY}`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`DB read failed: ${res.status}`);
+// Read all users via Cloud Function
+async function tbFetchAllUsers() {
+    const res = await fetch(`${TB_CF_BASE}/getAllUsers`, {
+        method: 'GET',
+        headers: { 'x-admin-key': TB_ADMIN_KEY },
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Cloud Function failed: ${res.status}`);
+    }
     return res.json();
 }
 
-// Write to TutorBox Firebase via REST API
-async function tbDbUpdate(path, data) {
-    const url = `${TB_DB_URL}/${path}.json?auth=${TB_API_KEY}`;
-    const res = await fetch(url, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+// Update user access via Cloud Function
+async function tbUpdateAccess(uid, access) {
+    const res = await fetch(`${TB_CF_BASE}/updateUserAccess`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'x-admin-key': TB_ADMIN_KEY,
+        },
+        body: JSON.stringify({ uid, access }),
     });
-    if (!res.ok) throw new Error(`DB write failed: ${res.status}`);
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Update failed: ${res.status}`);
+    }
     return res.json();
 }
 
@@ -137,16 +147,9 @@ async function loadTutorBoxAdmin() {
 
 async function tbRefreshUsers() {
     try {
-        const data = await tbDbRead('users');
-
-        if (!data) {
-            tbUsers = [];
-        } else {
-            tbUsers = Object.entries(data).map(([uid, userData]) => ({
-                uid,
-                ...userData,
-            }));
-        }
+        // Load users via Cloud Function (authenticated with admin key)
+        const result = await tbFetchAllUsers();
+        tbUsers = result.users || [];
 
         tbApplyFilters();
         tbRenderAnalytics();
@@ -503,20 +506,7 @@ async function tbSaveAccess() {
     try {
         const access = tbSelectedUser.access || {};
 
-        const updates = {
-            'access/languages': access.languages || [],
-            'access/features/smartLearning': access.features?.smartLearning || false,
-            'access/features/speakingPractice': access.features?.speakingPractice || false,
-            'access/features/callTutorbox': access.features?.callTutorbox || false,
-            'access/features/professionalEnglish': access.features?.professionalEnglish || false,
-            'access/features/kidsMode': access.features?.kidsMode || false,
-            'access/features/community': access.features?.community || false,
-            'access/maxBooks': access.maxBooks || 0,
-            'access/grantedBy': 'admin@ciudadbilingue.com',
-            'access/grantedAt': new Date().toISOString(),
-        };
-
-        await tbDbUpdate(`users/${tbSelectedUser.uid}`, updates);
+        await tbUpdateAccess(tbSelectedUser.uid, access);
 
         // Update local state
         const localUser = tbUsers.find(u => u.uid === tbSelectedUser.uid);
