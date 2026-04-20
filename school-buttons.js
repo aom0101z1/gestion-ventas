@@ -48,7 +48,7 @@ function addSchoolButtons() {
         { name: 'Empleados 2.0', icon: '👔', color: '#14b8a6', func: 'Employees', directorOnly: true },
         { name: 'Profesores 2.0', icon: '👩‍🏫', color: '#f59e0b', func: 'Teachers' },
         { name: 'Asistencia', icon: '📋', color: '#ef4444', func: 'Attendance' },
-        { name: 'App', icon: '📱', color: '#7c3aed', func: 'StudentProgress', directorOnly: true }
+        // App module removed — replaced by TutorBox tab in top menu
     ];
     
     modules.forEach(module => {

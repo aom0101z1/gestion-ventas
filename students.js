@@ -2008,18 +2008,49 @@ window.showCreateStudentAccountModal = function(studentId) {
                         El estudiante podrá recuperar su contraseña por SMS.
                     </p>
 
-                    <!-- Book selection -->
+                    <!-- Book/Course selection -->
                     <div style="margin-bottom: 1.25rem;">
                         <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #374151;">
-                            Libros asignados
+                            Cursos asignados
                         </label>
-                        <select id="studentBookSelect" style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1rem;">
-                            <option value="1">Book 1 (PreA1-A1)</option>
-                            <option value="1,2">Books 1-2 (A1)</option>
-                            <option value="1,2,3">Books 1-3 (A1-A2)</option>
-                            <option value="1,2,3,4,5">Books 1-5 (A1-A2)</option>
-                            <option value="1,2,3,4,5,6,7,8,9,10">Todos los libros (1-10)</option>
+                        <select id="studentBookSelect" style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1rem; margin-bottom: 8px;">
+                            <optgroup label="🇬🇧 English">
+                                <option value="1">English — Book 1 (PreA1-A1)</option>
+                                <option value="1,2">English — Books 1-2 (A1)</option>
+                                <option value="1,2,3">English — Books 1-3 (A1-A2)</option>
+                                <option value="1,2,3,4,5">English — Books 1-5 (A1-B1)</option>
+                                <option value="1,2,3,4,5,6,7,8,9,10">English — All 10 Books (PreA1-B2)</option>
+                            </optgroup>
+                            <optgroup label="🇫🇷 French">
+                                <option value="101">French — Book 1 (A1)</option>
+                                <option value="101,102,103">French — Books 1-3 (A1-B1)</option>
+                                <option value="101,102,103,104,105">French — Books 1-5 (A1-B1+)</option>
+                                <option value="101,102,103,104,105,106,107,108,109,110">French — All 10 Books (A1-C1)</option>
+                            </optgroup>
+                            <optgroup label="🇩🇪 German">
+                                <option value="601">German — Book 1 (A1)</option>
+                                <option value="601,602,603">German — Books 1-3</option>
+                                <option value="601,602,603,604,605,606,607,608,609,610">German — All 10 Books</option>
+                            </optgroup>
+                            <optgroup label="🇪🇸 Spanish">
+                                <option value="201">Spanish — Book 1 (A1)</option>
+                                <option value="201,202,203">Spanish — Books 1-3</option>
+                                <option value="201,202,203,204,205,206,207,208,209,210">Spanish — All 10 Books</option>
+                            </optgroup>
+                            <optgroup label="💼 Professional English">
+                                <option value="901">Business English (B1-B2)</option>
+                                <option value="903">Interview Prep (B1-B2)</option>
+                                <option value="901,903">Business + Interview Prep</option>
+                            </optgroup>
+                            <optgroup label="📦 Bundles">
+                                <option value="1,2,3,4,5,6,7,8,9,10,101,102,103,104,105,106,107,108,109,110">English + French Complete</option>
+                                <option value="1,2,3,4,5,6,7,8,9,10,101,102,103,104,105,106,107,108,109,110,601,602,603,604,605,606,607,608,609,610">English + French + German Complete</option>
+                                <option value="1,2,3,4,5,6,7,8,9,10,901,903">English Complete + Professional</option>
+                            </optgroup>
                         </select>
+                        <p style="font-size: 0.75rem; color: #9ca3af; margin: 0;">
+                            Para control de acceso detallado (features, idiomas), usa la pestaña TutorBox en el menú principal.
+                        </p>
                     </div>
 
                     <div id="studentAccountError" style="display: none; background: #fee2e2; color: #dc2626; padding: 0.75rem;
