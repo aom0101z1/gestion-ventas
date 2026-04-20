@@ -10,17 +10,42 @@
  * - B2B provisioning link
  */
 
-// Firebase Realtime DB reference (initialized in index.html)
-function getTutorboxRef(path) {
-    if (!window.tutorboxDb) {
-        console.error('❌ TutorBox Firebase not initialized');
-        return null;
+// TutorBox Firebase authentication — must sign in as admin to read/write users
+let tbAuthenticated = false;
+
+async function tbEnsureAuth() {
+    if (tbAuthenticated) return true;
+    try {
+        const { getAuth, signInWithEmailAndPassword } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+        const { initializeApp, getApp } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js');
+
+        let tutorboxApp;
+        try { tutorboxApp = getApp('tutorbox'); } catch(e) { return false; }
+
+        const tutorboxAuth = getAuth(tutorboxApp);
+
+        // Check if already signed in
+        if (tutorboxAuth.currentUser) {
+            tbAuthenticated = true;
+            console.log('✅ TutorBox auth: already signed in as', tutorboxAuth.currentUser.email);
+            return true;
+        }
+
+        // Prompt for admin credentials
+        const email = prompt('TutorBox Admin Email:', 'admin@ciudadbilingue.com');
+        if (!email) return false;
+        const password = prompt('TutorBox Admin Password:');
+        if (!password) return false;
+
+        await signInWithEmailAndPassword(tutorboxAuth, email, password);
+        tbAuthenticated = true;
+        console.log('✅ TutorBox auth: signed in as', email);
+        return true;
+    } catch (error) {
+        console.error('❌ TutorBox auth failed:', error);
+        alert('TutorBox login failed: ' + error.message);
+        return false;
     }
-    // Use the Firebase modular API
-    const { ref } = window.firebaseModules || {};
-    if (ref) return ref(window.tutorboxDb, path);
-    // Fallback — try compat API
-    return window.tutorboxDb.ref ? window.tutorboxDb.ref(path) : null;
 }
 
 // ====================================================================
@@ -128,6 +153,16 @@ async function loadTutorBoxAdmin() {
 
 async function tbRefreshUsers() {
     try {
+        // Authenticate with TutorBox Firebase first
+        const authed = await tbEnsureAuth();
+        if (!authed) {
+            document.getElementById('tbUserList').innerHTML = `
+                <div style="padding: 40px; text-align: center; color: #ef4444;">
+                    Authentication required. Click Refresh to try again.
+                </div>`;
+            return;
+        }
+
         const db = window.tutorboxDb;
         if (!db) {
             console.error('TutorBox DB not available');
