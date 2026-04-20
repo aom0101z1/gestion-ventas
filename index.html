@@ -1769,6 +1769,7 @@
                 <button class="tab" onclick="switchTab('admin')" id="adminTab" style="display: none;">🔐 Admin</button>
                 <button class="tab" onclick="switchTab('socialMedia')" id="socialMediaTab">💬 Social Media</button>
                 <button class="tab" onclick="switchTab('classProgress')" id="classProgressTab">📚 Progreso Clases</button>
+                <button class="tab" onclick="switchTab('tutorboxAdmin')" id="tutorboxAdminTab" style="background: linear-gradient(135deg, #7c3aed, #a855f7); color: white;">📱 TutorBox</button>
             </div>
 
             <!-- ========== SECTION 7: TAB CONTENT - CONTACTS ========== -->
@@ -2506,6 +2507,11 @@
             <!-- ========== SECTION 15.4: TAB CONTENT - STUDENT PROGRESS ========== -->
             <div id="studentProgress" class="tab-content hidden">
                 <!-- Content loaded dynamically by student-progress.js -->
+            </div>
+
+            <!-- ========== SECTION 16: TAB CONTENT - TUTORBOX ADMIN ========== -->
+            <div id="tutorboxAdmin" class="tab-content hidden">
+                <!-- Content loaded dynamically by tutorbox-admin.js -->
             </div>
 
         </div> <!-- End of container -->
@@ -3334,6 +3340,10 @@ onAuthStateChanged(auth, async (user) => {
                 } else if (tabName === 'studentProgress') {
                     if (typeof renderStudentProgressTab === 'function') {
                         renderStudentProgressTab();
+                    }
+                } else if (tabName === 'tutorboxAdmin') {
+                    if (typeof loadTutorBoxAdmin === 'function') {
+                        loadTutorBoxAdmin();
                     }
                 }
 
@@ -5648,6 +5658,7 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
     <script src="permission-enforcer.js"></script>
     <script src="class-progress.js"></script>
     <script src="student-progress.js?v=20260218"></script>
+    <script src="tutorbox-admin.js?v=20260420"></script>
 
     <!-- ========== SECTION 18: MODULE CHECK SCRIPT ========== -->
     <script>
