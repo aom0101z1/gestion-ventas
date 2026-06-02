@@ -1925,10 +1925,6 @@ class CoatsReportsManager {
                     <span class="stat-label">${this.t('avgAttendance')}</span>
                     <span class="stat-value">${avgAttendance.toFixed(1)}%</span>
                 </div>
-                <div class="group-stat">
-                    <span class="stat-label">${this.t('totalHours')}</span>
-                    <span class="stat-value">${group.totalGroupHours}</span>
-                </div>
             </div>
 
             <div class="group-progress-section">
