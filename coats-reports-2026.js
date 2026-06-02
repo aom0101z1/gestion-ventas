@@ -1776,12 +1776,15 @@ class CoatsReportsManager {
         const activeStudentsList = group.students.filter(s => s.status === 'active');
         const activeStudents = activeStudentsList.length;
 
-        // Calculate average attendance considering late-start students
+        // Calculate average attendance considering late-start students and per-group max.
+        // Priority: student override → lateStart calc → group max → global default.
+        // (Matches the formula in calculateProgramStats so the two sections agree.)
         let totalAttendancePct = 0;
         activeStudentsList.forEach(student => {
-            const maxHours = student.lateStart
-                ? this.calculateAvailableHoursSince(student.lateStart)
-                : this.programData.maxPossibleHours;
+            const maxHours = student.maxPossibleHoursOverride
+                || (student.lateStart ? this.calculateAvailableHoursSince(student.lateStart) : null)
+                || group.maxPossibleHours
+                || this.programData.maxPossibleHours;
             totalAttendancePct += (student.total / maxHours) * 100;
         });
         const avgAttendance = activeStudents > 0 ? totalAttendancePct / activeStudents : 0;
@@ -1872,9 +1875,10 @@ class CoatsReportsManager {
                                 .filter(s => s.status === 'active')
                                 .sort((a, b) => b.total - a.total)
                                 .map((student, index) => {
-                                    const maxHours = student.lateStart
-                                        ? this.calculateAvailableHoursSince(student.lateStart)
-                                        : this.programData.maxPossibleHours;
+                                    const maxHours = student.maxPossibleHoursOverride
+                                        || (student.lateStart ? this.calculateAvailableHoursSince(student.lateStart) : null)
+                                        || group.maxPossibleHours
+                                        || this.programData.maxPossibleHours;
                                     const pct = ((student.total / maxHours) * 100).toFixed(1);
                                     const pctClass = pct >= 70 ? 'high' : pct >= 50 ? 'medium' : 'low';
                                     return `
