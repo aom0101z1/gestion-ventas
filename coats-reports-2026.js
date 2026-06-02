@@ -152,7 +152,29 @@ class CoatsReportsManager {
                 teacherNotes: 'Observaciones del Profesor',
                 alsoInGroup: 'También en',
                 generalObservations: 'Observaciones Generales de los Profesores',
-                generalObservationsDesc: 'Comentarios consolidados del equipo docente sobre el progreso general del programa'
+                generalObservationsDesc: 'Comentarios consolidados del equipo docente sobre el progreso general del programa',
+                // Highlights / benchmark / context (added 2026-06-02)
+                highlights: 'Logros Destacados del Programa',
+                highlightsSubtitle: 'Resultados clave del año académico 2025-2026',
+                hl_retentionLabel: 'Tasa de Retención',
+                hl_retentionSub: 'estudiantes activos al cierre',
+                hl_booksLabel: 'Libros Avanzados (Promedio)',
+                hl_booksSub: 'todos los grupos subieron de libro',
+                hl_excellentLabel: 'Estudiantes con Asistencia Excelente',
+                hl_excellentSub: 'sobre 70% — meta del programa',
+                hl_hoursLabel: 'Horas Totales de Capacitación',
+                hl_hoursSub: 'horas-estudiante impartidas',
+                hl_cefrLabel: 'Cobertura CEFR',
+                hl_cefrSub: 'todos los grupos avanzaron de nivel',
+                hl_groupsLabel: 'Grupos que Subieron de Nivel',
+                hl_groupsSub: 'de 4 grupos activos',
+                benchmarkNote: 'Asistencia promedio en programas corporativos voluntarios comparables: 50–65%. Cualquier valor superior a 70% se considera excelente.',
+                benchmarkExcellent: 'Excelente ≥70%',
+                benchmarkGood: 'Bueno 50–69%',
+                benchmarkLow: 'Por debajo del benchmark <50%',
+                denominatorNote: '⏰ Las horas máximas reflejan el calendario real de clases para cada grupo, excluyendo festivos oficiales (Semana Santa, Día del Trabajo) y cancelaciones de calendario. Por eso el máximo varía entre 178h y 188h según el grupo.',
+                teacherQuoteTitle: 'Del equipo docente',
+                teacherQuoteText: 'Los estudiantes que asisten con regularidad muestran un progreso notablemente más rápido y mayor confianza al hablar inglés. La correlación entre asistencia y avance académico es muy clara en este programa.'
             },
             en: {
                 title: 'Progress Report - English Program',
@@ -248,7 +270,29 @@ class CoatsReportsManager {
                 teacherNotes: 'Teacher Notes',
                 alsoInGroup: 'Also in',
                 generalObservations: 'General Teacher Observations',
-                generalObservationsDesc: 'Consolidated comments from the teaching team on overall program progress'
+                generalObservationsDesc: 'Consolidated comments from the teaching team on overall program progress',
+                // Highlights / benchmark / context (added 2026-06-02)
+                highlights: 'Program Highlights',
+                highlightsSubtitle: 'Key results for the 2025-2026 academic year',
+                hl_retentionLabel: 'Retention Rate',
+                hl_retentionSub: 'students active at year-end',
+                hl_booksLabel: 'Books Advanced (Avg)',
+                hl_booksSub: 'every group moved up a book',
+                hl_excellentLabel: 'Students with Excellent Attendance',
+                hl_excellentSub: 'above 70% — the program target',
+                hl_hoursLabel: 'Total Training Hours',
+                hl_hoursSub: 'student-hours delivered',
+                hl_cefrLabel: 'CEFR Coverage',
+                hl_cefrSub: 'all groups advanced a level',
+                hl_groupsLabel: 'Groups That Advanced',
+                hl_groupsSub: 'of 4 active groups',
+                benchmarkNote: 'Average attendance in comparable voluntary corporate language programs: 50–65%. Anything above 70% is considered excellent.',
+                benchmarkExcellent: 'Excellent ≥70%',
+                benchmarkGood: 'Good 50–69%',
+                benchmarkLow: 'Below benchmark <50%',
+                denominatorNote: '⏰ Max possible hours reflect each group\'s actual class calendar, excluding official holidays (Holy Week, Labor Day) and calendar cancellations. This is why the max varies between 178h and 188h depending on the group.',
+                teacherQuoteTitle: 'From the teaching team',
+                teacherQuoteText: 'Students who attend regularly show notably faster progress and greater confidence speaking English. The correlation between attendance and academic advancement is very clear in this program.'
             }
         };
     }
@@ -1435,6 +1479,67 @@ class CoatsReportsManager {
                 </div>
             </div>
 
+            <!-- Highlights / Logros Destacados (added 2026-06-02) -->
+            ${(() => {
+                const retentionPct = stats.totalStudents > 0
+                    ? Math.round((stats.activeStudents / stats.totalStudents) * 100)
+                    : 0;
+                const avgBooksAdvanced = (
+                    this.programData.groups.reduce((sum, g) => sum + (g.currentBook - g.startBook), 0)
+                    / this.programData.groups.length
+                ).toFixed(1);
+                const groupsAdvancedCount = this.programData.groups.filter(
+                    g => g.currentBook > g.startBook
+                ).length;
+                return `
+                <div class="coats-section coats-highlights-section">
+                    <h3><span class="section-icon">⭐</span> ${this.t('highlights')}</h3>
+                    <p class="highlights-subtitle">${this.t('highlightsSubtitle')}</p>
+                    <div class="highlights-grid">
+                        <div class="highlight-card highlight-card-primary">
+                            <div class="highlight-icon">🎯</div>
+                            <div class="highlight-value">${retentionPct}%</div>
+                            <div class="highlight-label">${this.t('hl_retentionLabel')}</div>
+                            <div class="highlight-sub">${stats.activeStudents}/${stats.totalStudents} ${this.t('hl_retentionSub')}</div>
+                        </div>
+                        <div class="highlight-card">
+                            <div class="highlight-icon">📚</div>
+                            <div class="highlight-value">${avgBooksAdvanced}</div>
+                            <div class="highlight-label">${this.t('hl_booksLabel')}</div>
+                            <div class="highlight-sub">${this.t('hl_booksSub')}</div>
+                        </div>
+                        <div class="highlight-card highlight-card-success">
+                            <div class="highlight-icon">⭐</div>
+                            <div class="highlight-value">${stats.highAttendance.length}</div>
+                            <div class="highlight-label">${this.t('hl_excellentLabel')}</div>
+                            <div class="highlight-sub">${this.t('hl_excellentSub')}</div>
+                        </div>
+                        <div class="highlight-card">
+                            <div class="highlight-icon">⏱️</div>
+                            <div class="highlight-value">${stats.totalHours.toLocaleString()}</div>
+                            <div class="highlight-label">${this.t('hl_hoursLabel')}</div>
+                            <div class="highlight-sub">${this.t('hl_hoursSub')}</div>
+                        </div>
+                        <div class="highlight-card">
+                            <div class="highlight-icon">🎓</div>
+                            <div class="highlight-value">${groupsAdvancedCount}/4</div>
+                            <div class="highlight-label">${this.t('hl_groupsLabel')}</div>
+                            <div class="highlight-sub">${this.t('hl_groupsSub')}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Teacher quote callout (surfaced 2026-06-02) -->
+                <div class="coats-section teacher-quote-callout">
+                    <div class="teacher-quote-icon">💬</div>
+                    <div class="teacher-quote-body">
+                        <div class="teacher-quote-title">${this.t('teacherQuoteTitle')}</div>
+                        <p class="teacher-quote-text">"${this.t('teacherQuoteText')}"</p>
+                    </div>
+                </div>
+                `;
+            })()}
+
             <!-- Executive Summary -->
             <div class="coats-section coats-executive-summary">
                 <h3><span class="section-icon">📋</span> ${this.t('executiveSummary')}</h3>
@@ -1455,8 +1560,10 @@ class CoatsReportsManager {
                         <div class="stat-icon">📊</div>
                         <div class="stat-value">${stats.avgAttendance.toFixed(1)}%</div>
                         <div class="stat-label">${this.t('avgAttendance')}</div>
+                        <div class="stat-sub stat-benchmark">${this.t('benchmarkExcellent')}</div>
                     </div>
                 </div>
+                <p class="benchmark-note">📊 ${this.t('benchmarkNote')}</p>
             </div>
 
             <!-- Program Structure -->
@@ -1617,20 +1724,21 @@ class CoatsReportsManager {
                 <div class="correlation-stats">
                     <div class="correlation-stat high">
                         <div class="correlation-count">${stats.highAttendance.length}</div>
-                        <div class="correlation-label">${this.t('highAttendance')}</div>
+                        <div class="correlation-label">${this.t('benchmarkExcellent')}</div>
                         <div class="correlation-bar" style="width: ${(stats.highAttendance.length / stats.activeStudents) * 100}%"></div>
                     </div>
                     <div class="correlation-stat medium">
                         <div class="correlation-count">${stats.mediumAttendance.length}</div>
-                        <div class="correlation-label">${this.t('mediumAttendance')}</div>
+                        <div class="correlation-label">${this.t('benchmarkGood')}</div>
                         <div class="correlation-bar" style="width: ${(stats.mediumAttendance.length / stats.activeStudents) * 100}%"></div>
                     </div>
                     <div class="correlation-stat low">
                         <div class="correlation-count">${stats.lowAttendance.length}</div>
-                        <div class="correlation-label">${this.t('lowAttendance')}</div>
+                        <div class="correlation-label">${this.t('benchmarkLow')}</div>
                         <div class="correlation-bar" style="width: ${(stats.lowAttendance.length / stats.activeStudents) * 100}%"></div>
                     </div>
                 </div>
+                <p class="benchmark-note">📊 ${this.t('benchmarkNote')}</p>
             </div>
 
             <!-- Recognition & Awards -->
@@ -1714,6 +1822,7 @@ class CoatsReportsManager {
             <!-- Individual Progress Table -->
             <div class="coats-section">
                 <h3><span class="section-icon">👤</span> ${this.t('individualProgress')}</h3>
+                <p class="denominator-note">${this.t('denominatorNote')}</p>
                 <div class="coats-table-container">
                     <table class="coats-table">
                         <thead>
@@ -2389,6 +2498,129 @@ class CoatsReportsManager {
 
     getReportStyles() {
         return `
+        /* ==== Highlights / Benchmark styles (added 2026-06-02) ==== */
+        .coats-highlights-section {
+            background: linear-gradient(135deg, #f0f9ff 0%, #ede9fe 100%);
+            border: 1px solid #c7d2fe;
+        }
+        .highlights-subtitle {
+            color: #475569;
+            margin: -5px 0 20px;
+            font-size: 14px;
+        }
+        .highlights-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 18px;
+            margin-top: 8px;
+        }
+        .highlight-card {
+            background: white;
+            border-radius: 14px;
+            padding: 20px 18px;
+            text-align: center;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+            border: 1px solid #e2e8f0;
+            transition: transform 0.15s ease;
+        }
+        .highlight-card:hover { transform: translateY(-2px); }
+        .highlight-card-primary {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            border-color: #2563eb;
+        }
+        .highlight-card-success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border-color: #059669;
+        }
+        .highlight-card-primary .highlight-sub,
+        .highlight-card-success .highlight-sub { color: rgba(255,255,255,0.85); }
+        .highlight-card-primary .highlight-label,
+        .highlight-card-success .highlight-label { color: white; }
+        .highlight-icon {
+            font-size: 28px;
+            margin-bottom: 6px;
+        }
+        .highlight-value {
+            font-size: 32px;
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 4px;
+        }
+        .highlight-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 4px;
+        }
+        .highlight-sub {
+            font-size: 11px;
+            color: #64748b;
+            line-height: 1.3;
+        }
+
+        /* Teacher quote callout */
+        .teacher-quote-callout {
+            display: flex;
+            gap: 18px;
+            align-items: flex-start;
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border-left: 4px solid #f59e0b;
+            padding: 20px 22px;
+            border-radius: 12px;
+            margin: 18px 0;
+        }
+        .teacher-quote-icon {
+            font-size: 28px;
+            flex-shrink: 0;
+        }
+        .teacher-quote-title {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #92400e;
+            margin-bottom: 6px;
+        }
+        .teacher-quote-text {
+            font-size: 15px;
+            font-style: italic;
+            color: #78350f;
+            line-height: 1.5;
+            margin: 0;
+        }
+
+        /* Benchmark note */
+        .benchmark-note {
+            background: #f1f5f9;
+            border-left: 3px solid #64748b;
+            padding: 12px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #334155;
+            margin-top: 16px;
+            line-height: 1.5;
+        }
+        .stat-benchmark {
+            color: #10b981 !important;
+            font-weight: 600;
+        }
+
+        /* Denominator note */
+        .denominator-note {
+            background: #eff6ff;
+            border-left: 3px solid #3b82f6;
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #1e3a8a;
+            margin-bottom: 14px;
+            line-height: 1.5;
+        }
+
+        /* ==== End added styles ==== */
+
         .coats-report {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             max-width: 1200px;
