@@ -184,7 +184,11 @@ class CoatsReportsManager {
                 bookCompletedLabel: '¡Libro completado!',
                 booksCovered: 'libros cubiertos',
                 bookProgressLabel: 'Progreso en',
-                programProgressLabel: 'Progreso del programa total (12 libros → C1)'
+                programProgressLabel: 'Progreso del programa total (12 libros → C1)',
+                programPositionLabel: 'del programa de 12 libros',
+                booksThisYearTitle: 'Libros Avanzados Durante Este Año',
+                booksThisYearDesc: 'Cantidad de libros que cada grupo cubrió durante los 12 meses de programa (Jun 2025 → May 2026). No incluye libros previamente completados.',
+                booksThisYearLabel: 'libros este año'
             },
             en: {
                 title: 'Progress Report - English Program',
@@ -312,7 +316,11 @@ class CoatsReportsManager {
                 bookCompletedLabel: 'Book completed!',
                 booksCovered: 'books covered',
                 bookProgressLabel: 'Progress in',
-                programProgressLabel: 'Overall program progress (12 books → C1)'
+                programProgressLabel: 'Overall program progress (12 books → C1)',
+                programPositionLabel: 'of the 12-book program',
+                booksThisYearTitle: 'Books Advanced During This Year',
+                booksThisYearDesc: 'Number of books each group covered during the 12 months of program (Jun 2025 → May 2026). Does not include previously completed books.',
+                booksThisYearLabel: 'books this year'
             }
         };
     }
@@ -1603,7 +1611,7 @@ class CoatsReportsManager {
                                         </div>
                                     </div>
                                     <div class="final-progress-books-covered">
-                                        📘 <strong>${booksCovered}</strong> ${this.t('booksCovered')}
+                                        📘 ${this.language === 'es' ? `Libro <strong>${g.currentBook}</strong> de 12 del programa completo` : `Book <strong>${g.currentBook}</strong> of 12 in the full program`}
                                     </div>
                                     ${completed ? `<div class="final-progress-badge">🏆 ${this.t('bookCompletedLabel')}</div>` : ''}
                                 </div>
@@ -1815,6 +1823,27 @@ class CoatsReportsManager {
                     </div>
                 </div>
                 <p class="benchmark-note">📊 ${this.t('benchmarkNote')}</p>
+
+                <!-- Books advanced this year per group (added 2026-06-03) -->
+                <div class="books-this-year-block">
+                    <h4 class="books-this-year-title">📚 ${this.t('booksThisYearTitle')}</h4>
+                    <p class="books-this-year-desc">${this.t('booksThisYearDesc')}</p>
+                    <div class="books-this-year-grid">
+                        ${this.programData.groups.map(g => {
+                            const name = this.language === 'es' ? g.name : g.nameEn;
+                            const shortName = name.split(' - ')[0];
+                            const booksThisYear = g.currentBook - g.startBook + 1;
+                            return `
+                            <div class="books-this-year-card">
+                                <div class="books-this-year-group">${shortName}</div>
+                                <div class="books-this-year-value">${booksThisYear}</div>
+                                <div class="books-this-year-label">${this.t('booksThisYearLabel')}</div>
+                                <div class="books-this-year-range">${this.t('book')} ${g.startBook} → ${this.t('book')} ${g.currentBook}</div>
+                            </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
             </div>
 
             <!-- Recognition & Awards -->
@@ -2831,6 +2860,64 @@ class CoatsReportsManager {
         .final-progress-card--completed .final-progress-books-covered {
             background: rgba(255, 255, 255, 0.6);
             color: #78350f;
+        }
+
+        /* Books Advanced This Year section (added 2026-06-03) */
+        .books-this-year-block {
+            margin-top: 22px;
+            padding-top: 18px;
+            border-top: 1px solid #e2e8f0;
+        }
+        .books-this-year-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: #1e293b;
+            margin: 0 0 4px;
+        }
+        .books-this-year-desc {
+            font-size: 13px;
+            color: #64748b;
+            margin: 0 0 14px;
+        }
+        .books-this-year-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+        }
+        .books-this-year-card {
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+            border: 1px solid #93c5fd;
+            border-radius: 10px;
+            padding: 14px 12px;
+            text-align: center;
+        }
+        .books-this-year-group {
+            font-size: 12px;
+            font-weight: 700;
+            color: #1e40af;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            margin-bottom: 6px;
+        }
+        .books-this-year-value {
+            font-size: 36px;
+            font-weight: 800;
+            color: #1e3a8a;
+            line-height: 1;
+        }
+        .books-this-year-label {
+            font-size: 12px;
+            color: #475569;
+            margin-top: 2px;
+            margin-bottom: 8px;
+        }
+        .books-this-year-range {
+            font-size: 11px;
+            color: #475569;
+            background: rgba(255, 255, 255, 0.6);
+            padding: 3px 8px;
+            border-radius: 6px;
+            display: inline-block;
         }
 
         /* Denominator note */
