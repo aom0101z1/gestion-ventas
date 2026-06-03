@@ -20,9 +20,11 @@ class CoatsReportsManager {
                 semester: 'Full Year 2025-2026 / Año Completo 2025-2026'
             },
             totalBooks: 12,
-            // Per-group maxPossibleHours overrides this default (each group has its own value
-            // because the 2026 cancellation calendar differs by group schedule).
-            maxPossibleHours: 180,
+            // Program-wide max hours = sum of monthlyMaxHours (12+22+12+18+18+16+8+10+16+17+17+17 = 183).
+            // Used as the single denominator for ALL student attendance percentages so
+            // numbers are consistent across the Group Progress and Individual Progress sections.
+            // Per-group maxPossibleHours kept as data but no longer used in % calculation.
+            maxPossibleHours: 183,
             monthlyMaxHours: {
                 // 2025 (program-wide) — unchanged from original report
                 jun: 12, jul: 22, ago: 12, sep: 18, oct: 18, nov: 16, dic: 8,
@@ -172,7 +174,7 @@ class CoatsReportsManager {
                 benchmarkExcellent: 'Excelente ≥70%',
                 benchmarkGood: 'Bueno 50–69%',
                 benchmarkLow: 'Por debajo del benchmark <50%',
-                denominatorNote: '⏰ Las horas máximas reflejan el calendario real de clases para cada grupo, excluyendo festivos oficiales (Semana Santa, Día del Trabajo) y cancelaciones de calendario. Por eso el máximo varía entre 178h y 188h según el grupo.',
+                denominatorNote: '⏰ El máximo posible es 183 horas — el total de horas de clase programadas durante el año académico (Jun 2025 → May 2026), excluyendo festivos oficiales y cancelaciones de calendario. Todas las asistencias se calculan sobre este mismo denominador.',
                 teacherQuoteTitle: 'Del equipo docente',
                 teacherQuoteText: 'Los estudiantes que asisten con regularidad muestran un progreso notablemente más rápido y mayor confianza al hablar inglés. La correlación entre asistencia y avance académico es muy clara en este programa.',
                 unit: 'Unidad',
@@ -304,7 +306,7 @@ class CoatsReportsManager {
                 benchmarkExcellent: 'Excellent ≥70%',
                 benchmarkGood: 'Good 50–69%',
                 benchmarkLow: 'Below benchmark <50%',
-                denominatorNote: '⏰ Max possible hours reflect each group\'s actual class calendar, excluding official holidays (Holy Week, Labor Day) and calendar cancellations. This is why the max varies between 178h and 188h depending on the group.',
+                denominatorNote: '⏰ Max possible is 183 hours — the total scheduled class hours during the academic year (Jun 2025 → May 2026), excluding official holidays and calendar cancellations. All attendance percentages use this same denominator.',
                 teacherQuoteTitle: 'From the teaching team',
                 teacherQuoteText: 'Students who attend regularly show notably faster progress and greater confidence speaking English. The correlation between attendance and academic advancement is very clear in this program.',
                 unit: 'Unit',
@@ -657,11 +659,10 @@ class CoatsReportsManager {
                     totalStudents++;
                 }
 
-                // Max possible hours: prefer explicit per-student override, then late-start
-                // calc, then per-group max, then global default.
+                // Single denominator for all students: program total hours (183).
+                // Per-student override only honored for late starters with a different baseline.
                 let maxPossibleHours = student.maxPossibleHoursOverride
                     || (student.lateStart ? this.calculateAvailableHoursSince(student.lateStart) : null)
-                    || group.maxPossibleHours
                     || this.programData.maxPossibleHours;
                 const attendancePct = (student.total / maxPossibleHours) * 100;
 
@@ -1990,14 +1991,11 @@ class CoatsReportsManager {
         const activeStudentsList = group.students.filter(s => s.status === 'active');
         const activeStudents = activeStudentsList.length;
 
-        // Calculate average attendance considering late-start students and per-group max.
-        // Priority: student override → lateStart calc → group max → global default.
-        // (Matches the formula in calculateProgramStats so the two sections agree.)
+        // Average attendance — same denominator as calculateProgramStats (program total 183h).
         let totalAttendancePct = 0;
         activeStudentsList.forEach(student => {
             const maxHours = student.maxPossibleHoursOverride
                 || (student.lateStart ? this.calculateAvailableHoursSince(student.lateStart) : null)
-                || group.maxPossibleHours
                 || this.programData.maxPossibleHours;
             totalAttendancePct += (student.total / maxHours) * 100;
         });
@@ -2087,7 +2085,6 @@ class CoatsReportsManager {
                                 .map((student, index) => {
                                     const maxHours = student.maxPossibleHoursOverride
                                         || (student.lateStart ? this.calculateAvailableHoursSince(student.lateStart) : null)
-                                        || group.maxPossibleHours
                                         || this.programData.maxPossibleHours;
                                     const pct = ((student.total / maxHours) * 100).toFixed(1);
                                     const pctClass = pct >= 70 ? 'high' : pct >= 50 ? 'medium' : 'low';
