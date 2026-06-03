@@ -188,9 +188,9 @@ class CoatsReportsManager {
                 bookProgressLabel: 'Progreso en',
                 programProgressLabel: 'Progreso del programa total (12 libros → C1)',
                 programPositionLabel: 'del programa de 12 libros',
-                booksThisYearTitle: 'Libros Avanzados Durante Este Año',
-                booksThisYearDesc: 'Cantidad de libros que cada grupo cubrió durante los 12 meses de programa (Jun 2025 → May 2026). No incluye libros previamente completados.',
-                booksThisYearLabel: 'libros este año'
+                booksThisYearTitle: 'Libros Avanzados Durante el Contrato Completo',
+                booksThisYearDesc: 'Cantidad de libros que cada grupo cubrió a lo largo del contrato completo (Jun 2025 → May 2026, ambos semestres del año académico). No incluye libros previamente completados antes del inicio del contrato.',
+                booksThisYearLabel: 'libros en el contrato'
             },
             en: {
                 title: 'Progress Report - English Program',
@@ -322,9 +322,9 @@ class CoatsReportsManager {
                 bookProgressLabel: 'Progress in',
                 programProgressLabel: 'Overall program progress (12 books → C1)',
                 programPositionLabel: 'of the 12-book program',
-                booksThisYearTitle: 'Books Advanced During This Year',
-                booksThisYearDesc: 'Number of books each group covered during the 12 months of program (Jun 2025 → May 2026). Does not include previously completed books.',
-                booksThisYearLabel: 'books this year'
+                booksThisYearTitle: 'Books Advanced During the Full Contract',
+                booksThisYearDesc: 'Number of books each group covered throughout the full contract (Jun 2025 → May 2026, both semesters of the academic year). Does not include books previously completed before the contract started.',
+                booksThisYearLabel: 'books in contract'
             }
         };
     }
