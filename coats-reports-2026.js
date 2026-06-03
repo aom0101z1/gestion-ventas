@@ -183,7 +183,8 @@ class CoatsReportsManager {
                 progressEnded: 'Terminó',
                 bookCompletedLabel: '¡Libro completado!',
                 booksCovered: 'libros cubiertos',
-                bookProgressLabel: 'Progreso en'
+                bookProgressLabel: 'Progreso en',
+                programProgressLabel: 'Progreso del programa total (12 libros → C1)'
             },
             en: {
                 title: 'Progress Report - English Program',
@@ -310,7 +311,8 @@ class CoatsReportsManager {
                 progressEnded: 'Finished',
                 bookCompletedLabel: 'Book completed!',
                 booksCovered: 'books covered',
-                bookProgressLabel: 'Progress in'
+                bookProgressLabel: 'Progress in',
+                programProgressLabel: 'Overall program progress (12 books → C1)'
             }
         };
     }
@@ -1564,6 +1566,10 @@ class CoatsReportsManager {
                                 const completed = g.bookCompleted;
                                 const bookPct = Math.round((g.currentUnit / g.totalUnits) * 100);
                                 const booksCovered = g.currentBook - g.startBook + 1;
+                                // Overall program progress (books fully completed + current book pct) / 12 books to C1
+                                const programPct = Math.round(
+                                    ((g.currentBook - 1 + g.currentUnit / g.totalUnits) / this.programData.totalBooks) * 100
+                                );
                                 return `
                                 <div class="final-progress-card ${completed ? 'final-progress-card--completed' : ''}">
                                     <div class="final-progress-group">${shortName}</div>
@@ -1587,6 +1593,15 @@ class CoatsReportsManager {
                                             <div class="final-progress-bar-fill ${completed ? 'final-progress-bar-fill--completed' : ''}" style="width: ${bookPct}%"></div>
                                         </div>
                                     </div>
+                                    <div class="final-progress-bar-block">
+                                        <div class="final-progress-bar-header">
+                                            <span class="final-progress-bar-label">${this.t('programProgressLabel')}</span>
+                                            <span class="final-progress-bar-pct">${programPct}%</span>
+                                        </div>
+                                        <div class="final-progress-bar-track">
+                                            <div class="final-progress-bar-fill final-progress-bar-fill--overall" style="width: ${programPct}%"></div>
+                                        </div>
+                                    </div>
                                     <div class="final-progress-books-covered">
                                         📘 <strong>${booksCovered}</strong> ${this.t('booksCovered')}
                                     </div>
@@ -1601,33 +1616,7 @@ class CoatsReportsManager {
                 `;
             })()}
 
-            <!-- Executive Summary -->
-            <div class="coats-section coats-executive-summary">
-                <h3><span class="section-icon">📋</span> ${this.t('executiveSummary')}</h3>
-                <div class="coats-summary-grid">
-                    <div class="coats-stat-card coats-stat-highlight">
-                        <div class="stat-icon">👥</div>
-                        <div class="stat-value">${stats.totalStudents}</div>
-                        <div class="stat-label">${this.t('totalStudents')}</div>
-                        <div class="stat-sub">${stats.activeStudents} ${this.language === 'es' ? 'activos' : 'active'}</div>
-                    </div>
-                    <div class="coats-stat-card coats-stat-primary">
-                        <div class="stat-icon">🎓</div>
-                        <div class="stat-value">${stats.totalClassHoursDelivered}</div>
-                        <div class="stat-label">${this.t('classHoursDelivered')}</div>
-                        <div class="stat-sub">${stats.groups} ${this.language === 'es' ? 'grupos' : 'groups'} × ${stats.totalClassHoursPerGroup} hrs</div>
-                    </div>
-                    <div class="coats-stat-card">
-                        <div class="stat-icon">📊</div>
-                        <div class="stat-value">${stats.avgAttendance.toFixed(1)}%</div>
-                        <div class="stat-label">${this.t('avgAttendance')}</div>
-                        <div class="stat-sub stat-benchmark">${this.t('benchmarkExcellent')}</div>
-                    </div>
-                </div>
-                <p class="benchmark-note">📊 ${this.t('benchmarkNote')}</p>
-            </div>
-
-            <!-- Program Structure -->
+            <!-- Program Structure (moved above Executive Summary 2026-06-03) -->
             <div class="coats-section coats-program-structure">
                 <h3><span class="section-icon">🌐</span> ${this.t('programStructure')} - Ciudad Bilingüe</h3>
                 <div class="program-structure-container">
@@ -1689,6 +1678,32 @@ class CoatsReportsManager {
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <!-- Executive Summary (moved below Program Structure 2026-06-03) -->
+            <div class="coats-section coats-executive-summary">
+                <h3><span class="section-icon">📋</span> ${this.t('executiveSummary')}</h3>
+                <div class="coats-summary-grid">
+                    <div class="coats-stat-card coats-stat-highlight">
+                        <div class="stat-icon">👥</div>
+                        <div class="stat-value">${stats.totalStudents}</div>
+                        <div class="stat-label">${this.t('totalStudents')}</div>
+                        <div class="stat-sub">${stats.activeStudents} ${this.language === 'es' ? 'activos' : 'active'}</div>
+                    </div>
+                    <div class="coats-stat-card coats-stat-primary">
+                        <div class="stat-icon">🎓</div>
+                        <div class="stat-value">${stats.totalClassHoursDelivered}</div>
+                        <div class="stat-label">${this.t('classHoursDelivered')}</div>
+                        <div class="stat-sub">${stats.groups} ${this.language === 'es' ? 'grupos' : 'groups'} × ${stats.totalClassHoursPerGroup} hrs</div>
+                    </div>
+                    <div class="coats-stat-card">
+                        <div class="stat-icon">📊</div>
+                        <div class="stat-value">${stats.avgAttendance.toFixed(1)}%</div>
+                        <div class="stat-label">${this.t('avgAttendance')}</div>
+                        <div class="stat-sub stat-benchmark">${this.t('benchmarkExcellent')}</div>
+                    </div>
+                </div>
+                <p class="benchmark-note">📊 ${this.t('benchmarkNote')}</p>
             </div>
 
             <!-- Hours Breakdown -->
@@ -2797,6 +2812,9 @@ class CoatsReportsManager {
         }
         .final-progress-bar-fill--completed {
             background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+        }
+        .final-progress-bar-fill--overall {
+            background: linear-gradient(90deg, #a855f7 0%, #7c3aed 100%);
         }
         .final-progress-card--completed .final-progress-bar-pct { color: #92400e; }
         .final-progress-card--completed .final-progress-bar-track { background: rgba(180, 83, 9, 0.15); }
