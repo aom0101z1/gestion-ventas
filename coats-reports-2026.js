@@ -1543,18 +1543,6 @@ class CoatsReportsManager {
                             <div class="highlight-label">${this.t('hl_excellentLabel')}</div>
                             <div class="highlight-sub">${this.t('hl_excellentSub')}</div>
                         </div>
-                        <div class="highlight-card">
-                            <div class="highlight-icon">⏱️</div>
-                            <div class="highlight-value">${stats.totalHours.toLocaleString()}</div>
-                            <div class="highlight-label">${this.t('hl_hoursLabel')}</div>
-                            <div class="highlight-sub">${this.t('hl_hoursSub')}</div>
-                        </div>
-                        <div class="highlight-card">
-                            <div class="highlight-icon">🎓</div>
-                            <div class="highlight-value">${groupsAdvancedCount}/4</div>
-                            <div class="highlight-label">${this.t('hl_groupsLabel')}</div>
-                            <div class="highlight-sub">${this.t('hl_groupsSub')}</div>
-                        </div>
                     </div>
 
                     <!-- Intensity callout (added 2026-06-03) -->
