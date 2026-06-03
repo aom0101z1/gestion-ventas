@@ -342,25 +342,24 @@ class CoatsReportsManager {
                 examDate: '2025-12-07',
                 examDuration: null,
                 skills: {
-                    grammar: { level: 'B1', status: 'improving' },
+                    grammar: { level: 'A2', status: 'achieved' },
                     reading: { level: 'A2', status: 'on-track' },
                     writing: { level: 'A2', status: 'on-track' },
-                    speaking: { level: 'A2', status: 'needs-work' },
-                    listening: { level: 'A1-A2', status: 'needs-work' }
+                    speaking: { level: 'A2', status: 'achieved' },
+                    listening: { level: 'A2', status: 'on-track' }
                 },
                 strengths: [
-                    { es: 'Mejora significativa en gramática - alcanzó nivel B1', en: 'Significant grammar improvement - reached B1 level' },
-                    { es: 'Buen uso de tiempos verbales en pasado', en: 'Good use of past tenses' },
-                    { es: 'Capacidad de narrar eventos con coherencia', en: 'Ability to narrate events coherently' }
+                    { es: 'Inició muy débil en el grupo y terminó siendo una de las mejores de la clase', en: 'Started very weak in the group and ended up being one of the best in class' },
+                    { es: 'Notable mejora en fluidez al hablar inglés', en: 'Notable improvement in English speaking fluency' },
+                    { es: 'Mayor confianza y seguridad al expresarse', en: 'Greater confidence and self-assurance when expressing herself' }
                 ],
                 areasToImprove: [
-                    { es: 'Speaking y Listening son las áreas de mayor preocupación', en: 'Speaking and Listening are the main areas of concern' },
-                    { es: 'La ansiedad y nerviosismo afectan su fluidez', en: 'Anxiety and nervousness affect her fluency' },
-                    { es: 'Necesita desarrollar más autoconfianza', en: 'Needs to develop more self-confidence' }
+                    { es: 'Continuar reforzando Listening en contextos rápidos o con acentos variados', en: 'Keep reinforcing Listening in fast contexts or with varied accents' },
+                    { es: 'Avanzar hacia estructuras gramaticales de nivel B1 en el próximo período', en: 'Advance toward B1 grammar structures in the next period' }
                 ],
                 teacherNotes: {
-                    es: 'Inició muy débil en el grupo pero gracias a la combinación de clases privadas y grupales ha mejorado considerablemente. Ahora está cómoda en Grupo 1 trabajando con Libro 6. El miedo a cometer errores la pone nerviosa, pero con práctica continua seguirá mejorando.',
-                    en: 'Started very weak in the group but thanks to the combination of private and group classes has improved considerably. Now comfortable in Group 1 working with Book 6. Fear of making mistakes makes her nervous, but with continued practice she will keep improving.'
+                    es: 'Inició muy débil en el grupo, pero gracias a la combinación de clases privadas y grupales terminó siendo una de las mejores de la clase. Mejoró notablemente en fluidez y confianza al hablar inglés. Cerró el contrato en el Libro 7 (nivel A2 sólido) con base preparada para iniciar B1.',
+                    en: 'Started very weak in the group, but thanks to the combination of private and group classes ended up being one of the best in class. Notably improved in fluency and confidence speaking English. Closed the contract at Book 7 (solid A2 level) with the foundation ready to begin B1.'
                 }
             },
             {
