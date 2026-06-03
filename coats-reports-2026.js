@@ -174,7 +174,14 @@ class CoatsReportsManager {
                 benchmarkLow: 'Por debajo del benchmark <50%',
                 denominatorNote: '⏰ Las horas máximas reflejan el calendario real de clases para cada grupo, excluyendo festivos oficiales (Semana Santa, Día del Trabajo) y cancelaciones de calendario. Por eso el máximo varía entre 178h y 188h según el grupo.',
                 teacherQuoteTitle: 'Del equipo docente',
-                teacherQuoteText: 'Los estudiantes que asisten con regularidad muestran un progreso notablemente más rápido y mayor confianza al hablar inglés. La correlación entre asistencia y avance académico es muy clara en este programa.'
+                teacherQuoteText: 'Los estudiantes que asisten con regularidad muestran un progreso notablemente más rápido y mayor confianza al hablar inglés. La correlación entre asistencia y avance académico es muy clara en este programa.',
+                unit: 'Unidad',
+                intensityNote: 'A pesar de la baja intensidad horaria de 4 horas por semana, todos los estudiantes lograron avanzar varios libros dentro de nuestro programa de conversación. Cada libro contiene 40 unidades temáticas.',
+                finalProgressTitle: 'Posición Final por Grupo (al 29 de Mayo de 2026)',
+                finalProgressSubtitle: 'Punto de partida y punto de llegada después de 12 meses de programa',
+                progressStarted: 'Inició',
+                progressEnded: 'Terminó',
+                bookCompletedLabel: '¡Libro completado!'
             },
             en: {
                 title: 'Progress Report - English Program',
@@ -292,7 +299,14 @@ class CoatsReportsManager {
                 benchmarkLow: 'Below benchmark <50%',
                 denominatorNote: '⏰ Max possible hours reflect each group\'s actual class calendar, excluding official holidays (Holy Week, Labor Day) and calendar cancellations. This is why the max varies between 178h and 188h depending on the group.',
                 teacherQuoteTitle: 'From the teaching team',
-                teacherQuoteText: 'Students who attend regularly show notably faster progress and greater confidence speaking English. The correlation between attendance and academic advancement is very clear in this program.'
+                teacherQuoteText: 'Students who attend regularly show notably faster progress and greater confidence speaking English. The correlation between attendance and academic advancement is very clear in this program.',
+                unit: 'Unit',
+                intensityNote: 'Despite the low weekly intensity of just 4 hours per week, all students managed to advance several books in our conversation program. Each book contains 40 thematic units.',
+                finalProgressTitle: 'Final Position by Group (as of May 29, 2026)',
+                finalProgressSubtitle: 'Starting point and ending point after 12 months of program',
+                progressStarted: 'Started',
+                progressEnded: 'Finished',
+                bookCompletedLabel: 'Book completed!'
             }
         };
     }
@@ -423,8 +437,8 @@ class CoatsReportsManager {
                 startDate: '2025-06-11',
                 startBook: 3,
                 currentBook: 7,
-                currentPage: 80,        // estimated — Book 7 is 157 pages (50A + 107B)
-                totalPages: 157,
+                currentUnit: 38,
+                totalUnits: 40,
                 teachers: ['David Bedoya', 'Juanita Echavarría', 'Anderson Bedoya', 'Juan Pablo Bedoya', 'Alexander Osorio'],
                 // Per-group max for the full year (106 hrs 2025 + 76 hrs 2026 = 182)
                 maxPossibleHours: 182,
@@ -451,8 +465,8 @@ class CoatsReportsManager {
                 startDate: '2025-06-18',
                 startBook: 2,
                 currentBook: 5,
-                currentPage: 30,        // estimated — Book 5 is 50 pages
-                totalPages: 50,
+                currentUnit: 27,
+                totalUnits: 40,
                 teachers: ['Juan Pablo Bedoya'],
                 // Per-group max for the full year (106 hrs 2025 + 82 hrs 2026 = 188)
                 maxPossibleHours: 188,
@@ -481,8 +495,8 @@ class CoatsReportsManager {
                 startDate: '2025-06-11',
                 startBook: 4,
                 currentBook: 7,
-                currentPage: 100,       // estimated — Book 7 is 157 pages (50A + 107B)
-                totalPages: 157,
+                currentUnit: 38,
+                totalUnits: 40,
                 teachers: ['Anderson Bedoya', 'César Grisales', 'Alexander Osorio', 'Lee Stoutmire'],
                 // Per-group max for the full year (106 hrs 2025 + 74 hrs 2026 = 180)
                 maxPossibleHours: 180,
@@ -512,8 +526,9 @@ class CoatsReportsManager {
                 startDate: '2025-06-12',
                 startBook: 6,
                 currentBook: 8,
-                currentPage: 90,        // estimated — Book 8 is 157 pages (50A + 107B), advanced level
-                totalPages: 157,
+                currentUnit: 40,
+                totalUnits: 40,
+                bookCompleted: true,
                 teachers: ['Juan Pablo Bedoya', 'César Grisales', 'Anderson Bedoya'],
                 // Per-group max for the full year (106 hrs 2025 + 72 hrs 2026 = 178)
                 maxPossibleHours: 178,
@@ -668,7 +683,7 @@ class CoatsReportsManager {
         // Calculate completion stats - count total books completed across all groups
         const totalBooksCompleted = groups.reduce((sum, g) => sum + (g.currentBook - g.startBook), 0);
         const avgBookCompletion = groups.reduce((sum, g) => {
-            return sum + (g.currentPage / g.totalPages) * 100;
+            return sum + (g.currentUnit / g.totalUnits) * 100;
         }, 0) / groups.length;
 
         // Calculate class hours delivered (hours per group, not student-hours)
@@ -896,7 +911,7 @@ class CoatsReportsManager {
                 <h3>${group.name}</h3>
                 <p><strong>Horario:</strong> ${group.schedule}</p>
                 <p><strong>Profesores:</strong> ${group.teachers.join(', ')}</p>
-                <p><strong>Libro Actual:</strong> ${group.currentBook} (Pág ${group.currentPage}/${group.totalPages})</p>
+                <p><strong>Libro Actual:</strong> ${group.currentBook} (Unidad ${group.currentUnit}/${group.totalUnits})</p>
             </div>
 
             <!-- Attendance Grid -->
@@ -1527,6 +1542,42 @@ class CoatsReportsManager {
                             <div class="highlight-sub">${this.t('hl_groupsSub')}</div>
                         </div>
                     </div>
+
+                    <!-- Intensity callout (added 2026-06-03) -->
+                    <div class="intensity-callout">
+                        <span class="intensity-icon">⚡</span>
+                        <p class="intensity-text">${this.t('intensityNote')}</p>
+                    </div>
+
+                    <!-- Final position per group (added 2026-06-03) -->
+                    <div class="final-progress-block">
+                        <h4 class="final-progress-title">${this.t('finalProgressTitle')}</h4>
+                        <p class="final-progress-subtitle">${this.t('finalProgressSubtitle')}</p>
+                        <div class="final-progress-grid">
+                            ${this.programData.groups.map(g => {
+                                const name = this.language === 'es' ? g.name : g.nameEn;
+                                const shortName = name.split(' - ')[0];
+                                const completed = g.bookCompleted;
+                                return `
+                                <div class="final-progress-card ${completed ? 'final-progress-card--completed' : ''}">
+                                    <div class="final-progress-group">${shortName}</div>
+                                    <div class="final-progress-journey">
+                                        <div class="final-progress-from">
+                                            <span class="final-progress-step-label">${this.t('progressStarted')}</span>
+                                            <span class="final-progress-step-value">${this.t('book')} ${g.startBook}</span>
+                                        </div>
+                                        <span class="final-progress-arrow">→</span>
+                                        <div class="final-progress-to">
+                                            <span class="final-progress-step-label">${this.t('progressEnded')}</span>
+                                            <span class="final-progress-step-value">${this.t('book')} ${g.currentBook} · ${this.t('unit')} ${g.currentUnit}/${g.totalUnits}</span>
+                                        </div>
+                                    </div>
+                                    ${completed ? `<div class="final-progress-badge">🏆 ${this.t('bookCompletedLabel')}</div>` : ''}
+                                </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Teacher quote callout (surfaced 2026-06-02) -->
@@ -1897,11 +1948,11 @@ class CoatsReportsManager {
             totalAttendancePct += (student.total / maxHours) * 100;
         });
         const avgAttendance = activeStudents > 0 ? totalAttendancePct / activeStudents : 0;
-        const bookProgress = (group.currentPage / group.totalPages) * 100;
+        const bookProgress = (group.currentUnit / group.totalUnits) * 100;
         // Progress towards C1 (Book 12) - assumes student started from Book 1
         // Completed books + current book progress percentage
         const completedBooks = group.currentBook - 1;
-        const currentBookPct = group.currentPage / group.totalPages;
+        const currentBookPct = group.currentUnit / group.totalUnits;
         const overallProgressToC1 = ((completedBooks + currentBookPct) / this.programData.totalBooks) * 100;
         const booksAdvanced = group.currentBook - group.startBook;
 
@@ -1937,7 +1988,7 @@ class CoatsReportsManager {
                     </div>
                 </div>
                 <div class="progress-item">
-                    <span class="progress-label">${this.t('bookProgress')}: ${this.t('book')} ${group.currentBook} - ${this.t('page')} ${group.currentPage}/${group.totalPages}</span>
+                    <span class="progress-label">${this.t('bookProgress')}: ${this.t('book')} ${group.currentBook} - ${this.t('unit')} ${group.currentUnit}/${group.totalUnits}</span>
                     <div class="progress-bar-container">
                         <div class="progress-bar progress-bar-pages" style="width: ${bookProgress}%">
                             <span class="progress-text">${bookProgress.toFixed(0)}%</span>
@@ -2308,7 +2359,7 @@ class CoatsReportsManager {
                         borderRadius: 8
                     }, {
                         label: this.t('bookProgress') + ' %',
-                        data: groups.map(g => (g.currentPage / g.totalPages) * 100),
+                        data: groups.map(g => (g.currentUnit / g.totalUnits) * 100),
                         backgroundColor: '#8b5cf6',
                         borderRadius: 8
                     }]
@@ -2601,6 +2652,104 @@ class CoatsReportsManager {
         .stat-benchmark {
             color: #10b981 !important;
             font-weight: 600;
+        }
+
+        /* Intensity callout (added 2026-06-03) */
+        .intensity-callout {
+            display: flex;
+            gap: 14px;
+            align-items: flex-start;
+            background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+            border-left: 4px solid #10b981;
+            padding: 16px 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        .intensity-icon {
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+        .intensity-text {
+            font-size: 14px;
+            color: #065f46;
+            line-height: 1.5;
+            margin: 0;
+            font-weight: 500;
+        }
+
+        /* Final position per group (added 2026-06-03) */
+        .final-progress-block {
+            margin-top: 22px;
+        }
+        .final-progress-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #1e293b;
+            margin: 0 0 4px;
+        }
+        .final-progress-subtitle {
+            font-size: 13px;
+            color: #64748b;
+            margin: 0 0 14px;
+        }
+        .final-progress-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 12px;
+        }
+        .final-progress-card {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 14px 16px;
+        }
+        .final-progress-card--completed {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border-color: #f59e0b;
+        }
+        .final-progress-group {
+            font-size: 13px;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }
+        .final-progress-journey {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .final-progress-from,
+        .final-progress-to {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+        }
+        .final-progress-step-label {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #94a3b8;
+        }
+        .final-progress-step-value {
+            font-size: 13px;
+            font-weight: 600;
+            color: #1e293b;
+        }
+        .final-progress-arrow {
+            font-size: 20px;
+            color: #94a3b8;
+        }
+        .final-progress-badge {
+            margin-top: 10px;
+            padding: 4px 10px;
+            background: #f59e0b;
+            color: white;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 700;
+            text-align: center;
+            display: inline-block;
         }
 
         /* Denominator note */
