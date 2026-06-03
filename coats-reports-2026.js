@@ -181,7 +181,9 @@ class CoatsReportsManager {
                 finalProgressSubtitle: 'Punto de partida y punto de llegada después de 12 meses de programa',
                 progressStarted: 'Inició',
                 progressEnded: 'Terminó',
-                bookCompletedLabel: '¡Libro completado!'
+                bookCompletedLabel: '¡Libro completado!',
+                booksCovered: 'libros cubiertos',
+                bookProgressLabel: 'Progreso en'
             },
             en: {
                 title: 'Progress Report - English Program',
@@ -306,7 +308,9 @@ class CoatsReportsManager {
                 finalProgressSubtitle: 'Starting point and ending point after 12 months of program',
                 progressStarted: 'Started',
                 progressEnded: 'Finished',
-                bookCompletedLabel: 'Book completed!'
+                bookCompletedLabel: 'Book completed!',
+                booksCovered: 'books covered',
+                bookProgressLabel: 'Progress in'
             }
         };
     }
@@ -1558,6 +1562,8 @@ class CoatsReportsManager {
                                 const name = this.language === 'es' ? g.name : g.nameEn;
                                 const shortName = name.split(' - ')[0];
                                 const completed = g.bookCompleted;
+                                const bookPct = Math.round((g.currentUnit / g.totalUnits) * 100);
+                                const booksCovered = g.currentBook - g.startBook + 1;
                                 return `
                                 <div class="final-progress-card ${completed ? 'final-progress-card--completed' : ''}">
                                     <div class="final-progress-group">${shortName}</div>
@@ -1571,6 +1577,18 @@ class CoatsReportsManager {
                                             <span class="final-progress-step-label">${this.t('progressEnded')}</span>
                                             <span class="final-progress-step-value">${this.t('book')} ${g.currentBook} · ${this.t('unit')} ${g.currentUnit}/${g.totalUnits}</span>
                                         </div>
+                                    </div>
+                                    <div class="final-progress-bar-block">
+                                        <div class="final-progress-bar-header">
+                                            <span class="final-progress-bar-label">${this.t('bookProgressLabel')} ${this.t('book')} ${g.currentBook}</span>
+                                            <span class="final-progress-bar-pct">${bookPct}%</span>
+                                        </div>
+                                        <div class="final-progress-bar-track">
+                                            <div class="final-progress-bar-fill ${completed ? 'final-progress-bar-fill--completed' : ''}" style="width: ${bookPct}%"></div>
+                                        </div>
+                                    </div>
+                                    <div class="final-progress-books-covered">
+                                        📘 <strong>${booksCovered}</strong> ${this.t('booksCovered')}
                                     </div>
                                     ${completed ? `<div class="final-progress-badge">🏆 ${this.t('bookCompletedLabel')}</div>` : ''}
                                 </div>
@@ -2750,6 +2768,59 @@ class CoatsReportsManager {
             font-weight: 700;
             text-align: center;
             display: inline-block;
+        }
+
+        .final-progress-bar-block {
+            margin-top: 12px;
+        }
+        .final-progress-bar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 6px;
+        }
+        .final-progress-bar-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: #475569;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+        .final-progress-bar-pct {
+            font-size: 14px;
+            font-weight: 800;
+            color: #1e293b;
+        }
+        .final-progress-bar-track {
+            height: 10px;
+            background: #e2e8f0;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .final-progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
+            border-radius: 6px;
+            transition: width 0.4s ease;
+        }
+        .final-progress-bar-fill--completed {
+            background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+        }
+        .final-progress-card--completed .final-progress-bar-pct { color: #92400e; }
+        .final-progress-card--completed .final-progress-bar-track { background: rgba(180, 83, 9, 0.15); }
+
+        .final-progress-books-covered {
+            margin-top: 10px;
+            font-size: 13px;
+            color: #1e293b;
+            background: #f1f5f9;
+            padding: 6px 10px;
+            border-radius: 6px;
+            display: inline-block;
+        }
+        .final-progress-card--completed .final-progress-books-covered {
+            background: rgba(255, 255, 255, 0.6);
+            color: #78350f;
         }
 
         /* Denominator note */
