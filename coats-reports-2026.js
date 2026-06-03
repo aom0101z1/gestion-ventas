@@ -1531,12 +1531,6 @@ class CoatsReportsManager {
                             <div class="highlight-label">${this.t('hl_retentionLabel')}</div>
                             <div class="highlight-sub">${stats.activeStudents}/${stats.totalStudents} ${this.t('hl_retentionSub')}</div>
                         </div>
-                        <div class="highlight-card">
-                            <div class="highlight-icon">📚</div>
-                            <div class="highlight-value">${avgBooksAdvanced}</div>
-                            <div class="highlight-label">${this.t('hl_booksLabel')}</div>
-                            <div class="highlight-sub">${this.t('hl_booksSub')}</div>
-                        </div>
                         <div class="highlight-card highlight-card-success">
                             <div class="highlight-icon">⭐</div>
                             <div class="highlight-value">${stats.highAttendance.length}</div>
