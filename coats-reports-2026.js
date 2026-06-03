@@ -1598,14 +1598,6 @@ class CoatsReportsManager {
                     </div>
                 </div>
 
-                <!-- Teacher quote callout (surfaced 2026-06-02) -->
-                <div class="coats-section teacher-quote-callout">
-                    <div class="teacher-quote-icon">💬</div>
-                    <div class="teacher-quote-body">
-                        <div class="teacher-quote-title">${this.t('teacherQuoteTitle')}</div>
-                        <p class="teacher-quote-text">"${this.t('teacherQuoteText')}"</p>
-                    </div>
-                </div>
                 `;
             })()}
 
