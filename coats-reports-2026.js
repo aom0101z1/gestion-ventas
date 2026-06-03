@@ -160,6 +160,8 @@ class CoatsReportsManager {
                 hl_retentionSub: 'estudiantes activos al cierre',
                 hl_booksLabel: 'Libros Avanzados (Promedio)',
                 hl_booksSub: 'todos los grupos subieron de libro',
+                hl_cefrReachedLabel: 'Nivel CEFR Alcanzado',
+                hl_cefrReachedSub: 'según el grupo',
                 hl_excellentLabel: 'Estudiantes con Asistencia Excelente',
                 hl_excellentSub: 'sobre 70% — meta del programa',
                 hl_hoursLabel: 'Horas Totales de Capacitación',
@@ -292,6 +294,8 @@ class CoatsReportsManager {
                 hl_retentionSub: 'students active at year-end',
                 hl_booksLabel: 'Books Advanced (Avg)',
                 hl_booksSub: 'every group moved up a book',
+                hl_cefrReachedLabel: 'CEFR Level Reached',
+                hl_cefrReachedSub: 'depending on group',
                 hl_excellentLabel: 'Students with Excellent Attendance',
                 hl_excellentSub: 'above 70% — the program target',
                 hl_hoursLabel: 'Total Training Hours',
@@ -1530,6 +1534,12 @@ class CoatsReportsManager {
                             <div class="highlight-value">${retentionPct}%</div>
                             <div class="highlight-label">${this.t('hl_retentionLabel')}</div>
                             <div class="highlight-sub">${stats.activeStudents}/${stats.totalStudents} ${this.t('hl_retentionSub')}</div>
+                        </div>
+                        <div class="highlight-card">
+                            <div class="highlight-icon">🎯</div>
+                            <div class="highlight-value">A2 · B1</div>
+                            <div class="highlight-label">${this.t('hl_cefrReachedLabel')}</div>
+                            <div class="highlight-sub">${this.t('hl_cefrReachedSub')}</div>
                         </div>
                         <div class="highlight-card highlight-card-success">
                             <div class="highlight-icon">⭐</div>
