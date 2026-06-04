@@ -202,7 +202,10 @@ class CoatsReportsManager {
                 privateClassesTip: '4 estudiantes con clases individuales complementarias durante el contrato.',
                 withdrawnToggleOpen: '📋 Haga click aquí para ver los estudiantes retirados del programa',
                 withdrawnToggleClose: '🔽 Ocultar estudiantes retirados',
-                withdrawnTip: 'Estudiantes que se retiraron durante el contrato. No se incluyen en el cálculo de asistencia promedio.'
+                withdrawnTip: 'Estudiantes que se retiraron durante el contrato. No se incluyen en el cálculo de asistencia promedio.',
+                attendanceAnalysisToggleOpen: '📊 Haga click aquí para abrir el análisis de asistencia con gráficas detalladas',
+                attendanceAnalysisToggleClose: '🔽 Ocultar análisis de asistencia',
+                attendanceAnalysisTip: 'Incluye gráficas de asistencia por estudiante, progreso por grupo, y tendencia mensual a lo largo del contrato.'
             },
             en: {
                 title: 'Progress Report - English Program',
@@ -348,7 +351,10 @@ class CoatsReportsManager {
                 privateClassesTip: '4 students with complementary individual classes during the contract.',
                 withdrawnToggleOpen: '📋 Click here to view students who withdrew from the program',
                 withdrawnToggleClose: '🔽 Hide withdrawn students',
-                withdrawnTip: 'Students who withdrew during the contract. Not included in the average attendance calculation.'
+                withdrawnTip: 'Students who withdrew during the contract. Not included in the average attendance calculation.',
+                attendanceAnalysisToggleOpen: '📊 Click here to open the attendance analysis with detailed charts',
+                attendanceAnalysisToggleClose: '🔽 Hide attendance analysis',
+                attendanceAnalysisTip: 'Includes attendance-per-student chart, group progress, and monthly trend across the contract.'
             }
         };
     }
@@ -1763,26 +1769,34 @@ class CoatsReportsManager {
                 </div>
             </div>
 
-            <!-- Charts Section -->
+            <!-- Charts Section (collapsible 2026-06-04) -->
             <div class="coats-section coats-charts-section">
                 <h3><span class="section-icon">📊</span> ${this.t('attendanceAnalysis')}</h3>
-                <div class="coats-charts-grid">
-                    <div class="coats-chart-container">
-                        <canvas id="coats-attendance-chart"></canvas>
-                    </div>
-                    <div class="coats-chart-container">
-                        <canvas id="coats-progress-chart"></canvas>
-                    </div>
-                </div>
 
-                <!-- Monthly Trend Chart with Description -->
-                <div class="coats-chart-full-width">
-                    <h4 class="chart-title">${this.t('monthlyTrend')}</h4>
-                    <div class="coats-chart-container">
-                        <canvas id="coats-monthly-trend-chart"></canvas>
+                <button class="individual-progress-toggle" type="button" onclick="window.CoatsReports.toggleAttendanceAnalysis()">
+                    <span id="attendance-analysis-toggle-text">${this.t('attendanceAnalysisToggleOpen')}</span>
+                </button>
+                <p class="individual-progress-tip">${this.t('attendanceAnalysisTip')}</p>
+
+                <div class="attendance-analysis-content" id="attendance-analysis-content" style="display: none;">
+                    <div class="coats-charts-grid">
+                        <div class="coats-chart-container">
+                            <canvas id="coats-attendance-chart"></canvas>
+                        </div>
+                        <div class="coats-chart-container">
+                            <canvas id="coats-progress-chart"></canvas>
+                        </div>
                     </div>
-                    <div class="chart-description-box">
-                        <p class="chart-description">${this.t('monthlyTrendDesc')}</p>
+
+                    <!-- Monthly Trend Chart with Description -->
+                    <div class="coats-chart-full-width">
+                        <h4 class="chart-title">${this.t('monthlyTrend')}</h4>
+                        <div class="coats-chart-container">
+                            <canvas id="coats-monthly-trend-chart"></canvas>
+                        </div>
+                        <div class="chart-description-box">
+                            <p class="chart-description">${this.t('monthlyTrendDesc')}</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -2529,6 +2543,24 @@ class CoatsReportsManager {
         textSpan.textContent = isVisible
             ? this.t('withdrawnToggleOpen')
             : this.t('withdrawnToggleClose');
+    }
+
+    toggleAttendanceAnalysis() {
+        const content = document.getElementById('attendance-analysis-content');
+        const textSpan = document.getElementById('attendance-analysis-toggle-text');
+        if (!content || !textSpan) return;
+        const isVisible = content.style.display !== 'none';
+        content.style.display = isVisible ? 'none' : 'block';
+        textSpan.textContent = isVisible
+            ? this.t('attendanceAnalysisToggleOpen')
+            : this.t('attendanceAnalysisToggleClose');
+        // Charts rendered while the container was hidden have zero dimensions —
+        // resize() recomputes them once the container becomes visible.
+        if (!isVisible) {
+            setTimeout(() => {
+                Object.values(this.charts || {}).forEach(c => { if (c && c.resize) c.resize(); });
+            }, 50);
+        }
     }
 
     // ===== EXPORT FUNCTIONS =====
