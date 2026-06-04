@@ -1783,6 +1783,39 @@ class CoatsReportsManager {
                 </div>
             </div>
 
+            <!-- Individual Progress Table (moved right under Group Progress 2026-06-04) -->
+            <div class="coats-section coats-individual-progress-section">
+                <h3><span class="section-icon">👤</span> ${this.t('individualProgress')}</h3>
+                <p class="denominator-note">${this.t('denominatorNote')}</p>
+
+                <button class="individual-progress-toggle" type="button" onclick="window.CoatsReports.toggleIndividualProgress()">
+                    <span id="individual-progress-toggle-text">${this.t('individualProgressToggleOpen')}</span>
+                </button>
+                <p class="individual-progress-tip">${this.t('individualProgressTip')}</p>
+
+                <div class="individual-progress-content" id="individual-progress-content" style="display: none;">
+                    <div class="coats-table-container">
+                        <table class="coats-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>${this.t('name')}</th>
+                                    <th>${this.t('group')}</th>
+                                    <th>${this.t('totalHoursAttended')}</th>
+                                    <th>${this.t('attendanceRate')}</th>
+                                    <th>${this.t('booksAdvanced')}</th>
+                                    <th>${this.t('progress')}</th>
+                                    ${window.FirebaseData?.currentUser?.email === 'admin@ciudadbilingue.com' ? `<th>${this.language === 'es' ? 'Estado' : 'Status'}</th>` : ''}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${stats.allStudents.map((s, i) => this.renderStudentRow(s, i + 1)).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
             <!-- Charts Section (collapsible 2026-06-04) -->
             <div class="coats-section coats-charts-section">
                 <h3><span class="section-icon">📊</span> ${this.t('attendanceAnalysis')}</h3>
@@ -1896,40 +1929,6 @@ class CoatsReportsManager {
                 <div class="private-classes-content" id="private-classes-content" style="display: none;">
                     <div class="private-students-grid">
                         ${this.renderPrivateStudents()}
-                    </div>
-                </div>
-            </div>
-
-            <!-- Individual Progress Table -->
-            <div class="coats-section coats-individual-progress-section">
-                <h3><span class="section-icon">👤</span> ${this.t('individualProgress')}</h3>
-                <p class="denominator-note">${this.t('denominatorNote')}</p>
-
-                <!-- Collapsible toggle (collapsed by default 2026-06-04) -->
-                <button class="individual-progress-toggle" type="button" onclick="window.CoatsReports.toggleIndividualProgress()">
-                    <span id="individual-progress-toggle-text">${this.t('individualProgressToggleOpen')}</span>
-                </button>
-                <p class="individual-progress-tip">${this.t('individualProgressTip')}</p>
-
-                <div class="individual-progress-content" id="individual-progress-content" style="display: none;">
-                    <div class="coats-table-container">
-                        <table class="coats-table">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>${this.t('name')}</th>
-                                    <th>${this.t('group')}</th>
-                                    <th>${this.t('totalHoursAttended')}</th>
-                                    <th>${this.t('attendanceRate')}</th>
-                                    <th>${this.t('booksAdvanced')}</th>
-                                    <th>${this.t('progress')}</th>
-                                    ${window.FirebaseData?.currentUser?.email === 'admin@ciudadbilingue.com' ? `<th>${this.language === 'es' ? 'Estado' : 'Status'}</th>` : ''}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${stats.allStudents.map((s, i) => this.renderStudentRow(s, i + 1)).join('')}
-                            </tbody>
-                        </table>
                     </div>
                 </div>
             </div>
