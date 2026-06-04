@@ -1787,48 +1787,24 @@ class CoatsReportsManager {
                 </div>
             </div>
 
-            <!-- Attendance Distribution -->
-            <div class="coats-section coats-correlation-section">
-                <h3><span class="section-icon">🔗</span> ${this.t('correlation')}</h3>
-                <p class="correlation-description">${this.t('correlationText')}</p>
-                <div class="correlation-stats">
-                    <div class="correlation-stat high">
-                        <div class="correlation-count">${stats.highAttendance.length}</div>
-                        <div class="correlation-label">${this.t('benchmarkExcellent')}</div>
-                        <div class="correlation-bar" style="width: ${(stats.highAttendance.length / stats.activeStudents) * 100}%"></div>
-                    </div>
-                    <div class="correlation-stat medium">
-                        <div class="correlation-count">${stats.mediumAttendance.length}</div>
-                        <div class="correlation-label">${this.t('benchmarkGood')}</div>
-                        <div class="correlation-bar" style="width: ${(stats.mediumAttendance.length / stats.activeStudents) * 100}%"></div>
-                    </div>
-                    <div class="correlation-stat low">
-                        <div class="correlation-count">${stats.lowAttendance.length}</div>
-                        <div class="correlation-label">${this.t('benchmarkLow')}</div>
-                        <div class="correlation-bar" style="width: ${(stats.lowAttendance.length / stats.activeStudents) * 100}%"></div>
-                    </div>
-                </div>
-                <p class="benchmark-note">📊 ${this.t('benchmarkNote')}</p>
-
-                <!-- Books advanced this year per group (added 2026-06-03) -->
-                <div class="books-this-year-block">
-                    <h4 class="books-this-year-title">📚 ${this.t('booksThisYearTitle')}</h4>
-                    <p class="books-this-year-desc">${this.t('booksThisYearDesc')}</p>
-                    <div class="books-this-year-grid">
-                        ${this.programData.groups.map(g => {
-                            const name = this.language === 'es' ? g.name : g.nameEn;
-                            const shortName = name.split(' - ')[0];
-                            const booksThisYear = g.currentBook - g.startBook + 1;
-                            return `
-                            <div class="books-this-year-card">
-                                <div class="books-this-year-group">${shortName}</div>
-                                <div class="books-this-year-value">${booksThisYear}</div>
-                                <div class="books-this-year-label">${this.t('booksThisYearLabel')}</div>
-                                <div class="books-this-year-range">${this.t('book')} ${g.startBook} → ${this.t('book')} ${g.currentBook}</div>
-                            </div>
-                            `;
-                        }).join('')}
-                    </div>
+            <!-- Books advanced during full contract per group -->
+            <div class="coats-section">
+                <h3><span class="section-icon">📚</span> ${this.t('booksThisYearTitle')}</h3>
+                <p class="books-this-year-desc">${this.t('booksThisYearDesc')}</p>
+                <div class="books-this-year-grid">
+                    ${this.programData.groups.map(g => {
+                        const name = this.language === 'es' ? g.name : g.nameEn;
+                        const shortName = name.split(' - ')[0];
+                        const booksThisYear = g.currentBook - g.startBook + 1;
+                        return `
+                        <div class="books-this-year-card">
+                            <div class="books-this-year-group">${shortName}</div>
+                            <div class="books-this-year-value">${booksThisYear}</div>
+                            <div class="books-this-year-label">${this.t('booksThisYearLabel')}</div>
+                            <div class="books-this-year-range">${this.t('book')} ${g.startBook} → ${this.t('book')} ${g.currentBook}</div>
+                        </div>
+                        `;
+                    }).join('')}
                 </div>
             </div>
 
