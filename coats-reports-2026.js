@@ -235,7 +235,10 @@ class CoatsReportsManager {
                 selfStudyBenefit4: 'Práctica con múltiples acentos: Estados Unidos, Reino Unido, India y Australia',
                 selfStudyBenefit5: 'Programas disponibles para toda la familia del colaborador, incluyendo niños',
                 selfStudyDemo: 'Si tienen interés, con gusto coordinamos una demostración personalizada. Pueden conocer la plataforma en',
-                selfStudyExploreLink: 'www.tutorbox.app'
+                selfStudyExploreLink: 'www.tutorbox.app',
+                signatureClosing: 'Atentamente,',
+                signatureName: 'Alexander Osorio M.',
+                signatureTitle: 'Director del Programa'
             },
             en: {
                 title: 'Progress Report - English Program',
@@ -414,7 +417,10 @@ class CoatsReportsManager {
                 selfStudyBenefit4: 'Practice with multiple English accents: United States, United Kingdom, India, and Australia',
                 selfStudyBenefit5: 'Programs available for the entire family of your team members, including children',
                 selfStudyDemo: 'If interested, we will gladly coordinate a personalized demonstration. You can explore the platform at',
-                selfStudyExploreLink: 'www.tutorbox.app'
+                selfStudyExploreLink: 'www.tutorbox.app',
+                signatureClosing: 'Sincerely,',
+                signatureName: 'Alexander Osorio M.',
+                signatureTitle: 'Program Director'
             }
         };
     }
@@ -2057,6 +2063,13 @@ class CoatsReportsManager {
                     </div>
                 </div>
 
+                <!-- Signature (added 2026-06-04) -->
+                <div class="report-signature">
+                    <p class="signature-closing">${this.t('signatureClosing')}</p>
+                    <p class="signature-name">${this.t('signatureName')}</p>
+                    <p class="signature-title">${this.t('signatureTitle')}</p>
+                </div>
+
                 <div class="continuation-cta">
                     <h4>🎯 ${this.t('continuationCtaHeading')}</h4>
                     <p>${this.t('continuationCtaText')}</p>
@@ -3063,6 +3076,37 @@ class CoatsReportsManager {
         .self-study-link:hover {
             color: #312e81;
             border-bottom-color: #312e81;
+        }
+
+        /* Report signature (added 2026-06-04) */
+        .report-signature {
+            margin: 28px 0 18px;
+            padding: 22px 24px 6px;
+            border-top: 1px solid rgba(99, 102, 241, 0.25);
+            text-align: left;
+            max-width: 360px;
+        }
+        .signature-closing {
+            font-size: 14.5px;
+            color: #1e293b;
+            margin: 0 0 18px;
+        }
+        .signature-name {
+            font-family: 'Brush Script MT', 'Lucida Handwriting', cursive;
+            font-size: 28px;
+            color: #1e3a5f;
+            margin: 0 0 4px;
+            line-height: 1.1;
+        }
+        .signature-title {
+            font-size: 13px;
+            color: #475569;
+            font-weight: 600;
+            margin: 0;
+            padding-top: 8px;
+            border-top: 1px solid #cbd5e1;
+            display: inline-block;
+            min-width: 220px;
         }
 
         .continuation-cta {
