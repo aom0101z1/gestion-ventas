@@ -1553,6 +1553,40 @@ class CoatsReportsManager {
                 </div>
             </div>
 
+            <!-- Executive Summary (moved to top 2026-06-04) -->
+            <div class="coats-section coats-executive-summary">
+                <h3><span class="section-icon">📋</span> ${this.t('executiveSummary')}</h3>
+                <div class="coats-summary-grid">
+                    <div class="coats-stat-card coats-stat-highlight">
+                        <div class="stat-icon">👥</div>
+                        <div class="stat-value">${stats.totalPeople}</div>
+                        <div class="stat-label">${this.t('totalStudents')}</div>
+                        <div class="stat-sub">${this.language === 'es'
+                            ? `${stats.totalStudents} en grupos + ${stats.privateOnlyCount} solo en privadas`
+                            : `${stats.totalStudents} in groups + ${stats.privateOnlyCount} only in private classes`}</div>
+                    </div>
+                    <div class="coats-stat-card coats-stat-primary">
+                        <div class="stat-icon">🎓</div>
+                        <div class="stat-value">${stats.totalClassHoursDelivered}</div>
+                        <div class="stat-label">${this.t('classHoursDelivered')}</div>
+                        <div class="stat-sub">${stats.groups} ${this.language === 'es' ? 'grupos' : 'groups'} × ${stats.totalClassHoursPerGroup} hrs</div>
+                    </div>
+                    <div class="coats-stat-card">
+                        <div class="stat-icon">📊</div>
+                        <div class="stat-value">${stats.avgAttendance.toFixed(1)}%</div>
+                        <div class="stat-label">${this.t('avgAttendance')}</div>
+                        <div class="stat-sub stat-benchmark">${this.t('benchmarkExcellent')}</div>
+                    </div>
+                    <div class="coats-stat-card">
+                        <div class="stat-icon">🎯</div>
+                        <div class="stat-value">${stats.totalStudents > 0 ? Math.round((stats.activeStudents / stats.totalStudents) * 100) : 0}%</div>
+                        <div class="stat-label">${this.language === 'es' ? 'Tasa de Retención del Programa' : 'Program Retention Rate'}</div>
+                        <div class="stat-sub">${this.language === 'es' ? `solo ${stats.inactiveStudents} retiros confirmados` : `only ${stats.inactiveStudents} confirmed withdrawals`}</div>
+                    </div>
+                </div>
+                <p class="benchmark-note">📊 ${this.t('benchmarkNote')}</p>
+            </div>
+
             <!-- Highlights / Logros Destacados (added 2026-06-02) -->
             ${(() => {
                 const retentionPct = stats.totalStudents > 0
@@ -1719,40 +1753,6 @@ class CoatsReportsManager {
                         </div>
                     </div>
                 </div>
-            </div>
-
-            <!-- Executive Summary (moved below Program Structure 2026-06-03) -->
-            <div class="coats-section coats-executive-summary">
-                <h3><span class="section-icon">📋</span> ${this.t('executiveSummary')}</h3>
-                <div class="coats-summary-grid">
-                    <div class="coats-stat-card coats-stat-highlight">
-                        <div class="stat-icon">👥</div>
-                        <div class="stat-value">${stats.totalPeople}</div>
-                        <div class="stat-label">${this.t('totalStudents')}</div>
-                        <div class="stat-sub">${this.language === 'es'
-                            ? `${stats.totalStudents} en grupos + ${stats.privateOnlyCount} solo en privadas`
-                            : `${stats.totalStudents} in groups + ${stats.privateOnlyCount} only in private classes`}</div>
-                    </div>
-                    <div class="coats-stat-card coats-stat-primary">
-                        <div class="stat-icon">🎓</div>
-                        <div class="stat-value">${stats.totalClassHoursDelivered}</div>
-                        <div class="stat-label">${this.t('classHoursDelivered')}</div>
-                        <div class="stat-sub">${stats.groups} ${this.language === 'es' ? 'grupos' : 'groups'} × ${stats.totalClassHoursPerGroup} hrs</div>
-                    </div>
-                    <div class="coats-stat-card">
-                        <div class="stat-icon">📊</div>
-                        <div class="stat-value">${stats.avgAttendance.toFixed(1)}%</div>
-                        <div class="stat-label">${this.t('avgAttendance')}</div>
-                        <div class="stat-sub stat-benchmark">${this.t('benchmarkExcellent')}</div>
-                    </div>
-                    <div class="coats-stat-card">
-                        <div class="stat-icon">🎯</div>
-                        <div class="stat-value">${stats.totalStudents > 0 ? Math.round((stats.activeStudents / stats.totalStudents) * 100) : 0}%</div>
-                        <div class="stat-label">${this.language === 'es' ? 'Tasa de Retención del Programa' : 'Program Retention Rate'}</div>
-                        <div class="stat-sub">${this.language === 'es' ? `solo ${stats.inactiveStudents} retiros confirmados` : `only ${stats.inactiveStudents} confirmed withdrawals`}</div>
-                    </div>
-                </div>
-                <p class="benchmark-note">📊 ${this.t('benchmarkNote')}</p>
             </div>
 
             <!-- Group Progress -->
