@@ -208,7 +208,23 @@ class CoatsReportsManager {
                 attendanceAnalysisTip: 'Incluye gráficas de asistencia por estudiante, progreso por grupo, y tendencia mensual a lo largo del contrato.',
                 groupProgressToggleOpen: '📈 Haga click aquí para abrir la sección de Progreso por Grupo y ver el detalle de cada grupo',
                 groupProgressToggleClose: '🔽 Ocultar Progreso por Grupo',
-                groupProgressTip: 'Detalle por grupo: asistencia promedio, libro y unidad actual, profesores asignados, y lista expandible de estudiantes con sus horas y porcentajes.'
+                groupProgressTip: 'Detalle por grupo: asistencia promedio, libro y unidad actual, profesores asignados, y lista expandible de estudiantes con sus horas y porcentajes.',
+                continuationTitle: 'Continuación del Programa',
+                continuationLeadHeading: 'Recomendación importante',
+                continuationLead: 'Para preservar las habilidades de conversación que los estudiantes han desarrollado durante este año, recomendamos enfáticamente continuar el programa lo antes posible. La fluidez y confianza adquiridas pueden perderse rápidamente sin práctica continua. La pausa prolongada entre periodos disminuye significativamente los resultados ya alcanzados.',
+                continuationSpecializedHeading: 'Inglés Profesional Especializado para los grupos avanzados',
+                continuationSpecializedDesc: 'Los grupos que avanzan al Libro 7 y superiores ya están recibiendo contenido especializado en áreas profesionales específicas, alineado con su rol en COATS. Cada estudiante aprende inglés aplicado directamente a su trabajo diario.',
+                continuationCtaHeading: '¿Listo para el siguiente período?',
+                continuationCtaText: 'El equipo de Ciudad Bilingüe está preparado para iniciar el siguiente período de capacitación. Contacte a su asesor para definir cronograma y módulos especializados por área.',
+                profBusiness: 'Inglés para Negocios',
+                profFinance: 'Inglés para Finanzas',
+                profProcurement: 'Inglés para Procurement',
+                profIT: 'Inglés para Tecnologías de la Información',
+                profSupplyChain: 'Inglés para Supply Chain',
+                profHR: 'Inglés para Recursos Humanos',
+                profForeignTrade: 'Inglés para Comercio Exterior',
+                profInterviews: 'Inglés para Entrevistas',
+                profExecAssistant: 'Inglés para Asistencia Ejecutiva'
             },
             en: {
                 title: 'Progress Report - English Program',
@@ -360,7 +376,23 @@ class CoatsReportsManager {
                 attendanceAnalysisTip: 'Includes attendance-per-student chart, group progress, and monthly trend across the contract.',
                 groupProgressToggleOpen: '📈 Click here to open the Group Progress section and see each group\'s details',
                 groupProgressToggleClose: '🔽 Hide Group Progress',
-                groupProgressTip: 'Per-group detail: average attendance, current book and unit, assigned teachers, and an expandable student list with their hours and percentages.'
+                groupProgressTip: 'Per-group detail: average attendance, current book and unit, assigned teachers, and an expandable student list with their hours and percentages.',
+                continuationTitle: 'Program Continuation',
+                continuationLeadHeading: 'Important recommendation',
+                continuationLead: 'To preserve the conversation skills students have developed this year, we strongly recommend continuing the program as soon as possible. The fluency and confidence gained can quickly fade without ongoing practice. A prolonged pause between periods significantly diminishes the results already achieved.',
+                continuationSpecializedHeading: 'Specialized Professional English for Advanced Groups',
+                continuationSpecializedDesc: 'Groups advancing to Book 7 and above are already receiving specialized content in specific professional areas, aligned with their role at COATS. Each student learns English applied directly to their daily work.',
+                continuationCtaHeading: 'Ready for the next period?',
+                continuationCtaText: 'The Ciudad Bilingüe team is ready to begin the next training period. Contact your advisor to define schedule and specialized modules by area.',
+                profBusiness: 'Business English',
+                profFinance: 'Finance English',
+                profProcurement: 'Procurement English',
+                profIT: 'IT (Information Technology) English',
+                profSupplyChain: 'Supply Chain English',
+                profHR: 'Human Resources English',
+                profForeignTrade: 'Foreign Trade English',
+                profInterviews: 'Job Interviews English',
+                profExecAssistant: 'Executive Assistant English'
             }
         };
     }
@@ -1941,6 +1973,49 @@ class CoatsReportsManager {
             </div>
             ` : ''}
 
+            <!-- Continuation of Program (added 2026-06-04) -->
+            <div class="coats-section continuation-section">
+                <h3><span class="section-icon">🚀</span> ${this.t('continuationTitle')}</h3>
+
+                <div class="continuation-callout">
+                    <div class="continuation-icon">⏳</div>
+                    <div class="continuation-body">
+                        <h4>${this.t('continuationLeadHeading')}</h4>
+                        <p>${this.t('continuationLead')}</p>
+                    </div>
+                </div>
+
+                <div class="continuation-specialized">
+                    <h4>${this.t('continuationSpecializedHeading')}</h4>
+                    <p class="continuation-specialized-desc">${this.t('continuationSpecializedDesc')}</p>
+
+                    <div class="prof-areas-grid">
+                        ${[
+                            { img: 'business.png',       key: 'profBusiness'      },
+                            { img: 'finance.png',        key: 'profFinance'       },
+                            { img: 'procurement.png',    key: 'profProcurement'   },
+                            { img: 'it_services.png',    key: 'profIT'            },
+                            { img: 'foreign_trade.png',  key: 'profForeignTrade'  },
+                            { img: 'hr.png',             key: 'profHR'            },
+                            { img: 'interviews.png',     key: 'profInterviews'    },
+                            { img: 'exec_assistant.png', key: 'profExecAssistant' }
+                        ].map(a => `
+                            <div class="prof-area-card">
+                                <div class="prof-area-img-wrap">
+                                    <img src="images/professional/${a.img}" alt="${this.t(a.key)}" loading="lazy">
+                                </div>
+                                <div class="prof-area-label">${this.t(a.key)}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+
+                <div class="continuation-cta">
+                    <h4>🎯 ${this.t('continuationCtaHeading')}</h4>
+                    <p>${this.t('continuationCtaText')}</p>
+                </div>
+            </div>
+
             <!-- Export Actions -->
             <div class="coats-section coats-actions">
                 <button class="coats-btn coats-btn-primary" onclick="window.CoatsReports.exportToPDF()">
@@ -2758,6 +2833,121 @@ class CoatsReportsManager {
         .stat-benchmark {
             color: #10b981 !important;
             font-weight: 600;
+        }
+
+        /* Continuation of Program section (added 2026-06-04) */
+        .continuation-section {
+            background: linear-gradient(135deg, #f0f9ff 0%, #ede9fe 100%);
+            border: 1px solid #c7d2fe;
+        }
+        .continuation-callout {
+            display: flex;
+            gap: 18px;
+            align-items: flex-start;
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border-left: 5px solid #f59e0b;
+            padding: 22px 24px;
+            border-radius: 12px;
+            margin-top: 8px;
+            margin-bottom: 24px;
+        }
+        .continuation-icon {
+            font-size: 36px;
+            flex-shrink: 0;
+            line-height: 1;
+        }
+        .continuation-body h4 {
+            font-size: 17px;
+            color: #78350f;
+            margin: 0 0 8px;
+            font-weight: 700;
+        }
+        .continuation-body p {
+            font-size: 14.5px;
+            color: #78350f;
+            line-height: 1.6;
+            margin: 0;
+        }
+        .continuation-specialized {
+            margin-top: 8px;
+        }
+        .continuation-specialized > h4 {
+            font-size: 18px;
+            color: #1e293b;
+            margin: 0 0 6px;
+            font-weight: 700;
+        }
+        .continuation-specialized-desc {
+            font-size: 14px;
+            color: #475569;
+            line-height: 1.6;
+            margin: 0 0 18px;
+        }
+        .prof-areas-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .prof-area-card {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+            border: 1px solid #e2e8f0;
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+            cursor: default;
+        }
+        .prof-area-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 24px rgba(0, 0, 0, 0.14);
+        }
+        .prof-area-img-wrap {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        .prof-area-img-wrap img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        .prof-area-label {
+            padding: 10px 12px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #1e293b;
+            text-align: center;
+            line-height: 1.35;
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .continuation-cta {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            padding: 22px 24px;
+            border-radius: 12px;
+            text-align: center;
+            margin-top: 14px;
+            box-shadow: 0 8px 24px rgba(37, 99, 235, 0.25);
+        }
+        .continuation-cta h4 {
+            font-size: 18px;
+            margin: 0 0 8px;
+            font-weight: 700;
+        }
+        .continuation-cta p {
+            font-size: 14.5px;
+            line-height: 1.55;
+            margin: 0;
+            opacity: 0.95;
         }
 
         /* Intensity callout (added 2026-06-03) */
