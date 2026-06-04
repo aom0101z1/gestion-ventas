@@ -390,21 +390,23 @@ class CoatsReportsManager {
                 privateHours: 26,  // 2026 only (started Feb 2026)
                 privateHoursBreakdown: { 2025: 0, 2026: 26 },
                 teacher: 'Alexander Osorio-Lee',
-                currentBook: '1',
+                currentBook: 'Contenido corporativo personalizado',
                 groupRef: null,
                 startDate: '2026-02-16',
                 examDate: null,
                 skills: null,
                 strengths: [
-                    { es: 'Comenzó desde cero (Libro 1) con buena disposición', en: 'Started from scratch (Book 1) with strong willingness' },
-                    { es: 'Asistencia regular durante marzo y abril', en: 'Regular attendance during March and April' }
+                    { es: 'Trabajó con vocabulario y expresiones específicas de su rol corporativo', en: 'Worked on vocabulary and expressions specific to her corporate role' },
+                    { es: 'Preparación enfocada para evento profesional internacional en México', en: 'Focused preparation for international professional event in Mexico' },
+                    { es: 'Progreso notable en confianza para comunicación de negocios', en: 'Notable progress in confidence for business communication' }
                 ],
                 areasToImprove: [
-                    { es: 'Recuperar el ritmo de asistencia en mayo', en: 'Recover attendance pace in May' }
+                    { es: 'Continuar reforzando estructuras formales para contextos corporativos', en: 'Continue reinforcing formal structures for corporate contexts' },
+                    { es: 'Recuperar el ritmo de asistencia en las últimas semanas del período', en: 'Recover attendance pace in the final weeks of the period' }
                 ],
                 teacherNotes: {
-                    es: 'Estudiante nueva en clases privadas, iniciando con Libro 1 los lunes y jueves de 2 a 4 PM. Está construyendo bases sólidas en gramática elemental y vocabulario.',
-                    en: 'New private-class student, starting with Book 1 Monday and Thursday 2-4 PM. Building solid foundations in elementary grammar and vocabulary.'
+                    es: 'Las sesiones se enfocaron en contenido especializado adaptado a las necesidades de su rol en COATS, con énfasis en la preparación para un evento corporativo en México. El programa incluyó comunicación profesional, networking, presentaciones y vocabulario técnico relevante para su labor. El enfoque no se limitó al material de libro estándar, sino que combinó recursos específicos según el contexto laboral, complementados con elementos del Libro 1 cuando fue pertinente reforzar bases gramaticales. Esta metodología permitió aplicar el aprendizaje directamente a situaciones reales del entorno profesional.',
+                    en: 'Sessions focused on specialized content tailored to her role at COATS, with emphasis on preparation for a corporate event in Mexico. The program included professional communication, networking, presentations, and relevant technical vocabulary for her work. The approach was not limited to standard textbook material but combined work-context-specific resources, complemented with elements of Book 1 when appropriate to reinforce grammar foundations. This methodology allowed her to directly apply learning to real-world professional situations.'
                 }
             },
             {
@@ -412,21 +414,23 @@ class CoatsReportsManager {
                 privateHours: 26,  // 2026 only (started Feb 2026)
                 privateHoursBreakdown: { 2025: 0, 2026: 26 },
                 teacher: 'Alexander Osorio-Lee',
-                currentBook: '1',
+                currentBook: 'Contenido corporativo personalizado',
                 groupRef: null,
                 startDate: '2026-02-16',
                 examDate: null,
                 skills: null,
                 strengths: [
-                    { es: 'Asistencia constante en marzo y abril', en: 'Consistent attendance in March and April' },
-                    { es: 'Progreso paralelo con Valeria Pino en mismo horario', en: 'Parallel progress with Valeria Pino in same schedule' }
+                    { es: 'Desarrollo de vocabulario técnico y profesional alineado a su rol en la empresa', en: 'Developed technical and professional vocabulary aligned with her role in the company' },
+                    { es: 'Preparación específica para evento corporativo internacional en México', en: 'Specific preparation for international corporate event in Mexico' },
+                    { es: 'Mejora en fluidez para conversaciones de negocios y networking', en: 'Improved fluency for business conversations and networking' }
                 ],
                 areasToImprove: [
-                    { es: 'Recuperar el ritmo de asistencia en mayo', en: 'Recover attendance pace in May' }
+                    { es: 'Continuar fortaleciendo estructuras formales y vocabulario corporativo avanzado', en: 'Continue strengthening formal structures and advanced corporate vocabulary' },
+                    { es: 'Recuperar el ritmo de asistencia en las últimas semanas del período', en: 'Recover attendance pace in the final weeks of the period' }
                 ],
                 teacherNotes: {
-                    es: 'Estudiante nueva en clases privadas, comparte horario y curriculum (Libro 1, Lunes y Jueves 2-4 PM) con Valeria Pino. Buena base inicial para continuar avanzando.',
-                    en: 'New private-class student, shares schedule and curriculum (Book 1, Mon/Thu 2-4 PM) with Valeria Pino. Good initial base to continue advancing.'
+                    es: 'Comparte horario y enfoque metodológico con Valeria Pino (Lunes y Jueves 2-4 PM). El programa se diseñó alrededor de las necesidades reales de su rol en COATS, principalmente la preparación para un evento corporativo en México. Se trabajaron temas independientes relacionados con su labor: comunicación profesional, presentaciones, vocabulario técnico y manejo de situaciones formales en inglés. El material del Libro 1 se utilizó como apoyo cuando fue necesario reforzar bases, pero la mayor parte del trabajo se centró en contenido aplicable directamente a su contexto profesional.',
+                    en: 'Shares schedule and methodological approach with Valeria Pino (Monday and Thursday 2-4 PM). The program was designed around the real needs of her role at COATS, primarily preparation for a corporate event in Mexico. Independent topics related to her work were covered: professional communication, presentations, technical vocabulary, and handling formal situations in English. Book 1 material was used as support when needed to reinforce foundations, but most of the work focused on content directly applicable to her professional context.'
                 }
             }
         ];
