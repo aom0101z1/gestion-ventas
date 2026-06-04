@@ -70,7 +70,7 @@ class CoatsReportsManager {
                 attendanceVsProgress: 'Asistencia vs Progreso',
                 attendanceVsProgressDesc: 'Gráfica de Dispersión: Cada punto representa un estudiante. El eje horizontal (X) muestra su porcentaje de asistencia, y el eje vertical (Y) muestra cuántos libros ha avanzado. Los colores indican el nivel de asistencia: verde (≥70%), amarillo (50-69%), rojo (<50%). Esta gráfica permite visualizar la correlación entre asistencia y progreso académico.',
                 monthlyTrend: 'Tendencia Mensual de Asistencia',
-                monthlyTrendDesc: 'Gráfica de Líneas: Muestra el promedio de horas de asistencia por estudiante en cada grupo a lo largo del semestre (Junio-Diciembre). Al usar promedios, se normalizan los datos permitiendo comparar grupos con diferente número de estudiantes (Grupo 1: 8, Grupo 2: 8, Grupo 3: 9, Grupo 4: 6).',
+                monthlyTrendDesc: 'Muestra el promedio de horas de asistencia por estudiante en cada grupo a lo largo del contrato completo (Junio 2025 → Mayo 2026, 12 meses). Al usar promedios, los datos se normalizan permitiendo comparar grupos con diferente número de estudiantes activos (Grupo 1: 8, Grupo 2: 8, Grupo 3: 10, Grupo 4: 5).',
                 totalStudents: 'Total Estudiantes',
                 totalHours: 'Total Horas-Estudiante',
                 classHoursDelivered: 'Horas de Clase Impartidas',
@@ -213,7 +213,7 @@ class CoatsReportsManager {
                 attendanceVsProgress: 'Attendance vs Progress',
                 attendanceVsProgressDesc: 'Scatter Plot: Each point represents a student. The horizontal axis (X) shows their attendance percentage, and the vertical axis (Y) shows how many books they have advanced. Colors indicate attendance level: green (≥70%), yellow (50-69%), red (<50%). This chart visualizes the correlation between attendance and academic progress.',
                 monthlyTrend: 'Monthly Attendance Trend',
-                monthlyTrendDesc: 'Line Chart: Shows the average attendance hours per student in each group throughout the semester (June-December). By using averages, the data is normalized allowing comparison between groups with different numbers of students (Group 1: 8, Group 2: 8, Group 3: 9, Group 4: 6).',
+                monthlyTrendDesc: 'Shows the average attendance hours per student in each group throughout the full contract (June 2025 → May 2026, 12 months). By using averages, the data is normalized allowing comparison between groups with different numbers of active students (Group 1: 8, Group 2: 8, Group 3: 10, Group 4: 5).',
                 totalStudents: 'Total Students',
                 totalHours: 'Total Student-Hours',
                 classHoursDelivered: 'Class Hours Delivered',
@@ -1760,7 +1760,6 @@ class CoatsReportsManager {
                         <canvas id="coats-monthly-trend-chart"></canvas>
                     </div>
                     <div class="chart-description-box">
-                        <span class="chart-type-badge">${this.language === 'es' ? 'Gráfica de Líneas' : 'Line Chart'}</span>
                         <p class="chart-description">${this.t('monthlyTrendDesc')}</p>
                     </div>
                 </div>
