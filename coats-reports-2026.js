@@ -2019,7 +2019,6 @@ class CoatsReportsManager {
             ${group.bookCompleted ? `<div class="completed-badge book-badge">${this.t('bookCompleted')}</div>` : ''}
             <div class="group-header">
                 <h4>${this.language === 'es' ? group.name : group.nameEn}</h4>
-                <span class="group-schedule">${this.language === 'es' ? group.schedule : group.scheduleEn}</span>
             </div>
 
             <div class="group-stats">
