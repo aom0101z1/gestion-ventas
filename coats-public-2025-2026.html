@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>COATS Cadena - English Program Progress Report (Full Year 2025-2026)</title>
     <link rel="icon" href="data:,">
+    <meta name="robots" content="noindex, nofollow">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {
@@ -23,17 +24,157 @@
             margin: 0 auto;
             padding: 20px;
         }
+
+        /* Password gate (added 2026-06-04) */
+        .pw-gate {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(135deg, #1e3a5f 0%, #2d1b69 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+        .pw-card {
+            background: white;
+            border-radius: 18px;
+            padding: 36px 38px 32px;
+            width: 90%;
+            max-width: 420px;
+            box-shadow: 0 30px 60px -10px rgba(0, 0, 0, 0.4);
+            text-align: center;
+        }
+        .pw-logo {
+            font-size: 38px;
+            margin-bottom: 8px;
+        }
+        .pw-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 6px;
+        }
+        .pw-subtitle {
+            font-size: 13.5px;
+            color: #64748b;
+            margin-bottom: 22px;
+            line-height: 1.5;
+        }
+        .pw-input {
+            width: 100%;
+            padding: 13px 16px;
+            font-size: 15px;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 10px;
+            outline: 0;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+            margin-bottom: 12px;
+        }
+        .pw-input:focus {
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+        }
+        .pw-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            border: 0;
+            padding: 13px 16px;
+            font-size: 15px;
+            font-weight: 600;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .pw-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 20px rgba(37, 99, 235, 0.35);
+        }
+        .pw-error {
+            background: #fef2f2;
+            color: #991b1b;
+            font-size: 13px;
+            padding: 9px 12px;
+            border-radius: 8px;
+            margin-bottom: 14px;
+            display: none;
+        }
+        .pw-error.show { display: block; }
+        .pw-foot {
+            margin-top: 18px;
+            font-size: 11px;
+            color: #94a3b8;
+            line-height: 1.4;
+        }
     </style>
 </head>
 <body>
-    <div id="coatsReportContainer"></div>
+    <!-- Password gate -->
+    <div class="pw-gate" id="pwGate">
+        <form class="pw-card" id="pwForm" autocomplete="off">
+            <div class="pw-logo">🔒</div>
+            <div class="pw-title">Reporte Confidencial COATS</div>
+            <div class="pw-subtitle">Ciudad Bilingüe — Programa de Inglés 2025-2026<br>Ingrese la contraseña para continuar</div>
+            <div class="pw-error" id="pwError">Contraseña incorrecta. Intente de nuevo.</div>
+            <input type="password" class="pw-input" id="pwInput" placeholder="Contraseña" required autofocus>
+            <button type="submit" class="pw-btn">Acceder al reporte</button>
+            <div class="pw-foot">Documento de uso interno COATS Cadena<br>Si no tiene la contraseña, contacte a Ciudad Bilingüe.</div>
+        </form>
+    </div>
+
+    <div id="coatsReportContainer" style="display: none;"></div>
+
     <script src="coats-reports-2026.js?v=20260604q"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', async () => {
-            const coatsManager = new CoatsReportsManager('es');
-            window.CoatsReports = coatsManager;
-            await coatsManager.renderReport('coatsReportContainer');
-        });
+        (function () {
+            // Password is stored as SHA-256 hash to avoid plain text in source.
+            // Note: this is obfuscation, not real security — anyone with browser
+            // devtools can bypass by setting sessionStorage.coats_auth = '1'.
+            // Adequate for casual link-sharing protection only.
+            const EXPECTED_HASH = '4d448e448af159ad27ca0574f4880cc74bea335189f5f3e1e4f0c49172c34a51';
+            const STORAGE_KEY = 'coats_2026_auth';
+
+            async function sha256(str) {
+                const buf = new TextEncoder().encode(str);
+                const hashBuf = await crypto.subtle.digest('SHA-256', buf);
+                return Array.from(new Uint8Array(hashBuf))
+                    .map(b => b.toString(16).padStart(2, '0'))
+                    .join('');
+            }
+
+            async function renderReport() {
+                document.getElementById('pwGate').style.display = 'none';
+                document.getElementById('coatsReportContainer').style.display = '';
+                const coatsManager = new CoatsReportsManager('es');
+                window.CoatsReports = coatsManager;
+                await coatsManager.renderReport('coatsReportContainer');
+            }
+
+            document.addEventListener('DOMContentLoaded', async () => {
+                if (sessionStorage.getItem(STORAGE_KEY) === '1') {
+                    await renderReport();
+                    return;
+                }
+
+                const form = document.getElementById('pwForm');
+                const input = document.getElementById('pwInput');
+                const errorEl = document.getElementById('pwError');
+
+                form.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const hash = await sha256(input.value);
+                    if (hash === EXPECTED_HASH) {
+                        sessionStorage.setItem(STORAGE_KEY, '1');
+                        errorEl.classList.remove('show');
+                        await renderReport();
+                    } else {
+                        errorEl.classList.add('show');
+                        input.value = '';
+                        input.focus();
+                    }
+                });
+            });
+        })();
     </script>
 </body>
 </html>
