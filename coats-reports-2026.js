@@ -2431,8 +2431,8 @@ class CoatsReportsManager {
         if (trendCtx) {
             const months = ['jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic', 'ene', 'feb', 'mar', 'abr', 'may'];
             const monthLabels = this.language === 'es'
-                ? ['Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic', 'Ene', 'Feb', 'Mar', 'Abr', 'May']
-                : ['Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May'];
+                ? ["Jun '25", "Jul '25", "Ago '25", "Sep '25", "Oct '25", "Nov '25", "Dic '25", "Ene '26", "Feb '26", "Mar '26", "Abr '26", "May '26"]
+                : ["Jun '25", "Jul '25", "Aug '25", "Sep '25", "Oct '25", "Nov '25", "Dec '25", "Jan '26", "Feb '26", "Mar '26", "Apr '26", "May '26"];
 
             const groupTrends = this.programData.groups.map(group => {
                 const activeStudents = group.students.filter(s => s.status === 'active');
