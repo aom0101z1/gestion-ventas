@@ -225,6 +225,8 @@ class CoatsReportsManager {
                 profForeignTrade: 'Inglés para Comercio Exterior',
                 profInterviews: 'Inglés para Entrevistas',
                 profExecAssistant: 'Inglés para Asistencia Ejecutiva',
+                profChemEng: 'Inglés para Ingeniería Química',
+                profFrontDesk: 'Inglés para Recepción / Front Desk',
                 selfStudyHeading: 'Alternativa: Plataforma de Auto-estudio TutorBox',
                 selfStudyIntro: 'De forma complementaria o como alternativa al programa presencial, su equipo puede continuar el aprendizaje a través de nuestra plataforma de auto-estudio TutorBox. La plataforma está diseñada con el mismo enfoque en habilidades de conversación que las clases presenciales, e incluye tanto el programa general como las áreas profesionales especializadas.',
                 selfStudyBenefit1: 'Flexibilidad total — cada estudiante maneja su propio horario y ritmo de estudio',
@@ -402,6 +404,8 @@ class CoatsReportsManager {
                 profForeignTrade: 'Foreign Trade English',
                 profInterviews: 'Job Interviews English',
                 profExecAssistant: 'Executive Assistant English',
+                profChemEng: 'Chemical Engineering English',
+                profFrontDesk: 'Front Desk English',
                 selfStudyHeading: 'Alternative: TutorBox Self-Study Platform',
                 selfStudyIntro: 'As a complement or alternative to in-person classes, your team can continue learning through our TutorBox self-study platform. The platform is designed with the same focus on conversation skills as in-person classes, and includes both the general program and the specialized professional areas.',
                 selfStudyBenefit1: 'Full flexibility — each student manages their own schedule and pace',
@@ -2015,6 +2019,8 @@ class CoatsReportsManager {
                             { img: 'it_services.png',    key: 'profIT'            },
                             { img: 'foreign_trade.png',  key: 'profForeignTrade'  },
                             { img: 'hr.png',             key: 'profHR'            },
+                            { img: 'chem_eng.png',       key: 'profChemEng'       },
+                            { img: 'front_desk.png',     key: 'profFrontDesk'     },
                             { img: 'interviews.png',     key: 'profInterviews'    },
                             { img: 'exec_assistant.png', key: 'profExecAssistant' }
                         ].map(a => `
