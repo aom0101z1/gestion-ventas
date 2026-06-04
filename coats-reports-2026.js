@@ -199,7 +199,10 @@ class CoatsReportsManager {
                 awardsTip: 'Premios Oro, Plata y Bronce otorgados según asistencia y dedicación durante todo el contrato.',
                 privateClassesToggleOpen: '👩‍🏫 Haga click aquí para abrir la sección de Clases Privadas y ver el detalle de cada estudiante',
                 privateClassesToggleClose: '🔽 Ocultar sección de Clases Privadas',
-                privateClassesTip: '4 estudiantes con clases individuales complementarias durante el contrato.'
+                privateClassesTip: '4 estudiantes con clases individuales complementarias durante el contrato.',
+                withdrawnToggleOpen: '📋 Haga click aquí para ver los estudiantes retirados del programa',
+                withdrawnToggleClose: '🔽 Ocultar estudiantes retirados',
+                withdrawnTip: 'Estudiantes que se retiraron durante el contrato. No se incluyen en el cálculo de asistencia promedio.'
             },
             en: {
                 title: 'Progress Report - English Program',
@@ -342,7 +345,10 @@ class CoatsReportsManager {
                 awardsTip: 'Gold, Silver, and Bronze awards delivered based on attendance and dedication throughout the contract.',
                 privateClassesToggleOpen: '👩‍🏫 Click here to open the Private Classes section and view each student\'s details',
                 privateClassesToggleClose: '🔽 Hide Private Classes section',
-                privateClassesTip: '4 students with complementary individual classes during the contract.'
+                privateClassesTip: '4 students with complementary individual classes during the contract.',
+                withdrawnToggleOpen: '📋 Click here to view students who withdrew from the program',
+                withdrawnToggleClose: '🔽 Hide withdrawn students',
+                withdrawnTip: 'Students who withdrew during the contract. Not included in the average attendance calculation.'
             }
         };
     }
@@ -1908,13 +1914,21 @@ class CoatsReportsManager {
                 </div>
             </div>
 
-            <!-- Withdrawn Students -->
+            <!-- Withdrawn Students (collapsible 2026-06-04) -->
             ${stats.withdrawnStudents.length > 0 ? `
             <div class="coats-section coats-withdrawn-section">
                 <h3><span class="section-icon">📋</span> ${this.t('withdrawnStudents')}</h3>
                 <p class="withdrawn-note">${this.t('withdrawnNote')}</p>
-                <div class="withdrawn-list">
-                    ${stats.withdrawnStudents.map(s => this.renderWithdrawnStudentRow(s)).join('')}
+
+                <button class="individual-progress-toggle" type="button" onclick="window.CoatsReports.toggleWithdrawn()">
+                    <span id="withdrawn-toggle-text">${this.t('withdrawnToggleOpen')}</span>
+                </button>
+                <p class="individual-progress-tip">${this.t('withdrawnTip')}</p>
+
+                <div class="withdrawn-content" id="withdrawn-content" style="display: none;">
+                    <div class="withdrawn-list">
+                        ${stats.withdrawnStudents.map(s => this.renderWithdrawnStudentRow(s)).join('')}
+                    </div>
                 </div>
             </div>
             ` : ''}
@@ -2512,6 +2526,17 @@ class CoatsReportsManager {
         textSpan.textContent = isVisible
             ? this.t('privateClassesToggleOpen')
             : this.t('privateClassesToggleClose');
+    }
+
+    toggleWithdrawn() {
+        const content = document.getElementById('withdrawn-content');
+        const textSpan = document.getElementById('withdrawn-toggle-text');
+        if (!content || !textSpan) return;
+        const isVisible = content.style.display !== 'none';
+        content.style.display = isVisible ? 'none' : 'block';
+        textSpan.textContent = isVisible
+            ? this.t('withdrawnToggleOpen')
+            : this.t('withdrawnToggleClose');
     }
 
     // ===== EXPORT FUNCTIONS =====
