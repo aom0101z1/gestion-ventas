@@ -755,10 +755,19 @@ class CoatsReportsManager {
             if (s.status !== 'transferred') groupStudentNames.add(s.name.trim().toUpperCase());
         }));
         const privateStudents = (this.initializePrivateStudents && this.initializePrivateStudents()) || [];
-        const privateOnlyCount = privateStudents.filter(
+        const privateOnlyStudents = privateStudents.filter(
             p => !groupStudentNames.has(p.name.trim().toUpperCase())
+        );
+        const privateOnlyCount = privateOnlyStudents.length;
+        // All private students treated as active unless explicitly marked inactive.
+        const privateOnlyActiveCount = privateOnlyStudents.filter(
+            p => !p.status || p.status === 'active'
         ).length;
         const totalPeople = totalStudents + privateOnlyCount;
+        const totalPeopleActive = activeStudents + privateOnlyActiveCount;
+        const retentionPctIncludingPrivate = totalPeople > 0
+            ? (totalPeopleActive / totalPeople) * 100
+            : 0;
 
         return {
             totalStudents,
@@ -766,8 +775,11 @@ class CoatsReportsManager {
             transferredStudents,
             inactiveStudents,
             privateOnlyCount,
+            privateOnlyActiveCount,
             privateStudentsCount: privateStudents.length,
             totalPeople,
+            totalPeopleActive,
+            retentionPctIncludingPrivate,
             totalHours, // Student-hours (sum of all student attendance)
             totalClassHoursDelivered, // Class hours delivered (per group basis)
             totalClassHoursPerGroup,
@@ -1591,9 +1603,9 @@ class CoatsReportsManager {
                     </div>
                     <div class="coats-stat-card">
                         <div class="stat-icon">🎯</div>
-                        <div class="stat-value">${stats.totalStudents > 0 ? Math.round((stats.activeStudents / stats.totalStudents) * 100) : 0}%</div>
+                        <div class="stat-value">${stats.retentionPctIncludingPrivate.toFixed(1)}%</div>
                         <div class="stat-label">${this.language === 'es' ? 'Tasa de Retención del Programa' : 'Program Retention Rate'}</div>
-                        <div class="stat-sub">${this.language === 'es' ? `solo ${stats.inactiveStudents} retiros confirmados` : `only ${stats.inactiveStudents} confirmed withdrawals`}</div>
+                        <div class="stat-sub">${this.language === 'es' ? `${stats.totalPeopleActive}/${stats.totalPeople} activos · solo ${stats.inactiveStudents} retiros confirmados` : `${stats.totalPeopleActive}/${stats.totalPeople} active · only ${stats.inactiveStudents} confirmed withdrawals`}</div>
                     </div>
                 </div>
                 <p class="benchmark-note">📊 ${this.t('benchmarkNote')}</p>
@@ -1601,9 +1613,7 @@ class CoatsReportsManager {
 
             <!-- Highlights / Logros Destacados (added 2026-06-02) -->
             ${(() => {
-                const retentionPct = stats.totalStudents > 0
-                    ? Math.round((stats.activeStudents / stats.totalStudents) * 100)
-                    : 0;
+                const retentionPct = Math.round(stats.retentionPctIncludingPrivate);
                 const avgBooksAdvanced = (
                     this.programData.groups.reduce((sum, g) => sum + (g.currentBook - g.startBook), 0)
                     / this.programData.groups.length
@@ -1620,7 +1630,7 @@ class CoatsReportsManager {
                             <div class="highlight-icon">🎯</div>
                             <div class="highlight-value">${retentionPct}%</div>
                             <div class="highlight-label">${this.t('hl_retentionLabel')}</div>
-                            <div class="highlight-sub">${stats.activeStudents}/${stats.totalStudents} ${this.t('hl_retentionSub')}</div>
+                            <div class="highlight-sub">${stats.totalPeopleActive}/${stats.totalPeople} ${this.t('hl_retentionSub')}</div>
                         </div>
                         <div class="highlight-card">
                             <div class="highlight-icon">🎯</div>
