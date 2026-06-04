@@ -190,7 +190,16 @@ class CoatsReportsManager {
                 programPositionLabel: 'del programa de 12 libros',
                 booksThisYearTitle: 'Libros Avanzados Durante el Contrato Completo',
                 booksThisYearDesc: 'Cantidad de libros que cada grupo cubrió a lo largo del contrato completo (Jun 2025 → May 2026, ambos semestres del año académico). No incluye libros previamente completados antes del inicio del contrato.',
-                booksThisYearLabel: 'libros en el contrato'
+                booksThisYearLabel: 'libros en el contrato',
+                individualProgressToggleOpen: '👥 Haciendo click aquí abres la lista completa de estudiantes y podrás ver su progreso individual',
+                individualProgressToggleClose: '🔽 Ocultar lista de estudiantes',
+                individualProgressTip: 'La lista incluye los 31 estudiantes activos del programa, ordenados por tasa de asistencia.',
+                awardsToggleOpen: '🏆 Haga click aquí para abrir esta sección y ver los reconocimientos y premios entregados',
+                awardsToggleClose: '🔽 Ocultar reconocimientos y premios',
+                awardsTip: 'Premios Oro, Plata y Bronce otorgados según asistencia y dedicación durante todo el contrato.',
+                privateClassesToggleOpen: '👩‍🏫 Haga click aquí para abrir la sección de Clases Privadas y ver el detalle de cada estudiante',
+                privateClassesToggleClose: '🔽 Ocultar sección de Clases Privadas',
+                privateClassesTip: '4 estudiantes con clases individuales complementarias durante el contrato.'
             },
             en: {
                 title: 'Progress Report - English Program',
@@ -324,7 +333,16 @@ class CoatsReportsManager {
                 programPositionLabel: 'of the 12-book program',
                 booksThisYearTitle: 'Books Advanced During the Full Contract',
                 booksThisYearDesc: 'Number of books each group covered throughout the full contract (Jun 2025 → May 2026, both semesters of the academic year). Does not include books previously completed before the contract started.',
-                booksThisYearLabel: 'books in contract'
+                booksThisYearLabel: 'books in contract',
+                individualProgressToggleOpen: '👥 Click here to open the complete student list and view their individual progress',
+                individualProgressToggleClose: '🔽 Hide student list',
+                individualProgressTip: 'The list includes all 31 active students in the program, sorted by attendance rate.',
+                awardsToggleOpen: '🏆 Click here to open this section and see the recognitions and awards delivered',
+                awardsToggleClose: '🔽 Hide recognitions and awards',
+                awardsTip: 'Gold, Silver, and Bronze awards delivered based on attendance and dedication throughout the contract.',
+                privateClassesToggleOpen: '👩‍🏫 Click here to open the Private Classes section and view each student\'s details',
+                privateClassesToggleClose: '🔽 Hide Private Classes section',
+                privateClassesTip: '4 students with complementary individual classes during the contract.'
             }
         };
     }
@@ -1841,106 +1859,101 @@ class CoatsReportsManager {
                 </div>
             </div>
 
-            <!-- Recognition & Awards -->
+            <!-- Recognition & Awards (collapsible 2026-06-04) -->
             <div class="coats-section coats-awards-section">
                 <h3><span class="section-icon">🏆</span> ${this.t('recognitionAwards')}</h3>
 
-                <!-- Gold Awards -->
-                <div class="award-category award-gold">
-                    <div class="award-header">
-                        <span class="award-medal">🥇</span>
-                        <h4>${this.t('goldAward')}</h4>
-                    </div>
-                    <div class="award-winners">
-                        ${awards.gold.map((s, i) => this.renderAwardWinner(s, i + 1, 'gold')).join('')}
-                    </div>
-                </div>
+                <button class="individual-progress-toggle" type="button" onclick="window.CoatsReports.toggleAwards()">
+                    <span id="awards-toggle-text">${this.t('awardsToggleOpen')}</span>
+                </button>
+                <p class="individual-progress-tip">${this.t('awardsTip')}</p>
 
-                <!-- Silver Awards -->
-                <div class="award-category award-silver">
-                    <div class="award-header">
-                        <span class="award-medal">🥈</span>
-                        <h4>${this.t('silverAward')}</h4>
+                <div class="awards-content" id="awards-content" style="display: none;">
+                    <!-- Gold Awards -->
+                    <div class="award-category award-gold">
+                        <div class="award-header">
+                            <span class="award-medal">🥇</span>
+                            <h4>${this.t('goldAward')}</h4>
+                        </div>
+                        <div class="award-winners">
+                            ${awards.gold.map((s, i) => this.renderAwardWinner(s, i + 1, 'gold')).join('')}
+                        </div>
                     </div>
-                    <div class="award-winners">
-                        ${awards.silver.map((s, i) => this.renderAwardWinner(s, i + 7, 'silver')).join('')}
-                    </div>
-                </div>
 
-                <!-- Bronze Awards -->
-                ${awards.bronze.length > 0 ? `
-                <div class="award-category award-bronze">
-                    <div class="award-header">
-                        <span class="award-medal">🥉</span>
-                        <h4>${this.t('bronzeAward')}</h4>
+                    <!-- Silver Awards -->
+                    <div class="award-category award-silver">
+                        <div class="award-header">
+                            <span class="award-medal">🥈</span>
+                            <h4>${this.t('silverAward')}</h4>
+                        </div>
+                        <div class="award-winners">
+                            ${awards.silver.map((s, i) => this.renderAwardWinner(s, i + 7, 'silver')).join('')}
+                        </div>
                     </div>
-                    <div class="award-winners">
-                        ${awards.bronze.map((s, i) => this.renderAwardWinner(s, i + 13, 'bronze')).join('')}
+
+                    <!-- Bronze Awards -->
+                    ${awards.bronze.length > 0 ? `
+                    <div class="award-category award-bronze">
+                        <div class="award-header">
+                            <span class="award-medal">🥉</span>
+                            <h4>${this.t('bronzeAward')}</h4>
+                        </div>
+                        <div class="award-winners">
+                            ${awards.bronze.map((s, i) => this.renderAwardWinner(s, i + 13, 'bronze')).join('')}
+                        </div>
                     </div>
+                    ` : ''}
                 </div>
-                ` : ''}
             </div>
 
-            <!-- Private Classes Section -->
+            <!-- Private Classes Section (collapsible 2026-06-04) -->
             <div class="coats-section private-classes-section">
                 <h3><span class="section-icon">👩‍🏫</span> ${this.t('privateClasses')}</h3>
                 <p class="section-description">${this.t('privateClassesDesc')}</p>
-                <div class="private-students-grid">
-                    ${this.renderPrivateStudents()}
-                </div>
-            </div>
 
-            <!-- General Teacher Observations -->
-            <div class="coats-section general-observations-section">
-                <h3><span class="section-icon">📋</span> ${this.t('generalObservations')}</h3>
-                <p class="section-description">${this.t('generalObservationsDesc')}</p>
-                <div class="observations-grid">
-                    <div class="observation-card positive">
-                        <div class="observation-icon">📈</div>
-                        <h4>${this.language === 'es' ? 'Progreso Notable en Expresión Oral' : 'Notable Progress in Speaking'}</h4>
-                        <p>${this.language === 'es'
-                            ? 'Todos los profesores coinciden en que se nota un progreso notable en la capacidad de hablar de los estudiantes. Se observa mayor confianza y fluidez en todos los grupos.'
-                            : 'All teachers agree that there is notable progress in students\' speaking ability. Greater confidence and fluency is observed across all groups.'}</p>
-                    </div>
-                    <div class="observation-card positive">
-                        <div class="observation-icon">✓</div>
-                        <h4>${this.language === 'es' ? 'Correlación Asistencia-Progreso' : 'Attendance-Progress Correlation'}</h4>
-                        <p>${this.language === 'es'
-                            ? 'Las personas que asisten más constantemente a clases han tenido mucho mejor progreso y pueden hablar con mucha más fluidez y confianza que quienes asisten de manera irregular.'
-                            : 'Students who attend classes more consistently have shown much better progress and can speak with much more fluency and confidence than those who attend irregularly.'}</p>
-                    </div>
-                    <div class="observation-card recommendation">
-                        <div class="observation-icon">📱</div>
-                        <h4>${this.language === 'es' ? 'Uso del Teléfono en Clase' : 'Phone Use in Class'}</h4>
-                        <p>${this.language === 'es'
-                            ? 'Se observa que el uso del teléfono en clase afecta el progreso de los estudiantes. En algunas ocasiones deben estar pendientes de su teléfono, lo cual es entendible ya que están en su lugar de trabajo, pero se recomienda hacerlo lo menos posible para maximizar el aprovechamiento de las clases.'
-                            : 'Phone use during class has been observed to affect student progress. Sometimes students need to check their phones, which is understandable since they are at their workplace, but it is recommended to do so as little as possible to maximize class benefit.'}</p>
+                <button class="individual-progress-toggle" type="button" onclick="window.CoatsReports.togglePrivateClasses()">
+                    <span id="private-classes-toggle-text">${this.t('privateClassesToggleOpen')}</span>
+                </button>
+                <p class="individual-progress-tip">${this.t('privateClassesTip')}</p>
+
+                <div class="private-classes-content" id="private-classes-content" style="display: none;">
+                    <div class="private-students-grid">
+                        ${this.renderPrivateStudents()}
                     </div>
                 </div>
             </div>
 
             <!-- Individual Progress Table -->
-            <div class="coats-section">
+            <div class="coats-section coats-individual-progress-section">
                 <h3><span class="section-icon">👤</span> ${this.t('individualProgress')}</h3>
                 <p class="denominator-note">${this.t('denominatorNote')}</p>
-                <div class="coats-table-container">
-                    <table class="coats-table">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>${this.t('name')}</th>
-                                <th>${this.t('group')}</th>
-                                <th>${this.t('totalHoursAttended')}</th>
-                                <th>${this.t('attendanceRate')}</th>
-                                <th>${this.t('booksAdvanced')}</th>
-                                <th>${this.t('progress')}</th>
-                                ${window.FirebaseData?.currentUser?.email === 'admin@ciudadbilingue.com' ? `<th>${this.language === 'es' ? 'Estado' : 'Status'}</th>` : ''}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${stats.allStudents.map((s, i) => this.renderStudentRow(s, i + 1)).join('')}
-                        </tbody>
-                    </table>
+
+                <!-- Collapsible toggle (collapsed by default 2026-06-04) -->
+                <button class="individual-progress-toggle" type="button" onclick="window.CoatsReports.toggleIndividualProgress()">
+                    <span id="individual-progress-toggle-text">${this.t('individualProgressToggleOpen')}</span>
+                </button>
+                <p class="individual-progress-tip">${this.t('individualProgressTip')}</p>
+
+                <div class="individual-progress-content" id="individual-progress-content" style="display: none;">
+                    <div class="coats-table-container">
+                        <table class="coats-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>${this.t('name')}</th>
+                                    <th>${this.t('group')}</th>
+                                    <th>${this.t('totalHoursAttended')}</th>
+                                    <th>${this.t('attendanceRate')}</th>
+                                    <th>${this.t('booksAdvanced')}</th>
+                                    <th>${this.t('progress')}</th>
+                                    ${window.FirebaseData?.currentUser?.email === 'admin@ciudadbilingue.com' ? `<th>${this.language === 'es' ? 'Estado' : 'Status'}</th>` : ''}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${stats.allStudents.map((s, i) => this.renderStudentRow(s, i + 1)).join('')}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
@@ -2517,6 +2530,39 @@ class CoatsReportsManager {
         }
     }
 
+    toggleIndividualProgress() {
+        const content = document.getElementById('individual-progress-content');
+        const textSpan = document.getElementById('individual-progress-toggle-text');
+        if (!content || !textSpan) return;
+        const isVisible = content.style.display !== 'none';
+        content.style.display = isVisible ? 'none' : 'block';
+        textSpan.textContent = isVisible
+            ? this.t('individualProgressToggleOpen')
+            : this.t('individualProgressToggleClose');
+    }
+
+    toggleAwards() {
+        const content = document.getElementById('awards-content');
+        const textSpan = document.getElementById('awards-toggle-text');
+        if (!content || !textSpan) return;
+        const isVisible = content.style.display !== 'none';
+        content.style.display = isVisible ? 'none' : 'block';
+        textSpan.textContent = isVisible
+            ? this.t('awardsToggleOpen')
+            : this.t('awardsToggleClose');
+    }
+
+    togglePrivateClasses() {
+        const content = document.getElementById('private-classes-content');
+        const textSpan = document.getElementById('private-classes-toggle-text');
+        if (!content || !textSpan) return;
+        const isVisible = content.style.display !== 'none';
+        content.style.display = isVisible ? 'none' : 'block';
+        textSpan.textContent = isVisible
+            ? this.t('privateClassesToggleOpen')
+            : this.t('privateClassesToggleClose');
+    }
+
     // ===== EXPORT FUNCTIONS =====
 
     async exportToPDF() {
@@ -2924,6 +2970,35 @@ class CoatsReportsManager {
             color: #1e3a8a;
             margin-bottom: 14px;
             line-height: 1.5;
+        }
+
+        /* Collapsible toggle button (added 2026-06-04) */
+        .individual-progress-toggle {
+            display: block;
+            width: 100%;
+            text-align: center;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            border: 0;
+            padding: 16px 22px;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+            margin-top: 6px;
+        }
+        .individual-progress-toggle:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(37, 99, 235, 0.35);
+        }
+        .individual-progress-tip {
+            font-size: 12.5px;
+            color: #64748b;
+            text-align: center;
+            margin: 10px 0 6px;
+            font-style: italic;
         }
 
         /* ==== End added styles ==== */
