@@ -224,7 +224,16 @@ class CoatsReportsManager {
                 profHR: 'Inglés para Recursos Humanos',
                 profForeignTrade: 'Inglés para Comercio Exterior',
                 profInterviews: 'Inglés para Entrevistas',
-                profExecAssistant: 'Inglés para Asistencia Ejecutiva'
+                profExecAssistant: 'Inglés para Asistencia Ejecutiva',
+                selfStudyHeading: 'Alternativa: Plataforma de Auto-estudio TutorBox',
+                selfStudyIntro: 'De forma complementaria o como alternativa al programa presencial, su equipo puede continuar el aprendizaje a través de nuestra plataforma de auto-estudio TutorBox. La plataforma está diseñada con el mismo enfoque en habilidades de conversación que las clases presenciales, e incluye tanto el programa general como las áreas profesionales especializadas.',
+                selfStudyBenefit1: 'Flexibilidad total — cada estudiante maneja su propio horario y ritmo de estudio',
+                selfStudyBenefit2: 'Costo significativamente menor que las clases presenciales',
+                selfStudyBenefit3: 'Mismo enfoque en conversación que las clases con profesor',
+                selfStudyBenefit4: 'Práctica con múltiples acentos: Estados Unidos, Reino Unido, India y Australia',
+                selfStudyBenefit5: 'Programas disponibles para toda la familia del colaborador, incluyendo niños',
+                selfStudyDemo: 'Si tienen interés, con gusto coordinamos una demostración personalizada. Pueden conocer la plataforma en',
+                selfStudyExploreLink: 'www.tutorbox.app'
             },
             en: {
                 title: 'Progress Report - English Program',
@@ -392,7 +401,16 @@ class CoatsReportsManager {
                 profHR: 'Human Resources English',
                 profForeignTrade: 'Foreign Trade English',
                 profInterviews: 'Job Interviews English',
-                profExecAssistant: 'Executive Assistant English'
+                profExecAssistant: 'Executive Assistant English',
+                selfStudyHeading: 'Alternative: TutorBox Self-Study Platform',
+                selfStudyIntro: 'As a complement or alternative to in-person classes, your team can continue learning through our TutorBox self-study platform. The platform is designed with the same focus on conversation skills as in-person classes, and includes both the general program and the specialized professional areas.',
+                selfStudyBenefit1: 'Full flexibility — each student manages their own schedule and pace',
+                selfStudyBenefit2: 'Significantly lower cost than in-person classes',
+                selfStudyBenefit3: 'Same conversation focus as our teacher-led classes',
+                selfStudyBenefit4: 'Practice with multiple English accents: United States, United Kingdom, India, and Australia',
+                selfStudyBenefit5: 'Programs available for the entire family of your team members, including children',
+                selfStudyDemo: 'If interested, we will gladly coordinate a personalized demonstration. You can explore the platform at',
+                selfStudyExploreLink: 'www.tutorbox.app'
             }
         };
     }
@@ -2010,6 +2028,29 @@ class CoatsReportsManager {
                     </div>
                 </div>
 
+                <!-- Self-Study Platform option (added 2026-06-04) -->
+                <div class="self-study-block">
+                    <div class="self-study-header">
+                        <span class="self-study-icon">📱</span>
+                        <h4>${this.t('selfStudyHeading')}</h4>
+                    </div>
+                    <p class="self-study-intro">${this.t('selfStudyIntro')}</p>
+
+                    <div class="self-study-benefits">
+                        <div class="self-study-benefit"><span class="ssb-icon">🕐</span><span>${this.t('selfStudyBenefit1')}</span></div>
+                        <div class="self-study-benefit"><span class="ssb-icon">💰</span><span>${this.t('selfStudyBenefit2')}</span></div>
+                        <div class="self-study-benefit"><span class="ssb-icon">🎯</span><span>${this.t('selfStudyBenefit3')}</span></div>
+                        <div class="self-study-benefit"><span class="ssb-icon">🌍</span><span>${this.t('selfStudyBenefit4')}</span></div>
+                        <div class="self-study-benefit"><span class="ssb-icon">👨‍👩‍👧</span><span>${this.t('selfStudyBenefit5')}</span></div>
+                    </div>
+
+                    <div class="self-study-link-row">
+                        <p class="self-study-demo">${this.t('selfStudyDemo')}
+                            <a href="https://www.tutorbox.app" target="_blank" rel="noopener" class="self-study-link">${this.t('selfStudyExploreLink')}</a>
+                        </p>
+                    </div>
+                </div>
+
                 <div class="continuation-cta">
                     <h4>🎯 ${this.t('continuationCtaHeading')}</h4>
                     <p>${this.t('continuationCtaText')}</p>
@@ -2929,6 +2970,95 @@ class CoatsReportsManager {
             align-items: center;
             justify-content: center;
         }
+        /* Self-Study Platform block (added 2026-06-04) */
+        .self-study-block {
+            background: white;
+            border: 1px solid #c7d2fe;
+            border-radius: 14px;
+            padding: 24px 26px;
+            margin-top: 8px;
+            margin-bottom: 14px;
+            box-shadow: 0 6px 18px rgba(99, 102, 241, 0.10);
+        }
+        .self-study-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+        .self-study-icon {
+            font-size: 28px;
+            background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+            color: white;
+            width: 44px;
+            height: 44px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+        }
+        .self-study-header h4 {
+            font-size: 17px;
+            color: #1e293b;
+            margin: 0;
+            font-weight: 700;
+        }
+        .self-study-intro {
+            font-size: 14px;
+            color: #475569;
+            line-height: 1.65;
+            margin: 0 0 16px;
+        }
+        .self-study-benefits {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+        .self-study-benefit {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+            border-left: 3px solid #6366f1;
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-size: 13.5px;
+            color: #1e293b;
+            line-height: 1.45;
+        }
+        .ssb-icon {
+            font-size: 18px;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+        .self-study-link-row {
+            background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
+            border-radius: 10px;
+            padding: 14px 18px;
+            margin-top: 4px;
+        }
+        .self-study-demo {
+            font-size: 14px;
+            color: #4c1d95;
+            line-height: 1.55;
+            margin: 0;
+        }
+        .self-study-link {
+            display: inline-block;
+            color: #4f46e5;
+            font-weight: 700;
+            text-decoration: none;
+            border-bottom: 2px solid #4f46e5;
+            padding-bottom: 1px;
+            margin-left: 4px;
+            transition: color 0.15s ease;
+        }
+        .self-study-link:hover {
+            color: #312e81;
+            border-bottom-color: #312e81;
+        }
+
         .continuation-cta {
             background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
             color: white;
