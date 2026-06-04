@@ -1858,27 +1858,6 @@ class CoatsReportsManager {
                 </div>
             </div>
 
-            <!-- Books advanced during full contract per group -->
-            <div class="coats-section">
-                <h3><span class="section-icon">📚</span> ${this.t('booksThisYearTitle')}</h3>
-                <p class="books-this-year-desc">${this.t('booksThisYearDesc')}</p>
-                <div class="books-this-year-grid">
-                    ${this.programData.groups.map(g => {
-                        const name = this.language === 'es' ? g.name : g.nameEn;
-                        const shortName = name.split(' - ')[0];
-                        const booksThisYear = g.currentBook - g.startBook + 1;
-                        return `
-                        <div class="books-this-year-card">
-                            <div class="books-this-year-group">${shortName}</div>
-                            <div class="books-this-year-value">${booksThisYear}</div>
-                            <div class="books-this-year-label">${this.t('booksThisYearLabel')}</div>
-                            <div class="books-this-year-range">${this.t('book')} ${g.startBook} → ${this.t('book')} ${g.currentBook}</div>
-                        </div>
-                        `;
-                    }).join('')}
-                </div>
-            </div>
-
             <!-- Recognition & Awards (collapsible 2026-06-04) -->
             <div class="coats-section coats-awards-section">
                 <h3><span class="section-icon">🏆</span> ${this.t('recognitionAwards')}</h3>
