@@ -1723,27 +1723,14 @@ class CoatsReportsManager {
                         <div class="stat-label">${this.t('avgAttendance')}</div>
                         <div class="stat-sub stat-benchmark">${this.t('benchmarkExcellent')}</div>
                     </div>
+                    <div class="coats-stat-card">
+                        <div class="stat-icon">🎯</div>
+                        <div class="stat-value">${stats.totalStudents > 0 ? Math.round((stats.activeStudents / stats.totalStudents) * 100) : 0}%</div>
+                        <div class="stat-label">${this.language === 'es' ? 'Tasa de Retención del Programa' : 'Program Retention Rate'}</div>
+                        <div class="stat-sub">${this.language === 'es' ? `solo ${stats.inactiveStudents} retiros confirmados` : `only ${stats.inactiveStudents} confirmed withdrawals`}</div>
+                    </div>
                 </div>
                 <p class="benchmark-note">📊 ${this.t('benchmarkNote')}</p>
-            </div>
-
-            <!-- Key Insights -->
-            <div class="coats-section coats-insights">
-                <h3><span class="section-icon">💡</span> ${this.t('keyInsights')}</h3>
-                <div class="coats-insights-grid">
-                    <div class="insight-card insight-success">
-                        <span class="insight-icon">✅</span>
-                        <span>${this.t('insight1')}</span>
-                    </div>
-                    <div class="insight-card insight-achievement">
-                        <span class="insight-icon">🎓</span>
-                        <span>${this.t('insight2')}</span>
-                    </div>
-                    <div class="insight-card insight-info">
-                        <span class="insight-icon">📈</span>
-                        <span>${this.t('insight3')}</span>
-                    </div>
-                </div>
             </div>
 
             <!-- Group Progress -->
