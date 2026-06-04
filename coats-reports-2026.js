@@ -205,7 +205,10 @@ class CoatsReportsManager {
                 withdrawnTip: 'Estudiantes que se retiraron durante el contrato. No se incluyen en el cálculo de asistencia promedio.',
                 attendanceAnalysisToggleOpen: '📊 Haga click aquí para abrir el análisis de asistencia con gráficas detalladas',
                 attendanceAnalysisToggleClose: '🔽 Ocultar análisis de asistencia',
-                attendanceAnalysisTip: 'Incluye gráficas de asistencia por estudiante, progreso por grupo, y tendencia mensual a lo largo del contrato.'
+                attendanceAnalysisTip: 'Incluye gráficas de asistencia por estudiante, progreso por grupo, y tendencia mensual a lo largo del contrato.',
+                groupProgressToggleOpen: '📈 Haga click aquí para abrir la sección de Progreso por Grupo y ver el detalle de cada grupo',
+                groupProgressToggleClose: '🔽 Ocultar Progreso por Grupo',
+                groupProgressTip: 'Detalle por grupo: asistencia promedio, libro y unidad actual, profesores asignados, y lista expandible de estudiantes con sus horas y porcentajes.'
             },
             en: {
                 title: 'Progress Report - English Program',
@@ -354,7 +357,10 @@ class CoatsReportsManager {
                 withdrawnTip: 'Students who withdrew during the contract. Not included in the average attendance calculation.',
                 attendanceAnalysisToggleOpen: '📊 Click here to open the attendance analysis with detailed charts',
                 attendanceAnalysisToggleClose: '🔽 Hide attendance analysis',
-                attendanceAnalysisTip: 'Includes attendance-per-student chart, group progress, and monthly trend across the contract.'
+                attendanceAnalysisTip: 'Includes attendance-per-student chart, group progress, and monthly trend across the contract.',
+                groupProgressToggleOpen: '📈 Click here to open the Group Progress section and see each group\'s details',
+                groupProgressToggleClose: '🔽 Hide Group Progress',
+                groupProgressTip: 'Per-group detail: average attendance, current book and unit, assigned teachers, and an expandable student list with their hours and percentages.'
             }
         };
     }
@@ -1761,11 +1767,19 @@ class CoatsReportsManager {
                 </div>
             </div>
 
-            <!-- Group Progress -->
+            <!-- Group Progress (collapsible 2026-06-04) -->
             <div class="coats-section">
                 <h3><span class="section-icon">📈</span> ${this.t('groupProgress')}</h3>
-                <div class="coats-groups-container">
-                    ${this.programData.groups.map(group => this.renderGroupCard(group)).join('')}
+
+                <button class="individual-progress-toggle" type="button" onclick="window.CoatsReports.toggleGroupProgress()">
+                    <span id="group-progress-toggle-text">${this.t('groupProgressToggleOpen')}</span>
+                </button>
+                <p class="individual-progress-tip">${this.t('groupProgressTip')}</p>
+
+                <div class="group-progress-content" id="group-progress-content" style="display: none;">
+                    <div class="coats-groups-container">
+                        ${this.programData.groups.map(group => this.renderGroupCard(group)).join('')}
+                    </div>
                 </div>
             </div>
 
@@ -2561,6 +2575,17 @@ class CoatsReportsManager {
                 Object.values(this.charts || {}).forEach(c => { if (c && c.resize) c.resize(); });
             }, 50);
         }
+    }
+
+    toggleGroupProgress() {
+        const content = document.getElementById('group-progress-content');
+        const textSpan = document.getElementById('group-progress-toggle-text');
+        if (!content || !textSpan) return;
+        const isVisible = content.style.display !== 'none';
+        content.style.display = isVisible ? 'none' : 'block';
+        textSpan.textContent = isVisible
+            ? this.t('groupProgressToggleOpen')
+            : this.t('groupProgressToggleClose');
     }
 
     // ===== EXPORT FUNCTIONS =====
