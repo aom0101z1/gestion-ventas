@@ -2480,6 +2480,60 @@ class CoatsReportsManager {
     renderCharts(stats) {
         this.destroyCharts();
 
+        // Make the Attendance Analysis container visible BEFORE drawing charts,
+        // so each canvas has real dimensions. Without this, Chart.js renders into
+        // a 0×0 canvas and the chart is blank in both the live view (until resize)
+        // and the printed PDF.
+        const attEl = document.getElementById('attendance-analysis-content');
+        const collapseAttAfter = attEl && attEl.style.display === 'none';
+        if (collapseAttAfter) attEl.style.display = 'block';
+
+        // Set up print handlers once — they expand every collapsible section and
+        // resize charts before the browser snapshots the page for printing.
+        if (!this._printHandlersInstalled) {
+            this._printHandlersInstalled = true;
+            this._collapsibleIds = [
+                'individual-progress-content',
+                'awards-content',
+                'private-classes-content',
+                'withdrawn-content',
+                'attendance-analysis-content',
+                'group-progress-content'
+            ];
+            window.addEventListener('beforeprint', () => {
+                this._preprintState = {};
+                this._collapsibleIds.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        this._preprintState[id] = el.style.display;
+                        el.style.display = 'block';
+                    }
+                });
+                // Also expand every per-group student list inside Progreso por Grupo
+                document.querySelectorAll('.student-list-content').forEach(el => {
+                    el.dataset._preDisplay = el.style.display;
+                    el.style.display = 'block';
+                });
+                // Resize every Chart.js chart so canvases pick up real dimensions
+                Object.values(this.charts || {}).forEach(c => { if (c && c.resize) c.resize(); });
+            });
+            window.addEventListener('afterprint', () => {
+                if (this._preprintState) {
+                    Object.entries(this._preprintState).forEach(([id, prev]) => {
+                        const el = document.getElementById(id);
+                        if (el) el.style.display = prev;
+                    });
+                    this._preprintState = null;
+                }
+                document.querySelectorAll('.student-list-content').forEach(el => {
+                    if (el.dataset._preDisplay !== undefined) {
+                        el.style.display = el.dataset._preDisplay;
+                        delete el.dataset._preDisplay;
+                    }
+                });
+            });
+        }
+
         // Attendance Distribution Pie Chart
         const attendanceCtx = document.getElementById('coats-attendance-chart');
         if (attendanceCtx) {
@@ -2604,6 +2658,12 @@ class CoatsReportsManager {
                     }
                 }
             });
+        }
+
+        // Now that charts are drawn with proper canvas dimensions, restore the
+        // Attendance Analysis container to its collapsed state for the live UI.
+        if (collapseAttAfter && attEl) {
+            setTimeout(() => { attEl.style.display = 'none'; }, 60);
         }
     }
 
