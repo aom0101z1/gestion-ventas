@@ -2081,9 +2081,6 @@ class CoatsReportsManager {
                 <button class="coats-btn coats-btn-primary" onclick="window.CoatsReports.exportToPDF()">
                     <span>📄</span> ${this.t('exportPDF')}
                 </button>
-                <button class="coats-btn coats-btn-secondary" onclick="window.CoatsReports.exportToExcel()">
-                    <span>📊</span> ${this.t('exportExcel')}
-                </button>
                 <button class="coats-btn coats-btn-secondary" onclick="window.CoatsReports.printReport()">
                     <span>🖨️</span> ${this.t('print')}
                 </button>
@@ -4952,20 +4949,93 @@ class CoatsReportsManager {
             }
         }
 
-        /* Print Styles */
+        /* Print Styles (rebuilt 2026-06-04 for clean PDF export) */
         @media print {
+            /* Preserve all background colors and gradients in PDF */
+            *, *::before, *::after {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            /* Hide the password gate and the live-only UI controls */
+            .pw-gate,
             .coats-actions,
-            .coats-language-toggle {
+            .coats-language-toggle,
+            .coats-tabs-container {
                 display: none !important;
             }
 
-            .coats-report {
-                box-shadow: none;
-                background: white;
+            /* Hide all collapsible-toggle buttons + tips */
+            .individual-progress-toggle,
+            .individual-progress-tip,
+            .student-list-dropdown .dropdown-toggle {
+                display: none !important;
             }
 
-            .coats-section {
+            /* Force every collapsible content open so the PDF shows everything */
+            #individual-progress-content,
+            #awards-content,
+            #private-classes-content,
+            #withdrawn-content,
+            #attendance-analysis-content,
+            #group-progress-content,
+            .student-list-content {
+                display: block !important;
+            }
+
+            html, body {
+                background: white !important;
+            }
+            .coats-report {
+                box-shadow: none !important;
+                background: white !important;
+                padding: 10px !important;
+                max-width: 100% !important;
+                border-radius: 0 !important;
+            }
+
+            /* Avoid breaking cards and key blocks across pages */
+            .coats-section,
+            .highlight-card,
+            .final-progress-card,
+            .coats-group-card,
+            .prof-area-card,
+            .award-category,
+            .private-student-card,
+            .books-this-year-card,
+            .self-study-block,
+            .continuation-callout,
+            .continuation-cta,
+            .report-signature {
+                page-break-inside: avoid;
                 break-inside: avoid;
+            }
+
+            /* Section headings stay with their content */
+            h3, h4 {
+                page-break-after: avoid;
+                break-after: avoid;
+            }
+
+            /* Encourage a fresh page before big closing blocks */
+            .continuation-section {
+                page-break-before: auto;
+                break-before: auto;
+            }
+
+            /* Charts: cap their height so they don't overflow */
+            .coats-chart-container,
+            .coats-chart-full-width {
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+            .coats-chart-container canvas {
+                max-height: 380px !important;
+            }
+
+            /* Tighter typography for paper */
+            body {
+                font-size: 12px;
             }
         }
         `;
