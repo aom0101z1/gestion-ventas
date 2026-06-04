@@ -737,11 +737,25 @@ class CoatsReportsManager {
         const totalClassHoursPerGroup = Object.values(monthlyHours).reduce((a, b) => a + b, 0); // 110 hours per group
         const totalClassHoursDelivered = totalClassHoursPerGroup * groups.length; // 110 × 4 = 440 hours
 
+        // Count private students who are NOT already in any group (avoid double-counting Beatriz).
+        const groupStudentNames = new Set();
+        groups.forEach(g => g.students.forEach(s => {
+            if (s.status !== 'transferred') groupStudentNames.add(s.name.trim().toUpperCase());
+        }));
+        const privateStudents = (this.initializePrivateStudents && this.initializePrivateStudents()) || [];
+        const privateOnlyCount = privateStudents.filter(
+            p => !groupStudentNames.has(p.name.trim().toUpperCase())
+        ).length;
+        const totalPeople = totalStudents + privateOnlyCount;
+
         return {
             totalStudents,
             activeStudents,
             transferredStudents,
             inactiveStudents,
+            privateOnlyCount,
+            privateStudentsCount: privateStudents.length,
+            totalPeople,
             totalHours, // Student-hours (sum of all student attendance)
             totalClassHoursDelivered, // Class hours delivered (per group basis)
             totalClassHoursPerGroup,
@@ -1713,9 +1727,11 @@ class CoatsReportsManager {
                 <div class="coats-summary-grid">
                     <div class="coats-stat-card coats-stat-highlight">
                         <div class="stat-icon">👥</div>
-                        <div class="stat-value">${stats.totalStudents}</div>
+                        <div class="stat-value">${stats.totalPeople}</div>
                         <div class="stat-label">${this.t('totalStudents')}</div>
-                        <div class="stat-sub">${stats.activeStudents} ${this.language === 'es' ? 'activos' : 'active'}</div>
+                        <div class="stat-sub">${this.language === 'es'
+                            ? `${stats.totalStudents} en grupos + ${stats.privateOnlyCount} solo en privadas`
+                            : `${stats.totalStudents} in groups + ${stats.privateOnlyCount} only in private classes`}</div>
                     </div>
                     <div class="coats-stat-card coats-stat-primary">
                         <div class="stat-icon">🎓</div>
