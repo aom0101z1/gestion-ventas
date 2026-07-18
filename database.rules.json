@@ -2,10 +2,16 @@
   "rules": {
     "users": {
       ".read": "auth != null",
-      ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'director')",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || auth.token.email === 'admin@ciudadbilingue.com')",
       "$uid": {
-        ".read": "auth != null",
-        ".write": "$uid === auth.uid || root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'director'"
+        "profile": {
+          "lastLogin": {
+            ".write": "$uid === auth.uid"
+          }
+        },
+        "settings": {
+          ".write": "$uid === auth.uid"
+        }
       }
     },
     "contacts": {
@@ -14,15 +20,25 @@
     },
     "students": {
       ".read": "auth != null",
-      ".write": "auth != null"
+      "$studentId": {
+        ".write": "(auth != null && newData.exists()) || root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || auth.token.email === 'admin@ciudadbilingue.com'"
+      }
     },
     "payments": {
       ".read": "auth != null",
-      ".write": "auth != null"
+      "$paymentId": {
+        ".write": "(auth != null && !data.exists() && newData.exists()) || root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || auth.token.email === 'admin@ciudadbilingue.com'",
+        "invoiceNumber": {
+          ".write": "auth != null && !data.exists()"
+        },
+        "receiptNumber": {
+          ".write": "auth != null && !data.exists()"
+        }
+      }
     },
     "teachers": {
       ".read": "auth != null",
-      ".write": "auth != null"
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || auth.token.email === 'admin@ciudadbilingue.com')"
     },
     "attendance": {
       ".read": "auth != null",
@@ -42,35 +58,45 @@
     },
     "payroll": {
       ".read": "auth != null",
-      ".write": "auth != null"
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || auth.token.email === 'admin@ciudadbilingue.com')"
     },
     "employees": {
       ".read": "auth != null",
-      ".write": "auth != null"
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || auth.token.email === 'admin@ciudadbilingue.com')"
     },
     "products": {
       ".read": "auth != null",
-      ".write": "auth != null"
+      "$productId": {
+        ".write": "(auth != null && newData.exists()) || root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || auth.token.email === 'admin@ciudadbilingue.com'"
+      }
     },
     "invoices": {
       ".read": "auth != null",
-      ".write": "auth != null"
+      "$invoiceId": {
+        ".write": "(auth != null && !data.exists() && newData.exists()) || root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || auth.token.email === 'admin@ciudadbilingue.com'"
+      }
     },
     "cashDeliveries": {
       ".read": "auth != null",
-      ".write": "auth != null"
+      "$deliveryId": {
+        ".write": "(auth != null && !data.exists() && newData.exists() && newData.child('status').val() === 'pending') || root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || auth.token.email === 'admin@ciudadbilingue.com'"
+      }
     },
     "expenses": {
       ".read": "auth != null",
-      ".write": "auth != null"
+      "$expenseId": {
+        ".write": "(auth != null && !data.exists() && newData.exists()) || root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || auth.token.email === 'admin@ciudadbilingue.com'"
+      }
     },
     "comisiones": {
       ".read": "auth != null",
-      ".write": "auth != null"
+      "$comisionId": {
+        ".write": "(auth != null && newData.exists()) || root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || auth.token.email === 'admin@ciudadbilingue.com'"
+      }
     },
     "system": {
       ".read": "auth != null",
-      ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin')"
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || auth.token.email === 'admin@ciudadbilingue.com')"
     },
     "tasks": {
       ".read": "auth != null",
@@ -85,28 +111,39 @@
       ".write": "auth != null"
     },
     "auditLog": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || auth.token.email === 'admin@ciudadbilingue.com')",
+      "$entryId": {
+        ".write": "auth != null && !data.exists() && newData.exists()"
+      }
     },
     "invoiceCounters": {
       ".read": "auth != null",
-      ".write": "auth != null"
+      "$counterId": {
+        ".write": "auth != null",
+        ".validate": "newData.isNumber() && (!data.exists() || newData.val() > data.val())"
+      }
     },
     "permissions": {
       ".read": "auth != null",
-      ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin')"
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || auth.token.email === 'admin@ciudadbilingue.com')"
     },
     "dailyReconciliations": {
       ".read": "auth != null",
-      ".write": "auth != null"
+      "$date": {
+        ".write": "(auth != null && newData.exists()) || root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || auth.token.email === 'admin@ciudadbilingue.com'"
+      }
     },
     "otrosIngresos": {
       ".read": "auth != null",
-      ".write": "auth != null"
+      "$ingresoId": {
+        ".write": "(auth != null && !data.exists() && newData.exists()) || root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || auth.token.email === 'admin@ciudadbilingue.com'"
+      }
     },
     "sales": {
       ".read": "auth != null",
-      ".write": "auth != null"
+      "$saleId": {
+        ".write": "(auth != null && !data.exists() && newData.exists()) || root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || auth.token.email === 'admin@ciudadbilingue.com'"
+      }
     },
     "absences": {
       ".read": "auth != null",
@@ -126,11 +163,13 @@
     },
     "inventory-movements": {
       ".read": "auth != null",
-      ".write": "auth != null"
+      "$movementId": {
+        ".write": "(auth != null && !data.exists() && newData.exists()) || root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || auth.token.email === 'admin@ciudadbilingue.com'"
+      }
     },
     "paymentRates": {
       ".read": "auth != null",
-      ".write": "auth != null"
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || auth.token.email === 'admin@ciudadbilingue.com')"
     },
     "schedules": {
       ".read": "auth != null",
@@ -142,11 +181,52 @@
     },
     "teacherPayments": {
       ".read": "auth != null",
-      ".write": "auth != null"
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || auth.token.email === 'admin@ciudadbilingue.com')"
     },
     "voidedInvoices": {
       ".read": "auth != null",
+      "$invoiceId": {
+        ".write": "(!data.exists() && newData.exists()) && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || auth.token.email === 'admin@ciudadbilingue.com')"
+      }
+    },
+    "priceList": {
+      ".read": "auth != null",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || auth.token.email === 'admin@ciudadbilingue.com')"
+    },
+    "promotions": {
+      ".read": "auth != null",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || auth.token.email === 'admin@ciudadbilingue.com')"
+    },
+    "bookCatalog": {
+      ".read": "auth != null",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || auth.token.email === 'admin@ciudadbilingue.com')"
+    },
+    "studentBooks": {
+      ".read": "auth != null",
+      "$studentId": {
+        ".write": "(auth != null && newData.exists()) || root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || auth.token.email === 'admin@ciudadbilingue.com'"
+      }
+    },
+    "website-leads": {
+      ".read": "auth != null",
+      "$leadId": {
+        ".write": "(!data.exists() && newData.exists()) || auth != null"
+      }
+    },
+    "website-chats": {
+      ".read": "auth != null",
+      "$chatId": {
+        ".read": true,
+        ".write": true
+      }
+    },
+    "bot-config": {
+      ".read": true,
       ".write": "auth != null"
+    },
+    "admin-permissions": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.token.email === 'admin@ciudadbilingue.com'"
     }
   }
 }
