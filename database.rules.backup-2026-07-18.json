@@ -1,0 +1,168 @@
+{
+  "rules": {
+    "users": {
+      ".read": "auth != null",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'director')",
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "$uid === auth.uid || root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'director'"
+      }
+    },
+    "contacts": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "students": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "payments": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "teachers": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "attendance": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "grupos2": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "classProgress": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "classLocations": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "payroll": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "employees": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "products": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "invoices": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "cashDeliveries": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "expenses": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "comisiones": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "system": {
+      ".read": "auth != null",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin')"
+    },
+    "tasks": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "groups": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "sessions": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "auditLog": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "invoiceCounters": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "permissions": {
+      ".read": "auth != null",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin')"
+    },
+    "dailyReconciliations": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "otrosIngresos": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "sales": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "absences": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "coats": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "customers": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "holidays": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "inventory-movements": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "paymentRates": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "schedules": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "studentAttendanceHistory": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "teacherPayments": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "voidedInvoices": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "website-leads": {
+      ".read": "auth != null",
+      ".write": true
+    },
+    "website-chats": {
+      ".read": true,
+      ".write": true
+    },
+    "bot-config": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "admin-permissions": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.token.email === 'admin@ciudadbilingue.com'"
+    }
+  }
+}

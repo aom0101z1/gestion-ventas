@@ -143,7 +143,9 @@ class AdminCenterManager {
         profile: {
           email,
           name,
+          nombre: name,
           role: 'custom',
+          rol: 'custom',
           status: 'active',
           createdAt: new Date().toISOString(),
           createdBy: this.currentAdmin.email
@@ -1058,7 +1060,9 @@ async function handleEditUser(event, userId) {
   try {
     await window.AdminCenter.updateUser(userId, {
       'profile/name': newName,
+      'profile/nombre': newName,
       'profile/role': newRole,
+      'profile/rol': newRole,
       'profile/updatedAt': new Date().toISOString(),
       'profile/updatedBy': window.AdminCenter.currentAdmin.email
     });

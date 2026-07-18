@@ -1162,7 +1162,9 @@ window.createTeacherAccount = async function(teacherId) {
         const userRef = db.ref(window.FirebaseData.database, `users/${uid}/profile`);
         await db.set(userRef, {
             email: teacher.email,
+            name: teacher.name,
             nombre: teacher.name,
+            role: 'teacher',
             rol: 'teacher',
             teacherId: teacherId,
             createdAt: new Date().toISOString(),
