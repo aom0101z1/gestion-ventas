@@ -210,7 +210,7 @@
     "website-leads": {
       ".read": "auth != null",
       "$leadId": {
-        ".write": "!data.exists() && newData.exists()"
+        ".write": "(!data.exists() && newData.exists()) || auth != null"
       }
     },
     "website-chats": {
@@ -222,7 +222,7 @@
     },
     "bot-config": {
       ".read": true,
-      ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || auth.token.email === 'admin@ciudadbilingue.com')"
+      ".write": "auth != null"
     },
     "admin-permissions": {
       ".read": "auth != null",
