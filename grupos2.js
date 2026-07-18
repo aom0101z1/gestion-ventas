@@ -147,6 +147,9 @@ class GroupsManager2 {
     // Save group
     async saveGroup(groupData) {
         try {
+            // Capture previous book to detect curriculum advance (book ledger hook)
+            const previousBook = groupData.groupId ? this.groups.get(groupData.groupId)?.book : null;
+
             // If no ID, generate one
             if (!groupData.groupId) {
                 groupData.groupId = this.getNextGroupId(groupData.modality);
@@ -175,6 +178,12 @@ class GroupsManager2 {
             this.groups.set(groupData.groupId, groupData);
 
             console.log('✅ Group saved:', groupData.groupId, groupData.displayName);
+
+            // Book ledger: if the group's book advanced, mark it owed/included for its students
+            if (window.BookManager && previousBook != null && Number(groupData.book) !== Number(previousBook)) {
+                window.BookManager.onGroupBookAdvance(groupData, previousBook);
+            }
+
             return groupData;
         } catch (error) {
             console.error('❌ Error saving group:', error);

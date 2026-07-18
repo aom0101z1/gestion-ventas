@@ -2742,6 +2742,27 @@ function renderPaymentModal(student) {
                                     </select>
                                 </div>
 
+                                <!-- Libro (del catálogo oficial, precio bloqueado) -->
+                                <div>
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; min-width: 120px;">
+                                            <input type="checkbox" id="includeLibro" onchange="window.BookManager?.onBookToggle(); updatePaymentTotal()">
+                                            <span style="font-weight: 500;">📚 Libro</span>
+                                        </label>
+                                        <input type="number" id="libroAmount" value="0" min="0"
+                                               style="flex: 1; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; background: #f9fafb;"
+                                               placeholder="Precio oficial"
+                                               oninput="updatePaymentTotal()"
+                                               disabled readonly>
+                                    </div>
+                                    <select id="libroSelect" onchange="window.BookManager?.onBookSelected()"
+                                            style="display: none; width: 100%; margin-top: 4px; padding: 6px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                                    </select>
+                                    <select id="libroPromoSelect" onchange="window.BookManager?.onBookSelected()"
+                                            style="display: none; width: 100%; margin-top: 4px; padding: 6px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                                    </select>
+                                </div>
+
                                 <!-- Otro concepto -->
                                 <div style="display: flex; align-items: center; gap: 10px;">
                                     <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; min-width: 120px;">
@@ -3290,14 +3311,20 @@ window.updatePaymentTotal = function() {
         }
     }
 
+    // Libro (official catalog price, managed by BookManager)
+    const libroCheck = document.getElementById('includeLibro');
+    const libroInput = document.getElementById('libroAmount');
+    if (libroInput && !libroCheck?.checked) libroInput.value = 0;
+
     // Get additional amounts
     const matriculaAmount = matriculaCheck?.checked ? (parseFloat(matriculaInput?.value) || 0) : 0;
     const certificadoAmount = certificadoCheck?.checked ? (parseFloat(certificadoInput?.value) || 0) : 0;
     const otroAmount = otroCheck?.checked ? (parseFloat(otroAmountInput?.value) || 0) : 0;
     const otroConcepto = otroConceptoInput?.value || 'Otro';
+    const libroAmount = libroCheck?.checked ? (parseFloat(libroInput?.value) || 0) : 0;
 
     // Calculate total
-    const total = baseAmount + matriculaAmount + certificadoAmount + otroAmount;
+    const total = baseAmount + matriculaAmount + certificadoAmount + otroAmount + libroAmount;
 
     // Update hidden payAmount field
     const payAmountField = document.getElementById('payAmount');
@@ -3340,6 +3367,16 @@ window.updatePaymentTotal = function() {
                 <div style="display: flex; justify-content: space-between; padding: 4px 0; color: #166534;">
                     <span>+ ${otroConcepto}:</span>
                     <span>$${otroAmount.toLocaleString('es-CO')}</span>
+                </div>
+            `;
+        }
+
+        if (libroCheck?.checked) {
+            const libroName = document.getElementById('libroSelect')?.selectedOptions?.[0]?.textContent?.split(' - $')[0] || 'Libro';
+            html += `
+                <div style="display: flex; justify-content: space-between; padding: 4px 0; color: #166534;">
+                    <span>+ ${libroName}:</span>
+                    <span>$${libroAmount.toLocaleString('es-CO')}</span>
                 </div>
             `;
         }
@@ -3502,6 +3539,7 @@ window.loadPaymentsTab = async function() {
         await window.PaymentManager.init();
         await window.InvoiceStorage.init();
         if (window.PricingManager) await window.PricingManager.init();
+        if (window.BookManager) await window.BookManager.init();
 
         const students = window.StudentManager.getStudents();
         const summary = await window.PaymentManager.getPaymentSummary();
@@ -3523,9 +3561,15 @@ window.loadPaymentsTab = async function() {
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                             <h3 style="margin: 0;">🔍 Filtros Avanzados</h3>
                             <div style="display: flex; gap: 0.5rem;">
+                                <button onclick="window.BookManager?.showBooksReport()" class="btn btn-sm" style="background: #2563eb; color: white; padding: 0.5rem 1rem;">
+                                    📚 Libros
+                                </button>
                                 ${window.PricingManager?.isPricingAdmin() ? `
                                 <button onclick="window.PricingManager.showAdminModal()" class="btn btn-sm" style="background: #16a34a; color: white; padding: 0.5rem 1rem;">
                                     💲 Precios y Promos
+                                </button>
+                                <button onclick="window.BookManager?.showCatalogModal()" class="btn btn-sm" style="background: #7c3aed; color: white; padding: 0.5rem 1rem;">
+                                    📖 Catálogo
                                 </button>` : ''}
                                 <button onclick="showBulkSemesterPaymentModal()" class="btn btn-sm" style="background: #8b5cf6; color: white; padding: 0.5rem 1rem;">
                                     📅 Pago Semestre Masivo
@@ -4602,6 +4646,20 @@ async function processPayment(studentId) {
             pricingMeta = pricingResult.meta;
         }
 
+        // Validate book sale against official catalog (anti-fraud)
+        let bookItem = null;
+        if (window.BookManager && !isHourlyPayment) {
+            const bookResult = window.BookManager.validateBookItem();
+            if (!bookResult.ok) {
+                window.showNotification('❌ ' + bookResult.error, 'error');
+                return;
+            }
+            bookItem = bookResult.item;
+            if (bookItem && pricingMeta) {
+                pricingMeta.items.libro = bookItem;
+            }
+        }
+
         // Build line items array
         const lineItems = [];
 
@@ -4632,6 +4690,13 @@ async function processPayment(studentId) {
             lineItems.push({
                 concept: otroConcepto,
                 amount: otroAmount
+            });
+        }
+
+        if (bookItem && bookItem.charged > 0) {
+            lineItems.push({
+                concept: `Libro: ${bookItem.bookName}`,
+                amount: bookItem.charged
             });
         }
 
@@ -4731,7 +4796,8 @@ async function processPayment(studentId) {
                     matriculaAmount: paymentData.matriculaAmount,
                     certificadoAmount: paymentData.certificadoAmount,
                     otroConcepto: paymentData.otroConcepto,
-                    otroAmount: paymentData.otroAmount
+                    otroAmount: paymentData.otroAmount,
+                    pricing: paymentData.pricing
                 };
                 const transferPayment = await window.PaymentManager.recordPayment(studentId, transferPaymentData);
                 payments.push(transferPayment);
@@ -4771,7 +4837,8 @@ async function processPayment(studentId) {
                 matriculaAmount: paymentData.matriculaAmount,
                 certificadoAmount: paymentData.certificadoAmount,
                 otroConcepto: paymentData.otroConcepto,
-                otroAmount: paymentData.otroAmount
+                otroAmount: paymentData.otroAmount,
+                pricing: paymentData.pricing
             };
             const payment = await window.PaymentManager.recordPayment(studentId, singlePaymentData);
             const invoiceData = await InvoiceGenerator.generateInvoice(payment, student);
@@ -4785,9 +4852,20 @@ async function processPayment(studentId) {
             result.invoiceData = invoiceData;
         }
         
+        // Update the student's book ledger (anti-fraud Phase 3)
+        if (window.BookManager) {
+            const invoiceNumber = result?.invoiceData?.invoiceNumber || null;
+            if (bookItem) {
+                await window.BookManager.onBookPaid(studentId, bookItem, { invoiceNumber });
+            }
+            if (['academicSemester', 'twoSemesters', 'annual'].includes(paymentType)) {
+                await window.BookManager.onSemesterPaymentRecorded(studentId, { invoiceNumber });
+            }
+        }
+
         // Show success notification
         window.showNotification('✅ Pago registrado exitosamente', 'success');
-        
+
         // Close payment modal
         closePaymentModal();
         
