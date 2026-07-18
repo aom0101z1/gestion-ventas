@@ -191,15 +191,15 @@
     },
     "priceList": {
       ".read": "auth != null",
-      ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || auth.token.email === 'admin@ciudadbilingue.com')"
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || auth.token.email === 'admin@ciudadbilingue.com')"
     },
     "promotions": {
       ".read": "auth != null",
-      ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || auth.token.email === 'admin@ciudadbilingue.com')"
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || auth.token.email === 'admin@ciudadbilingue.com')"
     },
     "bookCatalog": {
       ".read": "auth != null",
-      ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || auth.token.email === 'admin@ciudadbilingue.com')"
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || auth.token.email === 'admin@ciudadbilingue.com')"
     },
     "studentBooks": {
       ".read": "auth != null",

@@ -242,7 +242,9 @@ async recordMultiMonthPayment(studentId, paymentData) {
                 paymentType: paymentData.paymentType, // 'semester', 'annual', etc
                 paymentPeriod: paymentData.paymentPeriod, // 'Semestre 1 2025', etc
                 installment: paymentData.installment || '1/1', // '1/3' for first of 3 payments
-                totalInstallments: paymentData.totalInstallments || 1
+                totalInstallments: paymentData.totalInstallments || 1,
+                // Official pricing metadata (listPrice vs charged, promo used)
+                pricing: paymentData.pricing || null
             };
 
             const db = window.firebaseModules.database;
@@ -329,7 +331,9 @@ async recordPayment(studentId, paymentData) {
             matriculaAmount: paymentData.matriculaAmount || 0,
             certificadoAmount: paymentData.certificadoAmount || 0,
             otroConcepto: paymentData.otroConcepto || '',
-            otroAmount: paymentData.otroAmount || 0
+            otroAmount: paymentData.otroAmount || 0,
+            // Official pricing metadata (listPrice vs charged, promo used)
+            pricing: paymentData.pricing || null
         };
 
         const db = window.firebaseModules.database;
@@ -2685,6 +2689,16 @@ function renderPaymentModal(student) {
                             <small id="amountHelp" style="color: #6b7280; display: block; margin-top: 5px;">
                                 Ingrese el monto total a pagar
                             </small>
+                            <small id="basePriceHint" style="color: #166534; display: block; margin-top: 3px;"></small>
+                            <div style="margin-top: 6px;">
+                                <select id="basePromoSelect" onchange="window.PricingManager?.applyBasePromo()" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                                    <option value="">Sin promoción</option>
+                                </select>
+                            </div>
+                            <label style="display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 0.875rem; color: #92400e; cursor: pointer;">
+                                <input type="checkbox" id="partialPaymentCheck">
+                                Abono / Pago parcial (el estudiante queda con saldo pendiente)
+                            </label>
                         </div>
 
                         <!-- Additional Items Section -->
@@ -2692,30 +2706,40 @@ function renderPaymentModal(student) {
                             <h4 style="margin: 0 0 1rem 0; color: #166534;">📦 Artículos Adicionales (Opcional)</h4>
 
                             <div style="display: flex; flex-direction: column; gap: 12px;">
-                                <!-- Matrícula -->
-                                <div style="display: flex; align-items: center; gap: 10px;">
-                                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; min-width: 120px;">
-                                        <input type="checkbox" id="includeMatricula" onchange="updatePaymentTotal()">
-                                        <span style="font-weight: 500;">Matrícula</span>
-                                    </label>
-                                    <input type="number" id="matriculaAmount" value="0" min="0"
-                                           style="flex: 1; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;"
-                                           placeholder="Valor matrícula"
-                                           oninput="updatePaymentTotal()"
-                                           disabled>
+                                <!-- Matrícula (precio oficial, solo modificable con promoción) -->
+                                <div>
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; min-width: 120px;">
+                                            <input type="checkbox" id="includeMatricula" onchange="window.PricingManager?.onItemToggle('matricula'); updatePaymentTotal()">
+                                            <span style="font-weight: 500;">Matrícula</span>
+                                        </label>
+                                        <input type="number" id="matriculaAmount" value="0" min="0"
+                                               style="flex: 1; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; background: #f9fafb;"
+                                               placeholder="Precio oficial"
+                                               oninput="updatePaymentTotal()"
+                                               disabled>
+                                    </div>
+                                    <select id="matriculaPromoSelect" onchange="window.PricingManager?.applyItemPromo('matricula')"
+                                            style="display: none; width: 100%; margin-top: 4px; padding: 6px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                                    </select>
                                 </div>
 
-                                <!-- Certificado -->
-                                <div style="display: flex; align-items: center; gap: 10px;">
-                                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; min-width: 120px;">
-                                        <input type="checkbox" id="includeCertificado" onchange="updatePaymentTotal()">
-                                        <span style="font-weight: 500;">Certificado</span>
-                                    </label>
-                                    <input type="number" id="certificadoAmount" value="0" min="0"
-                                           style="flex: 1; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;"
-                                           placeholder="Valor certificado"
-                                           oninput="updatePaymentTotal()"
-                                           disabled>
+                                <!-- Certificado (precio oficial, solo modificable con promoción) -->
+                                <div>
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; min-width: 120px;">
+                                            <input type="checkbox" id="includeCertificado" onchange="window.PricingManager?.onItemToggle('certificado'); updatePaymentTotal()">
+                                            <span style="font-weight: 500;">Certificado</span>
+                                        </label>
+                                        <input type="number" id="certificadoAmount" value="0" min="0"
+                                               style="flex: 1; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; background: #f9fafb;"
+                                               placeholder="Precio oficial"
+                                               oninput="updatePaymentTotal()"
+                                               disabled>
+                                    </div>
+                                    <select id="certificadoPromoSelect" onchange="window.PricingManager?.applyItemPromo('certificado')"
+                                            style="display: none; width: 100%; margin-top: 4px; padding: 6px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                                    </select>
                                 </div>
 
                                 <!-- Otro concepto -->
@@ -3169,17 +3193,23 @@ window.updateMonthSelection = function() {
 
     counter.textContent = `(${checkedBoxes.length} seleccionados)`;
 
-    // Show selected months count (no auto-fill - user enters amount manually)
+    // Show selected months count + auto-fill from official price (student.valor × months)
     if (checkedBoxes.length > 0) {
         const amountHelp = document.getElementById('amountHelp');
         if (amountHelp) {
             amountHelp.innerHTML = `${checkedBoxes.length} mes(es) seleccionado(s)`;
+        }
+        if (window.PricingManager?.loaded) {
+            window.PricingManager.populateBasePromoSelect();
+            window.PricingManager.autoFillBase(student, checkedBoxes.length);
         }
     } else {
         const amountHelp = document.getElementById('amountHelp');
         if (amountHelp) {
             amountHelp.innerHTML = `Ingrese el monto total a pagar`;
         }
+        const basePriceHint = document.getElementById('basePriceHint');
+        if (basePriceHint) basePriceHint.innerHTML = '';
     }
 
     // Update total calculation if the new UI is present
@@ -3471,6 +3501,7 @@ window.loadPaymentsTab = async function() {
         await window.StudentManager.init(); // Initialize StudentManager first!
         await window.PaymentManager.init();
         await window.InvoiceStorage.init();
+        if (window.PricingManager) await window.PricingManager.init();
 
         const students = window.StudentManager.getStudents();
         const summary = await window.PaymentManager.getPaymentSummary();
@@ -3492,6 +3523,10 @@ window.loadPaymentsTab = async function() {
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                             <h3 style="margin: 0;">🔍 Filtros Avanzados</h3>
                             <div style="display: flex; gap: 0.5rem;">
+                                ${window.PricingManager?.isPricingAdmin() ? `
+                                <button onclick="window.PricingManager.showAdminModal()" class="btn btn-sm" style="background: #16a34a; color: white; padding: 0.5rem 1rem;">
+                                    💲 Precios y Promos
+                                </button>` : ''}
                                 <button onclick="showBulkSemesterPaymentModal()" class="btn btn-sm" style="background: #8b5cf6; color: white; padding: 0.5rem 1rem;">
                                     📅 Pago Semestre Masivo
                                 </button>
@@ -4545,6 +4580,28 @@ async function processPayment(studentId) {
             ? (parseCurrencyValue(payAmountBaseField.value) || 0)  // Allow 0 as valid
             : totalAmount; // Only use totalAmount as fallback if field doesn't exist
 
+        // Validate against official price list + promotions (anti-fraud)
+        let pricingMeta = null;
+        if (window.PricingManager?.loaded && !isHourlyPayment) {
+            const pricingResult = window.PricingManager.buildPricingMeta({
+                student,
+                monthCount: selectedMonths.length,
+                baseAmount,
+                matriculaChecked: includeMatricula,
+                matriculaAmount,
+                certificadoChecked: includeCertificado,
+                certificadoAmount,
+                otroChecked: includeOtro,
+                otroConcepto,
+                otroAmount
+            });
+            if (!pricingResult.ok) {
+                window.showNotification('❌ ' + pricingResult.error, 'error');
+                return;
+            }
+            pricingMeta = pricingResult.meta;
+        }
+
         // Build line items array
         const lineItems = [];
 
@@ -4615,7 +4672,9 @@ async function processPayment(studentId) {
             isMixedPayment: paymentMethod === 'Mixto',
             mixedCashAmount: mixedCashAmount,
             mixedTransferAmount: mixedTransferAmount,
-            mixedBank: mixedBank
+            mixedBank: mixedBank,
+            // Official pricing metadata (listPrice vs charged, promos)
+            pricing: pricingMeta
         };
 
         // Add hourly payment data if applicable
