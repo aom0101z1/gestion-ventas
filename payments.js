@@ -163,22 +163,24 @@ getPaymentStatus(student) {
         return { color: '#60a5fa', status: '🏖️ Vacaciones', icon: '🏖️' };
     }
     
-    // Look for payment in the payments Map
-    const payment = Array.from(this.payments.values()).find(p => 
-        p.studentId === student.id && 
-        p.month?.toLowerCase() === monthName.toLowerCase() && 
-        p.year === currentYear
+    // Look for payments in the payments Map. There can be several records in
+    // one month (abono + completion, mixed cash+transfer pairs) — sum them.
+    const monthPayments = Array.from(this.payments.values()).filter(p =>
+        p.studentId === student.id &&
+        p.month?.toLowerCase() === monthName.toLowerCase() &&
+        p.year === currentYear &&
+        p.status !== 'cancelled'
     );
-    
-    // If payment exists for this month, check if it's full or partial
-    // Use the tuition portion (baseAmount) when available so that payments
+
+    // Tuition portion only: use baseAmount when available so that payments
     // that were only for books/matrícula don't count toward the mensualidad
-    if (payment && (payment.baseAmount === undefined || Number(payment.baseAmount) > 0)) {
+    const tuitionPaid = monthPayments.reduce((sum, p) =>
+        sum + (p.baseAmount !== undefined ? (Number(p.baseAmount) || 0) : (Number(p.amount) || 0)), 0);
+
+    if (tuitionPaid > 0) {
         // Convert to numbers to ensure proper comparison
         const expectedAmount = Number(student.valor) || 0;
-        const paidAmount = payment.baseAmount !== undefined
-            ? (Number(payment.baseAmount) || 0)
-            : (Number(payment.amount) || 0);
+        const paidAmount = tuitionPaid;
 
         console.log(`🔍 Checking payment for ${student.nombre}: Expected: $${expectedAmount}, Paid: $${paidAmount}`);
 
