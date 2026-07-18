@@ -171,10 +171,14 @@ getPaymentStatus(student) {
     );
     
     // If payment exists for this month, check if it's full or partial
-    if (payment) {
+    // Use the tuition portion (baseAmount) when available so that payments
+    // that were only for books/matrícula don't count toward the mensualidad
+    if (payment && (payment.baseAmount === undefined || Number(payment.baseAmount) > 0)) {
         // Convert to numbers to ensure proper comparison
         const expectedAmount = Number(student.valor) || 0;
-        const paidAmount = Number(payment.amount) || 0;
+        const paidAmount = payment.baseAmount !== undefined
+            ? (Number(payment.baseAmount) || 0)
+            : (Number(payment.amount) || 0);
 
         console.log(`🔍 Checking payment for ${student.nombre}: Expected: $${expectedAmount}, Paid: $${paidAmount}`);
 
@@ -2685,9 +2689,9 @@ function renderPaymentModal(student) {
                     ${(student.tipoPago !== 'POR_HORAS' && student.modalidad !== 'Privadas') ? `
                         <div class="form-group">
                             <label>Monto a pagar</label>
-                            <input type="text" id="payAmountBase" inputmode="numeric" value="" required onchange="updatePaymentTotal()" oninput="formatCurrencyInput(this); updatePaymentTotal()" placeholder="$0" style="font-size: 1.1rem; font-weight: 600;">
+                            <input type="text" id="payAmountBase" inputmode="numeric" value="" onchange="updatePaymentTotal()" oninput="formatCurrencyInput(this); updatePaymentTotal()" placeholder="$0" style="font-size: 1.1rem; font-weight: 600;">
                             <small id="amountHelp" style="color: #6b7280; display: block; margin-top: 5px;">
-                                Ingrese el monto total a pagar
+                                Ingrese el monto de mensualidad (déjelo vacío si solo vende artículos/libros)
                             </small>
                             <small id="basePriceHint" style="color: #166534; display: block; margin-top: 3px;"></small>
                             <div style="margin-top: 6px;">
@@ -4526,14 +4530,31 @@ async function processPayment(studentId) {
                 }));
 
             if (selectedMonths.length === 0) {
-                if (paymentType === 'twoSemesters') {
+                // Items-only sale (book/matrícula/certificado, no tuition):
+                // no month needed — register against the current month with base 0
+                const itemsChecked = ['includeMatricula', 'includeCertificado', 'includeOtro', 'includeLibro']
+                    .some(id => document.getElementById(id)?.checked);
+                const baseEmpty = (parseCurrencyValue(document.getElementById('payAmountBase')?.value) || 0) === 0;
+
+                if (itemsChecked && baseEmpty && paymentType === 'monthly') {
+                    const now = new Date();
+                    const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+                                      'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+                    selectedMonths = [{
+                        month: monthNames[now.getMonth()],
+                        year: now.getFullYear(),
+                        monthIndex: now.getMonth()
+                    }];
+                } else if (paymentType === 'twoSemesters') {
                     window.showNotification('❌ Por favor seleccione un año para los 2 semestres', 'error');
+                    return;
                 } else if (paymentType === 'academicSemester') {
                     window.showNotification('❌ Por favor seleccione un semestre académico', 'error');
+                    return;
                 } else {
-                    window.showNotification('❌ Por favor seleccione al menos un mes', 'error');
+                    window.showNotification('❌ Por favor seleccione al menos un mes (o marque solo artículos/libro sin monto de mensualidad)', 'error');
+                    return;
                 }
-                return;
             }
         } else {
             // For hourly payments, use current month

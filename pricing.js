@@ -205,9 +205,10 @@ class PricingManagerClass {
                 partial: false
             };
             if (baseAmount < required) {
+                const libroChecked = document.getElementById('includeLibro')?.checked || false;
                 if (partialCheck?.checked) {
                     meta.base.partial = true;
-                } else if (baseAmount > 0 || (!matriculaChecked && !certificadoChecked && !otroChecked)) {
+                } else if (baseAmount > 0 || (!matriculaChecked && !certificadoChecked && !otroChecked && !libroChecked)) {
                     const promoTxt = basePromo ? ` (con ${basePromo.name})` : '';
                     return {
                         ok: false,
