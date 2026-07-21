@@ -3210,9 +3210,26 @@ window.handlePaymentTypeChange = function() {
 
 // Update month selection counter
 window.updateMonthSelection = function() {
+    const paymentType = document.getElementById('paymentType').value;
+
+    // ANTI-FRAUD: for a MENSUAL payment, reject a future month the instant it is
+    // ticked (advance plans trimester/semester/annual may span future months).
+    if (paymentType === 'monthly') {
+        const todayStr = (window.getTodayInColombia && window.getTodayInColombia()) || new Date().toISOString().split('T')[0];
+        const [cy, cm] = todayStr.split('-').map(Number);
+        const curAbs = cy * 12 + (cm - 1);
+        let removedFuture = false;
+        document.querySelectorAll('.month-checkbox:checked').forEach(cb => {
+            const y = parseInt(cb.dataset.year), mi = parseInt(cb.dataset.monthIndex);
+            if (y * 12 + mi > curAbs) { cb.checked = false; removedFuture = true; }
+        });
+        if (removedFuture) {
+            window.showNotification('🚫 No se pueden seleccionar meses futuros en pago Mensual. Para pagos adelantados use Trimestre, Semestre o Anual.', 'error');
+        }
+    }
+
     const checkedBoxes = document.querySelectorAll('.month-checkbox:checked');
     const counter = document.getElementById('monthCounter');
-    const paymentType = document.getElementById('paymentType').value;
     const student = window.StudentManager.students.get(window.currentStudentId);
 
     // Use payAmountBase if it exists (new UI), otherwise payAmount (legacy)
