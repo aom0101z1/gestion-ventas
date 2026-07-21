@@ -602,12 +602,13 @@ function renderStudentForm(student = null) {
 
                     <div class="form-group" id="valorMensualGroup" style="display: ${!student || student?.tipoPago !== 'POR_HORAS' ? 'block' : 'none'};">
                         <label>Valor Mensualidad ($)</label>
-                        <input type="number" id="stuValor" value="${student?.valor || ''}" min="0" placeholder="Valor mensual">
+                        <input type="number" id="stuValor" value="${student?.valor || ''}" min="0" placeholder="Valor mensual" ${isEdit && !window.isStudentMoneyAdmin() ? 'readonly style="background:#f3f4f6;"' : ''}>
+                        ${isEdit && !window.isStudentMoneyAdmin() ? '<small style="color:#92400e;">Solo el Director puede cambiar el valor de un estudiante ya registrado.</small>' : ''}
                     </div>
 
                     <div class="form-group" id="valorHoraGroup" style="display: ${student?.tipoPago === 'POR_HORAS' ? 'block' : 'none'};">
                         <label>Valor / Hora ($)</label>
-                        <input type="number" id="stuValorHora" value="${student?.valorHora || ''}" min="0" placeholder="Valor por hora" step="0.01">
+                        <input type="number" id="stuValorHora" value="${student?.valorHora || ''}" min="0" placeholder="Valor por hora" step="0.01" ${isEdit && !window.isStudentMoneyAdmin() ? 'readonly style="background:#f3f4f6;"' : ''}>
                     </div>
 
                     ${!isEdit ? `
@@ -1023,10 +1024,21 @@ window.cancelStudentForm = function() {
 };
 
 // UPDATED: Toggle student status - Now appends to studentsContainer
+// Only Director / admin / super-admin may change a student's active status
+window.isStudentMoneyAdmin = function() {
+    const email = window.FirebaseData?.currentUser?.email;
+    return email === 'admin@ciudadbilingue.com' || window.userRole === 'admin' || window.userRole === 'director';
+};
+
 window.toggleStatus = async function(id) {
     const student = window.StudentManager.students.get(id);
     if (!student) return;
-    
+
+    if (!window.isStudentMoneyAdmin()) {
+        window.showNotification('🚫 Solo el Director puede activar o inactivar estudiantes.', 'error');
+        return;
+    }
+
     if (student.status === 'active') {
         // Show modal for inactive details - FIXED: Append to studentsContainer
         const container = document.getElementById('studentsContainer');
@@ -1071,7 +1083,12 @@ window.closeInactiveModal = function() {
 window.openPaymentNotes = async function(id) {
     const student = window.StudentManager.students.get(id);
     if (!student) return;
-    
+
+    if (!window.isStudentMoneyAdmin()) {
+        window.showNotification('🚫 Solo el Director puede cambiar el valor / acuerdo de pago de un estudiante.', 'error');
+        return;
+    }
+
     // FIXED: Append to studentsContainer instead of body
     const container = document.getElementById('studentsContainer');
     const existingModal = document.getElementById('paymentNotesModal');

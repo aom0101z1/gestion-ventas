@@ -3285,6 +3285,78 @@ window.parseCurrencyValue = function(value) {
     return parseFloat(String(value).replace(/[^0-9]/g, '')) || 0;
 };
 
+// Is a given month/year already covered by a non-cancelled tuition payment?
+// (any tuition amount counts as "started" so partial abonos don't read as skipped)
+window.isMonthTuitionCovered = function(studentId, monthName, year) {
+    if (!window.PaymentManager?.payments) return false;
+    const pm = Array.from(window.PaymentManager.payments.values()).filter(p =>
+        p.studentId === studentId &&
+        p.month?.toLowerCase() === String(monthName).toLowerCase() &&
+        Number(p.year) === Number(year) &&
+        p.status !== 'cancelled');
+    if (pm.length === 0) return false;
+    const tuition = pm.reduce((s, p) =>
+        s + (p.baseAmount !== undefined ? (Number(p.baseAmount) || 0) : (Number(p.amount) || 0)), 0);
+    return tuition > 0;
+};
+
+// Anti-fraud: block future-month and skip-month monthly payments.
+// Returns { ok:true } or { ok:false, type, error, context } for the alert.
+// Advance packages (trimester/academicSemester/annual/twoSemesters) are exempt —
+// they legitimately span future months.
+window.validateMonthlyPaymentOrder = function(studentId, student, selectedMonths, paymentType) {
+    if (paymentType !== 'monthly') return { ok: true };
+    if (!selectedMonths || selectedMonths.length === 0) return { ok: true };
+
+    const monthNames = ['enero','febrero','marzo','abril','mayo','junio',
+                        'julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    const todayStr = (window.getTodayInColombia && window.getTodayInColombia()) || new Date().toISOString().split('T')[0];
+    const [cy, cm] = todayStr.split('-').map(Number);
+    const curAbs = cy * 12 + (cm - 1);
+    const abs = (year, mi) => year * 12 + mi;
+
+    // 1) Future-month block
+    for (const m of selectedMonths) {
+        if (abs(m.year, m.monthIndex) > curAbs) {
+            return {
+                ok: false,
+                type: 'future-month',
+                error: `No se puede registrar un pago MENSUAL de ${m.month} ${m.year} porque es un mes futuro. Para pagos adelantados use un plan Trimestre, Semestre o Anual.`,
+                context: { studentId, studentName: student?.nombre, attemptedMonth: m.month, attemptedYear: m.year }
+            };
+        }
+    }
+
+    // 2) Skip-month block: the earliest month being paid must not jump over an
+    // earlier, fully-unpaid, non-holiday month (within a 12-month lookback,
+    // not before the student's start date).
+    const selAbs = selectedMonths.map(m => abs(m.year, m.monthIndex)).sort((a, b) => a - b);
+    const earliestSel = selAbs[0];
+
+    let startAbs = null;
+    if (student?.fechaInicio) {
+        const d = new Date(student.fechaInicio);
+        if (!isNaN(d.getTime())) startAbs = abs(d.getFullYear(), d.getMonth());
+    }
+    const from = Math.max(startAbs != null ? startAbs : (curAbs - 11), curAbs - 11);
+
+    for (let a = from; a < earliestSel && a <= curAbs; a++) {
+        const y = Math.floor(a / 12), mi = a % 12;
+        const mName = monthNames[mi];
+        if (window.PaymentConfig?.isHoliday && window.PaymentConfig.isHoliday(y, mName)) continue;
+        if (!window.isMonthTuitionCovered(studentId, mName, y)) {
+            const selName = monthNames[earliestSel % 12], selYear = Math.floor(earliestSel / 12);
+            return {
+                ok: false,
+                type: 'skip-month',
+                error: `No se puede pagar ${selName} ${selYear} porque ${mName} ${y} está PENDIENTE. Debe pagarse primero el mes más atrasado.`,
+                context: { studentId, studentName: student?.nombre, attemptedMonth: selName, attemptedYear: selYear, pendingMonth: `${mName} ${y}` }
+            };
+        }
+    }
+    return { ok: true };
+};
+
 // Update payment total with additional items (Matrícula, Certificado, etc.)
 window.updatePaymentTotal = function() {
     // Get base amount (parse formatted currency)
@@ -3546,6 +3618,7 @@ window.loadPaymentsTab = async function() {
         await window.InvoiceStorage.init();
         if (window.PricingManager) await window.PricingManager.init();
         if (window.BookManager) await window.BookManager.init();
+        if (window.SecurityAlertsManager?.isAlertsAdmin()) setTimeout(() => window.SecurityAlertsManager.refreshBadge(), 800);
 
         const students = window.StudentManager.getStudents();
         const summary = await window.PaymentManager.getPaymentSummary();
@@ -3567,6 +3640,10 @@ window.loadPaymentsTab = async function() {
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                             <h3 style="margin: 0;">🔍 Filtros Avanzados</h3>
                             <div style="display: flex; gap: 0.5rem;">
+                                ${window.SecurityAlertsManager?.isAlertsAdmin() ? `
+                                <button id="securityAlertsBtn" onclick="window.SecurityAlertsManager.showPanel()" class="btn btn-sm" style="background: #6b7280; color: white; padding: 0.5rem 1rem;">
+                                    🚨 Alertas
+                                </button>` : ''}
                                 <button onclick="window.BookManager?.showBooksReport()" class="btn btn-sm" style="background: #2563eb; color: white; padding: 0.5rem 1rem;">
                                     📚 Libros
                                 </button>
@@ -4568,6 +4645,18 @@ async function processPayment(studentId) {
                 year: now.getFullYear(),
                 monthIndex: now.getMonth()
             }];
+        }
+
+        // ANTI-FRAUD: block future-month / skip-month monthly payments and alert the owner
+        if (!isHourlyPayment) {
+            const orderCheck = window.validateMonthlyPaymentOrder(studentId, student, selectedMonths, paymentType);
+            if (!orderCheck.ok) {
+                window.showNotification('🚫 ' + orderCheck.error, 'error');
+                if (typeof window.logSecurityAlert === 'function') {
+                    window.logSecurityAlert(orderCheck.type, orderCheck.error, orderCheck.context);
+                }
+                return;
+            }
         }
 
         // Validate payment amount
