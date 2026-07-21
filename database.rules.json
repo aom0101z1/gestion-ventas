@@ -235,6 +235,16 @@
       "$alertId": {
         ".write": "root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || auth.token.email === 'admin@ciudadbilingue.com' || (auth != null && !data.exists() && newData.exists())"
       }
+    },
+    "bookMovements": {
+      ".read": "auth != null",
+      "$movementId": {
+        ".write": "(auth != null && !data.exists() && newData.exists()) || root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || auth.token.email === 'admin@ciudadbilingue.com'"
+      }
+    },
+    "bookLoans": {
+      ".read": "auth != null",
+      ".write": "auth != null"
     }
   }
 }

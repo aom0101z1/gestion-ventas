@@ -70,6 +70,89 @@ class BookManagerClass {
         return book.name || `${BOOK_LANGUAGES[book.language] || book.language} - Libro ${book.number}`;
     }
 
+    // ============ ENTITLEMENT POLICY (by student plan) ============
+    // Business rules (confirmed):
+    // - Semester / Annual plan  -> all books INCLUDED (free)
+    // - Monthly plan            -> Book 1 free, Books 2..10 owed as reached
+    // - Trimester / other       -> pay per book (all owed as reached)
+    planBooksPolicy(student) {
+        const t = String(student?.tipoPago || '').toUpperCase();
+        if (t.includes('SEMEST') || t.includes('ANU')) return 'included';
+        if (t === 'MENSUAL') return 'monthly';
+        return 'perbook';
+    }
+
+    // Desired ledger status for a given book number under the student's plan
+    desiredStatus(student, bookNumber) {
+        const policy = this.planBooksPolicy(student);
+        if (policy === 'included') return { status: 'included', extra: { includedBy: 'plan' } };
+        if (policy === 'monthly' && Number(bookNumber) === 1) {
+            return { status: 'promo', extra: { promoName: 'Primer libro gratis (mensual)', promoId: null, charged: 0 } };
+        }
+        return { status: 'owed', extra: {} };
+    }
+
+    // Find the student's current book number from their group (English catalog v1)
+    findStudentCurrentBook(studentId) {
+        if (!window.GroupsManager2?.groups) return null;
+        for (const group of window.GroupsManager2.groups.values()) {
+            if (group.studentIds?.includes(studentId)) {
+                const n = Number(group.book);
+                return n > 0 ? n : null;
+            }
+        }
+        return null;
+    }
+
+    // Recompute a single student's ledger for every book up to their current one.
+    // Never downgrades an already-resolved (paid/promo/included/waived) entry.
+    async initializeStudentLedger(studentId) {
+        const student = window.StudentManager?.students.get(studentId);
+        if (!student) return { created: 0 };
+        const currentBook = this.findStudentCurrentBook(studentId);
+        if (!currentBook) return { created: 0 };
+        if (!this.loaded) await this.init();
+
+        let created = 0;
+        const upper = this.planBooksPolicy(student) === 'included' ? currentBook : currentBook;
+        for (let n = 1; n <= upper; n++) {
+            const bookId = `english-${n}`;
+            if (!this.getBook(bookId)) continue;
+            const { status, extra } = this.desiredStatus(student, n);
+            const result = await this.setBookStatus(studentId, bookId, status, { reason: 'recalc', ...extra });
+            if (!result.skipped) created++;
+        }
+        return { created };
+    }
+
+    // Bulk recompute for every student that belongs to a group. Admin/director only.
+    async recalcAllLedgers() {
+        if (!this.isBooksAdmin()) {
+            window.showNotification('🚫 Solo administración puede recalcular libros', 'error');
+            return;
+        }
+        if (!confirm('¿Recalcular los libros de TODOS los estudiantes según su plan y el libro actual de su grupo?\n\nEsto NO cambia libros ya pagados/incluidos. Marca como adeudados los libros que los estudiantes mensuales/trimestrales ya alcanzaron y no han pagado.')) return;
+
+        try { await window.StudentManager?.init(); await window.PaymentManager?.init(); } catch (e) {}
+        if (!this.loaded) await this.init();
+
+        const students = window.StudentManager?.getStudents?.() || [];
+        let touched = 0, entries = 0;
+        for (const s of students) {
+            const id = s.id || s.studentId;
+            if (!id) continue;
+            const r = await this.initializeStudentLedger(id);
+            if (r.created > 0) { touched++; entries += r.created; }
+        }
+
+        if (typeof window.logAudit === 'function') {
+            await window.logAudit('Recálculo de libros', 'books', 'bulk',
+                `${entries} entradas creadas/actualizadas en ${touched} estudiantes`, { after: { touched, entries } });
+        }
+        window.showNotification(`✅ Libros recalculados: ${entries} entradas en ${touched} estudiantes`, 'success');
+        this.showBooksReport();
+    }
+
     // ============ STUDENT LEDGER ============
 
     async getStudentBooks(studentId) {
@@ -148,26 +231,36 @@ class BookManagerClass {
                 return;
             }
 
-            // Ensure payments are available for semester-coverage checks
-            try { await window.PaymentManager?.init(); } catch (e) { /* coverage check degrades gracefully */ }
+            try { await window.StudentManager?.init(); } catch (e) {}
 
-            let owedCount = 0, includedCount = 0;
+            // Plan-driven: each student in the group gets the reached book set
+            // according to THEIR plan (semester/annual=included, monthly book1=free,
+            // otherwise owed). Included-plan students also get earlier books filled.
+            let owedCount = 0, includedCount = 0, freeCount = 0;
             for (const studentId of groupData.studentIds) {
-                const covered = this.hasSemesterCoverage(studentId);
-                const result = await this.setBookStatus(studentId, bookId, covered ? 'included' : 'owed', {
-                    reason: 'group-advance',
-                    groupId: groupData.groupId,
-                    ...(covered ? { includedBy: 'semester-coverage' } : {})
-                });
-                if (!result.skipped) covered ? includedCount++ : owedCount++;
+                const student = window.StudentManager?.students.get(studentId);
+                if (!student) continue;
+                const policy = this.planBooksPolicy(student);
+
+                if (policy === 'included') {
+                    for (let n = 1; n <= newBook; n++) {
+                        if (!this.getBook(`english-${n}`)) continue;
+                        const r = await this.setBookStatus(studentId, `english-${n}`, 'included', { reason: 'group-advance', includedBy: 'plan', groupId: groupData.groupId });
+                        if (!r.skipped) includedCount++;
+                    }
+                } else {
+                    const { status, extra } = this.desiredStatus(student, newBook);
+                    const r = await this.setBookStatus(studentId, bookId, status, { reason: 'group-advance', groupId: groupData.groupId, ...extra });
+                    if (!r.skipped) { status === 'promo' ? freeCount++ : owedCount++; }
+                }
             }
 
             if (typeof window.logAudit === 'function') {
                 await window.logAudit('Libros asignados por avance de grupo', 'books', String(groupData.groupId),
-                    `Grupo ${groupData.displayName || groupData.groupId} avanzó a ${this.bookLabel(book)}: ${owedCount} adeudado(s), ${includedCount} incluido(s)`,
-                    { after: { libro: bookId, adeudados: owedCount, incluidos: includedCount } });
+                    `Grupo ${groupData.displayName || groupData.groupId} avanzó a ${this.bookLabel(book)}: ${owedCount} adeudado(s), ${freeCount} gratis, ${includedCount} incluido(s)`,
+                    { after: { libro: bookId, adeudados: owedCount, gratis: freeCount, incluidos: includedCount } });
             }
-            console.log(`📚 Group advance: ${bookId} → ${owedCount} owed, ${includedCount} included`);
+            console.log(`📚 Group advance: ${bookId} → ${owedCount} owed, ${freeCount} free, ${includedCount} included`);
         } catch (error) {
             // Never break group saving because of the book ledger
             console.error('❌ Error in onGroupBookAdvance:', error);
@@ -295,39 +388,31 @@ class BookManagerClass {
         }
     }
 
-    // Called after a semester/annual payment: mark the group's current book as included
+    // Called after a semester/annual payment: mark ALL books reached so far as
+    // included (books are free for these plans; delivered as the class progresses).
     async onSemesterPaymentRecorded(studentId, referenceInfo = {}) {
         try {
             if (!this.loaded) await this.init();
             const student = window.StudentManager?.students.get(studentId);
             if (!student) return;
 
-            // Find the student's group and its current book
-            let currentBook = null, groupId = null;
-            if (window.GroupsManager2?.groups) {
-                for (const group of window.GroupsManager2.groups.values()) {
-                    if (group.studentIds?.includes(studentId)) {
-                        currentBook = Number(group.book) || null;
-                        groupId = group.groupId;
-                        break;
-                    }
-                }
-            }
+            const currentBook = this.findStudentCurrentBook(studentId);
             if (!currentBook) return;
 
-            const bookId = `english-${currentBook}`;
-            if (!this.getBook(bookId)) return;
+            let marked = 0;
+            for (let n = 1; n <= currentBook; n++) {
+                if (!this.getBook(`english-${n}`)) continue;
+                const result = await this.setBookStatus(studentId, `english-${n}`, 'included', {
+                    reason: 'semester-payment',
+                    includedBy: 'semester-payment',
+                    invoiceNumber: referenceInfo.invoiceNumber || null
+                });
+                if (!result.skipped) marked++;
+            }
 
-            const result = await this.setBookStatus(studentId, bookId, 'included', {
-                reason: 'semester-payment',
-                includedBy: 'semester-payment',
-                invoiceNumber: referenceInfo.invoiceNumber || null,
-                groupId
-            });
-
-            if (!result.skipped && typeof window.logAudit === 'function') {
-                await window.logAudit('Libro incluido por pago de semestre', 'books', `${studentId}/${bookId}`,
-                    `${student.nombre} - libro incluido con pago de semestre`, { after: { bookId } });
+            if (marked > 0 && typeof window.logAudit === 'function') {
+                await window.logAudit('Libros incluidos por pago de semestre/anual', 'books', studentId,
+                    `${student.nombre} - ${marked} libro(s) incluido(s)`, { after: { marked } });
             }
         } catch (error) {
             console.error('❌ Error marking semester book included:', error);
@@ -393,7 +478,12 @@ class BookManagerClass {
                 <div style="background: white; border-radius: 12px; max-width: 860px; width: 100%; max-height: 90vh; overflow-y: auto; padding: 1.5rem;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                         <h3 style="margin: 0;">📚 Control de Libros</h3>
-                        <button onclick="document.getElementById('booksReportModal').remove()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">✕</button>
+                        <div style="display:flex;gap:0.5rem;align-items:center;">
+                            <button onclick="window.BookManager.showInventoryReport()" class="btn btn-sm" style="background:#16a34a;color:white;padding:0.4rem 0.8rem;">📦 Inventario</button>
+                            <button onclick="window.BookManager.showLoansPanel()" class="btn btn-sm" style="background:#0891b2;color:white;padding:0.4rem 0.8rem;">📕 Préstamos</button>
+                            ${this.isBooksAdmin() ? `<button onclick="window.BookManager.recalcAllLedgers()" class="btn btn-sm" style="background:#7c3aed;color:white;padding:0.4rem 0.8rem;">🔄 Recalcular</button>` : ''}
+                            <button onclick="document.getElementById('booksReportModal').remove()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">✕</button>
+                        </div>
                     </div>
                     <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
                         <div style="background: #fee2e2; border-radius: 8px; padding: 0.75rem 1rem;">
@@ -567,16 +657,20 @@ class BookManagerClass {
                 <td style="padding: 6px;">${BOOK_LANGUAGES[b.language] || b.language}</td>
                 <td style="padding: 6px;">
                     <input type="number" id="bookPrice_${b.id}" value="${b.price || 0}" min="0"
-                           style="width: 110px; padding: 4px; border: 1px solid #d1d5db; border-radius: 4px;">
+                           style="width: 100px; padding: 4px; border: 1px solid #d1d5db; border-radius: 4px;">
+                    <button onclick="window.BookManager.updateBookPrice('${b.id}')" class="btn btn-sm" style="background: #16a34a; color: white; padding: 2px 6px; font-size: 0.7rem;">💾</button>
                 </td>
+                <td style="padding: 6px; text-align:center; font-weight:600; ${Number(b.stock) < 0 ? 'color:#b91c1c;' : ''}">${Number(b.stock) || 0}</td>
                 <td style="padding: 6px;">
-                    <button onclick="window.BookManager.updateBookPrice('${b.id}')" class="btn btn-sm" style="background: #16a34a; color: white; padding: 2px 8px; font-size: 0.7rem;">💾</button>
-                    <button onclick="window.BookManager.toggleBookActive('${b.id}')" class="btn btn-sm" style="background: ${b.active === false ? '#10b981' : '#ef4444'}; color: white; padding: 2px 8px; font-size: 0.7rem;">
-                        ${b.active === false ? 'Activar' : 'Desactivar'}
+                    <input type="number" id="bookReceive_${b.id}" min="1" placeholder="+cant"
+                           style="width: 70px; padding: 4px; border: 1px solid #d1d5db; border-radius: 4px;">
+                    <button onclick="window.BookManager.receiveStock('${b.id}')" class="btn btn-sm" style="background: #2563eb; color: white; padding: 2px 6px; font-size: 0.7rem;">📥 Ingresar</button>
+                    <button onclick="window.BookManager.toggleBookActive('${b.id}')" class="btn btn-sm" style="background: ${b.active === false ? '#10b981' : '#ef4444'}; color: white; padding: 2px 6px; font-size: 0.7rem;">
+                        ${b.active === false ? 'Activar' : 'Off'}
                     </button>
                 </td>
             </tr>
-        `).join('') || '<tr><td colspan="4" style="padding: 12px; text-align: center; color: #6b7280;">Catálogo vacío</td></tr>';
+        `).join('') || '<tr><td colspan="5" style="padding: 12px; text-align: center; color: #6b7280;">Catálogo vacío</td></tr>';
 
         const html = `
             <div id="bookCatalogModal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 1rem;">
@@ -611,7 +705,8 @@ class BookManagerClass {
                                     <th style="padding: 6px;">Libro</th>
                                     <th style="padding: 6px;">Idioma</th>
                                     <th style="padding: 6px;">Precio</th>
-                                    <th style="padding: 6px;"></th>
+                                    <th style="padding: 6px; text-align:center;">Stock</th>
+                                    <th style="padding: 6px;">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody>${rows}</tbody>
@@ -643,6 +738,7 @@ class BookManagerClass {
                     number: n,
                     name: `${BOOK_LANGUAGES[language]} - Libro ${n}`,
                     price,
+                    stock: 0,
                     active: true,
                     createdAt: new Date().toISOString(),
                     createdBy: window.FirebaseData?.currentUser?.email || 'unknown'
@@ -714,6 +810,230 @@ class BookManagerClass {
             this.showCatalogModal();
         } catch (error) {
             console.error('❌ Error toggling book:', error);
+        }
+    }
+
+    // ============ PHYSICAL STOCK ============
+
+    // Receive printed copies into stock (admin/director)
+    async receiveStock(bookId) {
+        if (!this.isBooksAdmin()) return;
+        const qty = parseInt(document.getElementById(`bookReceive_${bookId}`)?.value) || 0;
+        if (qty <= 0) { window.showNotification('⚠️ Cantidad inválida', 'warning'); return; }
+        try {
+            const db = window.firebaseModules.database;
+            const book = this.catalog.get(bookId);
+            const newStock = (Number(book?.stock) || 0) + qty;
+            await db.update(db.ref(window.FirebaseData.database, `bookCatalog/books/${bookId}`), {
+                stock: newStock, updatedAt: new Date().toISOString(), updatedBy: window.FirebaseData?.currentUser?.email || 'unknown'
+            });
+            if (book) book.stock = newStock;
+            await this.recordMovement(bookId, 'receive', qty, `Ingreso de ${qty} copias`);
+            window.showNotification(`✅ +${qty} en stock (${this.bookLabel(book)})`, 'success');
+            this.showCatalogModal();
+        } catch (error) {
+            console.error('❌ Error receiving stock:', error);
+            window.showNotification('❌ Error al ingresar stock', 'error');
+        }
+    }
+
+    // Log an immutable stock movement
+    async recordMovement(bookId, type, qty, note, extra = {}) {
+        try {
+            const db = window.firebaseModules.database;
+            const id = `BMOV-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+            await db.set(db.ref(window.FirebaseData.database, `bookMovements/${id}`), {
+                bookId, type, qty, note: note || '',
+                by: window.FirebaseData?.currentUser?.email || 'unknown',
+                at: new Date().toISOString(), ...extra
+            });
+        } catch (e) { console.error('book movement log failed', e); }
+    }
+
+    // ============ INVENTORY RECONCILIATION ============
+    // Per title: received (catalog stock) vs books that went to students
+    // (derived from the ledger: paid/promo/included) vs currently on loan.
+    // Expected on shelf = received − goneToStudents − onLoan. Admin enters a
+    // physical count to reveal any discrepancy (missing/stolen copies).
+    async showInventoryReport() {
+        if (!this.loaded) await this.init();
+        const db = window.firebaseModules.database;
+
+        const sbSnap = await db.get(db.ref(window.FirebaseData.database, 'studentBooks'));
+        const ledgers = sbSnap.exists() ? sbSnap.val() : {};
+        const gone = {}; // bookId -> count of copies that left to students
+        Object.values(ledgers).forEach(l => {
+            Object.entries(l).forEach(([bookId, e]) => {
+                if (['paid', 'promo', 'included'].includes(e.status)) gone[bookId] = (gone[bookId] || 0) + 1;
+            });
+        });
+
+        const loans = await this.loadLoans();
+        const onLoan = {};
+        loans.filter(l => l.status === 'out').forEach(l => { onLoan[l.bookId] = (onLoan[l.bookId] || 0) + 1; });
+
+        const rows = this.getActiveBooks().map(b => {
+            const received = Number(b.stock) || 0;
+            const g = gone[b.id] || 0, ln = onLoan[b.id] || 0;
+            const expected = received - g - ln;
+            return `
+                <tr style="border-bottom:1px solid #e5e7eb;">
+                    <td style="padding:6px;">${this.bookLabel(b)}</td>
+                    <td style="padding:6px;text-align:center;">${received}</td>
+                    <td style="padding:6px;text-align:center;">${g}</td>
+                    <td style="padding:6px;text-align:center;">${ln}</td>
+                    <td style="padding:6px;text-align:center;font-weight:700;${expected < 0 ? 'color:#b91c1c;' : ''}">${expected}</td>
+                    <td style="padding:6px;text-align:center;"><input type="number" id="count_${b.id}" style="width:70px;padding:4px;border:1px solid #d1d5db;border-radius:4px;" oninput="window.BookManager._diff('${b.id}', ${expected})"></td>
+                    <td style="padding:6px;text-align:center;font-weight:700;" id="diff_${b.id}">—</td>
+                </tr>`;
+        }).join('') || '<tr><td colspan="7" style="padding:14px;text-align:center;color:#6b7280;">Catálogo vacío</td></tr>';
+
+        const html = `
+            <div id="bookInvModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;padding:1rem;">
+                <div style="background:white;border-radius:12px;max-width:820px;width:100%;max-height:90vh;overflow-y:auto;padding:1.5rem;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+                        <h3 style="margin:0;">📦 Inventario de Libros</h3>
+                        <button onclick="document.getElementById('bookInvModal').remove()" style="background:none;border:none;font-size:1.5rem;cursor:pointer;">✕</button>
+                    </div>
+                    <p style="font-size:0.8rem;color:#6b7280;margin-top:0;">Esperado en estante = Recibidos − Entregados a estudiantes − En préstamo. Cuenta físicamente y escribe el conteo: la diferencia muestra copias faltantes.</p>
+                    <div style="overflow-x:auto;">
+                        <table style="width:100%;border-collapse:collapse;font-size:0.85rem;">
+                            <thead><tr style="background:#f3f4f6;text-align:left;">
+                                <th style="padding:6px;">Libro</th><th style="padding:6px;text-align:center;">Recibidos</th>
+                                <th style="padding:6px;text-align:center;">A estudiantes</th><th style="padding:6px;text-align:center;">En préstamo</th>
+                                <th style="padding:6px;text-align:center;">Esperado</th><th style="padding:6px;text-align:center;">Conteo físico</th>
+                                <th style="padding:6px;text-align:center;">Diferencia</th>
+                            </tr></thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>`;
+        document.getElementById('bookInvModal')?.remove();
+        document.body.insertAdjacentHTML('beforeend', html);
+    }
+
+    _diff(bookId, expected) {
+        const input = document.getElementById(`count_${bookId}`);
+        const cell = document.getElementById(`diff_${bookId}`);
+        if (!input || !cell) return;
+        if (input.value === '') { cell.textContent = '—'; cell.style.color = ''; return; }
+        const d = (parseInt(input.value) || 0) - expected;
+        cell.textContent = d === 0 ? '✅ 0' : (d > 0 ? `+${d}` : `${d}`);
+        cell.style.color = d === 0 ? '#16a34a' : '#b91c1c';
+    }
+
+    // ============ LOAN REGISTER (loaner + teacher copies) ============
+
+    async loadLoans() {
+        const db = window.firebaseModules.database;
+        const snap = await db.get(db.ref(window.FirebaseData.database, 'bookLoans'));
+        return snap.exists() ? Object.entries(snap.val()).map(([id, l]) => ({ id, ...l })) : [];
+    }
+
+    async showLoansPanel() {
+        if (!this.loaded) await this.init();
+        try { await window.StudentManager?.init(); } catch (e) {}
+        const loans = (await this.loadLoans()).sort((a, b) => (b.dateOut || '').localeCompare(a.dateOut || ''));
+        const active = loans.filter(l => l.status === 'out');
+
+        const bookOpts = this.getActiveBooks().map(b => `<option value="${b.id}">${this.bookLabel(b)}</option>`).join('');
+
+        const rows = loans.map(l => `
+            <tr style="border-bottom:1px solid #e5e7eb; ${l.status !== 'out' ? 'opacity:0.55;' : ''}">
+                <td style="padding:6px;">${l.bookName || l.bookId}</td>
+                <td style="padding:6px;">${l.borrowerType === 'teacher' ? '👩‍🏫' : '🎓'} ${l.borrowerName || l.borrowerId || '—'}</td>
+                <td style="padding:6px;font-size:0.8rem;">${(l.dateOut || '').split('T')[0]}${l.expectedReturn ? ' → ' + l.expectedReturn : ''}</td>
+                <td style="padding:6px;">${l.status === 'out' ? '<span style="color:#b45309;">📕 Prestado</span>' : l.status === 'lost' ? '<span style="color:#b91c1c;">❌ Perdido</span>' : '<span style="color:#16a34a;">✅ Devuelto</span>'}</td>
+                <td style="padding:6px;">${l.status === 'out' ? `
+                    <button onclick="window.BookManager.returnLoan('${l.id}', false)" class="btn btn-sm" style="background:#16a34a;color:white;padding:2px 8px;font-size:0.7rem;">Devuelto</button>
+                    <button onclick="window.BookManager.returnLoan('${l.id}', true)" class="btn btn-sm" style="background:#b91c1c;color:white;padding:2px 8px;font-size:0.7rem;">Perdido</button>` : ''}</td>
+            </tr>`).join('') || '<tr><td colspan="5" style="padding:14px;text-align:center;color:#6b7280;">Sin préstamos registrados</td></tr>';
+
+        const html = `
+            <div id="bookLoansModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;padding:1rem;">
+                <div style="background:white;border-radius:12px;max-width:800px;width:100%;max-height:90vh;overflow-y:auto;padding:1.5rem;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+                        <h3 style="margin:0;">📕 Préstamos de Libros (${active.length} activos)</h3>
+                        <button onclick="document.getElementById('bookLoansModal').remove()" style="background:none;border:none;font-size:1.5rem;cursor:pointer;">✕</button>
+                    </div>
+                    <div style="background:#f9fafb;border-radius:8px;padding:1rem;margin-bottom:1rem;">
+                        <div style="font-weight:500;margin-bottom:0.5rem;">➕ Registrar préstamo</div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;">
+                            <select id="loanBook" style="padding:6px;border:1px solid #d1d5db;border-radius:6px;"><option value="">Libro...</option>${bookOpts}</select>
+                            <select id="loanType" style="padding:6px;border:1px solid #d1d5db;border-radius:6px;">
+                                <option value="student">🎓 Estudiante (olvidó el suyo)</option>
+                                <option value="teacher">👩‍🏫 Profesor (uso en clase)</option>
+                            </select>
+                            <input id="loanBorrower" placeholder="Nombre de quien lo lleva" style="padding:6px;border:1px solid #d1d5db;border-radius:6px;">
+                            <input id="loanExpected" type="date" style="padding:6px;border:1px solid #d1d5db;border-radius:6px;">
+                            <button onclick="window.BookManager.createLoan()" class="btn" style="background:#2563eb;color:white;padding:6px 12px;grid-column:span 2;">Registrar préstamo</button>
+                        </div>
+                    </div>
+                    <div style="overflow-x:auto;">
+                        <table style="width:100%;border-collapse:collapse;font-size:0.875rem;">
+                            <thead><tr style="background:#f3f4f6;text-align:left;">
+                                <th style="padding:6px;">Libro</th><th style="padding:6px;">Quién lo tiene</th>
+                                <th style="padding:6px;">Salida → Devolución</th><th style="padding:6px;">Estado</th><th style="padding:6px;"></th>
+                            </tr></thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>`;
+        document.getElementById('bookLoansModal')?.remove();
+        document.body.insertAdjacentHTML('beforeend', html);
+    }
+
+    async createLoan() {
+        const bookId = document.getElementById('loanBook')?.value;
+        const borrowerType = document.getElementById('loanType')?.value || 'student';
+        const borrowerName = document.getElementById('loanBorrower')?.value?.trim();
+        const expectedReturn = document.getElementById('loanExpected')?.value || null;
+        if (!bookId) { window.showNotification('⚠️ Seleccione el libro', 'warning'); return; }
+        if (!borrowerName) { window.showNotification('⚠️ Escriba quién lo lleva', 'warning'); return; }
+
+        try {
+            const db = window.firebaseModules.database;
+            const id = `LOAN-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+            const book = this.getBook(bookId);
+            const loan = {
+                bookId, bookName: book ? this.bookLabel(book) : bookId,
+                borrowerType, borrowerName, expectedReturn, status: 'out',
+                dateOut: new Date().toISOString(), by: window.FirebaseData?.currentUser?.email || 'unknown'
+            };
+            await db.set(db.ref(window.FirebaseData.database, `bookLoans/${id}`), loan);
+            await this.recordMovement(bookId, 'loan-out', -1, `Préstamo a ${borrowerName}`, { loanId: id });
+            if (typeof window.logAudit === 'function') {
+                await window.logAudit('Préstamo de libro', 'books', id, `${loan.bookName} → ${borrowerName} (${borrowerType})`, { after: loan });
+            }
+            window.showNotification('✅ Préstamo registrado', 'success');
+            this.showLoansPanel();
+        } catch (error) {
+            console.error('❌ Error creating loan:', error);
+            window.showNotification('❌ Error al registrar préstamo', 'error');
+        }
+    }
+
+    async returnLoan(loanId, lost) {
+        try {
+            const db = window.firebaseModules.database;
+            const snap = await db.get(db.ref(window.FirebaseData.database, `bookLoans/${loanId}`));
+            if (!snap.exists()) return;
+            const loan = snap.val();
+            await db.update(db.ref(window.FirebaseData.database, `bookLoans/${loanId}`), {
+                status: lost ? 'lost' : 'returned',
+                returnedAt: new Date().toISOString(), returnedBy: window.FirebaseData?.currentUser?.email || 'unknown'
+            });
+            await this.recordMovement(loan.bookId, lost ? 'loan-lost' : 'loan-return', lost ? 0 : 1, `${lost ? 'Perdido' : 'Devuelto'} por ${loan.borrowerName}`, { loanId });
+            if (typeof window.logAudit === 'function') {
+                await window.logAudit(lost ? 'Libro prestado PERDIDO' : 'Libro devuelto', 'books', loanId,
+                    `${loan.bookName} - ${loan.borrowerName}`, { after: { status: lost ? 'lost' : 'returned' } });
+            }
+            window.showNotification(lost ? '❌ Marcado como perdido' : '✅ Devolución registrada', lost ? 'info' : 'success');
+            this.showLoansPanel();
+        } catch (error) {
+            console.error('❌ Error returning loan:', error);
         }
     }
 }
