@@ -1,14 +1,35 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git revert:*)",
+      "Bash(git status:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push)",
-      "Bash(git -C \"E:\\\\GITHUB\\\\gestion-ventas\" log --oneline -20)",
-      "Bash(git -C \"E:\\\\GITHUB\\\\gestion-ventas\" log --all --graph --decorate --oneline)",
-      "Bash(wc:*)",
-      "Bash(git push:*)"
-    ]
+      "Bash(git push origin:*)",
+      "Bash(git push gitlab:*)",
+      "Bash(git pull:*)",
+      "Bash(git fetch:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(ls:*)",
+      "Bash(mkdir:*)",
+      "Bash(findstr:*)",
+      "Bash(powershell -Command \"Select-String -Path payments.js -Pattern ''Efectivo'' -CaseSensitive\")",
+      "Bash(powershell -Command \"Select-String -Path 'E:\\\\GITHUB\\\\gestion-ventas\\\\payments.js' -Pattern 'id=\\\\\"payMethod\\\\\"'\":*)",
+      "Bash(powershell -Command \"Select-String -Path ''E:\\\\GITHUB\\\\gestion-ventas\\\\finance.js'' -Pattern ''loadFinanceTab'' | Select-Object -First 5\")",
+      "Bash(powershell:*)",
+      "Bash(dir:*)",
+      "Bash(npx cap sync:*)",
+      "Bash(gradlew assembleDebug:*)",
+      "Bash(.gradlew.bat assembleDebug:*)",
+      "Bash(cmd /c \"gradlew.bat assembleDebug\")",
+      "Bash(adb devices:*)",
+      "Bash(adb install:*)",
+      "Bash(git push:*)",
+      "Bash(gradlew.bat assembleDebug:*)"
+    ],
+    "deny": [],
+    "ask": []
   }
 }

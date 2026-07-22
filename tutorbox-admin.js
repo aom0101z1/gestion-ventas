@@ -490,6 +490,12 @@ async function tbGrantFullAccess() {
 
 async function tbRevokeAllAccess() {
     if (!tbSelectedUser) return;
+    // Prevent self-lockout
+    const ADMIN_EMAILS = ['admin@ciudadbilingue.com', 'aom0101z1@gmail.com'];
+    if (ADMIN_EMAILS.includes(tbSelectedUser.email)) {
+        alert('Cannot revoke access from admin accounts.');
+        return;
+    }
     if (!confirm(`Revoke ALL access from ${tbSelectedUser.email}?`)) return;
     tbSelectedUser.access = {
         languages: [],
