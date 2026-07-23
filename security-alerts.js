@@ -95,6 +95,7 @@ class SecurityAlertsManagerClass {
             'future-month': '📅 Pago de mes futuro',
             'skip-month': '⏭️ Saltó un mes pendiente',
             'valor-change': '💲 Cambio de valor',
+            'bank-mismatch': '🏦 Consignación no encontrada',
             'other': '⚠️ Otro'
         };
 

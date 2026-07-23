@@ -3660,6 +3660,9 @@ window.loadPaymentsTab = async function() {
                                 ${window.SecurityAlertsManager?.isAlertsAdmin() ? `
                                 <button id="securityAlertsBtn" onclick="window.SecurityAlertsManager.showPanel()" class="btn btn-sm" style="background: #6b7280; color: white; padding: 0.5rem 1rem;">
                                     🚨 Alertas
+                                </button>
+                                <button onclick="window.BankReconManager?.showPanel()" class="btn btn-sm" style="background: #0e7490; color: white; padding: 0.5rem 1rem;">
+                                    🏦 Bancos
                                 </button>` : ''}
                                 <button onclick="window.BookManager?.showBooksReport()" class="btn btn-sm" style="background: #2563eb; color: white; padding: 0.5rem 1rem;">
                                     📚 Libros
