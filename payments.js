@@ -3441,12 +3441,34 @@ window.validateMonthlyPaymentOrder = function(studentId, student, selectedMonths
 
     let startAbs = null;
     if (student?.fechaInicio) {
-        const d = new Date(student.fechaInicio);
-        if (!isNaN(d.getTime())) startAbs = abs(d.getFullYear(), d.getMonth());
+        // Parse YYYY-MM directly: new Date('YYYY-MM-DD') is UTC midnight,
+        // which in Colombia (UTC-5) lands on the previous day — a fechaInicio
+        // on day 1 of a month would wrongly demand the previous month.
+        const m = String(student.fechaInicio).match(/^(\d{4})-(\d{1,2})/);
+        if (m) {
+            startAbs = abs(Number(m[1]), Number(m[2]) - 1);
+        } else {
+            const d = new Date(student.fechaInicio);
+            if (!isNaN(d.getTime())) startAbs = abs(d.getFullYear(), d.getMonth());
+        }
     }
     const from = Math.max(startAbs != null ? startAbs : (curAbs - 11), curAbs - 11);
 
-    for (let a = from; a < earliestSel && a <= curAbs; a++) {
+    // Continuity is only required since the student's most recent covered
+    // month. Gaps OLDER than the last recorded payment are historical
+    // (migrated old-system months, cancelled/corrected records) — they'd
+    // otherwise block every future payment forever. Recent fraud is still
+    // caught: skipping a month blocks the very next payment attempt.
+    let lastCoveredAbs = null;
+    for (let a = earliestSel - 1; a >= from; a--) {
+        if (window.isMonthTuitionCovered(studentId, monthNames[a % 12], Math.floor(a / 12))) {
+            lastCoveredAbs = a;
+            break;
+        }
+    }
+    const checkFrom = lastCoveredAbs != null ? lastCoveredAbs + 1 : from;
+
+    for (let a = checkFrom; a < earliestSel && a <= curAbs; a++) {
         const y = Math.floor(a / 12), mi = a % 12;
         const mName = monthNames[mi];
         if (window.PaymentConfig?.isHoliday && window.PaymentConfig.isHoliday(y, mName)) continue;
