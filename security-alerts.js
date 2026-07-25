@@ -33,6 +33,9 @@ class SecurityAlertsManagerClass {
                 attemptedMonth: context.attemptedMonth || null,
                 attemptedYear: context.attemptedYear || null,
                 pendingMonth: context.pendingMonth || null,
+                pendingMonthName: context.pendingMonthName || null,
+                pendingMonthIndex: context.pendingMonthIndex !== undefined ? context.pendingMonthIndex : null,
+                pendingYear: context.pendingYear || null,
                 byUid: window.FirebaseData?.currentUser?.uid || null,
                 byEmail: window.FirebaseData?.currentUser?.email || null,
                 createdAt: new Date().toISOString(),
@@ -90,6 +93,7 @@ class SecurityAlertsManagerClass {
             return;
         }
         await this.loadAlerts();
+        if (window.PaymentExceptionsManager) await window.PaymentExceptionsManager.load();
 
         const TYPE_LABEL = {
             'future-month': '📅 Pago de mes futuro',
@@ -109,9 +113,11 @@ class SecurityAlertsManagerClass {
                 <td style="padding: 8px;">${a.studentName || a.studentId || '—'}</td>
                 <td style="padding: 8px; font-size: 0.85rem;">${a.message}</td>
                 <td style="padding: 8px; font-size: 0.75rem; color: #6b7280;">${a.byEmail || '—'}</td>
-                <td style="padding: 8px;">
+                <td style="padding: 8px; white-space: nowrap;">
                     ${a.seen ? '<span style="color:#16a34a;">✓ Revisada</span>'
-                        : `<button onclick="window.SecurityAlertsManager.markSeen('${a.id}')" class="btn btn-sm" style="background:#16a34a;color:white;padding:2px 8px;font-size:0.7rem;">Marcar revisada</button>`}
+                        : `${a.type === 'skip-month' && this.pendingMonthOf(a) && a.studentId
+                            ? `<button onclick="window.SecurityAlertsManager.authorizeFromAlert('${a.id}')" class="btn btn-sm" style="background:#2563eb;color:white;padding:2px 8px;font-size:0.7rem;" title="Exonerar el mes pendiente para que los empleados puedan registrar el pago">✅ Autorizar</button> `
+                            : ''}<button onclick="window.SecurityAlertsManager.markSeen('${a.id}')" class="btn btn-sm" style="background:#16a34a;color:white;padding:2px 8px;font-size:0.7rem;">Marcar revisada</button>`}
                 </td>
             </tr>
         `).join('') || '<tr><td colspan="6" style="padding:16px;text-align:center;color:#6b7280;">No hay alertas 🎉</td></tr>';
@@ -141,12 +147,94 @@ class SecurityAlertsManagerClass {
                             <tbody>${rows}</tbody>
                         </table>
                     </div>
+                    ${this.renderExceptionsSection()}
                 </div>
             </div>
         `;
 
         document.getElementById('securityAlertsModal')?.remove();
         document.body.insertAdjacentHTML('beforeend', html);
+    }
+
+    // Active skip-month exceptions, shown below the alerts so the owner can
+    // review/revoke what has been exonerated.
+    renderExceptionsSection() {
+        const pem = window.PaymentExceptionsManager;
+        if (!pem || pem.map.size === 0) return '';
+        const rows = Array.from(pem.map.values())
+            .sort((a, b) => (b.grantedAt || '').localeCompare(a.grantedAt || ''))
+            .map(ex => {
+                const name = ex.studentName || window.StudentManager?.students?.get(ex.studentId)?.nombre || ex.studentId;
+                return `
+                <tr style="border-bottom: 1px solid #e5e7eb;">
+                    <td style="padding: 6px 8px;">${name}</td>
+                    <td style="padding: 6px 8px;">${ex.month} ${ex.year}</td>
+                    <td style="padding: 6px 8px; font-size: 0.8rem;">${ex.reason || '—'}</td>
+                    <td style="padding: 6px 8px; font-size: 0.75rem; color: #6b7280;">${ex.grantedBy || '—'} · ${(ex.grantedAt || '').slice(0, 10)}</td>
+                    <td style="padding: 6px 8px;">
+                        <button onclick="window.SecurityAlertsManager.revokeException('${ex.studentId}', '${ex.key}')" class="btn btn-sm" style="background:#dc2626;color:white;padding:2px 8px;font-size:0.7rem;">Revocar</button>
+                    </td>
+                </tr>`;
+            }).join('');
+        return `
+            <h4 style="margin: 1.5rem 0 0.5rem;">✅ Excepciones activas (meses exonerados)</h4>
+            <p style="font-size: 0.8rem; color: #6b7280; margin-top: 0;">
+                Estos meses no cuentan como pendientes: los empleados pueden registrar pagos de meses siguientes para estos estudiantes.
+            </p>
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.875rem;">
+                    <thead>
+                        <tr style="background: #f3f4f6; text-align: left;">
+                            <th style="padding: 6px 8px;">Estudiante</th>
+                            <th style="padding: 6px 8px;">Mes exonerado</th>
+                            <th style="padding: 6px 8px;">Motivo</th>
+                            <th style="padding: 6px 8px;">Autorizó</th>
+                            <th style="padding: 6px 8px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>`;
+    }
+
+    // Resolve the pending month of a skip-month alert to {monthIndex, year,
+    // monthName}. Older alerts only stored the "abril 2026" display string.
+    pendingMonthOf(alert) {
+        if (alert.pendingMonthIndex !== null && alert.pendingMonthIndex !== undefined && alert.pendingYear) {
+            return { monthIndex: alert.pendingMonthIndex, year: alert.pendingYear, monthName: alert.pendingMonthName };
+        }
+        const MONTHS = ['enero','febrero','marzo','abril','mayo','junio',
+                        'julio','agosto','septiembre','octubre','noviembre','diciembre'];
+        const m = String(alert.pendingMonth || '').trim().toLowerCase().match(/^([a-zñ]+)\s+(\d{4})$/);
+        if (!m) return null;
+        const idx = MONTHS.indexOf(m[1]);
+        if (idx === -1) return null;
+        return { monthIndex: idx, year: Number(m[2]), monthName: m[1] };
+    }
+
+    // "Autorizar" on a skip-month alert: exonerate the pending month for that
+    // student so staff can register later months.
+    async authorizeFromAlert(alertId) {
+        const alert = this.alerts.get(alertId);
+        const pem = window.PaymentExceptionsManager;
+        if (!alert || !pem) return;
+        const pending = this.pendingMonthOf(alert);
+        if (!pending || !alert.studentId) {
+            window.showNotification('❌ No se pudo identificar el mes pendiente de esta alerta', 'error');
+            return;
+        }
+        if (!confirm(`¿Exonerar ${pending.monthName} ${pending.year} para ${alert.studentName || alert.studentId}?\n\nLos empleados podrán registrar pagos de meses siguientes.`)) return;
+        const reason = prompt('Motivo de la excepción:') || '';
+        const granted = await pem.grant(alert.studentId, pending.monthIndex, pending.year, pending.monthName, reason);
+        if (granted) await this.markSeen(alertId);
+    }
+
+    async revokeException(studentId, key) {
+        const pem = window.PaymentExceptionsManager;
+        if (!pem) return;
+        if (!confirm('¿Revocar esta excepción? El mes volverá a contar como pendiente.')) return;
+        await pem.revoke(studentId, key);
+        this.showPanel();
     }
 
     async markSeen(alertId) {

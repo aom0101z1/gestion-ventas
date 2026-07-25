@@ -131,6 +131,9 @@ async loadPayments() {
             });
         }
         console.log(`✅ Loaded ${this.payments.size} payment records`);
+
+        // Admin-granted skip-month exceptions used by validateMonthlyPaymentOrder
+        if (window.PaymentExceptionsManager) await window.PaymentExceptionsManager.load();
     } catch (error) {
         console.error('❌ Error loading payments:', error);
         throw error; // Re-throw to be handled by caller
@@ -3317,6 +3320,92 @@ window.isMonthTuitionCovered = function(studentId, monthName, year) {
     return tuition > 0;
 };
 
+// Admin-granted exceptions to the skip-month block. One entry = one student
+// month the owner exonerated (e.g. student was absent in abril and won't pay
+// it). Stored at paymentExceptions/{studentId}/{year}-{monthIndex}; the node
+// is admin/director-write-only in database rules so staff can't self-grant.
+window.PaymentExceptionsManager = {
+    map: new Map(), // 'studentId|year-monthIndex' -> exception
+    loaded: false,
+
+    async load() {
+        try {
+            const db = window.firebaseModules.database;
+            const snap = await db.get(db.ref(window.FirebaseData.database, 'paymentExceptions'));
+            this.map.clear();
+            if (snap.exists()) {
+                Object.entries(snap.val()).forEach(([studentId, months]) => {
+                    Object.entries(months).forEach(([key, ex]) => {
+                        this.map.set(`${studentId}|${key}`, { studentId, key, ...ex });
+                    });
+                });
+            }
+            this.loaded = true;
+        } catch (e) {
+            console.warn('⚠️ Could not load payment exceptions:', e);
+        }
+    },
+
+    isExempt(studentId, monthIndex, year) {
+        return this.map.has(`${studentId}|${year}-${monthIndex}`);
+    },
+
+    isExceptionsAdmin() {
+        const email = window.FirebaseData?.currentUser?.email;
+        const role = window.userRole;
+        return email === 'admin@ciudadbilingue.com' || role === 'admin' || role === 'director';
+    },
+
+    async grant(studentId, monthIndex, year, monthName, reason) {
+        if (!this.isExceptionsAdmin()) {
+            window.showNotification('🚫 Solo administración puede autorizar excepciones de pago', 'error');
+            return false;
+        }
+        try {
+            const db = window.firebaseModules.database;
+            const ex = {
+                month: monthName,
+                monthIndex: monthIndex,
+                year: year,
+                studentName: window.StudentManager?.students?.get(studentId)?.nombre || null,
+                reason: reason || '',
+                grantedBy: window.FirebaseData?.currentUser?.email || 'unknown',
+                grantedAt: new Date().toISOString()
+            };
+            await db.set(db.ref(window.FirebaseData.database, `paymentExceptions/${studentId}/${year}-${monthIndex}`), ex);
+            this.map.set(`${studentId}|${year}-${monthIndex}`, { studentId, key: `${year}-${monthIndex}`, ...ex });
+            if (typeof window.logAudit === 'function') {
+                await window.logAudit('Excepción de pago autorizada', 'payment-exception', studentId,
+                    `${ex.studentName || studentId}: ${monthName} ${year} exonerado. ${reason || ''}`, { after: ex });
+            }
+            window.showNotification(`✅ Excepción autorizada: ${monthName} ${year} exonerado`, 'success');
+            return true;
+        } catch (error) {
+            console.error('❌ Error granting payment exception:', error);
+            window.showNotification('❌ Error autorizando la excepción', 'error');
+            return false;
+        }
+    },
+
+    async revoke(studentId, key) {
+        if (!this.isExceptionsAdmin()) return false;
+        try {
+            const db = window.firebaseModules.database;
+            const ex = this.map.get(`${studentId}|${key}`);
+            await db.set(db.ref(window.FirebaseData.database, `paymentExceptions/${studentId}/${key}`), null);
+            this.map.delete(`${studentId}|${key}`);
+            if (typeof window.logAudit === 'function') {
+                await window.logAudit('Excepción de pago revocada', 'payment-exception', studentId,
+                    `${ex?.studentName || studentId}: ${ex?.month || key} ${ex?.year || ''}`, { before: ex });
+            }
+            return true;
+        } catch (error) {
+            console.error('❌ Error revoking payment exception:', error);
+            return false;
+        }
+    }
+};
+
 // Anti-fraud: block future-month and skip-month monthly payments.
 // Returns { ok:true } or { ok:false, type, error, context } for the alert.
 // Advance packages (trimester/academicSemester/annual/twoSemesters) are exempt —
@@ -3361,13 +3450,14 @@ window.validateMonthlyPaymentOrder = function(studentId, student, selectedMonths
         const y = Math.floor(a / 12), mi = a % 12;
         const mName = monthNames[mi];
         if (window.PaymentConfig?.isHoliday && window.PaymentConfig.isHoliday(y, mName)) continue;
+        if (window.PaymentExceptionsManager?.isExempt(studentId, mi, y)) continue;
         if (!window.isMonthTuitionCovered(studentId, mName, y)) {
             const selName = monthNames[earliestSel % 12], selYear = Math.floor(earliestSel / 12);
             return {
                 ok: false,
                 type: 'skip-month',
                 error: `No se puede pagar ${selName} ${selYear} porque ${mName} ${y} está PENDIENTE. Debe pagarse primero el mes más atrasado.`,
-                context: { studentId, studentName: student?.nombre, attemptedMonth: selName, attemptedYear: selYear, pendingMonth: `${mName} ${y}` }
+                context: { studentId, studentName: student?.nombre, attemptedMonth: selName, attemptedYear: selYear, pendingMonth: `${mName} ${y}`, pendingMonthName: mName, pendingMonthIndex: mi, pendingYear: y }
             };
         }
     }
@@ -4669,9 +4759,33 @@ async function processPayment(studentId) {
 
         // ANTI-FRAUD: block future-month / skip-month monthly payments and alert the owner
         if (!isHourlyPayment) {
-            const orderCheck = window.validateMonthlyPaymentOrder(studentId, student, selectedMonths, paymentType);
+            let orderCheck = window.validateMonthlyPaymentOrder(studentId, student, selectedMonths, paymentType);
+
+            // Admin/director can authorize an exception on the spot (each pending
+            // month is confirmed separately; a granted month re-runs validation)
+            while (!orderCheck.ok && orderCheck.type === 'skip-month' &&
+                   orderCheck.context?.pendingMonthIndex !== undefined &&
+                   window.PaymentExceptionsManager?.isExceptionsAdmin()) {
+                const c = orderCheck.context;
+                const authorize = confirm(
+                    `${orderCheck.error}\n\n` +
+                    `Como administración puede AUTORIZAR una excepción:\n` +
+                    `${c.pendingMonth} quedará exonerado para ${c.studentName || 'este estudiante'} ` +
+                    `y los empleados podrán registrar pagos de meses siguientes.\n\n¿Autorizar y continuar?`
+                );
+                if (!authorize) break;
+                const reason = prompt(`Motivo de la excepción (${c.pendingMonth}):`) || '';
+                const granted = await window.PaymentExceptionsManager.grant(
+                    studentId, c.pendingMonthIndex, c.pendingYear, c.pendingMonthName, reason);
+                if (!granted) break;
+                orderCheck = window.validateMonthlyPaymentOrder(studentId, student, selectedMonths, paymentType);
+            }
+
             if (!orderCheck.ok) {
-                window.showNotification('🚫 ' + orderCheck.error, 'error');
+                const hint = (orderCheck.type === 'skip-month' && !window.PaymentExceptionsManager?.isExceptionsAdmin())
+                    ? ' Si el mes pendiente fue exonerado, pida a dirección autorizar la excepción (panel 🚨 Alertas).'
+                    : '';
+                window.showNotification('🚫 ' + orderCheck.error + hint, 'error');
                 if (typeof window.logSecurityAlert === 'function') {
                     window.logSecurityAlert(orderCheck.type, orderCheck.error, orderCheck.context);
                 }
