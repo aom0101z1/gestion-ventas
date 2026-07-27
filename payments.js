@@ -3215,8 +3215,10 @@ window.handlePaymentTypeChange = function() {
 window.updateMonthSelection = function() {
     const paymentType = document.getElementById('paymentType').value;
 
-    // ANTI-FRAUD: for a MENSUAL payment, reject a future month the instant it is
-    // ticked (advance plans trimester/semester/annual may span future months).
+    // ANTI-FRAUD: for a MENSUAL payment, reject a too-far future month the
+    // instant it is ticked. One month ahead is allowed (validated fully on
+    // submit: the student must be up to date); advance plans
+    // trimester/semester/annual may span further future months.
     if (paymentType === 'monthly') {
         const todayStr = (window.getTodayInColombia && window.getTodayInColombia()) || new Date().toISOString().split('T')[0];
         const [cy, cm] = todayStr.split('-').map(Number);
@@ -3224,10 +3226,10 @@ window.updateMonthSelection = function() {
         let removedFuture = false;
         document.querySelectorAll('.month-checkbox:checked').forEach(cb => {
             const y = parseInt(cb.dataset.year), mi = parseInt(cb.dataset.monthIndex);
-            if (y * 12 + mi > curAbs) { cb.checked = false; removedFuture = true; }
+            if (y * 12 + mi > curAbs + 1) { cb.checked = false; removedFuture = true; }
         });
         if (removedFuture) {
-            window.showNotification('🚫 No se pueden seleccionar meses futuros en pago Mensual. Para pagos adelantados use Trimestre, Semestre o Anual.', 'error');
+            window.showNotification('🚫 En pago Mensual solo se puede adelantar el mes siguiente. Para pagos más adelantados use Trimestre, Semestre o Anual.', 'error');
         }
     }
 
@@ -3421,13 +3423,16 @@ window.validateMonthlyPaymentOrder = function(studentId, student, selectedMonths
     const curAbs = cy * 12 + (cm - 1);
     const abs = (year, mi) => year * 12 + mi;
 
-    // 1) Future-month block
+    // 1) Future-month block: paying ONE month ahead is allowed (an up-to-date
+    // student may leave next month paid); anything further needs an advance
+    // plan. The continuity check below still requires everything up to that
+    // next month to be covered.
     for (const m of selectedMonths) {
-        if (abs(m.year, m.monthIndex) > curAbs) {
+        if (abs(m.year, m.monthIndex) > curAbs + 1) {
             return {
                 ok: false,
                 type: 'future-month',
-                error: `No se puede registrar un pago MENSUAL de ${m.month} ${m.year} porque es un mes futuro. Para pagos adelantados use un plan Trimestre, Semestre o Anual.`,
+                error: `No se puede registrar un pago MENSUAL de ${m.month} ${m.year}: solo se permite adelantar el mes siguiente. Para pagos más adelantados use un plan Trimestre, Semestre o Anual.`,
                 context: { studentId, studentName: student?.nombre, attemptedMonth: m.month, attemptedYear: m.year }
             };
         }
@@ -3438,6 +3443,8 @@ window.validateMonthlyPaymentOrder = function(studentId, student, selectedMonths
     // not before the student's start date).
     const selAbs = selectedMonths.map(m => abs(m.year, m.monthIndex)).sort((a, b) => a - b);
     const earliestSel = selAbs[0];
+    const maxSel = selAbs[selAbs.length - 1];
+    const selSet = new Set(selAbs);
 
     let startAbs = null;
     if (student?.fechaInicio) {
@@ -3460,7 +3467,8 @@ window.validateMonthlyPaymentOrder = function(studentId, student, selectedMonths
     // otherwise block every future payment forever. Recent fraud is still
     // caught: skipping a month blocks the very next payment attempt.
     let lastCoveredAbs = null;
-    for (let a = earliestSel - 1; a >= from; a--) {
+    for (let a = maxSel - 1; a >= from; a--) {
+        if (selSet.has(a)) continue; // being paid in this same operation
         if (window.isMonthTuitionCovered(studentId, monthNames[a % 12], Math.floor(a / 12))) {
             lastCoveredAbs = a;
             break;
@@ -3468,13 +3476,17 @@ window.validateMonthlyPaymentOrder = function(studentId, student, selectedMonths
     }
     const checkFrom = lastCoveredAbs != null ? lastCoveredAbs + 1 : from;
 
-    for (let a = checkFrom; a < earliestSel && a <= curAbs; a++) {
+    // Every month below the highest selected one must be covered, selected in
+    // this same payment, a holiday, or exempted. This is what allows paying
+    // next month ONLY when the student is fully up to date.
+    for (let a = checkFrom; a < maxSel; a++) {
+        if (selSet.has(a)) continue;
         const y = Math.floor(a / 12), mi = a % 12;
         const mName = monthNames[mi];
         if (window.PaymentConfig?.isHoliday && window.PaymentConfig.isHoliday(y, mName)) continue;
         if (window.PaymentExceptionsManager?.isExempt(studentId, mi, y)) continue;
         if (!window.isMonthTuitionCovered(studentId, mName, y)) {
-            const selName = monthNames[earliestSel % 12], selYear = Math.floor(earliestSel / 12);
+            const selName = monthNames[maxSel % 12], selYear = Math.floor(maxSel / 12);
             return {
                 ok: false,
                 type: 'skip-month',
