@@ -132,7 +132,10 @@ class PricingManagerClass {
 
     // Expected base tuition: student.valor × number of months (null if not computable)
     expectedBase(student, monthCount) {
-        const valor = Number(student?.valor) || 0;
+        // Base course + optional second course (weekday + Saturday students)
+        const valor = window.getStudentMonthlyTotal
+            ? window.getStudentMonthlyTotal(student)
+            : (Number(student?.valor) || 0);
         if (valor <= 0 || monthCount <= 0) return null;
         return valor * monthCount;
     }
@@ -154,9 +157,13 @@ class PricingManagerClass {
         const final = this.promoPrice(expected, promo);
         input.value = '$' + final.toLocaleString('es-CO');
         if (hint) {
+            const monthly = window.getStudentMonthlyTotal ? window.getStudentMonthlyTotal(student) : Number(student.valor);
+            const cursos = Number(student.valor2) > 0
+                ? ` (curso 1 $${Number(student.valor).toLocaleString('es-CO')} + curso 2 $${Number(student.valor2).toLocaleString('es-CO')})`
+                : '';
             hint.innerHTML = promo
                 ? `Precio lista: $${expected.toLocaleString('es-CO')} → con ${promo.name}: <strong>$${final.toLocaleString('es-CO')}</strong>`
-                : `Precio lista: $${Number(student.valor).toLocaleString('es-CO')} × ${monthCount} mes(es) = <strong>$${expected.toLocaleString('es-CO')}</strong>`;
+                : `Precio lista: $${monthly.toLocaleString('es-CO')}${cursos} × ${monthCount} mes(es) = <strong>$${expected.toLocaleString('es-CO')}</strong>`;
         }
         if (typeof window.updatePaymentTotal === 'function') window.updatePaymentTotal();
     }
@@ -196,7 +203,9 @@ class PricingManagerClass {
             const required = this.promoPrice(expected, basePromo);
             meta.base = {
                 listTotal: expected,
-                valorMensual: Number(student.valor),
+                valorMensual: window.getStudentMonthlyTotal ? window.getStudentMonthlyTotal(student) : Number(student.valor),
+                valorCurso1: Number(student.valor) || 0,
+                valorCurso2: Number(student.valor2) || 0,
                 months: monthCount,
                 charged: baseAmount,
                 required: required,

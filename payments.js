@@ -182,7 +182,7 @@ getPaymentStatus(student) {
 
     if (tuitionPaid > 0) {
         // Convert to numbers to ensure proper comparison
-        const expectedAmount = Number(student.valor) || 0;
+        const expectedAmount = window.getStudentMonthlyTotal(student);
         const paidAmount = tuitionPaid;
 
         console.log(`🔍 Checking payment for ${student.nombre}: Expected: $${expectedAmount}, Paid: $${paidAmount}`);
@@ -491,7 +491,7 @@ async deletePayment(paymentId) {
 
         // Get student data for default amount
         const student = window.StudentManager.students.get(studentId);
-        const defaultAmount = student?.valor || 0;
+        const defaultAmount = window.getStudentMonthlyTotal(student);
 
         // Build history object for each month
         for (const month of months) {
@@ -717,7 +717,7 @@ async deletePayment(paymentId) {
                     summary.partialAmount += status.remaining || 0;
                 } else if (status.status === 'Pagado') {
                     summary.paid++;
-                    summary.collectedAmount += student.valor || 0;
+                    summary.collectedAmount += window.getStudentMonthlyTotal(student);
                 } else if (status.color === '#ef4444') {
                     summary.overdue++;
                 } else if (status.color === '#fbbf24' || status.color === '#f59e0b') {
@@ -725,7 +725,7 @@ async deletePayment(paymentId) {
                 } else {
                     summary.pending++;
                 }
-                summary.totalAmount += student.valor || 0;
+                summary.totalAmount += window.getStudentMonthlyTotal(student);
             });
         }
 
@@ -2230,7 +2230,7 @@ function renderPaymentTable(students) {
                                 ${s.modalidadDetalle ? `<br><small style="color: #6b7280;">${s.modalidadDetalle}</small>` : ''}
                             </td>
                             <td style="padding: 0.75rem; text-align: right;">
-                                <strong>$${(s.valor || 0).toLocaleString()}</strong>
+                                <strong>$${window.getStudentMonthlyTotal(s).toLocaleString()}</strong>${s.valor2 ? '<br><small style="color: #7c3aed;">2 cursos</small>' : ''}
                             </td>
                             <td style="padding: 0.75rem; text-align: center;">
                                 ${getPaymentMethodBadge(s.id)}
@@ -2807,7 +2807,7 @@ function renderPaymentModal(student) {
                         </div>
 
                         <!-- Hidden field for actual total -->
-                        <input type="hidden" id="payAmount" value="${student.valor || ''}">
+                        <input type="hidden" id="payAmount" value="${window.getStudentMonthlyTotal(student) || ''}">
                     ` : ''}
                     
                     <!-- Installment Details (hidden by default) -->
@@ -4063,7 +4063,7 @@ window.sendPaymentReminder = async function(studentId) {
     if (!student) return;
     
     const status = window.PaymentManager.getPaymentStatus(student);
-    const message = `Hola ${student.nombre}, te recordamos que tu pago de $${(student.valor || 0).toLocaleString()} ${status.status}. 
+    const message = `Hola ${student.nombre}, te recordamos que tu pago de $${window.getStudentMonthlyTotal(student).toLocaleString()} ${status.status}.
     
 Ciudad Bilingüe - English School
 Métodos de pago: Nequi/Bancolombia o efectivo en la escuela.`;
@@ -5259,7 +5259,7 @@ window.showBulkSemesterPaymentModal = async function() {
                                     </td>
                                     <td style="padding: 0.75rem; font-weight: 500;">${s.nombre}</td>
                                     <td style="padding: 0.75rem; color: #6b7280;">${s.modalidad || 'Regular'}</td>
-                                    <td style="padding: 0.75rem; color: #6b7280;">$${(s.valor || 0).toLocaleString()}</td>
+                                    <td style="padding: 0.75rem; color: #6b7280;">$${window.getStudentMonthlyTotal(s).toLocaleString()}</td>
                                     <td style="padding: 0.75rem;">
                                         <input type="number"
                                                class="bulk-amount-input"

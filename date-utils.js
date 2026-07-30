@@ -95,4 +95,13 @@ window.getLocalDateTime = function() {
 window.getTodayInColombia = window.getLocalDate;
 window.getColombiaDateTime = window.getLocalDateTime;
 
+/**
+ * Total monthly tuition for a student: base course + optional second course
+ * (students taking e.g. weekday + Saturday classes have valor + valor2).
+ * Every billing/validation point must use this instead of student.valor.
+ */
+window.getStudentMonthlyTotal = function(student) {
+    return (Number(student?.valor) || 0) + (Number(student?.valor2) || 0);
+};
+
 console.log('✅ Date utilities loaded');

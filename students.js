@@ -611,6 +611,22 @@ function renderStudentForm(student = null) {
                         <input type="number" id="stuValorHora" value="${student?.valorHora || ''}" min="0" placeholder="Valor por hora" step="0.01" ${isEdit && !window.isStudentMoneyAdmin() ? 'readonly style="background:#f3f4f6;"' : ''}>
                     </div>
 
+                    <div class="form-group" id="segundoCursoGroup" style="display: ${!student || student?.tipoPago !== 'POR_HORAS' ? 'block' : 'none'}; border: 1px dashed #a78bfa; border-radius: 8px; padding: 0.75rem; background: #f5f3ff;">
+                        <label style="font-weight: 600;">➕ Segundo curso (opcional)</label>
+                        <small style="display: block; color: #6b7280; margin-bottom: 0.5rem;">
+                            Para estudiantes que toman dos cursos (ej: entre semana + sábados).
+                            La mensualidad total a facturar será la suma de los dos valores.
+                        </small>
+                        <label>Grupo segundo curso</label>
+                        <select id="stuGrupo2">
+                            <option value="">Sin segundo curso</option>
+                            ${getGrupos2Options(student?.grupo2)}
+                        </select>
+                        <label style="margin-top: 0.5rem;">Valor mensualidad segundo curso ($)</label>
+                        <input type="number" id="stuValor2" value="${student?.valor2 || ''}" min="0" placeholder="0 = sin cobro adicional" ${isEdit && !window.isStudentMoneyAdmin() ? 'readonly style="background:#f3f4f6;"' : ''}>
+                        ${isEdit && !window.isStudentMoneyAdmin() ? '<small style="color:#92400e;">Solo el Director puede cambiar el valor del segundo curso.</small>' : ''}
+                    </div>
+
                     ${!isEdit ? `
                     <div class="form-group">
                         <label>Matrícula ($)</label>
@@ -722,7 +738,7 @@ function renderStudentTable(students) {
                                 ${s.tipoPago === 'POR_HORAS' ? 'Por horas' : s.tipoPago || '-'}<br>
                                 <small>${s.tipoPago === 'POR_HORAS' ?
                                     `$${(s.valorHora || 0).toLocaleString()}/hora` :
-                                    `$${(s.valor || 0).toLocaleString()}`
+                                    `$${window.getStudentMonthlyTotal(s).toLocaleString()}${s.valor2 ? ' (2 cursos)' : ''}`
                                 }</small>
                             </td>
                             <td style="padding: 0.75rem; text-align: center;">
@@ -988,14 +1004,18 @@ window.handleTipoPagoChange = function() {
     const valorMensualGroup = document.getElementById('valorMensualGroup');
     const valorHoraGroup = document.getElementById('valorHoraGroup');
 
+    const segundoCursoGroup = document.getElementById('segundoCursoGroup');
+
     if (tipoPago === 'POR_HORAS') {
         valorMensualGroup.style.display = 'none';
         valorHoraGroup.style.display = 'block';
+        if (segundoCursoGroup) segundoCursoGroup.style.display = 'none';
         // Clear monthly value when switching to hourly
         document.getElementById('stuValor').value = '';
     } else {
         valorMensualGroup.style.display = 'block';
         valorHoraGroup.style.display = 'none';
+        if (segundoCursoGroup) segundoCursoGroup.style.display = 'block';
         // Clear hourly value when switching to monthly/semester
         document.getElementById('stuValorHora').value = '';
     }
@@ -1572,10 +1592,24 @@ async function saveStudentForm(studentId) {
     try {
         const tipoPago = document.getElementById('stuTipoPago').value;
         const newGrupo = document.getElementById('stuGrupo').value;
+        const newGrupo2 = document.getElementById('stuGrupo2')?.value || '';
 
         // Get old grupo value if editing
         const existingStudent = studentId ? window.StudentManager.students.get(studentId) : null;
         const oldGrupo = existingStudent?.grupo || '';
+        const oldGrupo2 = existingStudent?.grupo2 || '';
+
+        // valor2 (second course) is director-gated like valor: staff edits must
+        // carry the stored value through unchanged or the database rules
+        // reject the whole update (null stays null, not 0).
+        let valor2;
+        if (studentId && !window.isStudentMoneyAdmin()) {
+            valor2 = existingStudent?.valor2 !== undefined ? existingStudent.valor2 : null;
+        } else if (tipoPago === 'POR_HORAS') {
+            valor2 = existingStudent?.valor2 !== undefined ? existingStudent.valor2 : null;
+        } else {
+            valor2 = parseInt(document.getElementById('stuValor2')?.value) || 0;
+        }
 
         const studentData = {
             id: studentId,
@@ -1589,6 +1623,8 @@ async function saveStudentForm(studentId) {
             docAcudiente: document.getElementById('stuDocAcudiente').value,
             fechaInicio: document.getElementById('stuFechaInicio').value,
             grupo: newGrupo,
+            grupo2: newGrupo2,
+            valor2: valor2,
             modalidad: document.getElementById('stuModalidad').value,
             modalidadDetalle: document.getElementById('stuModalidadDetalle').value,
             tipoPago: tipoPago,
@@ -1621,11 +1657,13 @@ async function saveStudentForm(studentId) {
             }
         }
 
-        // Update Grupos 2.0 studentIds if group changed
+        // Update Grupos 2.0 studentIds if group changed. A student can be in
+        // two groups (second course): never remove them from a group that the
+        // OTHER course field still points to.
         if (window.GroupsManager2 && (oldGrupo !== newGrupo)) {
             try {
                 // Remove student from old group
-                if (oldGrupo) {
+                if (oldGrupo && oldGrupo !== newGrupo2) {
                     const oldGroupId = parseInt(oldGrupo);
                     const oldGroup = window.GroupsManager2.groups.get(oldGroupId);
                     if (oldGroup) {
@@ -1658,6 +1696,35 @@ async function saveStudentForm(studentId) {
             } catch (groupError) {
                 console.error('⚠️ Error updating group studentIds:', groupError);
                 // Don't fail the whole save, just log the error
+            }
+        }
+
+        // Same sync for the second-course group
+        if (window.GroupsManager2 && (oldGrupo2 !== newGrupo2)) {
+            try {
+                if (oldGrupo2 && oldGrupo2 !== newGrupo) {
+                    const oldGroup2 = window.GroupsManager2.groups.get(parseInt(oldGrupo2));
+                    if (oldGroup2) {
+                        await window.GroupsManager2.saveGroup({
+                            ...oldGroup2,
+                            studentIds: (oldGroup2.studentIds || []).filter(id => id !== savedStudent.id)
+                        });
+                        console.log(`📚 Removed student from second-course group ${oldGrupo2}`);
+                    }
+                }
+                if (newGrupo2) {
+                    const newGroup2 = window.GroupsManager2.groups.get(parseInt(newGrupo2));
+                    if (newGroup2) {
+                        const ids = newGroup2.studentIds || [];
+                        if (!ids.includes(savedStudent.id)) {
+                            ids.push(savedStudent.id);
+                            await window.GroupsManager2.saveGroup({ ...newGroup2, studentIds: ids });
+                            console.log(`📚 Added student to second-course group ${newGrupo2}`);
+                        }
+                    }
+                }
+            } catch (groupError) {
+                console.error('⚠️ Error updating second-course group studentIds:', groupError);
             }
         }
 
@@ -1754,7 +1821,7 @@ window.viewStudentPayments = async function(studentId) {
                             <div>
                                 <h3 style="margin: 0 0 0.5rem 0; font-size: 1.25rem;">💰 Pagos de ${student.nombre}</h3>
                                 <div style="font-size: 0.9rem; opacity: 0.9;">
-                                    Mensualidad: $${(student.valor || 0).toLocaleString('es-CO')} •
+                                    Mensualidad: $${window.getStudentMonthlyTotal(student).toLocaleString('es-CO')}${student.valor2 ? ` (curso 1: $${(student.valor || 0).toLocaleString('es-CO')} + curso 2: $${Number(student.valor2).toLocaleString('es-CO')})` : ''} •
                                     Total pagado: $${totalPaid.toLocaleString('es-CO')}
                                 </div>
                             </div>

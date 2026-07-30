@@ -538,7 +538,7 @@ class FinanceManager {
         };
 
         activeStudents.forEach(student => {
-            const amount = student.valor || 0;
+            const amount = window.getStudentMonthlyTotal ? window.getStudentMonthlyTotal(student) : (student.valor || 0);
             const paymentType = (student.tipoPago || 'MENSUAL').toUpperCase();
 
             if (paymentType === 'MENSUAL') {

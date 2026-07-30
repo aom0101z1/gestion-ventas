@@ -21,7 +21,7 @@
     "students": {
       ".read": "auth != null",
       "$studentId": {
-        ".write": "root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || auth.token.email === 'admin@ciudadbilingue.com' || (auth != null && newData.exists() && (!data.exists() || (newData.child('valor').val() === data.child('valor').val() && newData.child('valorHora').val() === data.child('valorHora').val() && newData.child('diaPago').val() === data.child('diaPago').val() && newData.child('tipoPago').val() === data.child('tipoPago').val() && newData.child('status').val() === data.child('status').val())))"
+        ".write": "root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || auth.token.email === 'admin@ciudadbilingue.com' || (auth != null && newData.exists() && (!data.exists() || (newData.child('valor').val() === data.child('valor').val() && newData.child('valor2').val() === data.child('valor2').val() && newData.child('valorHora').val() === data.child('valorHora').val() && newData.child('diaPago').val() === data.child('diaPago').val() && newData.child('tipoPago').val() === data.child('tipoPago').val() && newData.child('status').val() === data.child('status').val())))"
       }
     },
     "payments": {
