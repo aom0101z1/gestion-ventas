@@ -3322,6 +3322,38 @@ window.isMonthTuitionCovered = function(studentId, monthName, year) {
     return tuition > 0;
 };
 
+// Does the payment-order check demand this month? Only months where the
+// student was ACTIVE at both the start and the end of the month (per the
+// director-controlled statusHistory) are required. A student who retired and
+// later returned starts fresh: the inactive months in between — and the
+// partial retire/return months — are never demanded (they can still be
+// registered manually if the school decides to charge them).
+window.isMonthRequiredByStatus = function(student, monthIndex, year) {
+    let history = student?.statusHistory;
+    if (history && !Array.isArray(history)) history = Object.values(history);
+    if (!history || history.length === 0) return true;
+
+    const events = history
+        .map(e => ({ date: e.date || (e.changedAt || '').slice(0, 10), status: e.newStatus }))
+        .filter(e => e.date && (e.status === 'active' || e.status === 'inactive'))
+        .sort((a, b) => a.date.localeCompare(b.date));
+    if (events.length === 0) return true;
+
+    const statusAt = (dateStr) => {
+        let st = 'active'; // students start active
+        for (const e of events) {
+            if (e.date <= dateStr) st = e.status; else break;
+        }
+        return st;
+    };
+
+    const mm = String(monthIndex + 1).padStart(2, '0');
+    const firstDay = `${year}-${mm}-01`;
+    const lastDayNum = new Date(year, monthIndex + 1, 0).getDate();
+    const lastDay = `${year}-${mm}-${String(lastDayNum).padStart(2, '0')}`;
+    return statusAt(firstDay) === 'active' && statusAt(lastDay) === 'active';
+};
+
 // Admin-granted exceptions to the skip-month block. One entry = one student
 // month the owner exonerated (e.g. student was absent in abril and won't pay
 // it). Stored at paymentExceptions/{studentId}/{year}-{monthIndex}; the node
@@ -3485,6 +3517,7 @@ window.validateMonthlyPaymentOrder = function(studentId, student, selectedMonths
         const mName = monthNames[mi];
         if (window.PaymentConfig?.isHoliday && window.PaymentConfig.isHoliday(y, mName)) continue;
         if (window.PaymentExceptionsManager?.isExempt(studentId, mi, y)) continue;
+        if (!window.isMonthRequiredByStatus(student, mi, y)) continue;
         if (!window.isMonthTuitionCovered(studentId, mName, y)) {
             const selName = monthNames[maxSel % 12], selYear = Math.floor(maxSel / 12);
             return {
