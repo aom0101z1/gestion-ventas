@@ -140,6 +140,31 @@ class BankReconciliationManagerClass {
             });
         }
 
+        // --- Cesantías received (money the fund wired to the account) ---
+        try {
+            const cesSnap = await db.get(db.ref(window.FirebaseData.database, 'cesantias'));
+            if (cesSnap.exists()) {
+                Object.values(cesSnap.val()).forEach(c => {
+                    if (!c || c.status !== 'received') return;
+                    const day = (c.receivedDate || '').slice(0, 10);
+                    if (!inRange(day)) return;
+                    groups.set(`CES-${c.id}`, {
+                        key: c.id,
+                        sourceType: 'cesantias',
+                        date: day,
+                        time: '',
+                        bank: this.normalizeBank(c.receivedBank),
+                        amount: Number(c.amount) || 0,
+                        months: [],
+                        desc: `Cesantías: ${c.studentName || c.studentId} (${c.fondo || ''})${c.invoiceNumber ? ' - ' + c.invoiceNumber : ''}`,
+                        byEmail: c.resolvedBy || null
+                    });
+                });
+            }
+        } catch (e) {
+            // Node is admin-read-only; non-admin sessions just skip it
+        }
+
         this.rows = Array.from(groups.values())
             .sort((a, b) => (b.date + (b.time || '')).localeCompare(a.date + (a.time || '')));
         return this.rows;
@@ -329,7 +354,7 @@ class BankReconciliationManagerClass {
                 </div>`;
         }
 
-        const SOURCE_LABEL = { pago: '🎓 Pago', tienda: '🛒 Tienda', otro: '📥 Otro ingreso' };
+        const SOURCE_LABEL = { pago: '🎓 Pago', tienda: '🛒 Tienda', otro: '📥 Otro ingreso', cesantias: '📋 Cesantías' };
 
         // Group by day so each block can be checked against the statement's
         // transactions for that date.

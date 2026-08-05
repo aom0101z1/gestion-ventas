@@ -104,4 +104,13 @@ window.getStudentMonthlyTotal = function(student) {
     return (Number(student?.valor) || 0) + (Number(student?.valor2) || 0);
 };
 
+/**
+ * Cesantías payment whose money the fund has NOT wired yet: the month counts
+ * as covered for the student, but it is NOT income — exclude it from cash
+ * closure, revenue reports and bank reconciliation until marked received.
+ */
+window.isPendingCesantias = function(payment) {
+    return !!payment && payment.method === 'Cesantías' && payment.cesantiasStatus !== 'received';
+};
+
 console.log('✅ Date utilities loaded');

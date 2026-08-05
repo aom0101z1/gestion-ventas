@@ -201,7 +201,13 @@ getPaymentStatus(student) {
             };
         }
 
-        // Full payment
+        // Full payment. If it's covered only by cesantías the fund hasn't
+        // wired yet, show the receivable badge instead of Pagado.
+        const tuitionPayments = monthPayments.filter(p =>
+            (p.baseAmount !== undefined ? Number(p.baseAmount) : Number(p.amount)) > 0);
+        if (tuitionPayments.length > 0 && tuitionPayments.every(p => window.isPendingCesantias?.(p))) {
+            return { color: '#8b5cf6', status: '📋 Cesantías', icon: '📋' };
+        }
         return { color: '#10b981', status: 'Pagado', icon: '✅' };
     }
     
@@ -243,6 +249,8 @@ async recordMultiMonthPayment(studentId, paymentData) {
                 amount: Number(amountPerMonth), // Ensure amount is stored as number
                 method: paymentData.method,
                 bank: paymentData.bank,
+                // Cesantías: receivable until the fund wires the money
+                ...(paymentData.method === 'Cesantías' ? { cesantiasStatus: 'pending', cesantiasFondo: paymentData.cesantiasFondo || 'Otro' } : {}),
                 month: monthData.month.toLowerCase(),
                 year: monthData.year,
                 date: window.getColombiaDateTime(), // Use Colombia timezone
@@ -330,6 +338,8 @@ async recordPayment(studentId, paymentData) {
             baseAmount: Number(paymentData.baseAmount || paymentData.amount),
             method: paymentData.method,
             bank: paymentData.bank,
+            // Cesantías: receivable until the fund wires the money
+            ...(paymentData.method === 'Cesantías' ? { cesantiasStatus: 'pending', cesantiasFondo: paymentData.cesantiasFondo || 'Otro' } : {}),
             month: paymentData.month.toLowerCase(), // Ensure lowercase
             year: paymentData.year || new Date().getFullYear(),
             date: window.getColombiaDateTime(), // Use Colombia timezone
@@ -2833,6 +2843,7 @@ function renderPaymentModal(student) {
                             <option value="Transferencia">Transferencia</option>
                             <option value="Efectivo">Efectivo en la escuela</option>
                             <option value="Mixto">Mixto (Efectivo + Transferencia)</option>
+                            <option value="Cesantías">Cesantías (el fondo consigna después)</option>
                         </select>
                     </div>
 
@@ -2843,6 +2854,22 @@ function renderPaymentModal(student) {
                             <option value="Bancolombia">Bancolombia</option>
                             <option value="Otro">Otro</option>
                         </select>
+                    </div>
+
+                    <div class="form-group" id="cesantiasGroup" style="display: none; background: #f5f3ff; border: 2px solid #8b5cf6; border-radius: 8px; padding: 1rem;">
+                        <label style="font-weight: 600; color: #7c3aed;">📋 Fondo de Cesantías</label>
+                        <select id="cesantiasFondo" style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
+                            <option value="Porvenir">Porvenir</option>
+                            <option value="Protección">Protección</option>
+                            <option value="Colfondos">Colfondos</option>
+                            <option value="FNA">Fondo Nacional del Ahorro</option>
+                            <option value="Otro">Otro</option>
+                        </select>
+                        <small style="display: block; color: #6b7280; margin-top: 0.5rem;">
+                            El dinero quedará <strong>EN TRÁMITE</strong> hasta que el fondo consigne (1-3+ semanas).
+                            Entregue al acudiente la <strong>factura</strong> y la <strong>copia del RUT</strong> para llevar al fondo.
+                            No cuenta como ingreso hasta que administración lo marque recibido.
+                        </small>
                     </div>
 
                     <!-- Mixed Payment Section -->
@@ -3793,6 +3820,7 @@ window.loadPaymentsTab = async function() {
         if (window.PricingManager) await window.PricingManager.init();
         if (window.BookManager) await window.BookManager.init();
         if (window.SecurityAlertsManager?.isAlertsAdmin()) setTimeout(() => window.SecurityAlertsManager.refreshBadge(), 800);
+        if (window.CesantiasManager?.isCesantiasAdmin()) setTimeout(() => window.CesantiasManager.refreshBadge(), 900);
 
         const students = window.StudentManager.getStudents();
         const summary = await window.PaymentManager.getPaymentSummary();
@@ -3820,6 +3848,9 @@ window.loadPaymentsTab = async function() {
                                 </button>
                                 <button onclick="window.BankReconManager?.showPanel()" class="btn btn-sm" style="background: #0e7490; color: white; padding: 0.5rem 1rem;">
                                     🏦 Bancos
+                                </button>
+                                <button id="cesantiasBtn" onclick="window.CesantiasManager?.showPanel()" class="btn btn-sm" style="background: #6b7280; color: white; padding: 0.5rem 1rem;">
+                                    📋 Cesantías
                                 </button>` : ''}
                                 <button onclick="window.BookManager?.showBooksReport()" class="btn btn-sm" style="background: #2563eb; color: white; padding: 0.5rem 1rem;">
                                     📚 Libros
@@ -4022,6 +4053,10 @@ window.toggleBankOptions = function() {
 
     // Show/hide bank group for transfers
     bankGroup.style.display = method === 'Transferencia' ? 'block' : 'none';
+
+    // Show/hide cesantías fund selector
+    const cesantiasGroup = document.getElementById('cesantiasGroup');
+    if (cesantiasGroup) cesantiasGroup.style.display = method === 'Cesantías' ? 'block' : 'none';
 
     // Show/hide mixed payment section
     if (mixedGroup) {
@@ -5035,6 +5070,7 @@ async function processPayment(studentId) {
             baseAmount: baseAmount,
             method: paymentMethod,
             bank: paymentMethod === 'Transferencia' ? (document.getElementById('payBank')?.value || '') : '',
+            cesantiasFondo: paymentMethod === 'Cesantías' ? (document.getElementById('cesantiasFondo')?.value || 'Otro') : '',
             notes: document.getElementById('payNotes')?.value || '',
             paymentType: paymentType,
             paymentPeriod: paymentPeriod,
@@ -5155,7 +5191,7 @@ async function processPayment(studentId) {
             };
             const payment = await window.PaymentManager.recordPayment(studentId, singlePaymentData);
             const invoiceData = await InvoiceGenerator.generateInvoice(payment, student);
-            result = { invoiceData };
+            result = { invoiceData, payments: [payment] };
         } else {
             // Multi-month payment
             result = await window.PaymentManager.recordMultiMonthPayment(studentId, paymentData);
@@ -5174,6 +5210,20 @@ async function processPayment(studentId) {
             if (['academicSemester', 'twoSemesters', 'annual'].includes(paymentType)) {
                 await window.BookManager.onSemesterPaymentRecorded(studentId, { invoiceNumber });
             }
+        }
+
+        // Cesantías: create the pending-receivable tracking record + alert the owner
+        if (paymentData.method === 'Cesantías' && window.CesantiasManager) {
+            await window.CesantiasManager.createFromPayment({
+                studentId,
+                studentName: student?.nombre || null,
+                amount: totalAmount,
+                fondo: paymentData.cesantiasFondo || 'Otro',
+                invoiceNumber: result?.invoiceData?.invoiceNumber || null,
+                paymentIds: (result?.payments || []).map(p => p.id),
+                monthsLabel: selectedMonths.map(m => `${m.month} ${m.year}`).join(', '),
+                paymentType
+            });
         }
 
         // Show success notification

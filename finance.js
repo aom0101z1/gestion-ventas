@@ -449,7 +449,8 @@ class FinanceManager {
 
         // IMPORTANT: Only "Efectivo" is cash. Everything else (Transferencia, Nequi, Bancolombia, Consignación, etc.) is a transfer
         const cashPayments = payments.filter(p => p.method === 'Efectivo');
-        const transferPayments = payments.filter(p => p.method !== 'Efectivo'); // All non-cash methods
+        // All non-cash methods, except cesantías the fund hasn't wired yet
+        const transferPayments = payments.filter(p => p.method !== 'Efectivo' && !window.isPendingCesantias?.(p));
 
         const cashTotal = cashPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
         const transferTotal = transferPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
@@ -585,7 +586,9 @@ class FinanceManager {
                 const paymentDate = p.date ? p.date.split('T')[0] : null;
                 return paymentDate >= startDate && paymentDate <= endDate;
             });
-            tuitionRevenue = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+            // Pending cesantías are receivables, not revenue yet
+            tuitionRevenue = payments.reduce((sum, p) =>
+                sum + (window.isPendingCesantias?.(p) ? 0 : (p.amount || 0)), 0);
         } else {
             console.warn('⚠️ PaymentManager not available, tuition revenue will be 0');
         }

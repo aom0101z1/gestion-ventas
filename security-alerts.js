@@ -100,6 +100,8 @@ class SecurityAlertsManagerClass {
             'skip-month': '⏭️ Saltó un mes pendiente',
             'valor-change': '💲 Cambio de valor',
             'bank-mismatch': '🏦 Consignación no encontrada',
+            'cesantias-created': '📋 Factura por cesantías',
+            'cesantias-rejected': '📋 Cesantías rechazadas',
             'other': '⚠️ Otro'
         };
 
