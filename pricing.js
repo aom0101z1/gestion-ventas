@@ -405,6 +405,43 @@ class PricingManagerClass {
                         </div>
                     </div>
 
+                    <div style="background: #faf5ff; border: 2px solid #8b5cf6; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+                        <h4 style="margin: 0 0 0.5rem 0; color: #6b21a8;">🎓 Tipos de Curso (mensualidad oficial)</h4>
+                        <div style="font-size: 0.8rem; color: #6b7280; margin-bottom: 0.75rem;">
+                            En la ficha del estudiante se elige el tipo de curso y la mensualidad oficial se pone sola.
+                        </div>
+                        <table style="width: 100%; border-collapse: collapse; font-size: 0.875rem; margin-bottom: 0.75rem;">
+                            <thead><tr style="background: #ede9fe; text-align: left;">
+                                <th style="padding: 6px 8px;">Curso</th><th style="padding: 6px 8px;">Mensualidad</th><th style="padding: 6px 8px;"></th>
+                            </tr></thead>
+                            <tbody>
+                                ${Object.entries(this.priceList.cursoTipos || {}).sort((a, b) => (a[1].nombre || '').localeCompare(b[1].nombre || '')).map(([id, t]) => `
+                                <tr style="border-bottom: 1px solid #e5e7eb;">
+                                    <td style="padding: 6px 8px;">${t.nombre}</td>
+                                    <td style="padding: 6px 8px; font-weight: 600;">$${(Number(t.mensual) || 0).toLocaleString('es-CO')}</td>
+                                    <td style="padding: 6px 8px;">
+                                        <button onclick="window.PricingManager.deleteCursoTipo('${id}')" class="btn btn-sm" style="background:#dc2626;color:white;padding:2px 8px;font-size:0.7rem;">🗑</button>
+                                    </td>
+                                </tr>`).join('') || '<tr><td colspan="3" style="padding: 8px; color: #6b7280;">Sin tipos configurados</td></tr>'}
+                            </tbody>
+                        </table>
+                        <div style="display: grid; grid-template-columns: 2fr 1fr auto; gap: 0.75rem; align-items: end;">
+                            <div>
+                                <label style="font-size: 0.875rem; font-weight: 500;">Nombre del curso</label>
+                                <input type="text" id="ctNombre" placeholder="Ej: Francés 2 días/semana"
+                                       style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                            </div>
+                            <div>
+                                <label style="font-size: 0.875rem; font-weight: 500;">Mensualidad ($)</label>
+                                <input type="number" id="ctMensual" placeholder="Ej: 200000" min="0"
+                                       style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                            </div>
+                            <button onclick="window.PricingManager.saveCursoTipo()" class="btn" style="background: #7c3aed; color: white; padding: 0.5rem 1rem;">
+                                💾 Guardar
+                            </button>
+                        </div>
+                    </div>
+
                     <div style="background: #fef3c7; border: 2px solid #f59e0b; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
                         <h4 style="margin: 0 0 0.75rem 0; color: #92400e;">➕ Nueva Promoción</h4>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
@@ -525,6 +562,50 @@ class PricingManagerClass {
         } catch (error) {
             console.error('❌ Error saving semester package:', error);
             window.showNotification('❌ Error al guardar el precio de semestre', 'error');
+        }
+    }
+
+    async saveCursoTipo() {
+        if (!this.isPricingAdmin()) return;
+        const nombre = document.getElementById('ctNombre')?.value?.trim();
+        const mensual = parseInt(document.getElementById('ctMensual')?.value) || 0;
+        if (!nombre || mensual <= 0) {
+            window.showNotification('⚠️ Ingrese el nombre del curso y la mensualidad', 'warning');
+            return;
+        }
+        const id = nombre.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+            .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || `curso-${Date.now()}`;
+        try {
+            const db = window.firebaseModules.database;
+            await db.set(db.ref(window.FirebaseData.database, `priceList/cursoTipos/${id}`), { nombre, mensual });
+            if (!this.priceList.cursoTipos) this.priceList.cursoTipos = {};
+            this.priceList.cursoTipos[id] = { nombre, mensual };
+            if (typeof window.logAudit === 'function') {
+                await window.logAudit('Tipo de curso guardado', 'pricing', id,
+                    `${nombre}: $${mensual.toLocaleString('es-CO')}/mes`, { after: { nombre, mensual } });
+            }
+            window.showNotification('✅ Tipo de curso guardado', 'success');
+            this.showAdminModal();
+        } catch (error) {
+            console.error('❌ Error saving course type:', error);
+            window.showNotification('❌ Error al guardar el tipo de curso', 'error');
+        }
+    }
+
+    async deleteCursoTipo(id) {
+        if (!this.isPricingAdmin()) return;
+        const t = this.priceList.cursoTipos?.[id];
+        if (!confirm(`¿Eliminar el tipo de curso "${t?.nombre || id}"? Los estudiantes que ya lo tienen conservan su valor.`)) return;
+        try {
+            const db = window.firebaseModules.database;
+            await db.set(db.ref(window.FirebaseData.database, `priceList/cursoTipos/${id}`), null);
+            if (this.priceList.cursoTipos) delete this.priceList.cursoTipos[id];
+            if (typeof window.logAudit === 'function') {
+                await window.logAudit('Tipo de curso eliminado', 'pricing', id, t?.nombre || id, {});
+            }
+            this.showAdminModal();
+        } catch (error) {
+            console.error('❌ Error deleting course type:', error);
         }
     }
 

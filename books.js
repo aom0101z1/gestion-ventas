@@ -691,7 +691,7 @@ class BookManagerClass {
                             </div>
                             <div>
                                 <label style="font-size: 0.8rem;">Precio por libro</label><br>
-                                <input type="number" id="seedPrice" min="0" placeholder="Ej: 80000" style="padding: 6px; border: 1px solid #d1d5db; border-radius: 6px; width: 130px;">
+                                <input type="number" id="seedPrice" min="0" value="80000" placeholder="Ej: 80000" style="padding: 6px; border: 1px solid #d1d5db; border-radius: 6px; width: 130px;">
                             </div>
                             <button onclick="window.BookManager.seedSeries()" class="btn" style="background: #2563eb; color: white; padding: 6px 12px;">Crear Libros 1-10</button>
                         </div>

@@ -422,6 +422,26 @@ function renderPaymentNotesModal(student) {
 // ============================================
 
 // Helper function to get Grupos 2.0 options for the dropdown
+// Official course types (priceList/cursoTipos, admin-managed in 💲 Precios).
+// Selecting one auto-fills the official monthly price — no hand-typed values.
+function getCursoTipoOptions(selected) {
+    const tipos = window.PricingManager?.priceList?.cursoTipos || {};
+    return Object.entries(tipos)
+        .sort((a, b) => (a[1].nombre || '').localeCompare(b[1].nombre || ''))
+        .map(([id, t]) =>
+            `<option value="${id}" data-mensual="${Number(t.mensual) || 0}" ${selected === id ? 'selected' : ''}>${t.nombre} — $${(Number(t.mensual) || 0).toLocaleString('es-CO')}/mes</option>`)
+        .join('');
+}
+
+window.applyCursoTipo = function(which) {
+    const select = document.getElementById(which === '2' ? 'stuCursoTipo2' : 'stuCursoTipo');
+    const input = document.getElementById(which === '2' ? 'stuValor2' : 'stuValor');
+    if (!select || !input) return;
+    const opt = select.options[select.selectedIndex];
+    const mensual = Number(opt?.dataset?.mensual) || 0;
+    if (mensual > 0) input.value = mensual;
+};
+
 function getGrupos2Options(selectedGrupo) {
     // Try to get groups from Grupos 2.0 system first
     if (window.GroupsManager2 && window.GroupsManager2.groups && window.GroupsManager2.groups.size > 0) {
@@ -601,7 +621,12 @@ function renderStudentForm(student = null) {
                     </div>
 
                     <div class="form-group" id="valorMensualGroup" style="display: ${!student || student?.tipoPago !== 'POR_HORAS' ? 'block' : 'none'};">
-                        <label>Valor Mensualidad ($)</label>
+                        <label>Tipo de curso</label>
+                        <select id="stuCursoTipo" onchange="applyCursoTipo('1')" ${isEdit && !window.isStudentMoneyAdmin() ? 'disabled style="background:#f3f4f6;"' : ''}>
+                            <option value="">— Elegir tipo de curso (pone el precio oficial) —</option>
+                            ${getCursoTipoOptions(student?.cursoTipo)}
+                        </select>
+                        <label style="margin-top: 0.5rem;">Valor Mensualidad ($)</label>
                         <input type="number" id="stuValor" value="${student?.valor || ''}" min="0" placeholder="Valor mensual" ${isEdit && !window.isStudentMoneyAdmin() ? 'readonly style="background:#f3f4f6;"' : ''}>
                         ${isEdit && !window.isStudentMoneyAdmin() ? '<small style="color:#92400e;">Solo el Director puede cambiar el valor de un estudiante ya registrado.</small>' : ''}
                     </div>
@@ -621,6 +646,11 @@ function renderStudentForm(student = null) {
                         <select id="stuGrupo2">
                             <option value="">Sin segundo curso</option>
                             ${getGrupos2Options(student?.grupo2)}
+                        </select>
+                        <label style="margin-top: 0.5rem;">Tipo de curso (segundo curso)</label>
+                        <select id="stuCursoTipo2" onchange="applyCursoTipo('2')" ${isEdit && !window.isStudentMoneyAdmin() ? 'disabled style="background:#f3f4f6;"' : ''}>
+                            <option value="">— Elegir tipo de curso —</option>
+                            ${getCursoTipoOptions(student?.cursoTipo2)}
                         </select>
                         <label style="margin-top: 0.5rem;">Valor mensualidad segundo curso ($)</label>
                         <input type="number" id="stuValor2" value="${student?.valor2 || ''}" min="0" placeholder="0 = sin cobro adicional" ${isEdit && !window.isStudentMoneyAdmin() ? 'readonly style="background:#f3f4f6;"' : ''}>
@@ -807,7 +837,12 @@ window.StudentManager = new StudentManager();
 
 window.loadStudentsTab = async function() {
     console.log('📚 Loading students tab');
-    
+
+    // Course-type catalog (official monthly prices) lives in PricingManager
+    if (window.PricingManager && !window.PricingManager.loaded) {
+        window.PricingManager.init().catch(() => {});
+    }
+
     const container = document.getElementById('studentsContainer');
     if (!container) {
         console.error('❌ Students container not found');
@@ -1625,6 +1660,8 @@ async function saveStudentForm(studentId) {
             grupo: newGrupo,
             grupo2: newGrupo2,
             valor2: valor2,
+            cursoTipo: document.getElementById('stuCursoTipo')?.value || '',
+            cursoTipo2: document.getElementById('stuCursoTipo2')?.value || '',
             modalidad: document.getElementById('stuModalidad').value,
             modalidadDetalle: document.getElementById('stuModalidadDetalle').value,
             tipoPago: tipoPago,
