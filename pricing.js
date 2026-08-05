@@ -131,7 +131,36 @@ class PricingManagerClass {
     }
 
     // Expected base tuition: student.valor × number of months (null if not computable)
+    // Official semester package price for a given monthly value (e.g. monthly
+    // 200000 → semester 950000; 280000 → 1150000). Stored by admin in
+    // priceList/semesterPackages. Returns null when there is no package for
+    // that monthly value (grandfathered prices fall back to monthly × months).
+    semesterPackageFor(monthlyValor) {
+        const pkg = this.priceList?.semesterPackages?.[String(monthlyValor)];
+        return pkg ? Number(pkg) : null;
+    }
+
+    currentPaymentType() {
+        return document.getElementById('paymentType')?.value || 'monthly';
+    }
+
     expectedBase(student, monthCount) {
+        const paymentType = this.currentPaymentType();
+
+        // Semester payments use the official PACKAGE price per course, not
+        // monthly × months (the package includes the semester discount)
+        if (paymentType === 'academicSemester' || paymentType === 'twoSemesters') {
+            const multiplier = paymentType === 'twoSemesters' ? 2 : 1;
+            const parts = [];
+            for (const v of [Number(student?.valor) || 0, Number(student?.valor2) || 0]) {
+                if (v <= 0) continue;
+                const pkg = this.semesterPackageFor(v);
+                parts.push(pkg !== null ? pkg * multiplier : v * monthCount);
+            }
+            if (parts.length > 0 && monthCount > 0) return parts.reduce((a, b) => a + b, 0);
+            return null;
+        }
+
         // Base course + optional second course (weekday + Saturday students)
         const valor = window.getStudentMonthlyTotal
             ? window.getStudentMonthlyTotal(student)
@@ -157,13 +186,30 @@ class PricingManagerClass {
         const final = this.promoPrice(expected, promo);
         input.value = '$' + final.toLocaleString('es-CO');
         if (hint) {
-            const monthly = window.getStudentMonthlyTotal ? window.getStudentMonthlyTotal(student) : Number(student.valor);
-            const cursos = Number(student.valor2) > 0
-                ? ` (curso 1 $${Number(student.valor).toLocaleString('es-CO')} + curso 2 $${Number(student.valor2).toLocaleString('es-CO')})`
-                : '';
+            const paymentType = this.currentPaymentType();
+            let listLabel;
+            if (paymentType === 'academicSemester' || paymentType === 'twoSemesters') {
+                const mult = paymentType === 'twoSemesters' ? 2 : 1;
+                const parts = [];
+                [['curso 1', Number(student.valor) || 0], ['curso 2', Number(student.valor2) || 0]].forEach(([label, v]) => {
+                    if (v <= 0) return;
+                    const pkg = this.semesterPackageFor(v);
+                    parts.push(pkg !== null
+                        ? `${label}: paquete $${(pkg * mult).toLocaleString('es-CO')} (mensualidad $${v.toLocaleString('es-CO')})`
+                        : `${label}: $${v.toLocaleString('es-CO')} × ${monthCount} meses`);
+                });
+                const period = paymentType === 'twoSemesters' ? 'año (2 semestres)' : 'semestre';
+                listLabel = `Precio ${period}: ${parts.join(' + ')} = <strong>$${expected.toLocaleString('es-CO')}</strong>`;
+            } else {
+                const monthly = window.getStudentMonthlyTotal ? window.getStudentMonthlyTotal(student) : Number(student.valor);
+                const cursos = Number(student.valor2) > 0
+                    ? ` (curso 1 $${Number(student.valor).toLocaleString('es-CO')} + curso 2 $${Number(student.valor2).toLocaleString('es-CO')})`
+                    : '';
+                listLabel = `Precio lista: $${monthly.toLocaleString('es-CO')}${cursos} × ${monthCount} mes(es) = <strong>$${expected.toLocaleString('es-CO')}</strong>`;
+            }
             hint.innerHTML = promo
                 ? `Precio lista: $${expected.toLocaleString('es-CO')} → con ${promo.name}: <strong>$${final.toLocaleString('es-CO')}</strong>`
-                : `Precio lista: $${monthly.toLocaleString('es-CO')}${cursos} × ${monthCount} mes(es) = <strong>$${expected.toLocaleString('es-CO')}</strong>`;
+                : listLabel;
         }
         if (typeof window.updatePaymentTotal === 'function') window.updatePaymentTotal();
     }
@@ -206,6 +252,7 @@ class PricingManagerClass {
                 valorMensual: window.getStudentMonthlyTotal ? window.getStudentMonthlyTotal(student) : Number(student.valor),
                 valorCurso1: Number(student.valor) || 0,
                 valorCurso2: Number(student.valor2) || 0,
+                paymentTypeAtValidation: this.currentPaymentType(),
                 months: monthCount,
                 charged: baseAmount,
                 required: required,
@@ -319,6 +366,45 @@ class PricingManagerClass {
                         </div>
                     </div>
 
+                    <div style="background: #eff6ff; border: 2px solid #3b82f6; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+                        <h4 style="margin: 0 0 0.5rem 0; color: #1e40af;">📅 Precios de Semestre (paquete oficial)</h4>
+                        <div style="font-size: 0.8rem; color: #6b7280; margin-bottom: 0.75rem;">
+                            Precio fijo del Semestre Académico según la mensualidad del curso.
+                            Ej: mensualidad $200.000 → semestre $950.000; mensualidad $280.000 → semestre $1.150.000.
+                            Cursos sin paquete se calculan como mensualidad × meses.
+                        </div>
+                        <table style="width: 100%; border-collapse: collapse; font-size: 0.875rem; margin-bottom: 0.75rem;">
+                            <thead><tr style="background: #dbeafe; text-align: left;">
+                                <th style="padding: 6px 8px;">Mensualidad</th><th style="padding: 6px 8px;">Precio Semestre</th><th style="padding: 6px 8px;"></th>
+                            </tr></thead>
+                            <tbody>
+                                ${Object.entries(this.priceList.semesterPackages || {}).sort((a, b) => Number(a[0]) - Number(b[0])).map(([mensual, semestre]) => `
+                                <tr style="border-bottom: 1px solid #e5e7eb;">
+                                    <td style="padding: 6px 8px;">$${Number(mensual).toLocaleString('es-CO')}</td>
+                                    <td style="padding: 6px 8px; font-weight: 600;">$${Number(semestre).toLocaleString('es-CO')}</td>
+                                    <td style="padding: 6px 8px;">
+                                        <button onclick="window.PricingManager.deleteSemesterPackage('${mensual}')" class="btn btn-sm" style="background:#dc2626;color:white;padding:2px 8px;font-size:0.7rem;">🗑</button>
+                                    </td>
+                                </tr>`).join('') || '<tr><td colspan="3" style="padding: 8px; color: #6b7280;">Sin paquetes configurados</td></tr>'}
+                            </tbody>
+                        </table>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 0.75rem; align-items: end;">
+                            <div>
+                                <label style="font-size: 0.875rem; font-weight: 500;">Mensualidad ($)</label>
+                                <input type="number" id="spMensual" placeholder="Ej: 200000" min="0"
+                                       style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                            </div>
+                            <div>
+                                <label style="font-size: 0.875rem; font-weight: 500;">Precio Semestre ($)</label>
+                                <input type="number" id="spSemestre" placeholder="Ej: 950000" min="0"
+                                       style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                            </div>
+                            <button onclick="window.PricingManager.saveSemesterPackage()" class="btn" style="background: #2563eb; color: white; padding: 0.5rem 1rem;">
+                                💾 Guardar
+                            </button>
+                        </div>
+                    </div>
+
                     <div style="background: #fef3c7; border: 2px solid #f59e0b; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
                         <h4 style="margin: 0 0 0.75rem 0; color: #92400e;">➕ Nueva Promoción</h4>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
@@ -411,6 +497,51 @@ class PricingManagerClass {
         } catch (error) {
             console.error('❌ Error saving prices:', error);
             window.showNotification('❌ Error al guardar precios', 'error');
+        }
+    }
+
+    async saveSemesterPackage() {
+        if (!this.isPricingAdmin()) return;
+        const mensual = parseInt(document.getElementById('spMensual')?.value) || 0;
+        const semestre = parseInt(document.getElementById('spSemestre')?.value) || 0;
+        if (mensual <= 0 || semestre <= 0) {
+            window.showNotification('⚠️ Ingrese la mensualidad y el precio del semestre', 'warning');
+            return;
+        }
+        try {
+            const db = window.firebaseModules.database;
+            await db.update(db.ref(window.FirebaseData.database, 'priceList/semesterPackages'), {
+                [String(mensual)]: semestre
+            });
+            if (!this.priceList.semesterPackages) this.priceList.semesterPackages = {};
+            this.priceList.semesterPackages[String(mensual)] = semestre;
+            if (typeof window.logAudit === 'function') {
+                await window.logAudit('Precio de semestre actualizado', 'pricing', 'semesterPackages',
+                    `Mensualidad $${mensual.toLocaleString('es-CO')} → Semestre $${semestre.toLocaleString('es-CO')}`,
+                    { after: { mensual, semestre } });
+            }
+            window.showNotification('✅ Precio de semestre guardado', 'success');
+            this.showAdminModal();
+        } catch (error) {
+            console.error('❌ Error saving semester package:', error);
+            window.showNotification('❌ Error al guardar el precio de semestre', 'error');
+        }
+    }
+
+    async deleteSemesterPackage(mensualKey) {
+        if (!this.isPricingAdmin()) return;
+        if (!confirm(`¿Eliminar el paquete de semestre para mensualidad $${Number(mensualKey).toLocaleString('es-CO')}?`)) return;
+        try {
+            const db = window.firebaseModules.database;
+            await db.set(db.ref(window.FirebaseData.database, `priceList/semesterPackages/${mensualKey}`), null);
+            if (this.priceList.semesterPackages) delete this.priceList.semesterPackages[mensualKey];
+            if (typeof window.logAudit === 'function') {
+                await window.logAudit('Precio de semestre eliminado', 'pricing', 'semesterPackages',
+                    `Mensualidad $${Number(mensualKey).toLocaleString('es-CO')}`, {});
+            }
+            this.showAdminModal();
+        } catch (error) {
+            console.error('❌ Error deleting semester package:', error);
         }
     }
 
