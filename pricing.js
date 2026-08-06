@@ -178,9 +178,19 @@ class PricingManagerClass {
 
         const expected = this.expectedBase(student, monthCount);
         if (expected === null) {
+            // No official price computable: legacy free entry, flagged unvalidated
+            input.readOnly = false;
+            input.style.background = '';
             if (hint) hint.innerHTML = '⚠️ Este estudiante no tiene valor mensual configurado — el monto no será validado';
             return;
         }
+
+        // Official price exists: the amount is NOT hand-editable. It only
+        // unlocks when "Abono / Pago parcial" is checked (onPartialToggle).
+        const partial = document.getElementById('partialPaymentCheck')?.checked;
+        input.readOnly = !partial;
+        input.style.background = partial ? '' : '#f3f4f6';
+        if (partial) return; // keep whatever partial amount the user is typing
 
         const promo = select?.value ? this.promotions.get(select.value) : null;
         const final = this.promoPrice(expected, promo);
@@ -227,6 +237,22 @@ class PricingManagerClass {
         const student = window.StudentManager?.students.get(window.currentStudentId);
         const monthCount = document.querySelectorAll('.month-checkbox:checked').length;
         this.autoFillBase(student, monthCount);
+    }
+
+    // "Abono / Pago parcial" checkbox: checked → unlock the amount so the
+    // partial can be typed; unchecked → re-lock and restore the official price.
+    onPartialToggle() {
+        const input = document.getElementById('payAmountBase');
+        const check = document.getElementById('partialPaymentCheck');
+        if (!input || !check) return;
+        if (check.checked) {
+            input.readOnly = false;
+            input.style.background = '';
+            input.focus();
+        } else {
+            this.applyBasePromo();
+            if (typeof window.updatePaymentTotal === 'function') window.updatePaymentTotal();
+        }
     }
 
     // Validate amounts on submit and build the pricing metadata stored on the payment.

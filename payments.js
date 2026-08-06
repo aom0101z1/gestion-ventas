@@ -2715,7 +2715,7 @@ function renderPaymentModal(student) {
                                 </select>
                             </div>
                             <label style="display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 0.875rem; color: #92400e; cursor: pointer;">
-                                <input type="checkbox" id="partialPaymentCheck">
+                                <input type="checkbox" id="partialPaymentCheck" onchange="window.PricingManager?.onPartialToggle()">
                                 Abono / Pago parcial (el estudiante queda con saldo pendiente)
                             </label>
                         </div>
