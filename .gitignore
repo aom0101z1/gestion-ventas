@@ -1,5 +1,5 @@
-# Project documentation (keep local for security)
-PROJECT_SUMMARY_CRM.md
+﻿# Project documentation (keep local for security)
+crm_summary*.md
 CLAUDE.md
 .claude/
 
