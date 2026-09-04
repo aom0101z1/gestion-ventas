@@ -87,7 +87,16 @@ class AuditLogManager {
         try {
             const db = window.firebaseModules.database;
             const ref = db.ref(window.FirebaseData.database, 'auditLog');
-            const snapshot = await db.get(ref);
+            // 4 Sep 2026: the log had grown to MBs (photo base64 in before/after
+            // entries) and this full read froze the browser on the FIRST audit
+            // write of every session. Load only the newest 1,500 entries (keys
+            // are LOG-{timestamp}-…, so key order = time order) unless a date
+            // filter asks for history.
+            const canQuery = typeof db.query === 'function' && typeof db.limitToLast === 'function';
+            const src = canQuery && !startDate && !endDate
+                ? db.query(ref, db.orderByKey(), db.limitToLast(1500))
+                : ref;
+            const snapshot = await db.get(src);
 
             this.logs.clear();
 
@@ -127,7 +136,9 @@ class AuditLogManager {
                 entityType,
                 entityId,
                 description,
-                details: JSON.stringify(details), // Store as JSON string for Firebase
+                // Store as JSON string for Firebase — LARGE values (base64 photos,
+                // long blobs) are replaced by a marker so the log stays small.
+                details: JSON.stringify(window.sanitizeAuditDetails(details)),
                 userId: window.FirebaseData.currentUser?.uid || 'system',
                 userName: window.FirebaseData.currentUser?.email || 'Sistema',
                 timestamp: new Date().toISOString(),
@@ -665,6 +676,66 @@ window.toggleAuditLogDetails = function(logId) {
  * Wrapper function for easy audit logging from other modules
  * Usage: window.logAudit('Estudiante añadido', 'student', studentId, 'María González - C.C 12345', { after: studentData })
  */
+/**
+ * Replace oversized values (base64 images, long strings) in audit details
+ * with a short marker. Keeps before/after readable and the log small.
+ */
+window.sanitizeAuditDetails = function(value, depth = 0) {
+    if (depth > 6) return '[…]';
+    if (typeof value === 'string') {
+        if (value.startsWith('data:image/')) return `[foto ${Math.round(value.length / 1024)} KB]`;
+        return value.length > 400 ? value.slice(0, 200) + `… [${value.length} chars]` : value;
+    }
+    if (Array.isArray(value)) return value.slice(0, 50).map(v => window.sanitizeAuditDetails(v, depth + 1));
+    if (value && typeof value === 'object') {
+        const out = {};
+        for (const [k, v] of Object.entries(value)) out[k] = window.sanitizeAuditDetails(v, depth + 1);
+        return out;
+    }
+    return value;
+};
+
+/**
+ * 🧹 One-off maintenance (run from the browser console as admin):
+ *   compactAuditLog()
+ * Pages through auditLog and shrinks every entry whose details carry a
+ * base64 photo. Safe to re-run; prints progress.
+ */
+window.compactAuditLog = async function() {
+    const db = window.firebaseModules.database;
+    if (typeof db.query !== 'function') { console.error('query helpers not loaded — reload the CRM'); return; }
+    const root = db.ref(window.FirebaseData.database, 'auditLog');
+    let after = null, scanned = 0, fixed = 0, bytesSaved = 0;
+    for (;;) {
+        const q = after
+            ? db.query(root, db.orderByKey(), db.startAfter(after), db.limitToFirst(200))
+            : db.query(root, db.orderByKey(), db.limitToFirst(200));
+        const snap = await db.get(q);
+        if (!snap.exists()) break;
+        const data = snap.val();
+        const keys = Object.keys(data).sort();
+        const updates = {};
+        for (const id of keys) {
+            scanned++;
+            const d = data[id] && data[id].details;
+            if (typeof d === 'string' && d.length > 2000 && d.includes('data:image/')) {
+                let parsed;
+                try { parsed = JSON.parse(d); } catch (e) { parsed = { raw: d }; }
+                const small = JSON.stringify(window.sanitizeAuditDetails(parsed));
+                updates[`${id}/details`] = small;
+                bytesSaved += d.length - small.length;
+                fixed++;
+            }
+        }
+        if (Object.keys(updates).length) await db.update(root, updates);
+        console.log(`compactAuditLog: ${scanned} scanned · ${fixed} fixed · ${Math.round(bytesSaved / 1024)} KB saved`);
+        if (keys.length < 200) break;
+        after = keys[keys.length - 1];
+    }
+    console.log(`✅ compactAuditLog done: ${fixed} entries shrunk, ~${Math.round(bytesSaved / 1024)} KB removed`);
+    return { scanned, fixed, bytesSaved };
+};
+
 window.logAudit = async function(activityType, entityType, entityId, description, details = {}) {
     try {
         if (!window.AuditLogManager.initialized) {

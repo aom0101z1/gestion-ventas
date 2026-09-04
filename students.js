@@ -737,7 +737,7 @@ function renderStudentTable(students) {
                                 <div style="display: flex; align-items: center; gap: 0.5rem;">
                                     <div style="width: 32px; height: 32px; border-radius: 50%; background: #e5e7eb; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; ${s.photoUrl ? 'cursor: pointer;' : ''}" ${s.photoUrl ? `onclick="viewStudentPhotoFull('${s.photoUrl}', '${(s.nombre || '').replace(/'/g, "\\'")}')"` : ''}>
                                         ${s.photoUrl ?
-                                            `<img src="${s.photoUrl}" style="width: 100%; height: 100%; object-fit: cover;">` :
+                                            `<img src="${s.photoUrl}" loading="lazy" style="width: 100%; height: 100%; object-fit: cover;">` :
                                             `<span style="font-size: 0.9rem; color: #9ca3af;">👤</span>`
                                         }
                                     </div>
@@ -2456,6 +2456,51 @@ window.printLoginCard = function(studentId) {
  * photo REPLACES an older classroom photo but never a photo uploaded by
  * staff in the CRM (photoUpdatedBy !== 'classroom').
  */
+/**
+ * Shrink a data-URL photo for CRM storage: 128px JPEG (~5-8 KB). The room
+ * selfie is 320px (~30 KB) — fine for one tile, too heavy ×300 students in
+ * a node every module downloads.
+ */
+window.shrinkPhotoDataUrl = function(dataUrl, size = 128, quality = 0.72) {
+    return new Promise((resolve) => {
+        try {
+            const img = new Image();
+            img.onload = () => {
+                const s = Math.min(img.width, img.height);
+                const canvas = document.createElement('canvas');
+                canvas.width = size; canvas.height = size;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, size, size);
+                resolve(canvas.toDataURL('image/jpeg', quality));
+            };
+            img.onerror = () => resolve(dataUrl);
+            img.src = dataUrl;
+        } catch (e) { resolve(dataUrl); }
+    });
+};
+
+/**
+ * 🧹 One-off maintenance (browser console, admin): compactStudentPhotos()
+ * Re-compresses classroom photos already stored at 320px down to 128px.
+ * Writes directly (no audit entry). Staff-uploaded photos are left alone.
+ */
+window.compactStudentPhotos = async function() {
+    const db = window.firebaseModules.database;
+    let fixed = 0, saved = 0;
+    for (const s of window.StudentManager.students.values()) {
+        const p = s.photoUrl;
+        if (!p || typeof p !== 'string' || !p.startsWith('data:image/') || p.length < 12000) continue;
+        if (s.photoUpdatedBy && s.photoUpdatedBy !== 'classroom') continue;
+        const small = await window.shrinkPhotoDataUrl(p);
+        if (small.length >= p.length) continue;
+        await db.update(db.ref(window.FirebaseData.database, `students/${s.id}`), { photoUrl: small });
+        s.photoUrl = small;
+        fixed++; saved += p.length - small.length;
+    }
+    console.log(`✅ compactStudentPhotos: ${fixed} photos shrunk, ~${Math.round(saved / 1024)} KB removed`);
+    return { fixed, saved };
+};
+
 window.syncClassPhotos = async function() {
     const btn = document.getElementById('syncClassPhotosBtn');
     const all = Array.from(window.StudentManager.students.values()).filter(s => s.tutorboxUid);
@@ -2471,10 +2516,12 @@ window.syncClassPhotos = async function() {
             const data = await tbxPost('getB2BStudentPhotos', { uids: chunk.map(s => s.tutorboxUid) });
             const photos = data.photos || {};
             for (const s of chunk) {
-                const photo = photos[s.tutorboxUid];
-                if (!photo) continue;
+                const raw = photos[s.tutorboxUid];
+                if (!raw) continue;
                 const staffPhoto = s.photoUrl && s.photoUpdatedBy && s.photoUpdatedBy !== 'classroom';
-                if (staffPhoto || s.photoUrl === photo) { skipped++; continue; }
+                if (staffPhoto) { skipped++; continue; }
+                const photo = await window.shrinkPhotoDataUrl(raw);
+                if (s.photoUrl === photo) { skipped++; continue; }
                 await window.StudentManager.updateStudent(s.id, {
                     photoUrl: photo,
                     photoUpdatedAt: new Date().toISOString(),
