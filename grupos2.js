@@ -719,11 +719,32 @@ window.showGrupo2Form = async function(groupId = null) {
     await window.loadTutorBoxTeachers();
 
     const group = groupId ? window.GroupsManager2.groups.get(groupId) : null;
-    document.getElementById('grupo2FormContainer').innerHTML = renderGrupo2Form(group);
+
+    // 🪟 Pop-up (4 Sep): the form opens in a centered modal — same shell as
+    // the Estudiantes modal — instead of pushing the page down.
+    window.cancelGrupo2Form();
+    const modal = document.createElement('div');
+    modal.id = 'grupo2FormModal';
+    modal.style.cssText = `
+        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.5); display: flex; align-items: center;
+        justify-content: center; z-index: 10001; padding: 1rem;`;
+    modal.innerHTML = `
+        <div style="background: white; border-radius: 12px; max-width: 1000px; width: 96%; max-height: 90vh;
+                    overflow-y: auto; box-shadow: 0 20px 50px rgba(0,0,0,0.3);">
+            ${renderGrupo2Form(group)}
+        </div>`;
+    modal.addEventListener('click', (e) => { if (e.target === modal) window.cancelGrupo2Form(); });
+    document.body.appendChild(modal);
+    const onKey = (e) => { if (e.key === 'Escape') { window.cancelGrupo2Form(); document.removeEventListener('keydown', onKey); } };
+    document.addEventListener('keydown', onKey);
 };
 
 window.cancelGrupo2Form = function() {
-    document.getElementById('grupo2FormContainer').innerHTML = '';
+    const modal = document.getElementById('grupo2FormModal');
+    if (modal) modal.remove();
+    const inline = document.getElementById('grupo2FormContainer');
+    if (inline) inline.innerHTML = '';
 };
 
 // Update form based on modality selection
