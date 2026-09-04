@@ -310,6 +310,8 @@ window.loadGrupos2Tab = async function() {
     console.log('📦 Using container:', container.parentElement?.id || 'main page');
 
     try {
+        // 📚 book catalog first so the Libro filter lists the current books
+        await window.loadTutorBoxBooks();
         console.log('📝 Rendering view...');
         const viewHTML = renderGrupos2View();
         console.log('📝 View HTML length:', viewHTML.length);
@@ -374,7 +376,9 @@ function renderGrupos2View() {
                         <select id="filterBook" onchange="applyGrupos2Filters()"
                                 style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
                             <option value="all">Todos los libros</option>
-                            ${Array.from({length: 12}, (_, i) => `<option value="${i + 1}">Book ${i + 1}</option>`).join('')}
+                            ${(window._tbxBooks && window._tbxBooks.length
+                                ? window._tbxBooks.map(b => `<option value="${b.book_number}">${b.book_number} · ${b.title}</option>`)
+                                : Array.from({length: 12}, (_, i) => `<option value="${i + 1}">Book ${i + 1}</option>`)).join('')}
                         </select>
                     </div>
 
@@ -423,26 +427,45 @@ function renderGrupo2Form(group = null) {
     const manager = window.GroupsManager2;
     const isEdit = !!group;
 
-    // Teachers: 🎥 TutorBox Live accounts first (the list from tutorbox.app/admin/live —
-    // the account that opens the live class), then the CRM's own teacher records.
+    // Teachers: ONLY 🎥 TutorBox Live accounts (the list from tutorbox.app/admin/live —
+    // the account that opens the live class). The old CRM teacher records were
+    // removed from this picker (4 Sep). A group whose teacher is not in the list
+    // keeps its current value so it isn't lost on save.
     let teacherOptions = '<option value="">Sin asignar</option>';
     const tbx = window._tbxTeachers || [];
+    const currentIsTbx = !!group?.teacherId?.startsWith?.('tbx:');
+    const currentMatch = tbx.some(t => `tbx:${t.uid}` === group?.teacherId || (group?.teacherEmail && group.teacherEmail === t.email));
+    if (group?.teacherId && !currentMatch) {
+        teacherOptions += `<option value="${group.teacherId}" selected>${group.teacherName || group.teacherId} (actual)</option>`;
+    }
     if (tbx.length) {
-        teacherOptions += `<optgroup label="🎥 Profesores TutorBox Live (clases en vivo)">` + tbx.map(t => `
-            <option value="tbx:${t.uid}" ${group?.teacherId === `tbx:${t.uid}` || (!group?.teacherId?.startsWith?.('tbx:') && group?.teacherEmail && group.teacherEmail === t.email) ? 'selected' : ''}>
+        teacherOptions += tbx.map(t => `
+            <option value="tbx:${t.uid}" ${group?.teacherId === `tbx:${t.uid}` || (!currentIsTbx && group?.teacherEmail && group.teacherEmail === t.email) ? 'selected' : ''}>
                 ${t.name} · ${t.email}
             </option>
-        `).join('') + `</optgroup>`;
+        `).join('');
+    } else {
+        teacherOptions += `<option value="" disabled>⚠️ No se pudo cargar la lista de TutorBox Live</option>`;
     }
-    if (window.TeacherManager && window.TeacherManager.teachers && window.TeacherManager.teachers.size > 0) {
-        const teachers = Array.from(window.TeacherManager.teachers.values())
-            .filter(t => t.status !== 'inactive') // Only active teachers
-            .sort((a, b) => a.name.localeCompare(b.name)); // Sort alphabetically
-        teacherOptions += `<optgroup label="🏫 Profesores del CRM">` + teachers.map(t => `
-            <option value="${t.id}" ${group?.teacherId === t.id ? 'selected' : ''}>
-                ${t.name}
-            </option>
-        `).join('') + `</optgroup>`;
+
+    // Books: the CURRENT TutorBox catalog (tutorbox.app books manifest), grouped by
+    // family; falls back to Book 1-12 when offline. Value = real book number.
+    const books = window._tbxBooks || [];
+    const currentBook = group?.book != null ? Number(group.book) : null;
+    let bookOptions = '<option value="">Seleccionar...</option>';
+    if (books.length) {
+        const fams = new Map();
+        books.forEach(b => { if (!fams.has(b.familyLabel)) fams.set(b.familyLabel, []); fams.get(b.familyLabel).push(b); });
+        for (const [fam, list] of fams) {
+            bookOptions += `<optgroup label="${fam}">` + list.map(b => `
+                <option value="${b.book_number}" ${currentBook === Number(b.book_number) ? 'selected' : ''}>${b.book_number} · ${b.title}</option>
+            `).join('') + `</optgroup>`;
+        }
+        if (currentBook != null && !books.some(b => Number(b.book_number) === currentBook)) {
+            bookOptions += `<option value="${currentBook}" selected>Book ${currentBook} (actual)</option>`;
+        }
+    } else {
+        bookOptions += Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}" ${currentBook === i + 1 ? 'selected' : ''}>Book ${i + 1}</option>`).join('');
     }
 
     return `
@@ -474,16 +497,11 @@ function renderGrupo2Form(group = null) {
                     </select>
                 </div>
 
-                <!-- Book -->
+                <!-- Book (current TutorBox catalog) -->
                 <div class="form-group">
-                    <label>Libro (1-12)*</label>
+                    <label>Libro*</label>
                     <select id="grupo2Book" required>
-                        <option value="">Seleccionar...</option>
-                        ${Array.from({length: 12}, (_, i) => `
-                            <option value="${i + 1}" ${group?.book === i + 1 ? 'selected' : ''}>
-                                Book ${i + 1}
-                            </option>
-                        `).join('')}
+                        ${bookOptions}
                     </select>
                 </div>
 
@@ -648,7 +666,7 @@ function renderGrupo2Card(group) {
                         padding: 0.75rem; background: #f9fafb; border-radius: 6px; font-size: 0.875rem;">
                 <div>
                     <strong style="color: #6b7280;">📚 Libro:</strong>
-                    <span>Book ${group.book}${group.unit ? ` - Unit ${group.unit}` : ''}</span>
+                    <span title="${(window._tbxBooks || []).find(b => Number(b.book_number) === Number(group.book))?.title || ''}">${(() => { const b = (window._tbxBooks || []).find(x => Number(x.book_number) === Number(group.book)); return b ? `${b.book_number} · ${b.title}` : `Book ${group.book}`; })()}${group.unit ? ` - Unit ${group.unit}` : ''}</span>
                 </div>
                 <div>
                     <strong style="color: #6b7280;">📅 Días:</strong>
@@ -715,8 +733,8 @@ window.showGrupo2Form = async function(groupId = null) {
         }
     }
 
-    // 🎥 TutorBox Live teachers (cached; [] when offline)
-    await window.loadTutorBoxTeachers();
+    // 🎥 TutorBox Live teachers + 📚 current book catalog (cached; [] when offline)
+    await Promise.all([window.loadTutorBoxTeachers(), window.loadTutorBoxBooks()]);
 
     const group = groupId ? window.GroupsManager2.groups.get(groupId) : null;
 
@@ -1352,6 +1370,30 @@ const TUTORBOX_KEY = 'tbx-admin-2026-cb-provision-k9x7m';
  * 👩‍🏫 TutorBox Live teachers (same list as tutorbox.app/admin/live) for the
  * group form. Cached 5 min. Returns [] when offline so the form still opens.
  */
+/**
+ * 📚 Current TutorBox book catalog (tutorbox.app/tools/data/books-manifest.json:
+ * English adults 0-10, Teens 42x, Kids 43x, Tiny 47x, French 10x, Spanish 20x…).
+ * Cached 30 min; [] when offline → the form falls back to Book 1-12.
+ */
+window._tbxBooks = [];
+let _tbxBooksAt = 0;
+window.loadTutorBoxBooks = async function(force = false) {
+    if (!force && window._tbxBooks.length && Date.now() - _tbxBooksAt < 30 * 60 * 1000) return window._tbxBooks;
+    try {
+        const r = await fetch('https://tutorbox.app/tools/data/books-manifest.json', { cache: 'no-cache' });
+        const data = await r.json();
+        if (r.ok && Array.isArray(data)) {
+            window._tbxBooks = data
+                .filter(b => Number.isFinite(Number(b.book_number)))
+                .sort((a, b) => Number(a.book_number) - Number(b.book_number));
+            _tbxBooksAt = Date.now();
+        }
+    } catch (e) {
+        console.warn('books-manifest:', e.message);
+    }
+    return window._tbxBooks;
+};
+
 window._tbxTeachers = [];
 let _tbxTeachersAt = 0;
 window.loadTutorBoxTeachers = async function(force = false) {
