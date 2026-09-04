@@ -805,6 +805,20 @@ function renderStudentTable(students) {
                                           style="background: #d1fae5; color: #065f46; padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; display: inline-flex; align-items: center; height: 36px; border: 1px solid #a7f3d0; cursor: pointer;">
                                         ✓ App
                                     </button>
+                                    ${s.loginCode ? `
+                                    <button onclick="copyLoginCode('${s.loginCode}')"
+                                          title="Código de clase (clic para copiar). Doble clic = imprimir tarjeta"
+                                          ondblclick="printLoginCard('${s.id}')"
+                                          style="background: #fef3c7; color: #92400e; padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.85rem; font-weight: 800; font-family: monospace; letter-spacing: 0.08em; display: inline-flex; align-items: center; height: 36px; border: 1px solid #fcd34d; cursor: pointer;">
+                                        🎟️ ${s.loginCode}
+                                    </button>
+                                    ` : `
+                                    <button onclick="generateStudentLoginCode('${s.id}')"
+                                          title="Generar código de clase (letra + 5 números) para entrar sin contraseña"
+                                          style="background: #fffbeb; color: #b45309; padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; display: inline-flex; align-items: center; height: 36px; border: 1px dashed #f59e0b; cursor: pointer;">
+                                        🎟️ Código
+                                    </button>
+                                    `}
                                     ` : `
                                     <button onclick="showCreateStudentAccountModal('${s.id}')" class="btn btn-sm"
                                             style="background: #7c3aed; color: white; padding: 0.5rem 0.75rem; font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif; font-size: 1.2rem; min-width: 42px; height: 36px; line-height: 1;"
@@ -860,9 +874,16 @@ window.loadStudentsTab = async function() {
             <!-- Header with title and new student button -->
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <h2>👥 Gestión de Estudiantes</h2>
-                <button onclick="showStudentForm()" class="btn btn-primary">
-                    ➕ Nuevo Estudiante
-                </button>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                    <button onclick="syncClassPhotos()" class="btn btn-sm" id="syncClassPhotosBtn"
+                            title="Trae las selfies tomadas en las clases en vivo (tutorbox.app) a la foto de perfil de cada estudiante con cuenta"
+                            style="background: #0ea5e9; color: white;">
+                        📸 Sincronizar fotos de clase
+                    </button>
+                    <button onclick="showStudentForm()" class="btn btn-primary">
+                        ➕ Nuevo Estudiante
+                    </button>
+                </div>
             </div>
 
             <!-- Quick Date Filters -->
@@ -2204,6 +2225,146 @@ window.closeCreateStudentAccountModal = function() {
     if (modal) modal.remove();
 };
 
+// ============================================
+// SECTION: 🎟️ CLASS LOGIN CODES + 📸 CLASS PHOTO SYNC (4 Sep 2026)
+// Kids sign into tutorbox.app live classes with a letter + 5 random digits
+// (e.g. A48213) instead of email/password. The code lives on the TutorBox
+// side (users/{uid}/loginCode + loginCodes/{code}); the CRM mirrors it on
+// the student record (loginCode, loginCodeAt) and can ROTATE it any time.
+// The classroom selfie (classPhotos/{uid}) flows back into photoUrl.
+// ============================================
+
+async function tbxPost(path, body) {
+    const response = await fetch(`${TUTORBOX_CLOUD_FUNCTION_BASE}/${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-key': TUTORBOX_ADMIN_KEY },
+        body: JSON.stringify(body || {})
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.success === false) {
+        throw new Error(data.error || `HTTP ${response.status}`);
+    }
+    return data;
+}
+
+/**
+ * Generate (or rotate, if one exists) the class login code for a student
+ * with a TutorBox account. Returns the code. opts.silent skips the
+ * confirm/notification (used right after account creation).
+ */
+window.generateStudentLoginCode = async function(studentId, opts = {}) {
+    const student = window.StudentManager.students.get(studentId);
+    if (!student) {
+        window.showNotification('❌ Estudiante no encontrado', 'error');
+        return null;
+    }
+    const uid = opts.uid || student.tutorboxUid;
+    if (!uid) {
+        window.showNotification('❌ Primero crea la cuenta TutorBox (📱) del estudiante.', 'error');
+        return null;
+    }
+    if (student.loginCode && !opts.silent) {
+        const ok = confirm(`${student.nombre} ya tiene el código ${student.loginCode}.\n\n¿Generar uno NUEVO? El anterior dejará de funcionar (útil si perdió la tarjeta).`);
+        if (!ok) return null;
+    }
+    try {
+        const data = await tbxPost('setStudentLoginCode', { uid });
+        await window.StudentManager.updateStudent(studentId, {
+            loginCode: data.code,
+            loginCodeAt: new Date().toISOString(),
+            loginCodeBy: window.currentUser?.email || 'admin'
+        });
+        if (typeof window.logAudit === 'function') {
+            try { window.logAudit('student_login_code', { studentId, rotated: !!data.rotated }); } catch (e) { /* ignore */ }
+        }
+        if (!opts.silent) {
+            window.showNotification(`🎟️ Código de ${student.nombre}: ${data.code}`, 'success');
+            if (typeof window.loadStudentsTab === 'function') window.loadStudentsTab();
+        }
+        return data.code;
+    } catch (e) {
+        console.error('generateStudentLoginCode:', e);
+        if (!opts.silent) window.showNotification(`❌ No se pudo generar el código: ${e.message}`, 'error');
+        return null;
+    }
+};
+
+window.copyLoginCode = function(code) {
+    if (!code) return;
+    (navigator.clipboard?.writeText(code) || Promise.reject()).then(
+        () => window.showNotification(`📋 Código ${code} copiado`, 'success'),
+        () => window.showNotification(`🎟️ Código: ${code}`, 'info')
+    );
+};
+
+/** Printable pocket card: name + big code + where to type it. */
+window.printLoginCard = function(studentId) {
+    const s = window.StudentManager.students.get(studentId);
+    if (!s || !s.loginCode) return;
+    const w = window.open('', '_blank', 'width=520,height=420');
+    if (!w) return;
+    const name = (s.nombre || '').replace(/</g, '&lt;');
+    w.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Tarjeta ${s.loginCode}</title>
+    <style>body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;margin:0;padding:24px;background:#fff}
+    .card{width:340px;border:3px solid #7c3aed;border-radius:18px;padding:18px 20px;text-align:center}
+    .brand{font-weight:900;color:#7c3aed;font-size:14px;letter-spacing:.08em}
+    .name{font-size:18px;font-weight:700;margin:10px 0 4px;color:#111827}
+    .code{font-family:ui-monospace,Consolas,monospace;font-size:44px;font-weight:900;letter-spacing:.22em;color:#111827;margin:6px 0}
+    .how{font-size:12px;color:#4b5563}.how b{color:#111827}
+    @media print{body{padding:0}}</style></head><body>
+    <div class="card"><div class="brand">🏫 CIUDAD BILINGÜE · TutorBox Live</div>
+    <div class="name">${name}</div>
+    <div class="how">Mi código de clase</div>
+    <div class="code">${s.loginCode}</div>
+    <div class="how">1. Entra a <b>tutorbox.app/login</b><br>2. Toca <b>🎟️ Tengo un código</b><br>3. Escribe tu código y ¡a clase! 🎥</div>
+    </div><script>setTimeout(function(){window.print()},300)</script></body></html>`);
+    w.document.close();
+};
+
+/**
+ * 📸 Pull the classroom selfies (tutorbox.app live classes) into the CRM
+ * profile photo for every student with a TutorBox account. A classroom
+ * photo REPLACES an older classroom photo but never a photo uploaded by
+ * staff in the CRM (photoUpdatedBy !== 'classroom').
+ */
+window.syncClassPhotos = async function() {
+    const btn = document.getElementById('syncClassPhotosBtn');
+    const all = Array.from(window.StudentManager.students.values()).filter(s => s.tutorboxUid);
+    if (!all.length) {
+        window.showNotification('No hay estudiantes con cuenta TutorBox.', 'info');
+        return;
+    }
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Sincronizando…'; }
+    let updated = 0, skipped = 0;
+    try {
+        for (let i = 0; i < all.length; i += 100) {
+            const chunk = all.slice(i, i + 100);
+            const data = await tbxPost('getB2BStudentPhotos', { uids: chunk.map(s => s.tutorboxUid) });
+            const photos = data.photos || {};
+            for (const s of chunk) {
+                const photo = photos[s.tutorboxUid];
+                if (!photo) continue;
+                const staffPhoto = s.photoUrl && s.photoUpdatedBy && s.photoUpdatedBy !== 'classroom';
+                if (staffPhoto || s.photoUrl === photo) { skipped++; continue; }
+                await window.StudentManager.updateStudent(s.id, {
+                    photoUrl: photo,
+                    photoUpdatedAt: new Date().toISOString(),
+                    photoUpdatedBy: 'classroom',
+                    photoUpdatedByEmail: 'tutorbox.app/class'
+                });
+                updated++;
+            }
+        }
+        window.showNotification(`📸 Fotos de clase: ${updated} actualizadas · ${skipped} sin cambios`, 'success');
+        if (updated && typeof window.loadStudentsTab === 'function') window.loadStudentsTab();
+    } catch (e) {
+        console.error('syncClassPhotos:', e);
+        window.showNotification(`❌ Error sincronizando fotos: ${e.message}`, 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '📸 Sincronizar fotos de clase'; }
+    }
+};
+
 /**
  * Call Cloud Function to create TutorBox app account
  */
@@ -2263,9 +2424,23 @@ window.createStudentTutorBoxAccount = async function(studentId) {
             appCreatedBy: window.currentUser?.uid || 'admin'
         });
 
+        // 🎟️ Class login code (kids sign in with the code only) — best effort.
+        let loginCode = null;
+        try {
+            loginCode = await window.generateStudentLoginCode(studentId, { silent: true, uid: data.uid });
+        } catch (e) {
+            console.warn('login code generation failed:', e);
+        }
+
         // Show credentials
         successDiv.innerHTML = `
             <div style="font-weight: 600; margin-bottom: 0.5rem;">✅ Cuenta creada exitosamente</div>
+            ${loginCode ? `
+            <div style="background: #fffbeb; border: 2px solid #f59e0b; border-radius: 8px; padding: 0.75rem; margin: 0.5rem 0; text-align: center;">
+                <div style="font-size: 0.75rem; color: #92400e; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">🎟️ Código de clase (niños)</div>
+                <div style="font-family: monospace; font-size: 2rem; font-weight: 900; letter-spacing: 0.2em; color: #78350f;">${loginCode}</div>
+                <div style="font-size: 0.75rem; color: #92400e;">Entra en <b>tutorbox.app/login</b> → "Tengo un código". Sin correo ni contraseña.</div>
+            </div>` : ''}
             <div style="background: white; border: 1px solid #a7f3d0; border-radius: 6px; padding: 0.75rem; margin-top: 0.5rem;">
                 <div style="margin-bottom: 0.5rem;">
                     <span style="font-weight: 600;">📧 Email:</span>
