@@ -805,6 +805,13 @@ function renderStudentTable(students) {
                                           style="background: #d1fae5; color: #065f46; padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; display: inline-flex; align-items: center; height: 36px; border: 1px solid #a7f3d0; cursor: pointer;">
                                         ✓ App
                                     </button>
+                                    ` : `
+                                    <button onclick="showCreateStudentAccountModal('${s.id}')" class="btn btn-sm"
+                                            style="background: #7c3aed; color: white; padding: 0.5rem 0.75rem; font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif; font-size: 1.2rem; min-width: 42px; height: 36px; line-height: 1;"
+                                            aria-label="Crear Cuenta TutorBox" title="${s.tutorboxUid ? 'Activar acceso a la APP (ya tiene cuenta de clase)' : 'Crear Cuenta TutorBox (app)'}">
+                                        📱
+                                    </button>
+                                    `}
                                     ${s.loginCode ? `
                                     <button onclick="copyLoginCode('${s.loginCode}')"
                                           title="Código de clase (clic para copiar). Doble clic = imprimir tarjeta"
@@ -814,16 +821,9 @@ function renderStudentTable(students) {
                                     </button>
                                     ` : `
                                     <button onclick="generateStudentLoginCode('${s.id}')"
-                                          title="Generar código de clase (letra + 5 números) para entrar sin contraseña"
+                                          title="Generar código de clase (letra + 5 números) para entrar a las clases en vivo sin contraseña${s.tutorboxUid ? '' : ' — crea una cuenta solo-clases'}"
                                           style="background: #fffbeb; color: #b45309; padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; display: inline-flex; align-items: center; height: 36px; border: 1px dashed #f59e0b; cursor: pointer;">
                                         🎟️ Código
-                                    </button>
-                                    `}
-                                    ` : `
-                                    <button onclick="showCreateStudentAccountModal('${s.id}')" class="btn btn-sm"
-                                            style="background: #7c3aed; color: white; padding: 0.5rem 0.75rem; font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif; font-size: 1.2rem; min-width: 42px; height: 36px; line-height: 1;"
-                                            aria-label="Crear Cuenta TutorBox" title="Crear Cuenta TutorBox">
-                                        📱
                                     </button>
                                     `}
                                     ${(window.userRole === 'admin' || window.userRole === 'director') ? `
@@ -2239,6 +2239,20 @@ window.closeCreateStudentAccountModal = function() {
 // The classroom selfie (classPhotos/{uid}) flows back into photoUrl.
 // ============================================
 
+/** Body for provisionClassAccount (phone optional, first number only). */
+function classAccountPayload(studentId, student) {
+    const rawPhone = String(student.telefono || '').split(/[\/,;]+/)[0].trim();
+    const digits = rawPhone.replace(/\D/g, '');
+    const phone = !digits ? '' : rawPhone.startsWith('+') ? `+${digits}` : `+57${digits}`;
+    return {
+        fullName: student.nombre,
+        crmStudentId: studentId,
+        grupo: student.grupo || '',
+        schoolName: 'Ciudad Bilingue',
+        ...(phone.length >= 9 ? { phoneNumber: phone } : {})
+    };
+}
+
 async function tbxPost(path, body) {
     const response = await fetch(`${TUTORBOX_CLOUD_FUNCTION_BASE}/${path}`, {
         method: 'POST',
@@ -2265,8 +2279,29 @@ window.generateStudentLoginCode = async function(studentId, opts = {}) {
     }
     const uid = opts.uid || student.tutorboxUid;
     if (!uid) {
-        window.showNotification('❌ Primero crea la cuenta TutorBox (📱) del estudiante.', 'error');
-        return null;
+        // No TutorBox account yet → create a CLASSROOM-ONLY one (free tier, no
+        // books) and get the code in one call. "📱" later enables the app.
+        try {
+            const data = await tbxPost('provisionClassAccount', classAccountPayload(studentId, student));
+            await window.StudentManager.updateStudent(studentId, {
+                tutorboxUid: data.uid,
+                tutorboxEmail: data.email,
+                classAccount: true,
+                classAccountAt: new Date().toISOString(),
+                loginCode: data.code,
+                loginCodeAt: new Date().toISOString(),
+                loginCodeBy: window.currentUser?.email || 'admin'
+            });
+            if (!opts.silent) {
+                window.showNotification(`🎟️ Código de ${student.nombre}: ${data.code} (cuenta de clase creada)`, 'success');
+                if (typeof window.loadStudentsTab === 'function') window.loadStudentsTab();
+            }
+            return data.code;
+        } catch (e) {
+            console.error('provisionClassAccount:', e);
+            if (!opts.silent) window.showNotification(`❌ No se pudo crear la cuenta de clase: ${e.message}`, 'error');
+            return null;
+        }
     }
     if (student.loginCode && !opts.silent) {
         const ok = confirm(`${student.nombre} ya tiene el código ${student.loginCode}.\n\n¿Generar uno NUEVO? El anterior dejará de funcionar (útil si perdió la tarjeta).`);
@@ -2300,13 +2335,16 @@ window.generateStudentLoginCode = async function(studentId, opts = {}) {
  */
 window.generateAllLoginCodes = async function() {
     const btn = document.getElementById('genAllCodesBtn');
+    // Every ACTIVE student without a code. Students without a TutorBox
+    // account get a classroom-only account (no app books) in the same pass.
     const todo = Array.from(window.StudentManager.students.values())
-        .filter(s => s.tutorboxUid && !s.loginCode);
+        .filter(s => (s.status || 'active') === 'active' && !s.loginCode && s.nombre);
     if (!todo.length) {
-        window.showNotification('✅ Todos los estudiantes con cuenta ya tienen código.', 'info');
+        window.showNotification('✅ Todos los estudiantes activos ya tienen código.', 'info');
         return;
     }
-    if (!confirm(`Se generará un código de clase para ${todo.length} estudiante(s) con cuenta TutorBox y sin código.\n\n¿Continuar?`)) return;
+    const newAccounts = todo.filter(s => !s.tutorboxUid).length;
+    if (!confirm(`Se generará un código de clase para ${todo.length} estudiante(s) activo(s) sin código.\n\n${newAccounts} de ellos aún no tienen cuenta TutorBox: se les creará una cuenta SOLO PARA CLASES (sin acceso a la app; el botón 📱 lo activa después).\n\n¿Continuar?`)) return;
     if (btn) { btn.disabled = true; }
     let ok = 0, failed = 0, done = 0;
     const CONCURRENCY = 4;
@@ -2315,12 +2353,25 @@ window.generateAllLoginCodes = async function() {
         while (queue.length) {
             const s = queue.shift();
             try {
-                const data = await tbxPost('setStudentLoginCode', { uid: s.tutorboxUid });
-                await window.StudentManager.updateStudent(s.id, {
-                    loginCode: data.code,
-                    loginCodeAt: new Date().toISOString(),
-                    loginCodeBy: window.currentUser?.email || 'admin'
-                });
+                if (s.tutorboxUid) {
+                    const data = await tbxPost('setStudentLoginCode', { uid: s.tutorboxUid });
+                    await window.StudentManager.updateStudent(s.id, {
+                        loginCode: data.code,
+                        loginCodeAt: new Date().toISOString(),
+                        loginCodeBy: window.currentUser?.email || 'admin'
+                    });
+                } else {
+                    const data = await tbxPost('provisionClassAccount', classAccountPayload(s.id, s));
+                    await window.StudentManager.updateStudent(s.id, {
+                        tutorboxUid: data.uid,
+                        tutorboxEmail: data.email,
+                        classAccount: true,
+                        classAccountAt: new Date().toISOString(),
+                        loginCode: data.code,
+                        loginCodeAt: new Date().toISOString(),
+                        loginCodeBy: window.currentUser?.email || 'admin'
+                    });
+                }
                 ok++;
             } catch (e) {
                 console.warn('code for', s.nombre, 'failed:', e.message);
@@ -2441,16 +2492,24 @@ window.createStudentTutorBoxAccount = async function(studentId) {
     btn.disabled = true;
     btn.innerHTML = '⏳ Creando cuenta...';
 
+    // Classroom-only account already exists (🎟️ code issued first) → UPGRADE it
+    // to app access on the SAME uid instead of creating a second account.
+    const upgrading = !!student.tutorboxUid;
+
     try {
         const response = await fetch(
-            `${TUTORBOX_CLOUD_FUNCTION_BASE}/provisionStudentAccount`,
+            `${TUTORBOX_CLOUD_FUNCTION_BASE}/${upgrading ? 'enableStudentAppAccess' : 'provisionStudentAccount'}`,
             {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'x-admin-key': TUTORBOX_ADMIN_KEY
                 },
-                body: JSON.stringify({
+                body: JSON.stringify(upgrading ? {
+                    uid: student.tutorboxUid,
+                    enrolledBooks: enrolledBooks,
+                    phoneNumber: phone
+                } : {
                     fullName: student.nombre,
                     phoneNumber: phone,
                     schoolName: 'Ciudad Bilingue',
@@ -2466,6 +2525,7 @@ window.createStudentTutorBoxAccount = async function(studentId) {
         if (!response.ok || !data.success) {
             throw new Error(data.error || 'Error al crear la cuenta');
         }
+        if (upgrading) data.uid = student.tutorboxUid;
 
         // Update student record in CRM database
         await window.StudentManager.saveStudent({
@@ -2478,16 +2538,16 @@ window.createStudentTutorBoxAccount = async function(studentId) {
         });
 
         // 🎟️ Class login code (kids sign in with the code only) — best effort.
-        let loginCode = null;
+        let loginCode = student.loginCode || null; // keep an existing code (never rotate here)
         try {
-            loginCode = await window.generateStudentLoginCode(studentId, { silent: true, uid: data.uid });
+            if (!loginCode) loginCode = await window.generateStudentLoginCode(studentId, { silent: true, uid: data.uid });
         } catch (e) {
             console.warn('login code generation failed:', e);
         }
 
         // Show credentials
         successDiv.innerHTML = `
-            <div style="font-weight: 600; margin-bottom: 0.5rem;">✅ Cuenta creada exitosamente</div>
+            <div style="font-weight: 600; margin-bottom: 0.5rem;">${upgrading ? '✅ Acceso a la app activado (misma cuenta de clase)' : '✅ Cuenta creada exitosamente'}</div>
             ${loginCode ? `
             <div style="background: #fffbeb; border: 2px solid #f59e0b; border-radius: 8px; padding: 0.75rem; margin: 0.5rem 0; text-align: center;">
                 <div style="font-size: 0.75rem; color: #92400e; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">🎟️ Código de clase (niños)</div>
