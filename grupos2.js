@@ -1379,17 +1379,25 @@ window._tbxBooks = [];
 let _tbxBooksAt = 0;
 window.loadTutorBoxBooks = async function(force = false) {
     if (!force && window._tbxBooks.length && Date.now() - _tbxBooksAt < 30 * 60 * 1000) return window._tbxBooks;
-    try {
-        const r = await fetch('https://tutorbox.app/tools/data/books-manifest.json', { cache: 'no-cache' });
-        const data = await r.json();
-        if (r.ok && Array.isArray(data)) {
-            window._tbxBooks = data
-                .filter(b => Number.isFinite(Number(b.book_number)))
-                .sort((a, b) => Number(a.book_number) - Number(b.book_number));
-            _tbxBooksAt = Date.now();
+    // cache: 'reload' + a 10-minute version stamp: a copy cached BEFORE the CORS
+    // header existed would otherwise be revalidated and reused (CORS failure).
+    const stamp = Math.floor(Date.now() / 600000);
+    const hosts = ['https://tutorbox.app', 'https://tutorbox-4d7c9.web.app'];
+    for (const host of hosts) {
+        try {
+            const r = await fetch(`${host}/tools/data/books-manifest.json?v=${stamp}`, { cache: 'reload' });
+            const data = await r.json();
+            if (r.ok && Array.isArray(data) && data.length) {
+                window._tbxBooks = data
+                    .filter(b => Number.isFinite(Number(b.book_number)))
+                    .sort((a, b) => Number(a.book_number) - Number(b.book_number));
+                _tbxBooksAt = Date.now();
+                console.log(`📚 books-manifest: ${window._tbxBooks.length} libros (${host})`);
+                return window._tbxBooks;
+            }
+        } catch (e) {
+            console.warn('books-manifest', host, e.message);
         }
-    } catch (e) {
-        console.warn('books-manifest:', e.message);
     }
     return window._tbxBooks;
 };
