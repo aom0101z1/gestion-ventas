@@ -228,9 +228,33 @@ class GroupsManager2 {
             return {
                 ...group,
                 studentCount,
+                // Capacity badge (color/text). NOTE: this used to OVERWRITE the
+                // real status (active/inactive/completed) — which is why the
+                // "Grupos Activos" counter always showed 0. Both are kept now.
+                fillStatus: status,
+                groupStatus: group.status || 'active',
                 status
             };
         });
+    }
+
+    /** Display order: manual sortOrder (⠿ drag & drop) first, then group id. */
+    static sortForDisplay(groups) {
+        return groups.slice().sort((a, b) => {
+            const sa = Number.isFinite(a.sortOrder) ? a.sortOrder : 1e9;
+            const sb = Number.isFinite(b.sortOrder) ? b.sortOrder : 1e9;
+            return sa - sb || a.groupId - b.groupId;
+        });
+    }
+
+    /** Partial update (no displayName regeneration, no book-ledger hook). */
+    async patchGroup(groupId, updates) {
+        const db = window.firebaseModules.database;
+        const ref = db.ref(window.FirebaseData.database, `grupos2/${groupId}`);
+        updates.updatedAt = new Date().toISOString();
+        await db.update(ref, updates);
+        const cur = this.groups.get(groupId);
+        if (cur) this.groups.set(groupId, { ...cur, ...updates });
     }
 
     // Get filtered groups
@@ -251,7 +275,7 @@ class GroupsManager2 {
 
         if (filters.status && filters.status !== 'all') {
             if (filters.status === 'active') {
-                groups = groups.filter(g => g.status === 'active');
+                groups = groups.filter(g => g.groupStatus === 'active');
             } else if (filters.status === 'needStudents') {
                 groups = groups.filter(g => g.studentCount < 4);
             } else if (filters.status === 'full') {
@@ -259,10 +283,7 @@ class GroupsManager2 {
             }
         }
 
-        // Sort by group ID
-        groups.sort((a, b) => a.groupId - b.groupId);
-
-        return groups;
+        return GroupsManager2.sortForDisplay(groups);
     }
 }
 
@@ -573,23 +594,35 @@ function renderGrupo2Card(group) {
     const cardColor = ageConfig?.color || modalityConfig?.color || '#3b82f6';
     const cardTextColor = ageConfig?.textColor || 'white';
 
+    const isInactive = group.groupStatus && group.groupStatus !== 'active';
+    const fill = group.fillStatus || group.status;
+
     return `
-        <div style="background: white; border-radius: 8px; padding: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                    border-left: 6px solid ${cardColor}; border-top: 3px solid ${cardColor};">
+        <div id="g2card-${group.groupId}" data-gid="${group.groupId}"
+             ondragover="g2DragOver(event, ${group.groupId})" ondragleave="g2DragLeave(event, ${group.groupId})"
+             ondrop="g2Drop(event, ${group.groupId})"
+             style="background: white; border-radius: 8px; padding: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                    border-left: 6px solid ${cardColor}; border-top: 3px solid ${cardColor};
+                    ${isInactive ? 'opacity: 0.6; filter: grayscale(0.4);' : ''} ${group.hidden ? 'border-style: dashed;' : ''}">
             <!-- Header -->
-            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
-                <div>
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem; gap: 0.5rem;">
+                <span draggable="true" ondragstart="g2DragStart(event, ${group.groupId})" ondragend="g2DragEnd(event)"
+                      title="Arrastra para reordenar"
+                      style="cursor: grab; user-select: none; font-size: 1.4rem; line-height: 1; color: #9ca3af; padding: 0.15rem 0.25rem;">⠿</span>
+                <div style="flex: 1;">
                     <h3 style="margin: 0 0 0.25rem 0; font-size: 1.1rem; color: #111827;">
                         <span style="background: ${cardColor}; color: ${cardTextColor};
                                      padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.9rem; margin-right: 0.5rem;">
                             ${group.groupId}
                         </span>
                         ${group.displayName}
+                        ${isInactive ? `<span style="margin-left: 0.5rem; background: #e5e7eb; color: #374151; padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase;">${group.groupStatus === 'completed' ? 'Completado' : 'Inactivo'}</span>` : ''}
+                        ${group.hidden ? `<span style="margin-left: 0.35rem; background: #fef3c7; color: #92400e; padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.7rem; font-weight: 700;">🙈 oculto</span>` : ''}
                     </h3>
                     <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                        <span style="background: ${group.status.color}; color: white;
+                        <span style="background: ${fill.color}; color: white;
                                      padding: 0.25rem 0.75rem; border-radius: 4px; font-size: 0.8rem;">
-                            ${group.studentCount}/${group.maxStudents || 8} - ${group.status.text}
+                            ${group.studentCount}/${group.maxStudents || 8} - ${fill.text}
                         </span>
                         ${ageConfig ? `
                         <span style="background: ${cardColor}; color: ${cardTextColor};
@@ -641,6 +674,16 @@ function renderGrupo2Card(group) {
                 <button onclick="viewGrupo2Students(${group.groupId})" class="btn btn-sm"
                         style="background: #10b981; color: white; padding: 0.5rem 1rem;">
                     👥 Estudiantes (${group.studentCount})
+                </button>
+                <button onclick="toggleGrupo2Status(${group.groupId})" class="btn btn-sm"
+                        title="${isInactive ? 'Marcar como ACTIVO' : 'Marcar como INACTIVO'}"
+                        style="background: ${isInactive ? '#6b7280' : '#059669'}; color: white; padding: 0.5rem 1rem;">
+                    ${isInactive ? '⏸ Inactivo' : '✅ Activo'}
+                </button>
+                <button onclick="toggleGrupo2Hidden(${group.groupId})" class="btn btn-sm"
+                        title="${group.hidden ? 'Volver a mostrar este grupo en la lista' : 'Esconder este grupo de la lista (no se borra)'}"
+                        style="background: ${group.hidden ? '#f59e0b' : '#e5e7eb'}; color: ${group.hidden ? 'white' : '#374151'}; padding: 0.5rem 1rem;">
+                    ${group.hidden ? '👁 Mostrar' : '🙈 Ocultar'}
                 </button>
                 <button onclick="deleteGrupo2(${group.groupId})" class="btn btn-sm"
                         style="background: #ef4444; color: white; padding: 0.5rem 1rem;">
@@ -1060,21 +1103,35 @@ window.applyGrupos2Filters = function() {
 
 // Refresh grid
 window.refreshGrupos2Grid = async function() {
-    const groups = window.GroupsManager2.getGroupsWithStats();
+    const groups = GroupsManager2.sortForDisplay(window.GroupsManager2.getGroupsWithStats());
     renderGrupos2Grid(groups);
 };
 
+// 🙈 Hidden groups stay out of the list unless the admin toggles "Mostrar ocultos".
+window._grupos2ShowHidden = false;
+window.toggleGrupos2ShowHidden = function() {
+    window._grupos2ShowHidden = !window._grupos2ShowHidden;
+    if (typeof window.applyGrupos2Filters === 'function' && document.getElementById('filterModality')) {
+        window.applyGrupos2Filters();
+    } else {
+        window.refreshGrupos2Grid();
+    }
+};
+
 // Render grid
-function renderGrupos2Grid(groups) {
+function renderGrupos2Grid(allGroups) {
     const grid = document.getElementById('grupos2Grid');
     const stats = document.getElementById('grupos2Stats');
 
     if (!grid) return;
 
+    const hiddenCount = allGroups.filter(g => g.hidden).length;
+    const groups = window._grupos2ShowHidden ? allGroups : allGroups.filter(g => !g.hidden);
+
     // Render stats
     if (stats) {
         const totalStudents = groups.reduce((sum, g) => sum + g.studentCount, 0);
-        const activeGroups = groups.filter(g => g.status === 'active').length;
+        const activeGroups = groups.filter(g => g.groupStatus === 'active').length;
         const needStudents = groups.filter(g => g.studentCount < 4).length;
 
         stats.innerHTML = `
@@ -1114,11 +1171,106 @@ function renderGrupos2Grid(groups) {
     }
 
     grid.innerHTML = `
-        <div style="display: grid; gap: 1rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+            <span style="font-size: 0.8rem; color: #6b7280;">⠿ Arrastra las tarjetas para ordenarlas (el orden se guarda para todos)</span>
+            ${hiddenCount ? `
+            <button onclick="toggleGrupos2ShowHidden()" class="btn btn-sm"
+                    style="background: ${window._grupos2ShowHidden ? '#f59e0b' : '#e5e7eb'}; color: ${window._grupos2ShowHidden ? 'white' : '#374151'};">
+                ${window._grupos2ShowHidden ? '🙈 Esconder ocultos' : `👁 Mostrar ocultos (${hiddenCount})`}
+            </button>` : ''}
+        </div>
+        <div id="grupos2Cards" style="display: grid; gap: 1rem;">
             ${groups.map(group => renderGrupo2Card(group)).join('')}
         </div>
     `;
 }
+
+// ============================================
+// ⠿ DRAG & DROP ORDER · ✅/⏸ STATUS · 🙈 HIDE  (4 Sep 2026)
+// sortOrder / status / hidden are saved on grupos2/{id} (shared by all admins).
+// ============================================
+let _g2DragId = null;
+
+window.g2DragStart = function(ev, groupId) {
+    _g2DragId = groupId;
+    ev.dataTransfer.effectAllowed = 'move';
+    const card = document.getElementById(`g2card-${groupId}`);
+    if (card) card.style.opacity = '0.4';
+};
+window.g2DragEnd = function() {
+    const card = _g2DragId != null ? document.getElementById(`g2card-${_g2DragId}`) : null;
+    if (card) card.style.opacity = '';
+    document.querySelectorAll('[id^="g2card-"]').forEach(c => { c.style.outline = ''; });
+    _g2DragId = null;
+};
+window.g2DragOver = function(ev, groupId) {
+    if (_g2DragId == null || _g2DragId === groupId) return;
+    ev.preventDefault();
+    ev.dataTransfer.dropEffect = 'move';
+    const card = document.getElementById(`g2card-${groupId}`);
+    if (card) card.style.outline = '3px solid #6366f1';
+};
+window.g2DragLeave = function(ev, groupId) {
+    const card = document.getElementById(`g2card-${groupId}`);
+    if (card) card.style.outline = '';
+};
+window.g2Drop = async function(ev, targetId) {
+    ev.preventDefault();
+    const fromId = _g2DragId;
+    window.g2DragEnd();
+    if (fromId == null || fromId === targetId) return;
+    const cards = Array.from(document.querySelectorAll('#grupos2Cards [data-gid]'));
+    const ids = cards.map(c => parseInt(c.dataset.gid));
+    const from = ids.indexOf(fromId);
+    const to = ids.indexOf(targetId);
+    if (from < 0 || to < 0) return;
+    ids.splice(from, 1);
+    ids.splice(to, 0, fromId);
+    // Persist the visible order; groups not on screen keep their sortOrder.
+    try {
+        const db = window.firebaseModules.database;
+        const updates = {};
+        ids.forEach((id, i) => { updates[`${id}/sortOrder`] = i; });
+        await db.update(db.ref(window.FirebaseData.database, 'grupos2'), updates);
+        ids.forEach((id, i) => {
+            const g = window.GroupsManager2.groups.get(id);
+            if (g) g.sortOrder = i;
+        });
+    } catch (e) {
+        console.error('sortOrder save failed:', e);
+        window.showNotification('❌ No se pudo guardar el orden', 'error');
+    }
+    if (document.getElementById('filterModality')) window.applyGrupos2Filters(); else window.refreshGrupos2Grid();
+};
+
+window.toggleGrupo2Status = async function(groupId) {
+    const g = window.GroupsManager2.groups.get(groupId);
+    if (!g) return;
+    const next = (g.status || 'active') === 'active' ? 'inactive' : 'active';
+    try {
+        await window.GroupsManager2.patchGroup(groupId, { status: next });
+        if (typeof window.logAudit === 'function') {
+            try { window.logAudit('Grupo editado', 'group', String(groupId), `${g.displayName} → ${next}`, { before: { status: g.status || 'active' }, after: { status: next } }); } catch (e) { /* ignore */ }
+        }
+        window.showNotification(next === 'active' ? `✅ Grupo ${groupId} activo` : `⏸ Grupo ${groupId} inactivo`, 'success');
+    } catch (e) {
+        window.showNotification(`❌ No se pudo cambiar el estado: ${e.message}`, 'error');
+    }
+    if (document.getElementById('filterModality')) window.applyGrupos2Filters(); else window.refreshGrupos2Grid();
+};
+
+window.toggleGrupo2Hidden = async function(groupId) {
+    const g = window.GroupsManager2.groups.get(groupId);
+    if (!g) return;
+    const next = !g.hidden;
+    try {
+        await window.GroupsManager2.patchGroup(groupId, { hidden: next });
+        window.showNotification(next ? `🙈 Grupo ${groupId} oculto (botón "Mostrar ocultos" para verlo)` : `👁 Grupo ${groupId} visible`, 'success');
+    } catch (e) {
+        window.showNotification(`❌ No se pudo ocultar: ${e.message}`, 'error');
+    }
+    if (document.getElementById('filterModality')) window.applyGrupos2Filters(); else window.refreshGrupos2Grid();
+};
 
 // ============================================
 // TUTORBOX BATCH ACCOUNT PROVISIONING
