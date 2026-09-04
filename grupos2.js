@@ -423,17 +423,26 @@ function renderGrupo2Form(group = null) {
     const manager = window.GroupsManager2;
     const isEdit = !!group;
 
-    // Get teachers list (only active teachers)
+    // Teachers: 🎥 TutorBox Live accounts first (the list from tutorbox.app/admin/live —
+    // the account that opens the live class), then the CRM's own teacher records.
     let teacherOptions = '<option value="">Sin asignar</option>';
+    const tbx = window._tbxTeachers || [];
+    if (tbx.length) {
+        teacherOptions += `<optgroup label="🎥 Profesores TutorBox Live (clases en vivo)">` + tbx.map(t => `
+            <option value="tbx:${t.uid}" ${group?.teacherId === `tbx:${t.uid}` || (!group?.teacherId?.startsWith?.('tbx:') && group?.teacherEmail && group.teacherEmail === t.email) ? 'selected' : ''}>
+                ${t.name} · ${t.email}
+            </option>
+        `).join('') + `</optgroup>`;
+    }
     if (window.TeacherManager && window.TeacherManager.teachers && window.TeacherManager.teachers.size > 0) {
         const teachers = Array.from(window.TeacherManager.teachers.values())
             .filter(t => t.status !== 'inactive') // Only active teachers
             .sort((a, b) => a.name.localeCompare(b.name)); // Sort alphabetically
-        teacherOptions += teachers.map(t => `
+        teacherOptions += `<optgroup label="🏫 Profesores del CRM">` + teachers.map(t => `
             <option value="${t.id}" ${group?.teacherId === t.id ? 'selected' : ''}>
                 ${t.name}
             </option>
-        `).join('');
+        `).join('') + `</optgroup>`;
     }
 
     return `
@@ -661,7 +670,7 @@ function renderGrupo2Card(group) {
                 ` : ''}
                 <div>
                     <strong style="color: #6b7280;">👩‍🏫 Profesor:</strong>
-                    <span>${teacher?.name || 'Sin asignar'}</span>
+                    <span>${teacher?.name || group.teacherName || 'Sin asignar'}${group.teacherUid ? ' <span title="Profesor de TutorBox Live (clases en vivo)" style="font-size: 0.75rem;">🎥</span>' : ''}</span>
                 </div>
             </div>
 
@@ -706,6 +715,9 @@ window.showGrupo2Form = async function(groupId = null) {
         }
     }
 
+    // 🎥 TutorBox Live teachers (cached; [] when offline)
+    await window.loadTutorBoxTeachers();
+
     const group = groupId ? window.GroupsManager2.groups.get(groupId) : null;
     document.getElementById('grupo2FormContainer').innerHTML = renderGrupo2Form(group);
 };
@@ -743,12 +755,18 @@ window.saveGrupo2Form = async function(groupId) {
             return false;
         }
 
-        // Get teacher info
+        // Get teacher info — a TutorBox teacher (value "tbx:<uid>") carries the
+        // email that tutorbox.app/admin/groups uses to assign the live class.
         const teacherId = document.getElementById('grupo2Teacher').value;
         let teacherName = '';
-        if (teacherId && window.TeacherManager?.teachers) {
+        let teacherEmail = '';
+        let teacherUid = '';
+        if (teacherId && teacherId.startsWith('tbx:')) {
+            const t = (window._tbxTeachers || []).find(x => `tbx:${x.uid}` === teacherId);
+            if (t) { teacherName = t.name; teacherEmail = t.email || ''; teacherUid = t.uid; }
+        } else if (teacherId && window.TeacherManager?.teachers) {
             const teacher = window.TeacherManager.teachers.get(teacherId);
-            if (teacher) teacherName = teacher.name;
+            if (teacher) { teacherName = teacher.name; teacherEmail = (teacher.email || '').trim().toLowerCase(); }
         }
 
         // Validate age category
@@ -770,6 +788,8 @@ window.saveGrupo2Form = async function(groupId) {
             room: document.getElementById('grupo2Room')?.value || '',
             teacherId: teacherId,
             teacherName: teacherName,
+            teacherEmail: teacherEmail,
+            teacherUid: teacherUid,
             maxStudents: parseInt(document.getElementById('grupo2MaxStudents').value) || 8,
             status: document.getElementById('grupo2Status').value,
             ageCategory: ageCategory,
@@ -1306,6 +1326,31 @@ window.toggleGrupo2Hidden = async function(groupId) {
 
 const TUTORBOX_CF_BASE = 'https://us-central1-tutorbox-4d7c9.cloudfunctions.net';
 const TUTORBOX_KEY = 'tbx-admin-2026-cb-provision-k9x7m';
+
+/**
+ * 👩‍🏫 TutorBox Live teachers (same list as tutorbox.app/admin/live) for the
+ * group form. Cached 5 min. Returns [] when offline so the form still opens.
+ */
+window._tbxTeachers = [];
+let _tbxTeachersAt = 0;
+window.loadTutorBoxTeachers = async function(force = false) {
+    if (!force && window._tbxTeachers.length && Date.now() - _tbxTeachersAt < 5 * 60 * 1000) return window._tbxTeachers;
+    try {
+        const r = await fetch(`${TUTORBOX_CF_BASE}/getTutorBoxTeachers`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-admin-key': TUTORBOX_KEY },
+            body: '{}'
+        });
+        const data = await r.json();
+        if (r.ok && Array.isArray(data.teachers)) {
+            window._tbxTeachers = data.teachers;
+            _tbxTeachersAt = Date.now();
+        }
+    } catch (e) {
+        console.warn('getTutorBoxTeachers:', e.message);
+    }
+    return window._tbxTeachers;
+};
 
 /**
  * Batch create TutorBox accounts for all students in a group
