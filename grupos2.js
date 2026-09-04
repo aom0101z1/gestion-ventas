@@ -1107,6 +1107,16 @@ window.refreshGrupos2Grid = async function() {
     renderGrupos2Grid(groups);
 };
 
+// 🗓 Tab (Entre semana / Sábados) — remembered per device.
+window._grupos2Tab = (function() {
+    try { return localStorage.getItem('grupos2Tab') === 'saturday' ? 'saturday' : 'weekday'; } catch (e) { return 'weekday'; }
+})();
+window.setGrupos2Tab = function(tab) {
+    window._grupos2Tab = tab === 'saturday' ? 'saturday' : 'weekday';
+    try { localStorage.setItem('grupos2Tab', window._grupos2Tab); } catch (e) { /* ignore */ }
+    if (document.getElementById('filterModality')) window.applyGrupos2Filters(); else window.refreshGrupos2Grid();
+};
+
 // 🙈 Hidden groups stay out of the list unless the admin toggles "Mostrar ocultos".
 window._grupos2ShowHidden = false;
 window.toggleGrupos2ShowHidden = function() {
@@ -1126,7 +1136,13 @@ function renderGrupos2Grid(allGroups) {
     if (!grid) return;
 
     const hiddenCount = allGroups.filter(g => g.hidden).length;
-    const groups = window._grupos2ShowHidden ? allGroups : allGroups.filter(g => !g.hidden);
+    const visible = window._grupos2ShowHidden ? allGroups : allGroups.filter(g => !g.hidden);
+    // 🗓 Tabs: Sábados vs Entre semana (a group is "Sábado" when its days include Saturday).
+    const isSat = g => (g.days || []).some(d => /^s[aá]b/i.test(String(d)) || /^sat/i.test(String(d)));
+    const tab = window._grupos2Tab;
+    const satCount = visible.filter(isSat).length;
+    const weekCount = visible.length - satCount;
+    const groups = visible.filter(g => (tab === 'saturday') === isSat(g));
 
     // Render stats
     if (stats) {
@@ -1156,8 +1172,9 @@ function renderGrupos2Grid(allGroups) {
         `;
     }
 
-    // Render groups
-    if (groups.length === 0) {
+    // Render groups (empty state only when there is nothing at all; an empty
+    // TAB still shows the tab bar so the admin can switch).
+    if (allGroups.length === 0) {
         grid.innerHTML = `
             <div style="text-align: center; padding: 3rem; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
                 <div style="font-size: 3rem; margin-bottom: 1rem;">📚</div>
@@ -1170,7 +1187,18 @@ function renderGrupos2Grid(allGroups) {
         return;
     }
 
+    const tabBtn = (key, label, count) => `
+        <button onclick="setGrupos2Tab('${key}')"
+                style="padding: 0.6rem 1.25rem; border: none; border-radius: 10px 10px 0 0; cursor: pointer; font-weight: 700; font-size: 0.95rem;
+                       background: ${tab === key ? '#4f46e5' : '#e5e7eb'}; color: ${tab === key ? 'white' : '#374151'};">
+            ${label} <span style="opacity: 0.8; font-weight: 600;">(${count})</span>
+        </button>`;
+
     grid.innerHTML = `
+        <div style="display: flex; gap: 0.35rem; border-bottom: 3px solid #4f46e5; margin-bottom: 0.75rem;">
+            ${tabBtn('weekday', '📅 Entre semana', weekCount)}
+            ${tabBtn('saturday', '🗓 Sábados', satCount)}
+        </div>
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
             <span style="font-size: 0.8rem; color: #6b7280;">⠿ Arrastra las tarjetas para ordenarlas (el orden se guarda para todos)</span>
             ${hiddenCount ? `
