@@ -875,6 +875,11 @@ window.loadStudentsTab = async function() {
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <h2>👥 Gestión de Estudiantes</h2>
                 <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                    <button onclick="generateAllLoginCodes()" class="btn btn-sm" id="genAllCodesBtn"
+                            title="Genera el código de clase para TODOS los estudiantes con cuenta TutorBox que aún no tienen uno (no cambia los existentes)"
+                            style="background: #f59e0b; color: white;">
+                        🎟️ Códigos para todos
+                    </button>
                     <button onclick="syncClassPhotos()" class="btn btn-sm" id="syncClassPhotosBtn"
                             title="Trae las selfies tomadas en las clases en vivo (tutorbox.app) a la foto de perfil de cada estudiante con cuenta"
                             style="background: #0ea5e9; color: white;">
@@ -2286,6 +2291,54 @@ window.generateStudentLoginCode = async function(studentId, opts = {}) {
         console.error('generateStudentLoginCode:', e);
         if (!opts.silent) window.showNotification(`❌ No se pudo generar el código: ${e.message}`, 'error');
         return null;
+    }
+};
+
+/**
+ * 🎟️ Batch: issue a code to EVERY student with a TutorBox account that has
+ * none yet. Existing codes are never rotated here (use the per-row button).
+ */
+window.generateAllLoginCodes = async function() {
+    const btn = document.getElementById('genAllCodesBtn');
+    const todo = Array.from(window.StudentManager.students.values())
+        .filter(s => s.tutorboxUid && !s.loginCode);
+    if (!todo.length) {
+        window.showNotification('✅ Todos los estudiantes con cuenta ya tienen código.', 'info');
+        return;
+    }
+    if (!confirm(`Se generará un código de clase para ${todo.length} estudiante(s) con cuenta TutorBox y sin código.\n\n¿Continuar?`)) return;
+    if (btn) { btn.disabled = true; }
+    let ok = 0, failed = 0, done = 0;
+    const CONCURRENCY = 4;
+    const queue = todo.slice();
+    const worker = async () => {
+        while (queue.length) {
+            const s = queue.shift();
+            try {
+                const data = await tbxPost('setStudentLoginCode', { uid: s.tutorboxUid });
+                await window.StudentManager.updateStudent(s.id, {
+                    loginCode: data.code,
+                    loginCodeAt: new Date().toISOString(),
+                    loginCodeBy: window.currentUser?.email || 'admin'
+                });
+                ok++;
+            } catch (e) {
+                console.warn('code for', s.nombre, 'failed:', e.message);
+                failed++;
+            }
+            done++;
+            if (btn) btn.textContent = `⏳ ${done}/${todo.length}…`;
+        }
+    };
+    try {
+        await Promise.all(Array.from({ length: Math.min(CONCURRENCY, todo.length) }, worker));
+        if (typeof window.logAudit === 'function') {
+            try { window.logAudit('student_login_codes_batch', { ok, failed }); } catch (e) { /* ignore */ }
+        }
+        window.showNotification(`🎟️ Códigos generados: ${ok}${failed ? ` · ${failed} fallaron` : ''}`, failed ? 'warning' : 'success');
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '🎟️ Códigos para todos'; }
+        if (typeof window.loadStudentsTab === 'function') window.loadStudentsTab();
     }
 };
 
