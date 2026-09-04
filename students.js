@@ -1701,6 +1701,8 @@ async function saveStudentForm(studentId) {
         if (studentId) {
             await window.StudentManager.updateStudent(studentId, studentData);
             savedStudent = { ...existingStudent, ...studentData };
+            // 🔄 mirror name/group/age/guardian/email on the TutorBox profile
+            window.syncStudentToTutorBox(studentId, savedStudent);
         } else {
             savedStudent = await window.StudentManager.saveStudent(studentData);
 
@@ -2244,14 +2246,52 @@ function classAccountPayload(studentId, student) {
     const rawPhone = String(student.telefono || '').split(/[\/,;]+/)[0].trim();
     const digits = rawPhone.replace(/\D/g, '');
     const phone = !digits ? '' : rawPhone.startsWith('+') ? `+${digits}` : `+57${digits}`;
+    const email = String(student.correo || '').trim().toLowerCase();
     return {
         fullName: student.nombre,
         crmStudentId: studentId,
         grupo: student.grupo || '',
         schoolName: 'Ciudad Bilingue',
+        edad: student.edad || null,
+        acudiente: student.acudiente || null,
+        // 🔗 If this email already has a TutorBox account (parent's Gmail,
+        // tester account…), the code is attached to THAT account.
+        ...(email.includes('@') ? { email } : {}),
         ...(phone.length >= 9 ? { phoneNumber: phone } : {})
     };
 }
+
+/** Fields the CRM mirrors on the TutorBox profile after a class-account provision. */
+function classAccountRecord(data) {
+    return {
+        tutorboxUid: data.uid,
+        tutorboxEmail: data.email,
+        classAccount: !data.linkedExisting,
+        classAccountAt: new Date().toISOString(),
+        ...(data.linkedExisting ? { linkedExistingAccount: true } : {}),
+        ...(data.linkedExisting && data.hasAppAccount ? { hasAppAccount: true } : {}),
+        loginCode: data.code,
+        loginCodeAt: new Date().toISOString(),
+        loginCodeBy: window.currentUser?.email || 'admin'
+    };
+}
+
+/**
+ * 🔄 Keep the TutorBox profile in sync with the CRM record (name, group,
+ * age, guardian, email, status). Best-effort, never blocks the save.
+ */
+window.syncStudentToTutorBox = function(studentId, student) {
+    if (!student || !student.tutorboxUid) return;
+    tbxPost('syncStudentProfile', {
+        uid: student.tutorboxUid,
+        fullName: student.nombre || '',
+        grupo: student.grupo || '',
+        edad: student.edad || null,
+        acudiente: student.acudiente || null,
+        email: String(student.correo || '').trim().toLowerCase(),
+        status: student.status || 'active'
+    }).catch(e => console.warn('syncStudentProfile:', e.message));
+};
 
 async function tbxPost(path, body) {
     const response = await fetch(`${TUTORBOX_CLOUD_FUNCTION_BASE}/${path}`, {
@@ -2283,17 +2323,9 @@ window.generateStudentLoginCode = async function(studentId, opts = {}) {
         // books) and get the code in one call. "📱" later enables the app.
         try {
             const data = await tbxPost('provisionClassAccount', classAccountPayload(studentId, student));
-            await window.StudentManager.updateStudent(studentId, {
-                tutorboxUid: data.uid,
-                tutorboxEmail: data.email,
-                classAccount: true,
-                classAccountAt: new Date().toISOString(),
-                loginCode: data.code,
-                loginCodeAt: new Date().toISOString(),
-                loginCodeBy: window.currentUser?.email || 'admin'
-            });
+            await window.StudentManager.updateStudent(studentId, classAccountRecord(data));
             if (!opts.silent) {
-                window.showNotification(`🎟️ Código de ${student.nombre}: ${data.code} (cuenta de clase creada)`, 'success');
+                window.showNotification(`🎟️ Código de ${student.nombre}: ${data.code}${data.linkedExisting ? ' (vinculado a su cuenta existente ' + data.email + ')' : ' (cuenta de clase creada)'}`, 'success');
                 if (typeof window.loadStudentsTab === 'function') window.loadStudentsTab();
             }
             return data.code;
@@ -2346,7 +2378,7 @@ window.generateAllLoginCodes = async function() {
     const newAccounts = todo.filter(s => !s.tutorboxUid).length;
     if (!confirm(`Se generará un código de clase para ${todo.length} estudiante(s) activo(s) sin código.\n\n${newAccounts} de ellos aún no tienen cuenta TutorBox: se les creará una cuenta SOLO PARA CLASES (sin acceso a la app; el botón 📱 lo activa después).\n\n¿Continuar?`)) return;
     if (btn) { btn.disabled = true; }
-    let ok = 0, failed = 0, done = 0;
+    let ok = 0, failed = 0, done = 0, linked = 0;
     const CONCURRENCY = 4;
     const queue = todo.slice();
     const worker = async () => {
@@ -2362,15 +2394,8 @@ window.generateAllLoginCodes = async function() {
                     });
                 } else {
                     const data = await tbxPost('provisionClassAccount', classAccountPayload(s.id, s));
-                    await window.StudentManager.updateStudent(s.id, {
-                        tutorboxUid: data.uid,
-                        tutorboxEmail: data.email,
-                        classAccount: true,
-                        classAccountAt: new Date().toISOString(),
-                        loginCode: data.code,
-                        loginCodeAt: new Date().toISOString(),
-                        loginCodeBy: window.currentUser?.email || 'admin'
-                    });
+                    await window.StudentManager.updateStudent(s.id, classAccountRecord(data));
+                    if (data.linkedExisting) linked++;
                 }
                 ok++;
             } catch (e) {
@@ -2386,7 +2411,7 @@ window.generateAllLoginCodes = async function() {
         if (typeof window.logAudit === 'function') {
             try { window.logAudit('student_login_codes_batch', { ok, failed }); } catch (e) { /* ignore */ }
         }
-        window.showNotification(`🎟️ Códigos generados: ${ok}${failed ? ` · ${failed} fallaron` : ''}`, failed ? 'warning' : 'success');
+        window.showNotification(`🎟️ Códigos generados: ${ok}${linked ? ` · ${linked} vinculados a cuentas existentes` : ''}${failed ? ` · ${failed} fallaron` : ''}`, failed ? 'warning' : 'success');
     } finally {
         if (btn) { btn.disabled = false; btn.textContent = '🎟️ Códigos para todos'; }
         if (typeof window.loadStudentsTab === 'function') window.loadStudentsTab();
