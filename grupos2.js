@@ -1482,10 +1482,16 @@ let _tbxLinksAt = 0;
 window.loadClassLinks = async function(force = false) {
     if (!force && _tbxLinksAt && Date.now() - _tbxLinksAt < 5 * 60 * 1000) return window._tbxLinks;
     try {
+        // manual overrides (group.classCode) + apply: the recurring room becomes
+        // the group's official room on the TutorBox side (lobby cards, panels).
+        const manual = {};
+        for (const g of window.GroupsManager2.groups.values()) {
+            if (g.classCode && /^\d{6}$/.test(String(g.classCode))) manual[g.groupId] = String(g.classCode);
+        }
         const r = await fetch(`${TUTORBOX_CF_BASE}/getClassLinks`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-admin-key': TUTORBOX_KEY },
-            body: '{}'
+            body: JSON.stringify({ apply: true, manual })
         });
         const data = await r.json();
         if (r.ok && data.byGroup) {
