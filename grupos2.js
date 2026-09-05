@@ -570,8 +570,8 @@ function renderGrupo2Form(group = null) {
 
                 <!-- Max Students -->
                 <div class="form-group">
-                    <label>Capacidad Máxima</label>
-                    <input type="number" id="grupo2MaxStudents" min="1" max="15"
+                    <label>Capacidad (referencia, no limita)</label>
+                    <input type="number" id="grupo2MaxStudents" min="1" max="60"
                            value="${group?.maxStudents || 8}">
                 </div>
 
@@ -1116,11 +1116,11 @@ window.addStudentToGrupo2 = async function(groupId) {
         const group = window.GroupsManager2.groups.get(groupId);
         if (!group) throw new Error('Grupo no encontrado');
 
-        // Check capacity
+        // Capacity is a WARNING, never a block (5 Sep 2026, user decision):
+        // the admin can always add; the card badge shows "Lleno" / "N/8".
         const currentCount = (group.studentIds || []).length;
         if (currentCount >= (group.maxStudents || 8)) {
-            window.showNotification('⚠️ El grupo está lleno', 'warning');
-            return;
+            window.showNotification(`⚠️ El grupo ya tiene ${currentCount}/${group.maxStudents || 8} — se agrega de todas formas`, 'warning');
         }
 
         // Add student
