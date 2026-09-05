@@ -13,7 +13,10 @@ class GroupsManager2 {
             COATS: { name: 'Coats (Company)', range: [131, 134], color: '#f59e0b' },
             NAZARETH: { name: 'Hogar Nazareth', range: [135, 138], color: '#10b981' },
             PRIVADO: { name: 'Clases Privadas', range: [139, 150], color: '#8b5cf6' },
-            ONLINE: { name: 'Clases Online', range: [151, 160], color: '#ec4899' }
+            ONLINE: { name: 'Clases Online', range: [151, 160], color: '#ec4899' },
+            // 🧪 Test Class (5 Sep 2026): people sent by sales for a trial. They get a
+            // code like everyone; access to REAL groups is granted from tutorbox.app/admin/groups.
+            TEST: { name: '🧪 Test Class', range: [990, 999], color: '#f59e0b' }
         };
 
         // Available rooms for CB
@@ -1209,10 +1212,10 @@ window.refreshGrupos2Grid = async function() {
 
 // 🗓 Tab (Entre semana / Sábados) — remembered per device.
 window._grupos2Tab = (function() {
-    try { return localStorage.getItem('grupos2Tab') === 'saturday' ? 'saturday' : 'weekday'; } catch (e) { return 'weekday'; }
+    try { const t = localStorage.getItem('grupos2Tab'); return t === 'saturday' || t === 'test' ? t : 'weekday'; } catch (e) { return 'weekday'; }
 })();
 window.setGrupos2Tab = function(tab) {
-    window._grupos2Tab = tab === 'saturday' ? 'saturday' : 'weekday';
+    window._grupos2Tab = tab === 'saturday' ? 'saturday' : tab === 'test' ? 'test' : 'weekday';
     try { localStorage.setItem('grupos2Tab', window._grupos2Tab); } catch (e) { /* ignore */ }
     if (document.getElementById('filterModality')) window.applyGrupos2Filters(); else window.refreshGrupos2Grid();
 };
@@ -1239,10 +1242,13 @@ function renderGrupos2Grid(allGroups) {
     const visible = window._grupos2ShowHidden ? allGroups : allGroups.filter(g => !g.hidden);
     // 🗓 Tabs: Sábados vs Entre semana (a group is "Sábado" when its days include Saturday).
     const isSat = g => (g.days || []).some(d => /^s[aá]b/i.test(String(d)) || /^sat/i.test(String(d)));
+    const isTest = g => g.modality === 'TEST';
     const tab = window._grupos2Tab;
-    const satCount = visible.filter(isSat).length;
-    const weekCount = visible.length - satCount;
-    const groups = visible.filter(g => (tab === 'saturday') === isSat(g));
+    const testCount = visible.filter(isTest).length;
+    const satCount = visible.filter(g => !isTest(g) && isSat(g)).length;
+    const weekCount = visible.length - satCount - testCount;
+    const groups = visible.filter(g =>
+        tab === 'test' ? isTest(g) : !isTest(g) && ((tab === 'saturday') === isSat(g)));
 
     // Render stats
     if (stats) {
@@ -1298,7 +1304,14 @@ function renderGrupos2Grid(allGroups) {
         <div style="display: flex; gap: 0.35rem; border-bottom: 3px solid #4f46e5; margin-bottom: 0.75rem;">
             ${tabBtn('weekday', '📅 Entre semana', weekCount)}
             ${tabBtn('saturday', '🗓 Sábados', satCount)}
+            ${tabBtn('test', '🧪 Test Class', testCount)}
         </div>
+        ${tab === 'test' ? `
+        <div style="background: #fffbeb; border: 1px solid #fcd34d; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 0.75rem; font-size: 0.85rem; color: #78350f;">
+            🧪 <b>Test Class:</b> registra aquí a las personas que envía ventas para una clase de prueba (estudiante con modalidad <b>Prueba</b>, sin valor).
+            Reciben su código como todos. Importa este grupo en <b>tutorbox.app/admin/groups</b> y desde allí les das acceso a cualquier grupo real por 14 días.
+            Al matricularse, cámbialos al grupo real: conservan cuenta y código.
+        </div>` : ''}
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
             <span style="font-size: 0.8rem; color: #6b7280;">⠿ Arrastra las tarjetas para ordenarlas (el orden se guarda para todos)</span>
             ${hiddenCount ? `

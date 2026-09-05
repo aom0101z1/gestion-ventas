@@ -591,6 +591,7 @@ function renderStudentForm(student = null) {
                             <option value="Escuela" ${student?.modalidad === 'Escuela' ? 'selected' : ''}>Escuela</option>
                             <option value="Online" ${student?.modalidad === 'Online' ? 'selected' : ''}>Online</option>
                             <option value="Privadas" ${student?.modalidad === 'Privadas' ? 'selected' : ''}>Privadas</option>
+                            <option value="Prueba" ${student?.modalidad === 'Prueba' ? 'selected' : ''}>🧪 Prueba (Test Class, sin valor)</option>
                         </select>
                     </div>
 
