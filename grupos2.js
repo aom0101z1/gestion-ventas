@@ -982,10 +982,24 @@ window.viewGrupo2Students = async function(groupId) {
                                             ` : ''}
                                         </div>
                                     </div>
-                                    <button onclick="removeStudentFromGrupo2(${groupId}, '${student.id}')"
-                                            style="background: #fee2e2; color: #dc2626; border: none; padding: 0.5rem 0.75rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">
-                                        🗑️ Quitar
-                                    </button>
+                                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                        ${student.notFound ? '' : student.loginCode ? `
+                                        <button onclick="copyLoginCode('${student.loginCode}')"
+                                                title="Código de clase (clic para copiar). Doble clic = imprimir tarjeta"
+                                                ondblclick="printLoginCard('${student.id}')"
+                                                style="background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; padding: 0.45rem 0.6rem; border-radius: 6px; cursor: pointer; font-size: 0.9rem; font-weight: 800; font-family: monospace; letter-spacing: 0.08em;">
+                                            🎟️ ${student.loginCode}
+                                        </button>` : `
+                                        <button onclick="generateStudentLoginCode('${student.id}').then(c => { if (c) viewGrupo2Students(${groupId}); })"
+                                                title="Generar código de clase (crea cuenta solo-clases si no tiene)"
+                                                style="background: #fffbeb; color: #b45309; border: 1px dashed #f59e0b; padding: 0.45rem 0.6rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">
+                                            🎟️ Código
+                                        </button>`}
+                                        <button onclick="removeStudentFromGrupo2(${groupId}, '${student.id}')"
+                                                style="background: #fee2e2; color: #dc2626; border: none; padding: 0.5rem 0.75rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">
+                                            🗑️ Quitar
+                                        </button>
+                                    </div>
                                 </div>
                             `).join('')}
                         </div>
@@ -1013,9 +1027,17 @@ window.viewGrupo2Students = async function(groupId) {
                     }
                     return '<div></div>';
                 })()}
-                <button onclick="closeGrupo2StudentsModal()" style="background: #6b7280; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 6px; cursor: pointer; font-weight: 500;">
-                    Cerrar
-                </button>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    ${assignedStudents.some(s => s.loginCode) ? `
+                    <button onclick="copyGroupLoginCodes(${groupId})"
+                            title="Copia 'Nombre: CÓDIGO' de todo el grupo, listo para WhatsApp"
+                            style="background: #f59e0b; color: white; border: none; padding: 0.75rem 1.25rem; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.9rem;">
+                        📋 Copiar códigos (${assignedStudents.filter(s => s.loginCode).length})
+                    </button>` : ''}
+                    <button onclick="closeGrupo2StudentsModal()" style="background: #6b7280; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 6px; cursor: pointer; font-weight: 500;">
+                        Cerrar
+                    </button>
+                </div>
             </div>
         </div>
     `;
@@ -1053,6 +1075,25 @@ function getAvailableStudentsOptions(currentGroupStudentIds) {
 }
 
 // Close modal
+/**
+ * 📋 Copy every class login code of a group as "Nombre: CÓDIGO" lines —
+ * ready to paste in WhatsApp. Students without a code are listed as pendiente.
+ */
+window.copyGroupLoginCodes = function(groupId) {
+    const group = window.GroupsManager2.groups.get(groupId);
+    if (!group) return;
+    const lines = (group.studentIds || []).map(id => {
+        const s = window.StudentManager?.students?.get(id);
+        if (!s) return null;
+        return `${s.nombre}: ${s.loginCode || '(pendiente)'}`;
+    }).filter(Boolean);
+    const text = `🎓 ${group.displayName}\nEntra en tutorbox.app/login → "Tengo un código"\n\n` + lines.join('\n');
+    (navigator.clipboard?.writeText(text) || Promise.reject()).then(
+        () => window.showNotification(`📋 ${lines.length} códigos copiados`, 'success'),
+        () => { prompt('Copia los códigos:', text); }
+    );
+};
+
 window.closeGrupo2StudentsModal = function() {
     const modal = document.getElementById('grupo2StudentsModal');
     if (modal) modal.remove();
