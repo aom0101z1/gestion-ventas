@@ -2245,7 +2245,14 @@ window.closeCreateStudentAccountModal = function() {
 function classAccountPayload(studentId, student) {
     const rawPhone = String(student.telefono || '').split(/[\/,;]+/)[0].trim();
     const digits = rawPhone.replace(/\D/g, '');
-    const phone = !digits ? '' : rawPhone.startsWith('+') ? `+${digits}` : `+57${digits}`;
+    // Only a plausible mobile goes through: Colombian 10-digit (3xx…) or an
+    // international number with country code (10-15 digits). Anything else
+    // (landlines, 7-digit, typos) is dropped — the phone is optional for a
+    // class account and Firebase rejects malformed numbers.
+    let phone = '';
+    if (rawPhone.startsWith('+') && digits.length >= 10 && digits.length <= 15) phone = `+${digits}`;
+    else if (digits.length === 10 && digits.startsWith('3')) phone = `+57${digits}`;
+    else if (digits.length === 12 && digits.startsWith('573')) phone = `+${digits}`;
     const email = String(student.correo || '').trim().toLowerCase();
     return {
         fullName: student.nombre,
@@ -2257,7 +2264,7 @@ function classAccountPayload(studentId, student) {
         // 🔗 If this email already has a TutorBox account (parent's Gmail,
         // tester account…), the code is attached to THAT account.
         ...(email.includes('@') ? { email } : {}),
-        ...(phone.length >= 9 ? { phoneNumber: phone } : {})
+        ...(phone ? { phoneNumber: phone } : {})
     };
 }
 
