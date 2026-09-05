@@ -313,8 +313,9 @@ window.loadGrupos2Tab = async function() {
     console.log('📦 Using container:', container.parentElement?.id || 'main page');
 
     try {
-        // 📚 book catalog first so the Libro filter lists the current books
-        await window.loadTutorBoxBooks();
+        // 📚 book catalog first so the Libro filter lists the current books;
+        // 🔗 class links for the "Copiar enlace" buttons (best-effort)
+        await Promise.all([window.loadTutorBoxBooks(), window.loadClassLinks()]);
         console.log('📝 Rendering view...');
         const viewHTML = renderGrupos2View();
         console.log('📝 View HTML length:', viewHTML.length);
@@ -705,6 +706,21 @@ function renderGrupo2Card(group) {
                         style="background: #10b981; color: white; padding: 0.5rem 1rem;">
                     👥 Estudiantes (${group.studentCount})
                 </button>
+                ${(() => {
+                    const l = window.classCodeFor(group);
+                    return l ? `
+                <button onclick="copyClassLink('${l.code}')" class="btn btn-sm"
+                        title="Copiar enlace de la clase en vivo (${l.source === 'group' ? 'grupo importado' : l.source === 'live' ? 'clase repetitiva' : 'enlace manual'}). Doble clic = cambiar"
+                        ondblclick="linkClassToGroup(${group.groupId})"
+                        style="background: #4f46e5; color: white; padding: 0.5rem 1rem; font-family: monospace; letter-spacing: 0.05em;">
+                    🔗 ${l.code}
+                </button>` : `
+                <button onclick="linkClassToGroup(${group.groupId})" class="btn btn-sm"
+                        title="Este grupo aún no tiene clase en vivo enlazada: elige una clase repetitiva"
+                        style="background: #eef2ff; color: #4338ca; padding: 0.5rem 1rem; border: 1px dashed #6366f1;">
+                    🔗 Vincular clase
+                </button>`;
+                })()}
                 <button onclick="toggleGrupo2Status(${group.groupId})" class="btn btn-sm"
                         title="${isInactive ? 'Marcar como ACTIVO' : 'Marcar como INACTIVO'}"
                         style="background: ${isInactive ? '#6b7280' : '#059669'}; color: white; padding: 0.5rem 1rem;">
@@ -1454,6 +1470,60 @@ window.loadTutorBoxBooks = async function(force = false) {
         }
     }
     return window._tbxBooks;
+};
+
+/**
+ * 🔗 Class links (tutorbox.app/class?c=CODE) per CRM group — from the
+ * getClassLinks CF: imported group code first, else the recurring live class
+ * whose title starts with the group number. Manual override: group.classCode.
+ */
+window._tbxLinks = { byGroup: {}, live: [] };
+let _tbxLinksAt = 0;
+window.loadClassLinks = async function(force = false) {
+    if (!force && _tbxLinksAt && Date.now() - _tbxLinksAt < 5 * 60 * 1000) return window._tbxLinks;
+    try {
+        const r = await fetch(`${TUTORBOX_CF_BASE}/getClassLinks`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-admin-key': TUTORBOX_KEY },
+            body: '{}'
+        });
+        const data = await r.json();
+        if (r.ok && data.byGroup) {
+            window._tbxLinks = { byGroup: data.byGroup || {}, live: data.live || [] };
+            _tbxLinksAt = Date.now();
+        }
+    } catch (e) {
+        console.warn('getClassLinks:', e.message);
+    }
+    return window._tbxLinks;
+};
+/** Code for a group: manual override on the group, else the CF match. */
+window.classCodeFor = function(group) {
+    if (group.classCode && /^\d{6}$/.test(String(group.classCode))) return { code: String(group.classCode), source: 'manual' };
+    const hit = window._tbxLinks.byGroup[String(group.groupId)];
+    return hit ? { code: hit.code, source: hit.source } : null;
+};
+window.copyClassLink = function(code) {
+    const url = `https://tutorbox.app/class?c=${code}`;
+    (navigator.clipboard?.writeText(url) || Promise.reject()).then(
+        () => window.showNotification(`🔗 Enlace copiado: ${url}`, 'success'),
+        () => prompt('Copia el enlace:', url)
+    );
+};
+/** Manual link: pick one of the recurring live classes for this group. */
+window.linkClassToGroup = async function(groupId) {
+    await window.loadClassLinks(true);
+    const group = window.GroupsManager2.groups.get(groupId);
+    if (!group) return;
+    const live = window._tbxLinks.live || [];
+    const options = live.map((s, i) => `${i + 1}. ${s.code} · ${s.title || '(sin nombre)'} · ${s.teacherName || ''}`).join('\n');
+    const answer = prompt(`Escribe el CÓDIGO de 6 dígitos de la clase en vivo para el grupo ${groupId} (${group.displayName}).\n\nClases repetitivas disponibles:\n${options}\n\n(Deja vacío para quitar el enlace manual)`, group.classCode || '');
+    if (answer === null) return;
+    const code = answer.trim();
+    if (code && !/^\d{6}$/.test(code)) { window.showNotification('El código debe tener 6 dígitos', 'error'); return; }
+    await window.GroupsManager2.patchGroup(groupId, { classCode: code || null });
+    window.showNotification(code ? `🔗 Grupo ${groupId} enlazado a la clase ${code}` : `Enlace manual quitado del grupo ${groupId}`, 'success');
+    if (document.getElementById('filterModality')) window.applyGrupos2Filters(); else window.refreshGrupos2Grid();
 };
 
 window._tbxTeachers = [];
