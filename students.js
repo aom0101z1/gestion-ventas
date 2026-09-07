@@ -511,6 +511,31 @@ function renderStudentForm(student = null) {
                         </div>
                     </div>
 
+                    ${(() => {
+                        // 🎥 Live-class summary (from the last getB2BStudents fetch)
+                        const live = student?.tutorboxUid ? (window._liveByUid || {})[student.tutorboxUid] : null;
+                        if (!student?.tutorboxUid) return '';
+                        const lc = live?.liveClass;
+                        const href = `https://tutorbox.app/admin/student?uid=${encodeURIComponent(student.tutorboxUid)}${lc?.lastCode ? `&c=${lc.lastCode}` : ''}&name=${encodeURIComponent(student.nombre || '')}`;
+                        return `
+                    <div class="form-group" style="grid-column: span 2; background: #ecfeff; border: 1px solid #a5f3fc; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 0.5rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                            <strong style="color: #155e75;">🎥 Clases en vivo (TutorBox)</strong>
+                            <a href="${href}" target="_blank" rel="noopener" style="font-size: 0.8rem; color: #0e7490; font-weight: 600;">Ver historial completo ↗</a>
+                        </div>
+                        ${!live ? `<div style="font-size: 0.85rem; color: #64748b; margin-top: 0.35rem;">Datos no cargados aún — vuelve a abrir en unos segundos.</div>` : lc && lc.lastDate ? `
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.5rem; margin-top: 0.5rem; font-size: 0.85rem; color: #164e63;">
+                            <div>📅 Última clase: <b>${lc.lastDate}</b></div>
+                            <div>🗓 Días asistidos: <b>${lc.days}</b> · racha <b>${lc.streak}</b></div>
+                            <div>💎 Cristales: <b>${lc.crystals}</b></div>
+                            <div>🎮 Juegos: <b>${lc.games}</b> · 🗣 habló <b>${lc.spoken}</b> · ✔ <b>${lc.correct}</b></div>
+                            <div>🎟️ Código: <b style="font-family: monospace;">${live.loginCode || '—'}</b></div>
+                            <div>📸 Selfie de clase: <b>${live.hasClassPhoto ? 'sí' : 'no'}</b></div>
+                        </div>` : `
+                        <div style="font-size: 0.85rem; color: #64748b; margin-top: 0.35rem;">Cuenta creada (${live.email || ''}), código <b style="font-family: monospace;">${live.loginCode || '—'}</b>. Aún no ha entrado a una clase en vivo${live.lastCodeLogin ? ` — último login con código ${live.lastCodeLogin.slice(0, 10)}` : ''}.</div>`}
+                    </div>`;
+                    })()}
+
                     <div class="form-group">
                         <label>Nombre Completo*</label>
                         <input type="text" id="stuNombre" value="${student?.nombre || ''}" required>
@@ -813,6 +838,7 @@ function renderStudentTable(students) {
                                         📱
                                     </button>
                                     `}
+                                    <span id="liveChip-${s.id}"></span>
                                     ${s.loginCode ? `
                                     <button onclick="copyLoginCode('${s.loginCode}')"
                                           title="Código de clase (clic para copiar). Doble clic = imprimir tarjeta"
@@ -865,7 +891,11 @@ window.loadStudentsTab = async function() {
     }
 
     await window.StudentManager.init();
-    
+
+    // 🎥 Live-class data (crystals, last class, photo) — fetched in the background
+    // and painted into each row's chip; classroom selfies auto-sync once per session.
+    window.refreshLiveClassChips();
+
     // Get current filters from localStorage or default to 'all'
     const currentStatusFilter = localStorage.getItem('studentStatusFilter') || 'all';
     const currentModalidadFilter = localStorage.getItem('studentModalidadFilter') || 'all';
@@ -2426,6 +2456,56 @@ window.generateAllLoginCodes = async function() {
     }
 };
 
+/**
+ * 🎥 Live-class chips (5 Sep 2026): one getB2BStudents call → per-row chip
+ * "🎥 5 sep · 💎 55" (click = student history on tutorbox.app). Also syncs the
+ * classroom selfies once per browser session (quiet: notifies only on changes).
+ */
+window._liveByUid = {};
+let _liveFetchedAt = 0;
+let _photosSyncedThisSession = false;
+window.refreshLiveClassChips = async function(force = false) {
+    try {
+        if (force || Date.now() - _liveFetchedAt > 3 * 60 * 1000) {
+            const r = await fetch(`${TUTORBOX_CLOUD_FUNCTION_BASE}/getB2BStudents`, {
+                method: 'GET', headers: { 'x-admin-key': TUTORBOX_ADMIN_KEY }
+            });
+            const data = await r.json();
+            if (r.ok && Array.isArray(data.students)) {
+                window._liveByUid = {};
+                for (const s of data.students) window._liveByUid[s.uid] = s;
+                _liveFetchedAt = Date.now();
+            }
+        }
+    } catch (e) { console.warn('getB2BStudents:', e.message); }
+
+    const fmt = (d) => { if (!d) return '—'; const [y, m, dd] = d.split('-'); return `${parseInt(dd)} ${['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][parseInt(m) - 1]}`; };
+    for (const s of window.StudentManager.students.values()) {
+        const el = document.getElementById(`liveChip-${s.id}`);
+        if (!el) continue;
+        const live = s.tutorboxUid && window._liveByUid[s.tutorboxUid];
+        if (!live) { el.innerHTML = ''; continue; }
+        const lc = live.liveClass;
+        const href = `https://tutorbox.app/admin/student?uid=${encodeURIComponent(s.tutorboxUid)}${lc?.lastCode ? `&c=${lc.lastCode}` : ''}&name=${encodeURIComponent(s.nombre || '')}`;
+        el.innerHTML = lc && lc.lastDate ? `
+            <a href="${href}" target="_blank" rel="noopener"
+               title="Última clase en vivo: ${lc.lastDate} · ${lc.days} día(s) · racha ${lc.streak} · 💎 ${lc.crystals} · 🎮 ${lc.games} juegos · 🗣 ${lc.spoken} respuestas habladas${live.hasClassPhoto ? ' · 📸 con selfie' : ' · sin selfie'}. Clic = historial completo"
+               style="background: #ecfeff; color: #155e75; padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: 700; display: inline-flex; align-items: center; gap: 0.3rem; height: 36px; border: 1px solid #a5f3fc; text-decoration: none;">
+                🎥 ${fmt(lc.lastDate)} · 💎 ${lc.crystals}${live.hasClassPhoto ? ' · 📸' : ''}
+            </a>` : `
+            <span title="Cuenta creada, aún no ha entrado a una clase en vivo${live.lastCodeLogin ? ' (último login con código: ' + live.lastCodeLogin.slice(0, 10) + ')' : ''}"
+                  style="background: #f1f5f9; color: #64748b; padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.75rem; display: inline-flex; align-items: center; height: 36px; border: 1px solid #e2e8f0;">
+                🎥 sin clases
+            </span>`;
+    }
+
+    // Quiet selfie sync, once per session, only when someone has a selfie
+    if (!_photosSyncedThisSession && Object.values(window._liveByUid).some(x => x.hasClassPhoto)) {
+        _photosSyncedThisSession = true;
+        try { await window.syncClassPhotos({ quiet: true }); } catch (e) { /* ignore */ }
+    }
+};
+
 window.copyLoginCode = function(code) {
     if (!code) return;
     (navigator.clipboard?.writeText(code) || Promise.reject()).then(
@@ -2509,11 +2589,15 @@ window.compactStudentPhotos = async function() {
     return { fixed, saved };
 };
 
-window.syncClassPhotos = async function() {
+window.syncClassPhotos = async function(opts = {}) {
+    const quiet = !!opts.quiet;
     const btn = document.getElementById('syncClassPhotosBtn');
-    const all = Array.from(window.StudentManager.students.values()).filter(s => s.tutorboxUid);
+    // Only students whose account has a classroom selfie (when we know it) — one small call.
+    const known = Object.keys(window._liveByUid || {}).length > 0;
+    const all = Array.from(window.StudentManager.students.values())
+        .filter(s => s.tutorboxUid && (!known || window._liveByUid[s.tutorboxUid]?.hasClassPhoto));
     if (!all.length) {
-        window.showNotification('No hay estudiantes con cuenta TutorBox.', 'info');
+        if (!quiet) window.showNotification('No hay selfies de clase nuevas para sincronizar.', 'info');
         return;
     }
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Sincronizando…'; }
@@ -2539,7 +2623,7 @@ window.syncClassPhotos = async function() {
                 updated++;
             }
         }
-        window.showNotification(`📸 Fotos de clase: ${updated} actualizadas · ${skipped} sin cambios`, 'success');
+        if (!quiet || updated) window.showNotification(`📸 Fotos de clase: ${updated} actualizadas · ${skipped} sin cambios`, 'success');
         if (updated && typeof window.loadStudentsTab === 'function') window.loadStudentsTab();
     } catch (e) {
         console.error('syncClassPhotos:', e);
