@@ -892,10 +892,6 @@ window.loadStudentsTab = async function() {
 
     await window.StudentManager.init();
 
-    // 🎥 Live-class data (crystals, last class, photo) — fetched in the background
-    // and painted into each row's chip; classroom selfies auto-sync once per session.
-    window.refreshLiveClassChips();
-
     // Get current filters from localStorage or default to 'all'
     const currentStatusFilter = localStorage.getItem('studentStatusFilter') || 'all';
     const currentModalidadFilter = localStorage.getItem('studentModalidadFilter') || 'all';
@@ -991,6 +987,11 @@ window.loadStudentsTab = async function() {
             </div>
         </div>
     `;
+
+    // 🎥 Live-class chips — AFTER the rows exist (9 Sep fix: when the data was
+    // cached the paint ran before the table and the chips vanished until a
+    // lucky reload). Fetch in the background, paint into each row's chip.
+    window.refreshLiveClassChips();
 
     // Add search listener
     document.getElementById('studentSearch')?.addEventListener('input', refreshStudentTable);
@@ -2108,6 +2109,7 @@ function refreshStudentTable() {
     });
 
     document.getElementById('studentTableContainer').innerHTML = renderStudentTable(filtered);
+    if (typeof window.paintLiveClassChips === 'function') window.paintLiveClassChips();
 
     // Update counter
     const counterText = startDate || endDate
@@ -2478,7 +2480,17 @@ window.refreshLiveClassChips = async function(force = false) {
             }
         }
     } catch (e) { console.warn('getB2BStudents:', e.message); }
+    window.paintLiveClassChips();
 
+    // Quiet selfie sync, once per session, only when someone has a selfie
+    if (!_photosSyncedThisSession && Object.values(window._liveByUid).some(x => x.hasClassPhoto)) {
+        _photosSyncedThisSession = true;
+        try { await window.syncClassPhotos({ quiet: true }); } catch (e) { /* ignore */ }
+    }
+};
+
+/** Paint the chips into whatever rows are on screen right now (cheap, re-runnable). */
+window.paintLiveClassChips = function() {
     const fmt = (d) => { if (!d) return '—'; const [y, m, dd] = d.split('-'); return `${parseInt(dd)} ${['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][parseInt(m) - 1]}`; };
     for (const s of window.StudentManager.students.values()) {
         const el = document.getElementById(`liveChip-${s.id}`);
@@ -2497,12 +2509,6 @@ window.refreshLiveClassChips = async function(force = false) {
                   style="background: #f1f5f9; color: #64748b; padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.75rem; display: inline-flex; align-items: center; height: 36px; border: 1px solid #e2e8f0;">
                 🎥 sin clases
             </span>`;
-    }
-
-    // Quiet selfie sync, once per session, only when someone has a selfie
-    if (!_photosSyncedThisSession && Object.values(window._liveByUid).some(x => x.hasClassPhoto)) {
-        _photosSyncedThisSession = true;
-        try { await window.syncClassPhotos({ quiet: true }); } catch (e) { /* ignore */ }
     }
 };
 
