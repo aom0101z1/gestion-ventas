@@ -569,6 +569,33 @@ function renderGrupo2Form(group = null) {
                     </select>
                 </div>
 
+                <!-- 🔗 Live class (10 Sep): pick the recurring TutorBox Live room that is
+                     this group's OFFICIAL room. Replaces the old double-click prompt
+                     (single click copied the link and closed the prompt). -->
+                <div class="form-group">
+                    <label>🔗 Clase en vivo (sala oficial en tutorbox.app)</label>
+                    <select id="grupo2ClassCode">
+                        ${(() => {
+                            const live = (window._tbxLinks && window._tbxLinks.live) || [];
+                            const manual = group && group.classCode && /^\d{6}$/.test(String(group.classCode)) ? String(group.classCode) : '';
+                            const auto = group ? (window._tbxLinks.byGroup || {})[String(group.groupId)] : null;
+                            const autoLabel = auto ? `Automática: ${auto.code} (${auto.source === 'live' ? 'clase repetitiva con el número del grupo' : 'grupo importado'})` : 'Automática (clase repetitiva cuyo nombre empieza con el número del grupo)';
+                            const opts = [`<option value="" ${manual ? '' : 'selected'}>${autoLabel}</option>`];
+                            let found = false;
+                            for (const c of live) {
+                                const sel = manual === String(c.code);
+                                if (sel) found = true;
+                                opts.push(`<option value="${c.code}" ${sel ? 'selected' : ''}>${c.code} · ${(c.title || '(sin nombre)').replace(/</g, '&lt;')} · ${(c.teacherName || '').replace(/</g, '&lt;')}</option>`);
+                            }
+                            if (manual && !found) opts.push(`<option value="${manual}" selected>${manual} · (código manual, no está en la lista de repetitivas)</option>`);
+                            return opts.join('');
+                        })()}
+                    </select>
+                    <div style="font-size: 0.75rem; color: #6b7280; margin-top: 0.25rem;">
+                        Los estudiantes del grupo entran a esta sala desde su lobby. Solo aparecen las clases repetitivas de tutorbox.app.
+                    </div>
+                </div>
+
                 <!-- Max Students -->
                 <div class="form-group">
                     <label>Capacidad (referencia, no limita)</label>
@@ -710,12 +737,12 @@ function renderGrupo2Card(group) {
                     const l = window.classCodeFor(group);
                     return l ? `
                 <button onclick="copyClassLink('${l.code}')" class="btn btn-sm"
-                        title="Copiar enlace de la clase en vivo (${l.source === 'group' ? 'grupo importado' : l.source === 'live' ? 'clase repetitiva' : 'enlace manual'}). Doble clic = cambiar"
-                        ondblclick="linkClassToGroup(${group.groupId})"
+                        title="Copiar enlace de la clase en vivo (${l.source === 'group' ? 'grupo importado' : l.source === 'live' ? 'clase repetitiva' : 'enlace manual'}). Para cambiarla: ✏️ Editar → Clase en vivo"
+                        ondblclick="showGrupo2Form(${group.groupId})"
                         style="background: #4f46e5; color: white; padding: 0.5rem 1rem; font-family: monospace; letter-spacing: 0.05em;">
                     🔗 ${l.code}
                 </button>` : `
-                <button onclick="linkClassToGroup(${group.groupId})" class="btn btn-sm"
+                <button onclick="showGrupo2Form(${group.groupId})" class="btn btn-sm"
                         title="Este grupo aún no tiene clase en vivo enlazada: elige una clase repetitiva"
                         style="background: #eef2ff; color: #4338ca; padding: 0.5rem 1rem; border: 1px dashed #6366f1;">
                     🔗 Vincular clase
@@ -753,7 +780,7 @@ window.showGrupo2Form = async function(groupId = null) {
     }
 
     // 🎥 TutorBox Live teachers + 📚 current book catalog (cached; [] when offline)
-    await Promise.all([window.loadTutorBoxTeachers(), window.loadTutorBoxBooks()]);
+    await Promise.all([window.loadTutorBoxTeachers(), window.loadTutorBoxBooks(), window.loadClassLinks()]);
 
     const group = groupId ? window.GroupsManager2.groups.get(groupId) : null;
 
@@ -848,6 +875,7 @@ window.saveGrupo2Form = async function(groupId) {
             teacherName: teacherName,
             teacherEmail: teacherEmail,
             teacherUid: teacherUid,
+            classCode: (document.getElementById('grupo2ClassCode')?.value || '').trim() || null,
             maxStudents: parseInt(document.getElementById('grupo2MaxStudents').value) || 8,
             status: document.getElementById('grupo2Status').value,
             ageCategory: ageCategory,
@@ -857,6 +885,8 @@ window.saveGrupo2Form = async function(groupId) {
         await window.GroupsManager2.saveGroup(groupData);
 
         window.showNotification(`✅ Grupo ${groupData.groupId} guardado exitosamente`, 'success');
+        // 🔗 apply the (possibly new) class link on the TutorBox side right away
+        try { await window.loadClassLinks(true); } catch (e) { /* offline */ }
         cancelGrupo2Form();
         await refreshGrupos2Grid();
 
