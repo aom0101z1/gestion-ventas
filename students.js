@@ -2194,9 +2194,8 @@ window.paintLastPayments = function() {
         if (!t) { el.innerHTML = '<span style="color: #9ca3af; font-size: 0.85rem;">Sin pagos</span>'; continue; }
         const months = [...new Set(t.months)].map(fmtMonth).join(', ');
         el.innerHTML = `
-            <div style="font-weight: 700; color: ${t.pending ? '#7c3aed' : '#065f46'};">${t.pending ? '📋 ' : ''}$${t.amount.toLocaleString('es-CO')}</div>
-            <small style="color: #374151;">${fmtDate(t.date)}</small>
-            ${months ? `<br><small style="color: #6b7280;" title="${t.method || ''}${t.bank ? ' - ' + t.bank : ''}">${months}</small>` : ''}`;
+            <div style="font-weight: 700; color: ${t.pending ? '#7c3aed' : '#065f46'};" title="${months ? 'Cubre: ' + months : ''}${t.method ? ' · ' + t.method : ''}${t.bank ? ' - ' + t.bank : ''}">${t.pending ? '📋 ' : ''}$${t.amount.toLocaleString('es-CO')}</div>
+            <small style="color: #374151;">${fmtDate(t.date)}</small>`;
     }
 };
 
