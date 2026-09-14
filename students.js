@@ -727,11 +727,12 @@ function renderStudentTable(students) {
                 <tr>
                     <th style="padding: 0.75rem; text-align: center; width: 50px;">#</th>
                     <th style="padding: 0.75rem; text-align: left;">Nombre</th>
-                    <th style="padding: 0.75rem; text-align: left;">Documento</th>
+                    <th style="padding: 0.75rem; text-align: center; width: 56px;" title="Día de Pago registrado en la ficha del estudiante">DP1</th>
+                    <th style="padding: 0.75rem; text-align: center; width: 72px;" title="Día de pago ajustado (manual) — se guarda al salir de la casilla">DP2</th>
                     <th style="padding: 0.75rem; text-align: left;">Teléfono</th>
                     <th style="padding: 0.75rem; text-align: left;">Grupo</th>
-                    <th style="padding: 0.75rem; text-align: left;">Modalidad</th>
                     <th style="padding: 0.75rem; text-align: left;">Pago</th>
+                    <th style="padding: 0.75rem; text-align: left;" title="Último pago registrado en el módulo de Pagos">Último Pago</th>
                     <th style="padding: 0.75rem; text-align: center;">Fecha Registro</th>
                     <th style="padding: 0.75rem; text-align: center;">Estado</th>
                     <th style="padding: 0.75rem; text-align: center;">Acciones</th>
@@ -770,7 +771,13 @@ function renderStudentTable(students) {
                                     <span>${s.nombre || '-'}${s.paymentNotes ? ' 📋' : ''}</span>
                                 </div>
                             </td>
-                            <td style="padding: 0.75rem;">${s.tipoDoc || ''} ${s.numDoc || '-'}</td>
+                            <td style="padding: 0.75rem; text-align: center; font-weight: 700; color: #374151;">${s.diaPago || '-'}</td>
+                            <td style="padding: 0.5rem; text-align: center;">
+                                <input type="number" min="1" max="31" value="${s.diaPago2 ?? ''}" placeholder="—"
+                                       onchange="saveDiaPago2('${s.id}', this)"
+                                       title="Día de pago ajustado — se guarda al salir de la casilla"
+                                       style="width: 56px; padding: 0.35rem; text-align: center; border: 1px solid #d1d5db; border-radius: 4px; font-weight: 700; color: #7c3aed; background: #faf5ff;">
+                            </td>
                             <td style="padding: 0.75rem;">
                                 ${phoneNumber ? `
                                     <a href="https://wa.me/57${phoneNumber}"
@@ -787,15 +794,14 @@ function renderStudentTable(students) {
                                 ` : '<span style="color: #9ca3af;">Sin grupo</span>'}
                             </td>
                             <td style="padding: 0.75rem;">
-                                ${s.modalidad || '-'}
-                                ${s.modalidadDetalle ? `<br><small style="color: #6b7280;">${s.modalidadDetalle}</small>` : ''}
-                            </td>
-                            <td style="padding: 0.75rem;">
                                 ${s.tipoPago === 'POR_HORAS' ? 'Por horas' : s.tipoPago || '-'}<br>
                                 <small>${s.tipoPago === 'POR_HORAS' ?
                                     `$${(s.valorHora || 0).toLocaleString()}/hora` :
                                     `$${window.getStudentMonthlyTotal(s).toLocaleString()}${s.valor2 ? ' (2 cursos)' : ''}`
                                 }</small>
+                            </td>
+                            <td style="padding: 0.75rem;" id="lastPay-${s.id}">
+                                <span style="color: #9ca3af; font-size: 0.8rem;">…</span>
                             </td>
                             <td style="padding: 0.75rem; text-align: center;">
                                 <span style="color: #6b7280; font-size: 0.9rem;">
@@ -992,6 +998,10 @@ window.loadStudentsTab = async function() {
     // cached the paint ran before the table and the chips vanished until a
     // lucky reload). Fetch in the background, paint into each row's chip.
     window.refreshLiveClassChips();
+
+    // 💰 Último Pago per row — same pattern as the chips: fetch in the
+    // background, paint into each row's cell once the table exists.
+    window.refreshLastPayments();
 
     // Add search listener
     document.getElementById('studentSearch')?.addEventListener('input', refreshStudentTable);
@@ -2110,6 +2120,7 @@ function refreshStudentTable() {
 
     document.getElementById('studentTableContainer').innerHTML = renderStudentTable(filtered);
     if (typeof window.paintLiveClassChips === 'function') window.paintLiveClassChips();
+    if (typeof window.paintLastPayments === 'function') window.paintLastPayments();
 
     // Update counter
     const counterText = startDate || endDate
@@ -2118,6 +2129,102 @@ function refreshStudentTable() {
 
     document.getElementById('studentResultsCounter').textContent = counterText;
 }
+
+// ============================================
+// SECTION: ÚLTIMO PAGO + DP2 (día de pago ajustado)
+// ============================================
+// DP1 = student.diaPago (ficha; frozen for staff by the rules).
+// DP2 = student.diaPago2 — manual, editable inline in the table by any staff
+// (after the 10 Aug 2026 earthquake payment days moved 2-3 weeks).
+// Último Pago = the most recent non-cancelled payment TRANSACTION of the
+// student (multi-month payments share a masterPaymentId → summed as one).
+
+let _lastPayFetchedAt = 0;
+window._lastPayByStudent = window._lastPayByStudent || {};
+
+/** Build { studentId → {amount, date, months, method, bank, pending} } from all payments. */
+function buildLastPaymentIndex(records) {
+    const tx = {};
+    for (const p of records) {
+        if (!p || !p.studentId || p.status === 'cancelled') continue;
+        const key = p.masterPaymentId || p.id;
+        const t = tx[key] || (tx[key] = { studentId: p.studentId, amount: 0, date: null, months: [], method: p.method, bank: p.bank, pending: false });
+        t.amount += Number(p.amount) || 0;
+        const d = p.date ? new Date(p.date) : null;
+        if (d && !isNaN(d) && (!t.date || d > t.date)) t.date = d;
+        if (p.month) t.months.push(`${p.month}${p.year ? ' ' + p.year : ''}`);
+        if (p.cesantiasStatus === 'pending') t.pending = true;
+    }
+    const byStudent = {};
+    for (const t of Object.values(tx)) {
+        if (!t.date) continue;
+        const cur = byStudent[t.studentId];
+        if (!cur || t.date > cur.date) byStudent[t.studentId] = t;
+    }
+    return byStudent;
+}
+
+window.refreshLastPayments = async function(force = false) {
+    try {
+        if (window.PaymentManager?.payments?.size > 0) {
+            // Pagos module already loaded → always rebuild from memory (cheap, fresh)
+            const records = Array.from(window.PaymentManager.payments.entries()).map(([id, p]) => ({ id, ...p }));
+            window._lastPayByStudent = buildLastPaymentIndex(records);
+            _lastPayFetchedAt = Date.now();
+        } else if (force || Date.now() - _lastPayFetchedAt > 3 * 60 * 1000) {
+            const db = window.firebaseModules.database;
+            const snap = await db.get(db.ref(window.FirebaseData.database, 'payments'));
+            const records = snap.exists() ? Object.entries(snap.val()).map(([id, p]) => ({ id, ...p })) : [];
+            window._lastPayByStudent = buildLastPaymentIndex(records);
+            _lastPayFetchedAt = Date.now();
+        }
+    } catch (e) { console.warn('Último pago:', e.message); }
+    window.paintLastPayments();
+};
+
+/** Paint "Último Pago" into whatever rows are on screen (cheap, re-runnable). */
+window.paintLastPayments = function() {
+    const MES = { enero: 'ene', febrero: 'feb', marzo: 'mar', abril: 'abr', mayo: 'may', junio: 'jun', julio: 'jul', agosto: 'ago', septiembre: 'sep', octubre: 'oct', noviembre: 'nov', diciembre: 'dic' };
+    const fmtDate = (d) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+    const fmtMonth = (m) => { const [name, year] = m.split(' '); return `${MES[name] || name}${year ? ' ' + year.slice(-2) : ''}`; };
+    for (const s of window.StudentManager.students.values()) {
+        const el = document.getElementById(`lastPay-${s.id}`);
+        if (!el) continue;
+        const t = window._lastPayByStudent[s.id];
+        if (!t) { el.innerHTML = '<span style="color: #9ca3af; font-size: 0.85rem;">Sin pagos</span>'; continue; }
+        const months = [...new Set(t.months)].map(fmtMonth).join(', ');
+        el.innerHTML = `
+            <div style="font-weight: 700; color: ${t.pending ? '#7c3aed' : '#065f46'};">${t.pending ? '📋 ' : ''}$${t.amount.toLocaleString('es-CO')}</div>
+            <small style="color: #374151;">${fmtDate(t.date)}</small>
+            ${months ? `<br><small style="color: #6b7280;" title="${t.method || ''}${t.bank ? ' - ' + t.bank : ''}">${months}</small>` : ''}`;
+    }
+};
+
+/** DP2 inline save. Empty → removes the value (null). Rules: staff may write
+ *  new fields on students/$id as long as the frozen ones stay unchanged. */
+window.saveDiaPago2 = async function(studentId, input) {
+    const raw = input.value.trim();
+    const n = raw === '' ? null : parseInt(raw, 10);
+    if (n !== null && (isNaN(n) || n < 1 || n > 31)) {
+        window.showNotification('DP2 debe ser un día entre 1 y 31', 'error');
+        const st = window.StudentManager.students.get(studentId);
+        input.value = st?.diaPago2 ?? '';
+        return;
+    }
+    input.disabled = true;
+    try {
+        await window.StudentManager.updateStudent(studentId, { diaPago2: n });
+        input.style.borderColor = '#10b981';
+        setTimeout(() => { input.style.borderColor = '#d1d5db'; }, 1200);
+    } catch (e) {
+        console.error('DP2:', e);
+        window.showNotification('❌ No se pudo guardar DP2: ' + (e.message || e), 'error');
+        const st = window.StudentManager.students.get(studentId);
+        input.value = st?.diaPago2 ?? '';
+    } finally {
+        input.disabled = false;
+    }
+};
 
 // ============================================
 // SECTION: TUTORBOX APP ACCOUNT PROVISIONING
