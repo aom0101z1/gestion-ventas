@@ -471,6 +471,10 @@ function getGrupos2Options(selectedGrupo) {
 
 function renderStudentForm(student = null) {
     const isEdit = !!student;
+    // Price fields are Director-only on a registered student — but a 🧪 Prueba
+    // record (Test Class, no value yet) is converted to a real enrollment by
+    // reception, so staff may set course type / value ONCE (15 Sep 2026).
+    const priceLocked = isEdit && !window.isStudentMoneyAdmin() && !window.isTrialRecord(student);
     return `
         <div id="studentFormModal" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; 
              background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;">
@@ -648,18 +652,19 @@ function renderStudentForm(student = null) {
 
                     <div class="form-group" id="valorMensualGroup" style="display: ${!student || student?.tipoPago !== 'POR_HORAS' ? 'block' : 'none'};">
                         <label>Tipo de curso</label>
-                        <select id="stuCursoTipo" onchange="applyCursoTipo('1')" ${isEdit && !window.isStudentMoneyAdmin() ? 'disabled style="background:#f3f4f6;"' : ''}>
+                        <select id="stuCursoTipo" onchange="applyCursoTipo('1')" ${priceLocked ? 'disabled style="background:#f3f4f6;"' : ''}>
                             <option value="">— Elegir tipo de curso (pone el precio oficial) —</option>
                             ${getCursoTipoOptions(student?.cursoTipo)}
                         </select>
                         <label style="margin-top: 0.5rem;">Valor Mensualidad ($)</label>
-                        <input type="number" id="stuValor" value="${student?.valor || ''}" min="0" placeholder="Valor mensual" ${isEdit && !window.isStudentMoneyAdmin() ? 'readonly style="background:#f3f4f6;"' : ''}>
-                        ${isEdit && !window.isStudentMoneyAdmin() ? '<small style="color:#92400e;">Solo el Director puede cambiar el valor de un estudiante ya registrado.</small>' : ''}
+                        <input type="number" id="stuValor" value="${student?.valor || ''}" min="0" placeholder="Valor mensual" ${priceLocked ? 'readonly style="background:#f3f4f6;"' : ''}>
+                        ${priceLocked ? '<small style="color:#92400e;">Solo el Director puede cambiar el valor de un estudiante ya registrado.</small>' : ''}
+                        ${isEdit && !priceLocked && !window.isStudentMoneyAdmin() ? '<small style="color:#065f46;">🧪 Registro de prueba: puedes fijar el tipo de curso y el valor una sola vez. Después solo el Director podrá cambiarlos.</small>' : ''}
                     </div>
 
                     <div class="form-group" id="valorHoraGroup" style="display: ${student?.tipoPago === 'POR_HORAS' ? 'block' : 'none'};">
                         <label>Valor / Hora ($)</label>
-                        <input type="number" id="stuValorHora" value="${student?.valorHora || ''}" min="0" placeholder="Valor por hora" step="0.01" ${isEdit && !window.isStudentMoneyAdmin() ? 'readonly style="background:#f3f4f6;"' : ''}>
+                        <input type="number" id="stuValorHora" value="${student?.valorHora || ''}" min="0" placeholder="Valor por hora" step="0.01" ${priceLocked ? 'readonly style="background:#f3f4f6;"' : ''}>
                     </div>
 
                     <div class="form-group" id="segundoCursoGroup" style="display: ${!student || student?.tipoPago !== 'POR_HORAS' ? 'block' : 'none'}; border: 1px dashed #a78bfa; border-radius: 8px; padding: 0.75rem; background: #f5f3ff;">
@@ -674,13 +679,13 @@ function renderStudentForm(student = null) {
                             ${getGrupos2Options(student?.grupo2)}
                         </select>
                         <label style="margin-top: 0.5rem;">Tipo de curso (segundo curso)</label>
-                        <select id="stuCursoTipo2" onchange="applyCursoTipo('2')" ${isEdit && !window.isStudentMoneyAdmin() ? 'disabled style="background:#f3f4f6;"' : ''}>
+                        <select id="stuCursoTipo2" onchange="applyCursoTipo('2')" ${priceLocked ? 'disabled style="background:#f3f4f6;"' : ''}>
                             <option value="">— Elegir tipo de curso —</option>
                             ${getCursoTipoOptions(student?.cursoTipo2)}
                         </select>
                         <label style="margin-top: 0.5rem;">Valor mensualidad segundo curso ($)</label>
-                        <input type="number" id="stuValor2" value="${student?.valor2 || ''}" min="0" placeholder="0 = sin cobro adicional" ${isEdit && !window.isStudentMoneyAdmin() ? 'readonly style="background:#f3f4f6;"' : ''}>
-                        ${isEdit && !window.isStudentMoneyAdmin() ? '<small style="color:#92400e;">Solo el Director puede cambiar el valor del segundo curso.</small>' : ''}
+                        <input type="number" id="stuValor2" value="${student?.valor2 || ''}" min="0" placeholder="0 = sin cobro adicional" ${priceLocked ? 'readonly style="background:#f3f4f6;"' : ''}>
+                        ${priceLocked ? '<small style="color:#92400e;">Solo el Director puede cambiar el valor del segundo curso.</small>' : ''}
                     </div>
 
                     ${!isEdit ? `
@@ -1151,6 +1156,15 @@ window.cancelStudentForm = function() {
 window.isStudentMoneyAdmin = function() {
     const email = window.FirebaseData?.currentUser?.email;
     return email === 'admin@ciudadbilingue.com' || window.userRole === 'admin' || window.userRole === 'director';
+};
+
+// A 🧪 Prueba (Test Class) record, or one that never got a price, is not a
+// registered student yet: reception may set its course type / value once.
+// Mirrors the students/$id write rule (database.rules.json) — keep in sync.
+window.isTrialRecord = function(student) {
+    if (!student) return false;
+    const valor = parseInt(student.valor) || 0;
+    return student.modalidad === 'Prueba' || valor <= 0;
 };
 
 window.toggleStatus = async function(id) {
@@ -1706,7 +1720,7 @@ async function saveStudentForm(studentId) {
         // carry the stored value through unchanged or the database rules
         // reject the whole update (null stays null, not 0).
         let valor2;
-        if (studentId && !window.isStudentMoneyAdmin()) {
+        if (studentId && !window.isStudentMoneyAdmin() && !window.isTrialRecord(existingStudent)) {
             valor2 = existingStudent?.valor2 !== undefined ? existingStudent.valor2 : null;
         } else if (tipoPago === 'POR_HORAS') {
             valor2 = existingStudent?.valor2 !== undefined ? existingStudent.valor2 : null;
@@ -1833,6 +1847,12 @@ async function saveStudentForm(studentId) {
             } catch (groupError) {
                 console.error('⚠️ Error updating second-course group studentIds:', groupError);
             }
+        }
+
+        // 🔗 Mirror every touched group's member list to TutorBox (root-cause
+        // fix 15 Sep 2026: the portal import copied members only once).
+        for (const gid of new Set([oldGrupo, newGrupo, oldGrupo2, newGrupo2].filter(Boolean))) {
+            window.syncGroupMembersToTutorBox(gid);
         }
 
         window.showNotification('✅ Estudiante guardado', 'success');
@@ -2437,6 +2457,34 @@ window.syncStudentToTutorBox = function(studentId, student) {
         email: String(student.correo || '').trim().toLowerCase(),
         status: student.status || 'active'
     }).catch(e => console.warn('syncStudentProfile:', e.message));
+};
+
+/**
+ * 🔗 Push a Grupos 2.0 member list to the TutorBox class group (15 Sep 2026).
+ * Called after ANY membership change (student form grupo/grupo2, Grupos 2.0
+ * add/remove). The Cloud Function reconciles adds + removes and is a no-op
+ * for groups never imported in /admin/groups. Best-effort, never blocks.
+ */
+window.syncGroupMembersToTutorBox = function(groupId) {
+    const gid = String(groupId || '').trim();
+    const group = gid && window.GroupsManager2?.groups?.get(parseInt(gid));
+    if (!group) return Promise.resolve();
+    const members = (group.studentIds || []).map(sid => {
+        const s = window.StudentManager?.students?.get(sid);
+        if (!s) return null;
+        const phone = String(s.telefono || '').split(/[\/,;]+/)[0].trim();
+        return {
+            crmStudentId: String(sid),
+            name: s.nombre || `ID: ${sid}`,
+            email: String(s.correo || '').trim().toLowerCase() || null,
+            phone: phone || null,
+            crmStatus: s.status || 'active',
+            tutorboxUid: s.tutorboxUid || null
+        };
+    }).filter(Boolean);
+    return tbxPost('syncGroupMembers', { groupId: gid, members })
+        .then(r => { if (r && !r.skipped) console.log(`🔗 grupo ${gid} → TutorBox: +${(r.added || []).length} link ${(r.linked || []).length} -${(r.removed || []).length}`); })
+        .catch(e => console.warn('syncGroupMembers:', e.message));
 };
 
 async function tbxPost(path, body) {

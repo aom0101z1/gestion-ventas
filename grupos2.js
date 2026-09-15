@@ -1180,6 +1180,9 @@ window.addStudentToGrupo2 = async function(groupId) {
         // Update local cache
         group.studentIds = studentIds;
 
+        // 🔗 mirror membership to the TutorBox class group (15 Sep 2026)
+        window.syncGroupMembersToTutorBox?.(groupId);
+
         window.showNotification('✅ Estudiante agregado al grupo', 'success');
 
         // Refresh modal
@@ -1212,6 +1215,9 @@ window.removeStudentFromGrupo2 = async function(groupId, studentId) {
 
         // Update local cache
         group.studentIds = studentIds;
+
+        // 🔗 mirror membership to the TutorBox class group (15 Sep 2026)
+        window.syncGroupMembersToTutorBox?.(groupId);
 
         window.showNotification('✅ Estudiante removido del grupo', 'success');
 
