@@ -2924,7 +2924,7 @@ onAuthStateChanged(auth, async (user) => {
 
             // Reportes: admin@ciudadbilingue.com always; anyone else only through the
             // `reports` module permission (PermissionEnforcer shows/hides it — 15 Sep 2026,
-            // vendedor gets the 🎯 Ventas view only, see loadReportsData).
+            // the ventas role gets the 🎯 Ventas view only, see loadReportsData).
             if (reportsTab && isMainAdmin) {
                 reportsTab.style.display = 'block';
             }
@@ -4418,7 +4418,7 @@ onAuthStateChanged(auth, async (user) => {
             // Sales Ranking - This section continues with the existing code...
             try {
                 const allUsers = await window.FirebaseData.getAllUsers();
-                const salespeople = Object.entries(allUsers).filter(([uid, user]) => user.role === 'vendedor');
+                const salespeople = Object.entries(allUsers).filter(([uid, user]) => user.role === 'vendedor' || user.role === 'ventas');
                 
                 const rankings = salespeople.map(([uid, user]) => {
                     const userContacts = contacts.filter(c => c.salespersonId === uid);

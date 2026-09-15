@@ -1012,6 +1012,7 @@ function showEditUserModal(userId) {
               <option value="director" ${currentRole === 'director' ? 'selected' : ''}>Director</option>
               <option value="teacher" ${currentRole === 'teacher' ? 'selected' : ''}>Profesor</option>
               <option value="vendedor" ${currentRole === 'vendedor' ? 'selected' : ''}>Vendedor</option>
+              <option value="ventas" ${currentRole === 'ventas' ? 'selected' : ''}>Ventas (solo área comercial)</option>
               <option value="custom" ${currentRole === 'custom' ? 'selected' : ''}>Custom</option>
             </select>
           </div>
@@ -1075,7 +1076,7 @@ async function handleEditUser(event, userId) {
     // sales module set — Contactos, Leads, Pipeline, Clases de prueba, Reportes
     // (Ventas view) — and turns every other module off. The database rules also
     // block this role from writing students, payments and the school nodes.
-    if (newRole === 'vendedor' && oldRole !== 'vendedor') {
+    if (newRole === 'ventas' && oldRole !== 'ventas') {
       const salesModules = ['contacts', 'leads', 'pipeline', 'trials', 'reports'];
       SYSTEM_MODULES.forEach(m => { updates[`permissions/modules/${m.id}`] = salesModules.includes(m.id); });
     }

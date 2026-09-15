@@ -1,6 +1,6 @@
 // trials.js — 🧪 Clases de prueba (15 Sep 2026)
 //
-// The hand-off between VENTAS and the school. A salesperson (role `vendedor`)
+// The hand-off between VENTAS and the school. A salesperson (role `ventas`)
 // records the people who want a test class with the same details as the
 // student registration form MINUS the enrollment fields (grupo, fecha de
 // inicio, tipo de curso, valor, día de pago, segundo curso). Reception then
@@ -81,7 +81,7 @@ window.TrialsManager = new TrialsManager();
 // ── helpers ────────────────────────────────────────────────────────────────
 
 function trialsIsSales() {
-    return window.userRole === 'vendedor';
+    return window.userRole === 'ventas';
 }
 
 // Staff who can create the Prueba student and complete the enrollment

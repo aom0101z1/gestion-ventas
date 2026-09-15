@@ -16,7 +16,7 @@ console.log('🔒 Loading Permission Enforcer...');
             display: none !important;
         }
         /* Hide navigation tabs until authenticated */
-        #contactsTab, #leadsTab, #pipelineTab, #reportsTab,
+        #contactsTab, #leadsTab, #pipelineTab, #trialsTab, #reportsTab,
         #tasksTab, #monitoringTab, #socialMediaTab, #configTab, #adminTab {
             display: none !important;
         }
@@ -353,7 +353,7 @@ class PermissionEnforcer {
         // Modules that were never gated before 15 Sep 2026 stay open for existing
         // staff whose permission node does not mention them — except for the
         // sales role, which only sees what is explicitly granted.
-        if (this.userPermissions[module] === undefined && this.userRole !== 'vendedor' &&
+        if (this.userPermissions[module] === undefined && this.userRole !== 'ventas' &&
             ['tasks', 'socialMedia', 'classProgress', 'tutorboxAdmin', 'tienda', 'finance'].includes(module)) {
             return true;
         }
