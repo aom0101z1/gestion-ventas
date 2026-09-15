@@ -133,16 +133,22 @@ class PermissionEnforcer {
             contacts: { elementId: 'contactsTab', type: 'tab' },
             leads: { elementId: 'leadsTab', type: 'tab' },
             pipeline: { elementId: 'pipelineTab', type: 'tab' },
+            trials: { elementId: 'trialsTab', type: 'tab' },            // 🧪 Clases de prueba (15 Sep 2026)
             reports: { elementId: 'reportsTab', type: 'tab' },
             tasks: { elementId: 'tasksTab', type: 'tab' },
             monitoring: { elementId: 'monitoringTab', type: 'tab' },
             socialMedia: { elementId: 'socialMediaTab', type: 'tab' },
+            classProgress: { elementId: 'classProgressTab', type: 'tab' },   // gated since 15 Sep 2026
+            tutorboxAdmin: { elementId: 'tutorboxAdminTab', type: 'tab' },   // gated since 15 Sep 2026
             config: { elementId: 'configTab', type: 'tab' },
             admin: { elementId: 'adminTab', type: 'tab' },
-            
-            // School modules (button bar)
+
+            // School modules (button bar) — matched by button TEXT in
+            // enforceSchoolButtonPermissions (school-buttons.js sets no ids)
             students: { elementId: 'studentsBtn', type: 'school' },
             payments: { elementId: 'paymentsBtn', type: 'school' },
+            tienda: { elementId: 'tiendaBtn', type: 'school' },
+            finance: { elementId: 'financeBtn', type: 'school' },
             groups: { elementId: 'groupsBtn', type: 'school' },
             teachers: { elementId: 'teachersBtn', type: 'school' },
             attendance: { elementId: 'attendanceBtn', type: 'school' }
@@ -344,6 +350,14 @@ class PermissionEnforcer {
             return true;
         }
         
+        // Modules that were never gated before 15 Sep 2026 stay open for existing
+        // staff whose permission node does not mention them — except for the
+        // sales role, which only sees what is explicitly granted.
+        if (this.userPermissions[module] === undefined && this.userRole !== 'vendedor' &&
+            ['tasks', 'socialMedia', 'classProgress', 'tutorboxAdmin', 'tienda', 'finance'].includes(module)) {
+            return true;
+        }
+
         // Check specific permission
         return this.userPermissions[module] === true;
     }
@@ -381,11 +395,16 @@ class PermissionEnforcer {
         });
         
         // Check if user has any school permissions
-        const schoolModules = ['students', 'payments', 'groups', 'teachers', 'attendance'];
+        const schoolModules = ['students', 'payments', 'tienda', 'finance', 'groups', 'teachers', 'attendance'];
         const hasAnySchoolPermission = schoolModules.some(module => this.hasPermission(module));
-        
+
         // Control school button bar visibility
         this.controlSchoolButtonBar(hasAnySchoolPermission);
+
+        // Never leave the user on a tab they cannot see (15 Sep 2026): Contactos is
+        // the tab open at login; a user without that module lands on the first
+        // permitted tab instead.
+        this.ensureVisibleActiveTab();
         
         // Force re-run school buttons script if it exists and user has permissions
         if (hasAnySchoolPermission) {
@@ -405,6 +424,29 @@ class PermissionEnforcer {
         }
     }
     
+    // If the active tab is hidden by permissions, switch to the first visible one
+    ensureVisibleActiveTab() {
+        try {
+            const tabs = Array.from(document.querySelectorAll('.tabs .tab'));
+            if (!tabs.length) return;
+            const visible = (el) => el.style.display !== 'none' && el.offsetParent !== null;
+            const active = tabs.find(t => t.classList.contains('active'));
+            if (active && visible(active)) return;
+            const first = tabs.find(visible);
+            if (!first) {
+                console.warn('🚫 No visible tabs for this user');
+                return;
+            }
+            const target = (first.id || '').replace(/Tab$/, '');
+            if (target && typeof window.switchTab === 'function') {
+                console.log(`↪️ Active tab not permitted — switching to ${target}`);
+                window.switchTab(target);
+            }
+        } catch (e) {
+            console.warn('ensureVisibleActiveTab:', e.message);
+        }
+    }
+
     // Control school button bar visibility
     controlSchoolButtonBar(shouldShow) {
         const buttonBar = document.getElementById('schoolButtonBar');
@@ -450,6 +492,8 @@ class PermissionEnforcer {
         const buttonModuleMap = {
             'Estudiantes': 'students',
             'Pagos': 'payments',
+            'Tienda': 'tienda',
+            'Finanzas': 'finance',
             'Grupos': 'groups',
             'Profesores': 'teachers',
             'Asistencia': 'attendance'

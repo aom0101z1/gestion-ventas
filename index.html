@@ -1760,10 +1760,11 @@
                 <button class="tab active" onclick="switchTab('contacts')" id="contactsTab">📞 Contactos</button>
                 <button class="tab" onclick="switchTab('leads')" id="leadsTab">👥 Leads</button>
                 <button class="tab" onclick="switchTab('pipeline')" id="pipelineTab">🎯 Pipeline</button>
+                <button class="tab" onclick="switchTab('trials')" id="trialsTab">🧪 Clases de prueba</button>
                 <button class="tab" onclick="switchTab('reports')" id="reportsTab" style="display: none;">📊 Reportes</button>
                 <button class="tab" onclick="switchTab('coatsReports')" id="coatsReportsTab" style="display: none;">🏢 COATS</button>
                 <button class="tab" onclick="switchTab('monitoring')" id="monitoringTab" style="display: none;">👀 Monitoreo</button>
-                <button onclick="switchTab('tasks')" class="tab">📋 Tareas</button>
+                <button onclick="switchTab('tasks')" class="tab" id="tasksTab">📋 Tareas</button>
                 <button class="tab" onclick="switchTab('auditLog')" id="auditLogTab" style="display: none;">📋 Registro</button>
                 <button class="tab" onclick="switchTab('config')" id="configTab" style="display: none;">⚙️ Config</button>
                 <button class="tab" onclick="switchTab('admin')" id="adminTab" style="display: none;">🔐 Admin</button>
@@ -2167,6 +2168,16 @@
             </div>
 
             <!-- ========== SECTION 9: TAB CONTENT - PIPELINE ========== -->
+            <!-- ========== TAB CONTENT - 🧪 CLASES DE PRUEBA (trials.js, 15 Sep 2026) ========== -->
+            <div id="trials" class="tab-content hidden">
+                <div id="trialsContainer">
+                    <div style="text-align: center; color: #666; padding: 2rem;">
+                        <div class="loading-spinner"></div><br>
+                        Cargando clases de prueba...
+                    </div>
+                </div>
+            </div>
+
             <div id="pipeline" class="tab-content hidden">
                 <h2>🎯 Pipeline de Ventas</h2>
                 <div style="margin-bottom: 1rem;">
@@ -2911,9 +2922,11 @@ onAuthStateChanged(auth, async (user) => {
             const currentUserEmail = window.FirebaseData?.currentUser?.email;
             const isMainAdmin = currentUserEmail === 'admin@ciudadbilingue.com';
 
-            // Show Reportes and COATS tabs only for admin@ciudadbilingue.com
-            if (reportsTab) {
-                reportsTab.style.display = isMainAdmin ? 'block' : 'none';
+            // Reportes: admin@ciudadbilingue.com always; anyone else only through the
+            // `reports` module permission (PermissionEnforcer shows/hides it — 15 Sep 2026,
+            // vendedor gets the 🎯 Ventas view only, see loadReportsData).
+            if (reportsTab && isMainAdmin) {
+                reportsTab.style.display = 'block';
             }
             if (coatsReportsTab) {
                 coatsReportsTab.style.display = isMainAdmin ? 'block' : 'none';
@@ -3309,6 +3322,8 @@ onAuthStateChanged(auth, async (user) => {
                     loadConfigData();
                 } else if (tabName === 'pipeline') {
                     loadPipelineData();
+                } else if (tabName === 'trials') {
+                    if (typeof loadTrialsTab === 'function') loadTrialsTab();
                 } else if (tabName === 'reports') {
                     loadReportsData();
                 } else if (tabName === 'tasks') {
@@ -3362,8 +3377,16 @@ onAuthStateChanged(auth, async (user) => {
         async function loadReportsData() {
             console.log('📊 Loading reports data...');
             try {
+                // Sales-only view (15 Sep 2026): a user who is not a money admin sees
+                // just the 🎯 Ventas report — the school reports stay Director-only.
+                const salesOnly = typeof window.isStudentMoneyAdmin === 'function' && !window.isStudentMoneyAdmin();
+                ['financialReportTab', 'studentsReportTab', 'invoicesReportTab'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.style.display = salesOnly ? 'none' : '';
+                });
                 await window.ReportsManager.init();
                 await refreshReports();
+                if (salesOnly) switchReportTab('sales');
             } catch (error) {
                 console.error('❌ Error loading reports:', error);
                 showNotification('Error cargando reportes: ' + error.message, 'error');
@@ -5634,6 +5657,7 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
     <script src="fixes.js"></script>
     <script src="social.js"></script>
     <script src="pipeline.js"></script>
+    <script src="trials.js?v=20260915"></script>
     <script src="debug-permissions.js"></script>
     <script src="employees.js"></script>
     <script src="tasks-enhanced.js"></script>

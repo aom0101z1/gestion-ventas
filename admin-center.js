@@ -7,9 +7,13 @@ const SYSTEM_MODULES = [
   { id: 'contacts', name: 'Contactos', icon: '📇', color: '#3b82f6' },
   { id: 'leads', name: 'Leads', icon: '🎯', color: '#10b981' },
   { id: 'pipeline', name: 'Pipeline', icon: '🔄', color: '#8b5cf6' },
+  { id: 'trials', name: 'Clases de prueba', icon: '🧪', color: '#f59e0b' },
   { id: 'reports', name: 'Reportes', icon: '📊', color: '#f59e0b' },
   { id: 'monitoring', name: 'Monitoreo', icon: '📡', color: '#ef4444' },
   { id: 'tasks', name: 'Tareas', icon: '📋', color: '#06b6d4' },
+  { id: 'socialMedia', name: 'Social Media', icon: '💬', color: '#0ea5e9' },
+  { id: 'classProgress', name: 'Progreso Clases', icon: '📚', color: '#6366f1' },
+  { id: 'tutorboxAdmin', name: 'TutorBox', icon: '📱', color: '#7c3aed' },
   { id: 'students', name: 'Estudiantes', icon: '👥', color: '#ec4899' },
   { id: 'payments', name: 'Pagos', icon: '💰', color: '#10b981' },
   { id: 'tienda', name: 'Tienda', icon: '🛒', color: '#f97316' },
@@ -1058,14 +1062,25 @@ async function handleEditUser(event, userId) {
   const oldRole = user ? (user.role || user.rol || 'custom') : '';
 
   try {
-    await window.AdminCenter.updateUser(userId, {
+    const updates = {
       'profile/name': newName,
       'profile/nombre': newName,
       'profile/role': newRole,
       'profile/rol': newRole,
       'profile/updatedAt': new Date().toISOString(),
       'profile/updatedBy': window.AdminCenter.currentAdmin.email
-    });
+    };
+
+    // 🎯 Vendedor preset (15 Sep 2026): switching a user TO the sales role sets the
+    // sales module set — Contactos, Leads, Pipeline, Clases de prueba, Reportes
+    // (Ventas view) — and turns every other module off. The database rules also
+    // block this role from writing students, payments and the school nodes.
+    if (newRole === 'vendedor' && oldRole !== 'vendedor') {
+      const salesModules = ['contacts', 'leads', 'pipeline', 'trials', 'reports'];
+      SYSTEM_MODULES.forEach(m => { updates[`permissions/modules/${m.id}`] = salesModules.includes(m.id); });
+    }
+
+    await window.AdminCenter.updateUser(userId, updates);
 
     // Update local cache to reflect changes immediately
     if (user) {
