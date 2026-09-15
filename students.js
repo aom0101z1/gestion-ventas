@@ -2469,7 +2469,17 @@ window.syncGroupMembersToTutorBox = function(groupId) {
     const gid = String(groupId || '').trim();
     const group = gid && window.GroupsManager2?.groups?.get(parseInt(gid));
     if (!group) return Promise.resolve();
-    const members = (group.studentIds || []).map(sid => {
+    // Membership = the group's studentIds ∪ ACTIVE students whose own grupo /
+    // grupo2 field points here. The two sources diverge for records edited
+    // before the studentIds sync existed (the 14 Sep audit's 27 students live
+    // only in the field) — inactive records keep a stale field, so they are
+    // never added by the field alone.
+    const ids = new Set((group.studentIds || []).map(String));
+    for (const [sid, s] of window.StudentManager?.students || []) {
+        const active = !s.status || s.status === 'active';
+        if (active && (String(s.grupo) === gid || String(s.grupo2) === gid)) ids.add(String(sid));
+    }
+    const members = [...ids].map(sid => {
         const s = window.StudentManager?.students?.get(sid);
         if (!s) return null;
         const phone = String(s.telefono || '').split(/[\/,;]+/)[0].trim();
