@@ -14,12 +14,19 @@ const SYSTEM_MODULES = [
   { id: 'socialMedia', name: 'Social Media', icon: '💬', color: '#0ea5e9' },
   { id: 'classProgress', name: 'Progreso Clases', icon: '📚', color: '#6366f1' },
   { id: 'tutorboxAdmin', name: 'TutorBox', icon: '📱', color: '#7c3aed' },
+  { id: 'coatsReports', name: 'COATS', icon: '🏢', color: '#0891b2' },
+  { id: 'auditLog', name: 'Registro (auditoría)', icon: '📜', color: '#64748b' },
+  { id: 'config', name: 'Config', icon: '⚙️', color: '#475569' },
+  { id: 'admin', name: 'Admin (requiere rol admin/director)', icon: '🔐', color: '#dc2626' },
+  // 🏫 Módulos Escolares (button bar)
   { id: 'students', name: 'Estudiantes', icon: '👥', color: '#ec4899' },
   { id: 'payments', name: 'Pagos', icon: '💰', color: '#10b981' },
   { id: 'tienda', name: 'Tienda', icon: '🛒', color: '#f97316' },
   { id: 'finance', name: 'Finanzas', icon: '💵', color: '#14b8a6' },
-  { id: 'groups', name: 'Grupos', icon: '📚', color: '#8b5cf6' },
-  { id: 'teachers', name: 'Profesores', icon: '👩‍🏫', color: '#f59e0b' },
+  { id: 'nomina', name: 'Nómina', icon: '💼', color: '#0ea5e9' },
+  { id: 'groups', name: 'Grupos 2.0', icon: '🎓', color: '#8b5cf6' },
+  { id: 'employees', name: 'Empleados 2.0', icon: '👔', color: '#14b8a6' },
+  { id: 'teachers', name: 'Profesores 2.0', icon: '👩‍🏫', color: '#f59e0b' },
   { id: 'attendance', name: 'Asistencia', icon: '✅', color: '#06b6d4' }
 ];
 

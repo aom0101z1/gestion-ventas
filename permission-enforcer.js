@@ -140,6 +140,8 @@ class PermissionEnforcer {
             socialMedia: { elementId: 'socialMediaTab', type: 'tab' },
             classProgress: { elementId: 'classProgressTab', type: 'tab' },   // gated since 15 Sep 2026
             tutorboxAdmin: { elementId: 'tutorboxAdminTab', type: 'tab' },   // gated since 15 Sep 2026
+            coatsReports: { elementId: 'coatsReportsTab', type: 'tab' },
+            auditLog: { elementId: 'auditLogTab', type: 'tab' },
             config: { elementId: 'configTab', type: 'tab' },
             admin: { elementId: 'adminTab', type: 'tab' },
 
@@ -149,7 +151,9 @@ class PermissionEnforcer {
             payments: { elementId: 'paymentsBtn', type: 'school' },
             tienda: { elementId: 'tiendaBtn', type: 'school' },
             finance: { elementId: 'financeBtn', type: 'school' },
+            nomina: { elementId: 'nominaBtn', type: 'school' },
             groups: { elementId: 'groupsBtn', type: 'school' },
+            employees: { elementId: 'employeesBtn', type: 'school' },
             teachers: { elementId: 'teachersBtn', type: 'school' },
             attendance: { elementId: 'attendanceBtn', type: 'school' }
         };
@@ -395,8 +399,7 @@ class PermissionEnforcer {
         });
         
         // Check if user has any school permissions
-        const schoolModules = ['students', 'payments', 'tienda', 'finance', 'groups', 'teachers', 'attendance'];
-        const hasAnySchoolPermission = schoolModules.some(module => this.hasPermission(module));
+        const hasAnySchoolPermission = this.schoolModules.some(module => this.hasPermission(module));
 
         // Control school button bar visibility
         this.controlSchoolButtonBar(hasAnySchoolPermission);
@@ -494,7 +497,9 @@ class PermissionEnforcer {
             'Pagos': 'payments',
             'Tienda': 'tienda',
             'Finanzas': 'finance',
+            'Nómina': 'nomina',
             'Grupos': 'groups',
+            'Empleados': 'employees',
             'Profesores': 'teachers',
             'Asistencia': 'attendance'
         };
@@ -519,50 +524,52 @@ class PermissionEnforcer {
         });
     }
     
-    // Observer for school buttons (they load after page load)
+    // Modules that live in the 🏫 school button bar
+    get schoolModules() {
+        return ['students', 'payments', 'tienda', 'finance', 'nomina', 'groups', 'employees', 'teachers', 'attendance'];
+    }
+
+    // Observer for school buttons. school-buttons.js REMOVES and RE-CREATES the bar
+    // on every addSchoolButtons() call (DOMContentLoaded, a 1 s timer, login), so a
+    // one-shot check is not enough — a bar re-created after the check came back
+    // fully visible for the sales role (15 Sep 2026). The observer now stays on for
+    // the whole session and re-applies the permissions each time a bar appears.
     observeSchoolButtons() {
         console.log('👁️ Setting up school button observer...');
-        
+        const hasAnySchoolPermission = this.schoolModules.some(module => this.hasPermission(module));
+
         // First, try to run school buttons if they haven't been created yet
-        if (typeof window.originalAddSchoolButtons === 'function' || typeof window.addSchoolButtons === 'function') {
-            const schoolModules = ['students', 'payments', 'groups', 'teachers', 'attendance'];
-            const hasAnySchoolPermission = schoolModules.some(module => this.hasPermission(module));
-            
-            if (hasAnySchoolPermission) {
-                console.log('🏫 User has school permissions, ensuring buttons are created');
-                // Try to run the original function
-                if (window.originalAddSchoolButtons) {
-                    window.originalAddSchoolButtons();
-                } else if (window.addSchoolButtons) {
-                    window.addSchoolButtons();
-                }
+        if (hasAnySchoolPermission && (typeof window.originalAddSchoolButtons === 'function' || typeof window.addSchoolButtons === 'function')) {
+            console.log('🏫 User has school permissions, ensuring buttons are created');
+            if (window.originalAddSchoolButtons) {
+                window.originalAddSchoolButtons();
+            } else if (window.addSchoolButtons) {
+                window.addSchoolButtons();
             }
         }
-        
-        // Check periodically for school button bar
-        const checkInterval = setInterval(() => {
+
+        const apply = () => {
             const buttonBar = document.getElementById('schoolButtonBar');
-            if (buttonBar) {
-                console.log('📦 School button bar detected');
-                clearInterval(checkInterval);
-                
-                // Check if user should see it
-                const schoolModules = ['students', 'payments', 'groups', 'teachers', 'attendance'];
-                const hasAnySchoolPermission = schoolModules.some(module => this.hasPermission(module));
-                
-                // Show with proper flex display and vertical layout
-                if (hasAnySchoolPermission) {
-                    buttonBar.style.display = 'flex';
-                    buttonBar.style.flexDirection = 'column'; // ENSURE vertical
-                    buttonBar.classList.add('authorized');
+            if (!buttonBar || buttonBar.dataset.permApplied === '1') return;
+            buttonBar.dataset.permApplied = '1';
+            console.log('📦 School button bar detected — applying permissions');
+            this.controlSchoolButtonBar(this.schoolModules.some(module => this.hasPermission(module)));
+        };
+        apply();
+
+        if (this._schoolBarObserver) this._schoolBarObserver.disconnect();
+        this._schoolBarObserver = new MutationObserver((mutations) => {
+            if (!this.isAuthenticated) return;
+            for (const m of mutations) {
+                for (const node of m.addedNodes) {
+                    if (node.nodeType === 1 && (node.id === 'schoolButtonBar' || node.id === 'schoolFloatBtn')) {
+                        apply();
+                        return;
+                    }
                 }
-                
-                this.controlSchoolButtonBar(hasAnySchoolPermission);
             }
-        }, 500); // Check every 500ms
-        
-        // Stop checking after 10 seconds
-        setTimeout(() => clearInterval(checkInterval), 10000);
+        });
+        this._schoolBarObserver.observe(document.body, { childList: true });
     }
     
     // Refresh permissions (call this after admin changes permissions)

@@ -38,40 +38,64 @@ function addSchoolButtons() {
     
     // Create buttons
     const modules = [
-        { name: 'Estudiantes', icon: '👥', color: '#3b82f6', func: 'Students' },
-        { name: 'Pagos', icon: '💰', color: '#10b981', func: 'Payments' },
-        { name: 'Tienda', icon: '🏪', color: '#ec4899', func: 'Tienda' },
-        { name: 'Finanzas', icon: '💵', color: '#6366f1', func: 'Finance' },
-        { name: 'Nómina', icon: '💼', color: '#0ea5e9', func: 'Payroll', adminOnly: true },
+        { name: 'Estudiantes', icon: '👥', color: '#3b82f6', func: 'Students', perm: 'students' },
+        { name: 'Pagos', icon: '💰', color: '#10b981', func: 'Payments', perm: 'payments' },
+        { name: 'Tienda', icon: '🏪', color: '#ec4899', func: 'Tienda', perm: 'tienda' },
+        { name: 'Finanzas', icon: '💵', color: '#6366f1', func: 'Finance', perm: 'finance' },
+        { name: 'Nómina', icon: '💼', color: '#0ea5e9', func: 'Payroll', perm: 'nomina', adminOnly: true },
         // { name: 'Grupos', icon: '📚', color: '#8b5cf6', func: 'Groups' }, // Hidden - replaced by Grupos 2.0, but groups.js still loaded for attendance.js dependency
-        { name: 'Grupos 2.0', icon: '🎓', color: '#667eea', func: 'Grupos2', directorOnly: true },
-        { name: 'Empleados 2.0', icon: '👔', color: '#14b8a6', func: 'Employees', directorOnly: true },
-        { name: 'Profesores 2.0', icon: '👩‍🏫', color: '#f59e0b', func: 'Teachers' },
-        { name: 'Asistencia', icon: '📋', color: '#ef4444', func: 'Attendance' },
+        { name: 'Grupos 2.0', icon: '🎓', color: '#667eea', func: 'Grupos2', perm: 'groups', directorOnly: true },
+        { name: 'Empleados 2.0', icon: '👔', color: '#14b8a6', func: 'Employees', perm: 'employees', directorOnly: true },
+        { name: 'Profesores 2.0', icon: '👩‍🏫', color: '#f59e0b', func: 'Teachers', perm: 'teachers' },
+        { name: 'Asistencia', icon: '📋', color: '#ef4444', func: 'Attendance', perm: 'attendance' },
         // App module removed — replaced by TutorBox tab in top menu
     ];
-    
+
+    // 🔐 Module permissions (15 Sep 2026). The bar is rebuilt several times after
+    // login, so it gates itself instead of relying on the enforcer's first pass:
+    //  - the sales role (`ventas`) never gets the bar;
+    //  - once PermissionEnforcer has loaded users/{uid}/permissions/modules, each
+    //    button needs its module (admins/directors always pass);
+    //  - admin-only / director-only modules also open for a user whose module was
+    //    ticked EXPLICITLY in Admin → Ver Permisos.
+    if (window.userRole === 'ventas') {
+        console.log('🚫 Sales role — no school modules');
+        return;
+    }
+    const pe = window.PermissionEnforcer;
+    const permsReady = !!(pe && pe.isReady);
+    const allowed = (perm) => !permsReady || pe.hasPermission(perm);
+    const explicit = (perm) => permsReady && pe.userPermissions && pe.userPermissions[perm] === true;
+    let visibleCount = 0;
+
     modules.forEach(module => {
         const userRole = window.userRole || '';
         const userEmail = window.FirebaseData?.currentUser?.email || '';
 
-        // Skip admin-only modules (only admin@ciudadbilingue.com)
+        // Skip admin-only modules (only admin@ciudadbilingue.com, or an explicit grant)
         if (module.adminOnly) {
-            if (userEmail !== 'admin@ciudadbilingue.com') {
+            if (userEmail !== 'admin@ciudadbilingue.com' && !explicit(module.perm)) {
                 console.log(`⚠️ Skipping ${module.name} - admin only`);
                 return; // Skip this module
             }
         }
 
-        // Skip director-only modules if user is not director
+        // Skip director-only modules if user is not director (or explicitly granted)
         if (module.directorOnly) {
             // Allow director, admin, or specific email accounts
             const allowedEmails = ['admin@ciudadbilingue.com', 'contacto@ciudadbilingue.com'];
-            if (userRole !== 'director' && userRole !== 'admin' && !allowedEmails.includes(userEmail)) {
+            if (userRole !== 'director' && userRole !== 'admin' && !allowedEmails.includes(userEmail) && !explicit(module.perm)) {
                 console.log(`⚠️ Skipping ${module.name} - director only`);
                 return; // Skip this module
             }
         }
+
+        // Module permission (Admin → Ver Permisos)
+        if (!module.adminOnly && !module.directorOnly && !allowed(module.perm)) {
+            console.log(`🚫 Skipping ${module.name} - module not permitted`);
+            return;
+        }
+        visibleCount += 1;
 
         const btn = document.createElement('button');
         btn.innerHTML = `${module.icon} ${module.name}`;
@@ -117,6 +141,10 @@ function addSchoolButtons() {
     };
     buttonBar.appendChild(minimizeBtn);
     
+    if (permsReady && visibleCount === 0) {
+        console.log('🚫 No school modules permitted — bar not added');
+        return;
+    }
     document.body.appendChild(buttonBar);
     console.log('✅ School button bar added!');
 }
