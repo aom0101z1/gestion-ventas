@@ -490,6 +490,10 @@ class PermissionEnforcer {
     enforceSchoolButtonPermissions() {
         const buttonBar = document.getElementById('schoolButtonBar');
         if (!buttonBar) return;
+        // A bar built after permissions loaded already applied module + role/email
+        // rules per button (school-buttons.js) — re-hiding by text would remove
+        // role-granted buttons such as Empleados 2.0 for contacto@.
+        if (buttonBar.dataset.selfGated === '1') return;
         
         // Map of button text to module permission
         const buttonModuleMap = {

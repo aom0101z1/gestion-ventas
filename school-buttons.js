@@ -64,6 +64,10 @@ function addSchoolButtons() {
     }
     const pe = window.PermissionEnforcer;
     const permsReady = !!(pe && pe.isReady);
+    // Tell the enforcer this bar already applied the module + role/email rules, so
+    // its text-based pass must not hide role-granted buttons (Grupos 2.0 / Empleados
+    // 2.0 for contacto@, Nómina for the superadmin) again.
+    buttonBar.dataset.selfGated = permsReady ? '1' : '0';
     const allowed = (perm) => !permsReady || pe.hasPermission(perm);
     const explicit = (perm) => permsReady && pe.userPermissions && pe.userPermissions[perm] === true;
     let visibleCount = 0;
