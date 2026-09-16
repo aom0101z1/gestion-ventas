@@ -1695,7 +1695,7 @@
                         <input type="password" id="password" required>
                     </div>
                     <button type="submit" class="btn btn-firebase" style="width: 100%;" id="loginBtn">
-                        🔐 Ingresar con Firebase
+                        🔐 Ingresar
                     </button>
                 </form>
                 <div id="loginError" class="error-message hidden">
@@ -1723,7 +1723,7 @@
                     <strong id="currentUserName">Usuario</strong>
                     <span id="userRole" style="color: #667eea; font-size: 0.9rem;"></span>
                     <span style="background: #ff6b35; color: white; padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.8rem; margin-left: 0.5rem;">
-                        🔥 Firebase
+                        ☁️ En línea
                     </span>
                 </div>
                 <div style="display: flex; gap: 0.5rem; align-items: center;">
@@ -1741,7 +1741,7 @@
                 <div class="stat-card">
                     <div class="stat-number" style="color: #10b981;" id="totalLeads">0</div>
                     <div>Total Leads</div>
-                    <div style="font-size: 0.8rem; color: #666; margin-top: 0.25rem;">📊 Firebase</div>
+                    <div style="font-size: 0.8rem; color: #666; margin-top: 0.25rem;">📊 Base de datos</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number" style="color: #667eea;" id="activeLeads">0</div>
@@ -2048,7 +2048,7 @@
                 <!-- GENERAL LEADS VIEW -->
                 <div id="generalLeadsView">
                     <div style="margin-bottom: 1rem;">
-                        <button onclick="refreshAllData()" class="btn btn-primary" style="margin-right: 1rem;">🔄 Sync Firebase</button>
+                        <button onclick="refreshAllData()" class="btn btn-primary" style="margin-right: 1rem;">🔄 Sincronizar</button>
 
                         <div id="leadsFilters" style="display: none; margin-top: 1rem;">
                             <select id="salespersonFilter" onchange="updateLeadsTable('individual')" style="padding: 0.5rem; border-radius: 5px; border: 1px solid #ccc; margin-right: 0.5rem;">
@@ -2091,7 +2091,7 @@
                 <!-- COMPANY LEADS VIEW -->
                 <div id="companyLeadsView" style="display: none;">
                     <div style="margin-bottom: 1rem;">
-                        <button onclick="refreshAllData()" class="btn btn-primary" style="margin-right: 1rem;">🔄 Sync Firebase</button>
+                        <button onclick="refreshAllData()" class="btn btn-primary" style="margin-right: 1rem;">🔄 Sincronizar</button>
                     </div>
 
                     <table class="table">
@@ -2186,7 +2186,7 @@
                 <div id="pipelineContainer">
                     <div style="text-align: center; color: #666; padding: 2rem;">
                         <div class="loading-spinner"></div><br>
-                        Cargando pipeline desde Firebase...
+                        Cargando pipeline ...
                     </div>
                 </div>
             </div>
@@ -2575,7 +2575,7 @@ window.firebaseModules = {
 
         const statusEl = document.getElementById('firebaseStatus');
         statusEl.className = 'firebase-status';
-        statusEl.innerHTML = '🔥 Firebase Conectado';
+        statusEl.innerHTML = '🟢 Sistema conectado';
 
         console.log('✅ Firebase initialized successfully');
 
@@ -3067,7 +3067,7 @@ onAuthStateChanged(auth, async (user) => {
             event.preventDefault();
 
             if (!window.FirebaseData || !window.FirebaseData.currentUser) {
-                alert('❌ Firebase no disponible o usuario no autenticado. Recarga la página.');
+                alert('❌ Base de datos no disponible o usuario no autenticado. Recarga la página.');
                 return;
             }
 
@@ -3182,7 +3182,7 @@ onAuthStateChanged(auth, async (user) => {
 
             } catch (error) {
                 console.error('❌ Error saving to Firebase:', error);
-                alert(`❌ Error al guardar en Firebase: ${error.message}`);
+                alert(`❌ Error al guardar: ${error.message}`);
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = originalText;
@@ -4010,7 +4010,7 @@ onAuthStateChanged(auth, async (user) => {
                     const tbody = contactTypeFilter === 'company' ? document.getElementById('companyLeadsTable') : document.getElementById('leadsTable');
                     if (tbody) {
                         const colspan = contactTypeFilter === 'company' ? '9' : '6';
-                        tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align: center; color: #dc2626; padding: 2rem;">❌ Firebase no disponible</td></tr>`;
+                        tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align: center; color: #dc2626; padding: 2rem;">❌ Base de datos no disponible</td></tr>`;
                     }
                     return;
                 }
@@ -4151,7 +4151,7 @@ onAuthStateChanged(auth, async (user) => {
                 if (!window.FirebaseData || !window.FirebaseData.currentUser) {
                     container.innerHTML = `
                         <div style="text-align: center; color: #dc2626; padding: 2rem;">
-                            ❌ Firebase no disponible
+                            ❌ Base de datos no disponible
                         </div>
                     `;
                     return;
@@ -4699,7 +4699,7 @@ onAuthStateChanged(auth, async (user) => {
                 
                 alert(`🧪 TEST CONVENIOS SYSTEM:
 
-🔥 Firebase: ${results.firebaseAvailable ? '✅' : '❌'}
+☁️ Base de datos: ${results.firebaseAvailable ? '✅' : '❌'}
 ⚙️ Función Convenios: ${results.conveniosFunction ? '✅' : '❌'}
 📋 Convenios Cargados: ${results.conveniosLoaded}
 🔧 Handle Function: ${results.handleSourceChangeExists ? '✅' : '❌'}

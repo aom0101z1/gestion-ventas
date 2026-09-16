@@ -1544,7 +1544,7 @@ async function renderHistoricalClosuresView() {
                             `).join('')}
                         </div>
                         <button onclick="verifyFirebaseData()" style="margin-top: 1rem; padding: 0.5rem 1rem; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer;">
-                            🔄 Verificar Firebase Directamente
+                            🔄 Verificar base de datos
                         </button>
                         <div id="firebaseVerification" style="margin-top: 0.5rem;"></div>
                     </div>

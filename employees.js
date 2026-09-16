@@ -869,7 +869,7 @@ window.filterEmployees = function() {
 };
 
 window.migrateEmployees = async function() {
-    if (!confirm('¿Migrar usuarios de Firebase a empleados?\n\nEsto creará registros de empleados para todos los usuarios que aún no tengan uno.')) {
+    if (!confirm('¿Migrar usuarios del sistema a empleados?\n\nEsto creará registros de empleados para todos los usuarios que aún no tengan uno.')) {
         return;
     }
 

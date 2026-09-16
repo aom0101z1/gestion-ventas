@@ -998,7 +998,7 @@ class CoatsReportsManager {
             <!-- Save Button -->
             <div class="admin-actions">
                 <button class="coats-btn coats-btn-primary" onclick="window.CoatsReports.saveToFirebase()">
-                    💾 Guardar en Firebase (Próximo Semestre)
+                    💾 Guardar (Próximo Semestre)
                 </button>
                 <button class="coats-btn coats-btn-secondary" onclick="window.CoatsReports.exportAdminData()">
                     📥 Exportar Datos
@@ -1288,7 +1288,7 @@ class CoatsReportsManager {
 
             await db.set(ref, dataToSave);
 
-            alert('✅ Datos guardados en Firebase exitosamente');
+            alert('✅ Datos guardados exitosamente');
             console.log('💾 COATS data saved to Firebase');
 
         } catch (error) {
