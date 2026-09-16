@@ -235,15 +235,15 @@ function renderTrialRow(r) {
         <tr style="border-bottom:1px solid #e5e7eb;">
             <td style="padding:0.6rem;">
                 <div style="font-weight:600;">${trialsEsc(r.nombre)}</div>
-                <div style="color:#6b7280; font-size:0.8rem;">${trialsEsc(r.tipoDoc || '')} ${trialsEsc(r.numDoc || '')}${r.acudiente ? ` · Acudiente: ${trialsEsc(r.acudiente)}` : ''}</div>
+                <div style="color:#6b7280; font-size:0.8rem;">${r.numDoc ? `${trialsEsc(r.tipoDoc || '')} ${trialsEsc(r.numDoc)}` : ''}${r.acudiente ? ` · Acudiente: ${trialsEsc(r.acudiente)}` : ''}</div>
                 ${r.notas ? `<div style="color:#6b7280; font-size:0.8rem;">📝 ${trialsEsc(r.notas)}</div>` : ''}
             </td>
             <td style="padding:0.6rem;">
                 <a href="https://wa.me/57${trialsEsc(String(r.telefono || '').replace(/\D/g, ''))}" target="_blank" style="color:#2563eb;">${trialsEsc(r.telefono || '')}</a>
                 ${r.correo ? `<div style="color:#6b7280; font-size:0.8rem;">${trialsEsc(r.correo)}</div>` : ''}
             </td>
-            <td style="padding:0.6rem;">${trialsEsc(r.edad || '')}</td>
-            <td style="padding:0.6rem;">${trialsEsc(r.modalidad || '')}${r.modalidadDetalle ? ` (${trialsEsc(r.modalidadDetalle)})` : ''}<div style="color:#6b7280; font-size:0.8rem;">${trialsEsc(r.tipoPago || '')}</div></td>
+            <td style="padding:0.6rem;">${trialsEsc(r.edadCategoria || '')}${r.edad ? ` · ${trialsEsc(r.edad)} años` : ''}</td>
+            <td style="padding:0.6rem;">${trialsEsc(r.modalidad || 'Online')}${r.modalidadDetalle ? ` (${trialsEsc(r.modalidadDetalle)})` : ''}<div style="color:#6b7280; font-size:0.8rem;">${trialsEsc(r.tipoPago || '')}</div></td>
             <td style="padding:0.6rem; font-size:0.85rem;">${trialInfo}</td>
             <td style="padding:0.6rem; font-size:0.85rem;">${trialsEsc(r.createdByName || r.createdBy || '')}<div style="color:#6b7280; font-size:0.75rem;">${trialsEsc(String(r.createdAt || '').slice(0, 10))}</div></td>
             <td style="padding:0.6rem;">
@@ -282,26 +282,12 @@ function renderTrialForm(req = null) {
                     <button onclick="closeTrialForm()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">✖</button>
                 </div>
                 <div style="background:#fffbeb; border:1px solid #fcd34d; border-radius:6px; padding:0.6rem 0.9rem; margin-bottom:1rem; font-size:0.85rem; color:#92400e;">
-                    🧪 Grupo, fecha de inicio, tipo de curso, valor, día de pago y segundo curso <b>no se llenan aquí</b>: recepción los completa al matricular.
+                    🧪 Documento, modalidad (se asume Online), grupo, fecha de inicio, tipo de curso, valor, día de pago y segundo curso <b>no se llenan aquí</b>: recepción los completa al matricular.
                 </div>
                 <form id="trialForm" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                     <div class="form-group">
                         <label>Nombre Completo*</label>
                         <input type="text" id="trlNombre" value="${trialsEsc(req?.nombre || '')}" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Tipo Documento</label>
-                        <select id="trlTipoDoc">
-                            ${['C.C', 'T.I', 'C.E', 'PAS', 'PPT'].map(v => opt(v, req?.tipoDoc || 'C.C')).join('')}
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Número Documento*</label>
-                        <input type="text" id="trlNumDoc" value="${trialsEsc(req?.numDoc || '')}" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Edad</label>
-                        <input type="number" id="trlEdad" min="2" max="99" value="${trialsEsc(req?.edad || '')}">
                     </div>
                     <div class="form-group">
                         <label>Teléfono*</label>
@@ -312,38 +298,21 @@ function renderTrialForm(req = null) {
                         <input type="email" id="trlCorreo" value="${trialsEsc(req?.correo || '')}">
                     </div>
                     <div class="form-group">
-                        <label>Acudiente</label>
+                        <label>¿Adulto o niño/niña?*</label>
+                        <select id="trlEdadCategoria" onchange="trialsEdadCategoriaChange()" required>
+                            <option value="">Seleccionar</option>
+                            ${opt('Adulto', req?.edadCategoria)}
+                            ${opt('Niño', req?.edadCategoria)}
+                            ${opt('Niña', req?.edadCategoria)}
+                        </select>
+                    </div>
+                    <div class="form-group" id="trlEdadGroup" style="display:${req?.edadCategoria === 'Niño' || req?.edadCategoria === 'Niña' ? 'block' : 'none'};">
+                        <label>Edad del niño/niña*</label>
+                        <input type="number" id="trlEdad" min="2" max="17" value="${trialsEsc(req?.edad || '')}" placeholder="Años">
+                    </div>
+                    <div class="form-group">
+                        <label>Acudiente <small style="color:#6b7280;">(para niños)</small></label>
                         <input type="text" id="trlAcudiente" value="${trialsEsc(req?.acudiente || '')}">
-                    </div>
-                    <div class="form-group">
-                        <label>Tipo Doc. Acudiente</label>
-                        <select id="trlTipoDocAcudiente">
-                            <option value="">Seleccionar</option>
-                            ${['C.C', 'C.E', 'PAS', 'PPT'].map(v => opt(v, req?.tipoDocAcudiente || '')).join('')}
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Número Doc. Acudiente</label>
-                        <input type="text" id="trlDocAcudiente" value="${trialsEsc(req?.docAcudiente || '')}">
-                    </div>
-                    <div class="form-group">
-                        <label>Modalidad</label>
-                        <select id="trlModalidad" onchange="trialsModalidadChange()">
-                            <option value="">Seleccionar</option>
-                            ${opt('Presencial', req?.modalidad)}
-                            ${opt('Compañia', req?.modalidad, 'Compañía')}
-                            ${opt('Escuela', req?.modalidad)}
-                            ${opt('Online', req?.modalidad)}
-                            ${opt('Privadas', req?.modalidad)}
-                        </select>
-                    </div>
-                    <div class="form-group" id="trlModalidadDetalleGroup" style="display:${req?.modalidad === 'Compañia' || req?.modalidad === 'Escuela' ? 'block' : 'none'};">
-                        <label id="trlModalidadDetalleLabel">${req?.modalidad === 'Compañia' ? 'Compañía' : req?.modalidad === 'Escuela' ? 'Escuela' : 'Detalle'}</label>
-                        <select id="trlModalidadDetalle">
-                            <option value="">Seleccionar</option>
-                            ${req?.modalidad === 'Compañia' ? `${opt('COATS', req?.modalidadDetalle)}${opt('OTRA', req?.modalidadDetalle)}` : ''}
-                            ${req?.modalidad === 'Escuela' ? `${opt('Hogar Nazareth', req?.modalidadDetalle)}${opt('Remigio', req?.modalidadDetalle)}${opt('otro', req?.modalidadDetalle, 'Otro')}` : ''}
-                        </select>
                     </div>
                     <div class="form-group">
                         <label>Tipo Pago</label>
@@ -370,20 +339,15 @@ function renderTrialForm(req = null) {
         </div>`;
 }
 
-window.trialsModalidadChange = function() {
-    const modalidad = document.getElementById('trlModalidad').value;
-    const group = document.getElementById('trlModalidadDetalleGroup');
-    const label = document.getElementById('trlModalidadDetalleLabel');
-    const select = document.getElementById('trlModalidadDetalle');
-    if (modalidad === 'Compañia') {
-        group.style.display = 'block'; label.textContent = 'Compañía';
-        select.innerHTML = '<option value="">Seleccionar</option><option value="COATS">COATS</option><option value="OTRA">OTRA</option>';
-    } else if (modalidad === 'Escuela') {
-        group.style.display = 'block'; label.textContent = 'Escuela';
-        select.innerHTML = '<option value="">Seleccionar</option><option value="Hogar Nazareth">Hogar Nazareth</option><option value="Remigio">Remigio</option><option value="otro">Otro</option>';
-    } else {
-        group.style.display = 'none'; select.value = '';
-    }
+// Edad: "Adulto" needs no age; "Niño"/"Niña" reveals the age box (16 Sep 2026)
+window.trialsEdadCategoriaChange = function() {
+    const cat = document.getElementById('trlEdadCategoria').value;
+    const group = document.getElementById('trlEdadGroup');
+    const input = document.getElementById('trlEdad');
+    const isChild = cat === 'Niño' || cat === 'Niña';
+    group.style.display = isChild ? 'block' : 'none';
+    input.required = isChild;
+    if (!isChild) input.value = '';
 };
 
 window.showTrialForm = function(id = null) {
@@ -399,19 +363,20 @@ window.showTrialForm = function(id = null) {
         btn.disabled = true;
         try {
             const v = (elId) => (document.getElementById(elId)?.value || '').trim();
+            const edadCategoria = v('trlEdadCategoria');
+            const isChild = edadCategoria === 'Niño' || edadCategoria === 'Niña';
+            if (isChild && !v('trlEdad')) throw new Error('Indica la edad del niño/niña');
             await window.TrialsManager.save({
                 id: req?.id,
                 nombre: v('trlNombre'),
-                tipoDoc: v('trlTipoDoc'),
-                numDoc: v('trlNumDoc'),
-                edad: v('trlEdad'),
+                edadCategoria,
+                edad: isChild ? v('trlEdad') : '',
                 telefono: v('trlTelefono'),
                 correo: v('trlCorreo').toLowerCase(),
                 acudiente: v('trlAcudiente'),
-                tipoDocAcudiente: v('trlTipoDocAcudiente'),
-                docAcudiente: v('trlDocAcudiente'),
-                modalidad: v('trlModalidad'),
-                modalidadDetalle: v('trlModalidadDetalle'),
+                // Documento, modalidad and the enrollment fields are completed by
+                // reception at matriculation; modalidad is assumed Online for now.
+                modalidad: req?.modalidad || 'Online',
                 tipoPago: v('trlTipoPago'),
                 fuente: v('trlFuente'),
                 notas: v('trlNotas')
