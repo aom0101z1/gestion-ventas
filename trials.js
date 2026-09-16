@@ -284,7 +284,7 @@ function renderTrialForm(req = null) {
                 </div>
                 <form id="trialForm" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                     <div class="form-group">
-                        <label>Nombre Completo*</label>
+                        <label>Nombre Completo Estudiante*</label>
                         <input type="text" id="trlNombre" value="${trialsEsc(req?.nombre || '')}" required>
                     </div>
                     <div class="form-group">
@@ -309,7 +309,7 @@ function renderTrialForm(req = null) {
                         <input type="number" id="trlEdad" min="2" max="17" value="${trialsEsc(req?.edad || '')}" placeholder="Años">
                     </div>
                     <div class="form-group">
-                        <label>Acudiente <small style="color:#6b7280;">(para niños)</small></label>
+                        <label>Nombre Completo Acudiente <small style="color:#6b7280;">(para niños)</small></label>
                         <input type="text" id="trlAcudiente" value="${trialsEsc(req?.acudiente || '')}">
                     </div>
                     <div class="form-group">
