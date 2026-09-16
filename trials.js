@@ -183,12 +183,10 @@ function renderTrialsTab() {
             <table class="data-table" style="width:100%; border-collapse:collapse;">
                 <thead>
                     <tr style="background:#f3f4f6; text-align:left;">
-                        <th style="padding:0.6rem;">Nombre</th>
+                        <th style="padding:0.6rem; min-width:260px;">Nombre</th>
                         <th style="padding:0.6rem;">Teléfono</th>
-                        <th style="padding:0.6rem;">Edad</th>
-                        <th style="padding:0.6rem;">Modalidad</th>
-                        <th style="padding:0.6rem;">Clase de prueba</th>
-                        <th style="padding:0.6rem;">Vendedor</th>
+                        <th style="padding:0.6rem; white-space:nowrap;">Edad</th>
+                        ${sales ? '' : '<th style="padding:0.6rem;">Vendedor</th>'}
                         <th style="padding:0.6rem;">Estado</th>
                         <th style="padding:0.6rem;">Acciones</th>
                     </tr>
@@ -227,28 +225,28 @@ function renderTrialRow(r) {
         actions.push(btn('↩️ Reabrir', `trialsSetDecision('${r.id}', 'pendiente')`, '#9ca3af'));
     }
 
+    // Test-class group + date live under the status once reception registered the person
     const trialInfo = r.trialGroupId
-        ? `<div>🧪 Grupo ${trialsEsc(r.trialGroupId)}</div><div style="color:#6b7280;">${trialsEsc(r.trialDate || '')}</div>`
-        : '<span style="color:#9ca3af;">—</span>';
+        ? `<div style="color:#6b7280; font-size:0.75rem;">🧪 Grupo ${trialsEsc(r.trialGroupId)} · ${trialsEsc(r.trialDate || '')}</div>`
+        : '';
 
     return `
         <tr style="border-bottom:1px solid #e5e7eb;">
-            <td style="padding:0.6rem;">
-                <div style="font-weight:600;">${trialsEsc(r.nombre)}</div>
-                <div style="color:#6b7280; font-size:0.8rem;">${r.numDoc ? `${trialsEsc(r.tipoDoc || '')} ${trialsEsc(r.numDoc)}` : ''}${r.acudiente ? ` · Acudiente: ${trialsEsc(r.acudiente)}` : ''}</div>
+            <td style="padding:0.6rem; min-width:260px;">
+                <div style="font-weight:600; white-space:nowrap;">${trialsEsc(r.nombre)}</div>
+                ${r.acudiente ? `<div style="color:#6b7280; font-size:0.8rem;">Acudiente: ${trialsEsc(r.acudiente)}</div>` : ''}
                 ${r.notas ? `<div style="color:#6b7280; font-size:0.8rem;">📝 ${trialsEsc(r.notas)}</div>` : ''}
             </td>
             <td style="padding:0.6rem;">
                 <a href="https://wa.me/57${trialsEsc(String(r.telefono || '').replace(/\D/g, ''))}" target="_blank" style="color:#2563eb;">${trialsEsc(r.telefono || '')}</a>
                 ${r.correo ? `<div style="color:#6b7280; font-size:0.8rem;">${trialsEsc(r.correo)}</div>` : ''}
             </td>
-            <td style="padding:0.6rem;">${trialsEsc(r.edadCategoria || '')}${r.edad ? ` · ${trialsEsc(r.edad)} años` : ''}</td>
-            <td style="padding:0.6rem;">${trialsEsc(r.modalidad || 'Online')}${r.modalidadDetalle ? ` (${trialsEsc(r.modalidadDetalle)})` : ''}<div style="color:#6b7280; font-size:0.8rem;">${trialsEsc(r.tipoPago || '')}</div></td>
-            <td style="padding:0.6rem; font-size:0.85rem;">${trialInfo}</td>
-            <td style="padding:0.6rem; font-size:0.85rem;">${trialsEsc(r.createdByName || r.createdBy || '')}<div style="color:#6b7280; font-size:0.75rem;">${trialsEsc(String(r.createdAt || '').slice(0, 10))}</div></td>
+            <td style="padding:0.6rem; white-space:nowrap;">${trialsEsc(r.edadCategoria || '')}${r.edad ? ` · ${trialsEsc(r.edad)} años` : ''}</td>
+            ${sales ? '' : `<td style="padding:0.6rem; font-size:0.85rem;">${trialsEsc(r.createdByName || r.createdBy || '')}<div style="color:#6b7280; font-size:0.75rem;">${trialsEsc(String(r.createdAt || '').slice(0, 10))}</div></td>`}
             <td style="padding:0.6rem;">
                 <span style="display:inline-block; padding:0.25rem 0.6rem; border-radius:999px; background:${S.bg}; color:${S.color}; font-size:0.8rem; white-space:nowrap;">${S.label}</span>
                 ${r.decisionAt ? `<div style="color:#6b7280; font-size:0.75rem;">${trialsEsc(String(r.decisionAt).slice(0, 10))}</div>` : ''}
+                ${trialInfo}
             </td>
             <td style="padding:0.6rem; white-space:nowrap;">${actions.join('')}</td>
         </tr>`;
