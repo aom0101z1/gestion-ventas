@@ -115,10 +115,18 @@ function trialsTestGroupOptions(selected) {
     ).join('');
 }
 
+// The module can be open in TWO places: the 🧪 tab (#trials > #trialsContainer) and
+// the 🏫 Módulos Escolares overlay (school-buttons.js openModule creates its own
+// #trialsContainer inside #schoolModuleView). Prefer the visible one.
+function trialsContainerEl() {
+    const all = Array.from(document.querySelectorAll('#trialsContainer'));
+    return all.reverse().find(el => el.offsetParent !== null) || all[0] || null;
+}
+
 // ── tab ────────────────────────────────────────────────────────────────────
 
 window.loadTrialsTab = async function() {
-    const container = document.getElementById('trialsContainer');
+    const container = trialsContainerEl();
     if (!container) return;
     try {
         await window.TrialsManager.load();
@@ -136,7 +144,7 @@ window.loadTrialsTab = async function() {
 window.trialsFilter = { status: '', q: '' };
 
 function renderTrialsTab() {
-    const container = document.getElementById('trialsContainer');
+    const container = trialsContainerEl();
     if (!container) return;
     const all = Array.from(window.TrialsManager.requests.values())
         .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
@@ -350,7 +358,7 @@ window.trialsEdadCategoriaChange = function() {
 
 window.showTrialForm = function(id = null) {
     const req = id ? window.TrialsManager.requests.get(id) : null;
-    const container = document.getElementById('trialsContainer');
+    const container = trialsContainerEl();
     const existing = document.getElementById('trialFormModal');
     if (existing) existing.remove();
     container.insertAdjacentHTML('beforeend', renderTrialForm(req));
@@ -424,7 +432,7 @@ window.showTrialRegisterModal = async function(id) {
         try { await window.GroupsManager2.init(true); } catch (_) {}
     }
     const today = new Date().toISOString().slice(0, 10);
-    const container = document.getElementById('trialsContainer');
+    const container = trialsContainerEl();
     const existing = document.getElementById('trialRegisterModal');
     if (existing) existing.remove();
     container.insertAdjacentHTML('beforeend', `
@@ -547,5 +555,74 @@ window.trialsOpenEnrollment = async function(id) {
     }
     window.showNotification?.('El módulo Estudiantes tardó en cargar — busca a ' + req.nombre + ' y edítalo.', 'warning');
 };
+
+// ── live badge: pending people (reception + admin) ─────────────────────────
+//
+// Listens to trialRequests in real time. "Pending" = added by sales and not yet
+// registered in a Test Class (status pendiente, no studentId). The count shows as
+// a red badge on the 🧪 tab button and on the Módulos Escolares button; a toast
+// fires when a NEW person arrives during the session.
+
+window.trialsPendingCount = 0;
+
+window.trialsUpdateBadges = function(count) {
+    if (typeof count === 'number') window.trialsPendingCount = count;
+    const n = window.trialsPendingCount;
+    const targets = [document.getElementById('trialsTab'), ...document.querySelectorAll('[data-trials-btn]')];
+    targets.forEach(el => {
+        if (!el) return;
+        let badge = el.querySelector('.trials-badge');
+        if (!n) { if (badge) badge.remove(); return; }
+        if (!badge) {
+            badge = document.createElement('span');
+            badge.className = 'trials-badge';
+            badge.style.cssText = 'position:absolute; top:-6px; right:-6px; min-width:20px; height:20px; padding:0 6px; border-radius:999px; background:#dc2626; color:white; font-size:0.75rem; font-weight:700; line-height:20px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.3); pointer-events:none;';
+            if (getComputedStyle(el).position === 'static') el.style.position = 'relative';
+            el.appendChild(badge);
+        }
+        badge.textContent = n > 99 ? '99+' : String(n);
+        badge.title = `${n} persona(s) pendiente(s) de clase de prueba`;
+    });
+};
+
+window.trialsStartWatcher = function() {
+    if (window._trialsWatcherOn || trialsIsSales()) return;
+    const db = window.firebaseModules?.database;
+    if (!db || !db.onValue || !window.FirebaseData?.database) return;
+    window._trialsWatcherOn = true;
+    let seenIds = null;
+    db.onValue(db.ref(window.FirebaseData.database, 'trialRequests'), (snap) => {
+        const data = snap.val() || {};
+        // keep the module cache fresh so an open list re-renders with live data
+        window.TrialsManager.requests.clear();
+        for (const [id, r] of Object.entries(data)) window.TrialsManager.requests.set(id, { ...r, id });
+        window.TrialsManager.loaded = true;
+
+        const pending = Object.values(data).filter(r => r && (r.status || 'pendiente') === 'pendiente' && !r.studentId);
+        window.trialsUpdateBadges(pending.length);
+
+        const ids = new Set(Object.keys(data));
+        if (seenIds) {
+            const fresh = Object.entries(data).filter(([id]) => !seenIds.has(id)).map(([, r]) => r);
+            if (fresh.length && typeof window.showNotification === 'function') {
+                const who = fresh.map(r => r.nombre).filter(Boolean).join(', ');
+                window.showNotification(`🧪 Nueva persona para clase de prueba: ${who} — abre 🧪 Clases de prueba`, 'info', 10000);
+            }
+        }
+        seenIds = ids;
+        if (trialsContainerEl() && trialsContainerEl().querySelector('table, [id="trialsSearch"]')) renderTrialsTab();
+    }, (err) => console.warn('trials watcher:', err.message));
+};
+
+// Start once the user is authenticated (the bar and tabs may appear later — the
+// badge helper is also called by school-buttons.js after it builds the bar).
+(function trialsBoot() {
+    const tick = setInterval(() => {
+        if (window.FirebaseData?.currentUser && window.userRole) {
+            clearInterval(tick);
+            window.trialsStartWatcher();
+        }
+    }, 1000);
+})();
 
 console.log('✅ Trials module loaded');

@@ -39,6 +39,8 @@ function addSchoolButtons() {
     // Create buttons
     const modules = [
         { name: 'Estudiantes', icon: '👥', color: '#3b82f6', func: 'Students', perm: 'students' },
+        // 🧪 people sent by sales for a test class (trials.js) — badge = pending count
+        { name: 'Clases de prueba', icon: '🧪', color: '#f59e0b', func: 'Trials', perm: 'trials', badge: 'trials' },
         { name: 'Pagos', icon: '💰', color: '#10b981', func: 'Payments', perm: 'payments' },
         { name: 'Tienda', icon: '🏪', color: '#ec4899', func: 'Tienda', perm: 'tienda' },
         { name: 'Finanzas', icon: '💵', color: '#6366f1', func: 'Finance', perm: 'finance' },
@@ -115,6 +117,11 @@ function addSchoolButtons() {
             transition: all 0.2s;
         `;
 
+        if (module.badge === 'trials') {
+            btn.dataset.trialsBtn = '1';   // trials.js paints the pending-count badge here
+            btn.style.position = 'relative';
+        }
+
         btn.onmouseover = () => btn.style.opacity = '0.8';
         btn.onmouseout = () => btn.style.opacity = '1';
 
@@ -151,6 +158,7 @@ function addSchoolButtons() {
     }
     document.body.appendChild(buttonBar);
     console.log('✅ School button bar added!');
+    if (typeof window.trialsUpdateBadges === 'function') window.trialsUpdateBadges();
 }
 
 // Create floating button when minimized
@@ -204,7 +212,7 @@ function openModule(moduleName) {
     // Create header
     container.innerHTML = `
         <div style="background: #f3f4f6; padding: 1rem; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
-            <h2 style="margin: 0;">📚 ${moduleName} Module</h2>
+            <h2 style="margin: 0;">${moduleName === 'Trials' ? '🧪 Clases de prueba' : `📚 ${moduleName} Module`}</h2>
             <button onclick="document.getElementById('schoolModuleView').style.display='none'"
                     style="padding: 0.5rem 1rem; background: #dc2626; color: white; border: none; border-radius: 4px; cursor: pointer;">
                 ✖️ Cerrar
