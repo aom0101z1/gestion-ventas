@@ -887,6 +887,19 @@ window.saveGrupo2Form = async function(groupId) {
         window.showNotification(`✅ Grupo ${groupData.groupId} guardado exitosamente`, 'success');
         // 🔗 apply the (possibly new) class link on the TutorBox side right away
         try { await window.loadClassLinks(true); } catch (e) { /* offline */ }
+        // 👑 21 Sep 2026: the group's teacher becomes the OWNER of its TutorBox room (old owner stays co-teacher)
+        if (groupData.teacherUid || groupData.teacherEmail) {
+            try {
+                const r = await fetch(`${TUTORBOX_CF_BASE}/setGroupTeacher`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-admin-key': TUTORBOX_KEY },
+                    body: JSON.stringify({ groupId: groupData.groupId, uid: groupData.teacherUid || undefined, email: groupData.teacherEmail || undefined })
+                });
+                const j = await r.json();
+                if (r.ok && j.changedOwner) window.showNotification(`👑 ${groupData.teacherName} ahora es el profesor titular de la sala ${j.code}`, 'success');
+                else if (!r.ok && j.error === 'teacher_not_on_tutorbox') window.showNotification('⚠️ Ese profesor no tiene cuenta en TutorBox todavía: créala desde el Teachers Module (🎓 Cuenta TutorBox)', 'warning');
+            } catch (e) { console.warn('setGroupTeacher', e); }
+        }
         cancelGrupo2Form();
         await refreshGrupos2Grid();
 
