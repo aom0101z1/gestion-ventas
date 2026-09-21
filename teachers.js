@@ -226,10 +226,17 @@ function renderTeachersView() {
                     <h2 style="margin: 0 0 0.5rem 0; font-size: 1.75rem;">👩‍🏫 Profesores 2.0</h2>
                     <p style="margin: 0; opacity: 0.9; font-size: 0.9rem;">Gestión de profesores y asignación de grupos</p>
                 </div>
+                <div style="display:flex; gap:.5rem; flex-wrap:wrap;">
+                <button onclick="linkAllTeachersOnTutorBox()" title="Vincula en TutorBox a todos los profesores activos con correo real y trae su código"
+                        style="background: rgba(255,255,255,.2); color: white; font-weight: bold; border: 1px solid rgba(255,255,255,.5);
+                        padding: 0.75rem 1rem; border-radius: 8px; cursor: pointer; font-size: 0.9rem;">
+                    🎓 Vincular todos en TutorBox
+                </button>
                 <button onclick="showTeacherModal()" style="background: white; color: #d97706; font-weight: bold;
                         padding: 0.75rem 1.5rem; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem;">
                     ➕ Nuevo Profesor
                 </button>
+                </div>
             </div>
 
             <!-- Stats -->
@@ -303,7 +310,7 @@ function renderTeachersStats(teachers) {
     const inactive = teachers.filter(t => t.status === 'inactive').length;
     const totalGroups = teachers.reduce((sum, t) => sum + t.groupCount, 0);
     const totalStudents = teachers.reduce((sum, t) => sum + t.studentCount, 0);
-    const withAppAccount = teachers.filter(t => t.hasAppAccount).length;
+    const withAppAccount = teachers.filter(t => t.tutorboxUid).length; // 21 Sep 2026: linked on TutorBox (not the old CRM-side account)
 
     return `
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
@@ -471,16 +478,22 @@ function renderTeacherRow(teacher) {
             </td>
             <td style="padding: 1rem; text-align: center;">
                 <div style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;">
-                    ${teacher.hasAppAccount ? `
-                        <span title="Ya tiene cuenta de app" style="background: #d1fae5; color: #065f46; padding: 0.4rem 0.6rem;
-                               border-radius: 6px; font-size: 0.75rem; font-weight: 600;">
-                            ✓ App
+                    ${teacher.tutorboxUid ? `
+                        <span title="Cuenta TutorBox vinculada · código de profesor" onclick="copyTeacherCode('${teacher.id}')"
+                              style="background: #ede9fe; color: #4c1d95; padding: 0.4rem 0.6rem; border-radius: 6px;
+                                     font-size: 0.75rem; font-weight: 700; font-family: ui-monospace, Menlo, monospace; cursor: copy; letter-spacing: .04em;">
+                            🎓 ${teacher.teacherCode || '✓ TutorBox'}
                         </span>
+                        <button onclick="provisionTeacherOnTutorBox('${teacher.id}', true)" title="Generar un código nuevo (el anterior deja de funcionar)"
+                                style="background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; padding: 0.4rem 0.5rem;
+                                       border-radius: 6px; cursor: pointer; font-size: 0.75rem;">
+                            🔄
+                        </button>
                     ` : `
-                        <button onclick="showCreateAccountModal('${teacher.id}')" title="Crear cuenta para app móvil"
+                        <button onclick="provisionTeacherOnTutorBox('${teacher.id}')" title="Crear o vincular la cuenta en TutorBox y emitir su código de profesor"
                                 style="background: #10b981; color: white; border: none; padding: 0.4rem 0.6rem;
                                        border-radius: 6px; cursor: pointer; font-size: 0.75rem; font-weight: 600;">
-                            📱 Crear Cuenta
+                            🎓 Cuenta TutorBox
                         </button>
                     `}
                     <button onclick="showTeacherModal('${teacher.id}')" title="Editar profesor"
@@ -1218,6 +1231,87 @@ window.createTeacherAccount = async function(teacherId) {
         btn.disabled = false;
         btn.innerHTML = '🔐 Crear Cuenta';
     }
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   🎓 TutorBox link (21 Sep 2026, founder: one identity per teacher across CRM and platform)
+   "Cuenta TutorBox" calls provisionTeacher on the platform: finds/creates the TutorBox account by
+   email, sets role teacher, issues the T code (T12345-ABCD), and we store uid + code on the CRM row.
+   The old CRM-side "Crear Cuenta" (an account in ciudad-bilingue-crm) is retired.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const TBX_TEACHERS_CF = 'https://us-central1-tutorbox-4d7c9.cloudfunctions.net';
+const TBX_TEACHERS_KEY = 'tbx-admin-2026-cb-provision-k9x7m';
+
+window.provisionTeacherOnTutorBox = async function(teacherId, rotate) {
+    const teacher = window.TeacherManager.teachers.get(teacherId);
+    if (!teacher) return;
+    const email = String(teacher.email || '').trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        alert('Este profesor no tiene un correo válido. Edita el profesor y agrega su correo real antes de crear la cuenta.');
+        return;
+    }
+    if (rotate && !confirm(`¿Generar un código nuevo para ${teacher.name}? El código anterior deja de funcionar de inmediato.`)) return;
+    try {
+        let uid = teacher.tutorboxUid;
+        let code = teacher.teacherCode;
+        if (!uid || !rotate) {
+            const r = await fetch(`${TBX_TEACHERS_CF}/provisionTeacher`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-admin-key': TBX_TEACHERS_KEY },
+                body: JSON.stringify({ crmTeacherId: teacherId, name: teacher.name, email, phone: teacher.phone || teacher.telefono || '' })
+            });
+            const j = await r.json();
+            if (!r.ok) throw new Error(j.error || `http_${r.status}`);
+            uid = j.uid; code = j.code;
+        }
+        if (rotate) {
+            const r = await fetch(`${TBX_TEACHERS_CF}/setTeacherLoginCode`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-admin-key': TBX_TEACHERS_KEY },
+                body: JSON.stringify({ uid })
+            });
+            const j = await r.json();
+            if (!r.ok) throw new Error(j.error || `http_${r.status}`);
+            code = j.code;
+        }
+        await window.TeacherManager.saveTeacher({ ...teacher, tutorboxUid: uid, teacherCode: code, hasAppAccount: true, tutorboxLinkedAt: new Date().toISOString() });
+        if (typeof refreshTeachersGrid === 'function') await refreshTeachersGrid();
+        alert(`${teacher.name}\n\nCódigo de profesor: ${code}\n\nEntra en tutorbox.app/class → "Tengo un código". El código quedó guardado en la fila del profesor (clic para copiar).`);
+    } catch (e) {
+        console.error('provisionTeacherOnTutorBox', e);
+        alert('No se pudo vincular la cuenta en TutorBox: ' + (e.message || e));
+    }
+};
+
+window.linkAllTeachersOnTutorBox = async function() {
+    const list = [...window.TeacherManager.teachers.values()].filter(t => t.status !== 'inactive' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(t.email || '')) && !/^\d+@|^0+@|8888|9999/.test(String(t.email)));
+    if (!list.length) { alert('No hay profesores activos con correo real.'); return; }
+    if (!confirm(`Vincular ${list.length} profesor(es) en TutorBox y traer sus códigos. Los que ya tienen código lo conservan. ¿Continuar?`)) return;
+    const done = [], failed = [];
+    for (const teacher of list) {
+        try {
+            const r = await fetch(`${TBX_TEACHERS_CF}/provisionTeacher`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-admin-key': TBX_TEACHERS_KEY },
+                body: JSON.stringify({ crmTeacherId: teacher.id, name: teacher.name, email: String(teacher.email).trim().toLowerCase(), phone: teacher.phone || teacher.telefono || '' })
+            });
+            const j = await r.json();
+            if (!r.ok) throw new Error(j.error || `http_${r.status}`);
+            await window.TeacherManager.saveTeacher({ ...teacher, tutorboxUid: j.uid, teacherCode: j.code, hasAppAccount: true, tutorboxLinkedAt: new Date().toISOString() });
+            done.push(`${teacher.name}: ${j.code}${j.created ? ' (cuenta nueva)' : ''}`);
+        } catch (e) { failed.push(`${teacher.name}: ${e.message || e}`); }
+    }
+    if (typeof refreshTeachersGrid === 'function') await refreshTeachersGrid();
+    const NL = String.fromCharCode(10);
+    alert(`Vinculados ${done.length}:` + NL + done.join(NL) + (failed.length ? NL + NL + `Fallaron ${failed.length}:` + NL + failed.join(NL) : ''));
+};
+
+window.copyTeacherCode = function(teacherId) {
+    const teacher = window.TeacherManager.teachers.get(teacherId);
+    if (!teacher || !teacher.teacherCode) return;
+    navigator.clipboard?.writeText(teacher.teacherCode).then(() => {
+        if (window.showToast) window.showToast(`Código ${teacher.teacherCode} copiado`); else alert(`Código copiado: ${teacher.teacherCode}`);
+    });
 };
 
 console.log('✅ Teachers module loaded successfully');
