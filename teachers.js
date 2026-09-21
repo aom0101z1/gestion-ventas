@@ -227,6 +227,11 @@ function renderTeachersView() {
                     <p style="margin: 0; opacity: 0.9; font-size: 0.9rem;">Gestión de profesores y asignación de grupos</p>
                 </div>
                 <div style="display:flex; gap:.5rem; flex-wrap:wrap;">
+                <button onclick="importTeachersFromTutorBox()" title="Crea en el CRM los profesores que existen en TutorBox y aquí no (con su correo y su código)"
+                        style="background: rgba(255,255,255,.2); color: white; font-weight: bold; border: 1px solid rgba(255,255,255,.5);
+                        padding: 0.75rem 1rem; border-radius: 8px; cursor: pointer; font-size: 0.9rem;">
+                    ⬇️ Importar desde TutorBox
+                </button>
                 <button onclick="linkAllTeachersOnTutorBox()" title="Vincula en TutorBox a todos los profesores activos con correo real y trae su código"
                         style="background: rgba(255,255,255,.2); color: white; font-weight: bold; border: 1px solid rgba(255,255,255,.5);
                         padding: 0.75rem 1rem; border-radius: 8px; cursor: pointer; font-size: 0.9rem;">
@@ -1304,6 +1309,37 @@ window.linkAllTeachersOnTutorBox = async function() {
     if (typeof refreshTeachersGrid === 'function') await refreshTeachersGrid();
     const NL = String.fromCharCode(10);
     alert(`Vinculados ${done.length}:` + NL + done.join(NL) + (failed.length ? NL + NL + `Fallaron ${failed.length}:` + NL + failed.join(NL) : ''));
+};
+
+window.importTeachersFromTutorBox = async function() {
+    try {
+        const r = await fetch(`${TBX_TEACHERS_CF}/getTutorBoxTeachers`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin-key': TBX_TEACHERS_KEY }, body: '{}' });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error || `http_${r.status}`);
+        const existing = new Map();
+        for (const t of window.TeacherManager.teachers.values()) if (t.email) existing.set(String(t.email).trim().toLowerCase(), t);
+        const candidates = (j.teachers || []).filter(t => t.role === 'teacher' && t.email && !existing.has(String(t.email).toLowerCase()));
+        if (!candidates.length) { alert('Todos los profesores de TutorBox ya están en el CRM.'); return; }
+        if (!confirm(`Crear ${candidates.length} profesor(es) en el CRM desde TutorBox:` + String.fromCharCode(10) + candidates.map(t => `• ${t.name} (${t.email})`).join(String.fromCharCode(10)))) return;
+        let n = 0;
+        for (const t of candidates) {
+            await window.TeacherManager.saveTeacher({ name: t.name, email: t.email, status: 'active', languages: ['en'], paymentType: 'hourly', tutorboxUid: t.uid, teacherCode: t.teacherCode || '', hasAppAccount: true, tutorboxLinkedAt: new Date().toISOString(), createdFrom: 'tutorbox-import' });
+            n++;
+        }
+        // mirror the CRM id back to the platform so both sides point at each other
+        await window.TeacherManager.init(true);
+        for (const t of window.TeacherManager.teachers.values()) {
+            if (t.createdFrom === 'tutorbox-import' && t.tutorboxUid && !t.crmMirrored) {
+                fetch(`${TBX_TEACHERS_CF}/provisionTeacher`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin-key': TBX_TEACHERS_KEY }, body: JSON.stringify({ crmTeacherId: t.id, name: t.name, email: t.email }) }).catch(() => {});
+                window.TeacherManager.saveTeacher({ ...t, crmMirrored: true }).catch(() => {});
+            }
+        }
+        if (typeof refreshTeachersGrid === 'function') await refreshTeachersGrid();
+        alert(`Importados ${n} profesor(es) con su código.`);
+    } catch (e) {
+        console.error('importTeachersFromTutorBox', e);
+        alert('No se pudo importar: ' + (e.message || e));
+    }
 };
 
 window.copyTeacherCode = function(teacherId) {
