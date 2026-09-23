@@ -1142,8 +1142,26 @@ window.deleteStudent = async function(id) {
         return;
     }
 
+    /* 🔗 23 sep 2026: los grupos del estudiante se leen ANTES de borrarlo — después
+       la ficha ya no existe y no hay a quién preguntarle. Sin esto, borrar aquí
+       dejaba al estudiante vivo para siempre en el grupo de TutorBox: inflaba la
+       lista del salón y contaba como una inasistencia permanente en los reportes
+       del grupo (caso real: el Nicolás Oviedo duplicado siguió en el grupo 121
+       después de borrarlo). Agregar o quitar a CUALQUIER otro estudiante del grupo
+       ya disparaba el sync y lo limpiaba de rebote; borrar, no. */
+    const st = window.StudentManager?.students?.get(String(id));
+    const groups = [...new Set([st?.grupo, st?.grupo2]
+        .map(g => String(g ?? '').trim())
+        .filter(g => g && !isNaN(parseInt(g))))];
+
     if (await window.StudentManager.deleteStudent(id)) {
         loadStudentsTab();
+        // El sync manda la membresía COMPLETA del grupo y TutorBox poda a quien ya
+        // no aparezca, así que basta con volver a correrlo por cada grupo tocado.
+        for (const gid of groups) {
+            try { await window.syncGroupMembersToTutorBox?.(gid); }
+            catch (e) { console.warn(`syncGroupMembers tras borrar (grupo ${gid}):`, e.message); }
+        }
         window.showNotification('✅ Estudiante eliminado', 'success');
     }
 };
