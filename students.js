@@ -734,6 +734,7 @@ function renderStudentTable(students) {
                     <th style="padding: 0.75rem; text-align: left;">Nombre</th>
                     <th style="padding: 0.75rem; text-align: center; width: 56px;" title="Día de Pago registrado en la ficha del estudiante">DP1</th>
                     <th style="padding: 0.75rem; text-align: center; width: 72px;" title="Día de pago ajustado (manual) — se guarda al salir de la casilla">DP2</th>
+                    <th style="padding: 0.75rem; text-align: center; width: 60px;" title="OK = NO enviarle el aviso de pago este mes (exonerar). Verde claro = automático, el módulo de Pagos ya registra el pago. Verde fuerte = lo exoneraste a mano. Rojo = avisar igual. — = automático. Se reinicia solo cada mes. OJO: marcar OK no registra el dinero; el pago se registra en Pagos.">OK</th>
                     <th style="padding: 0.75rem; text-align: left;">Teléfono</th>
                     <th style="padding: 0.75rem; text-align: left;">Grupo</th>
                     <th style="padding: 0.75rem; text-align: left;">Pago</th>
@@ -783,6 +784,7 @@ function renderStudentTable(students) {
                                        title="Día de pago ajustado — se guarda al salir de la casilla"
                                        style="width: 56px; padding: 0.35rem; text-align: center; border: 1px solid #d1d5db; border-radius: 4px; font-weight: 700; color: #7c3aed; background: #faf5ff;">
                             </td>
+                            <td id="pagoOK-${s.id}" style="padding: 0.5rem; text-align: center;"></td>
                             <td style="padding: 0.75rem;">
                                 ${phoneNumber ? `
                                     <a href="https://wa.me/57${phoneNumber}"
@@ -2190,16 +2192,20 @@ window.refreshLastPayments = async function(force = false) {
             // Pagos module already loaded → always rebuild from memory (cheap, fresh)
             const records = Array.from(window.PaymentManager.payments.entries()).map(([id, p]) => ({ id, ...p }));
             window._lastPayByStudent = buildLastPaymentIndex(records);
+            // 23 sep: la columna OK se alimenta de los MISMOS registros (sin otra consulta)
+            window._paidThisMonth = buildPaidThisMonthIndex(records);
             _lastPayFetchedAt = Date.now();
         } else if (force || Date.now() - _lastPayFetchedAt > 3 * 60 * 1000) {
             const db = window.firebaseModules.database;
             const snap = await db.get(db.ref(window.FirebaseData.database, 'payments'));
             const records = snap.exists() ? Object.entries(snap.val()).map(([id, p]) => ({ id, ...p })) : [];
             window._lastPayByStudent = buildLastPaymentIndex(records);
+            window._paidThisMonth = buildPaidThisMonthIndex(records);
             _lastPayFetchedAt = Date.now();
         }
     } catch (e) { console.warn('Último pago:', e.message); }
     window.paintLastPayments();
+    window.paintPagoOK();
 };
 
 /** Paint "Último Pago" into whatever rows are on screen (cheap, re-runnable). */
@@ -2216,6 +2222,149 @@ window.paintLastPayments = function() {
         el.innerHTML = `
             <div style="font-weight: 700; color: ${t.pending ? '#7c3aed' : '#065f46'};" title="${months ? 'Cubre: ' + months : ''}${t.method ? ' · ' + t.method : ''}${t.bank ? ' - ' + t.bank : ''}">${t.pending ? '📋 ' : ''}$${t.amount.toLocaleString('es-CO')}</div>
             <small style="color: #374151;">${fmtDate(t.date)}</small>`;
+    }
+};
+
+// ============================================
+// SECTION: COLUMNA "OK" — exonerar el aviso de pago del mes (23 sep 2026)
+// ============================================
+// El sistema de avisos (TutorBox) calcula la etapa desde el módulo de Pagos.
+// Falla en un caso, el más común: el estudiante YA PAGÓ pero el pago todavía no
+// está digitado (efectivo de ayer, comprobante de las 8pm). Sin una salida
+// manual, ese estudiante recibe el aviso y la academia pierde la confianza en
+// la herramienta. Esta columna es esa salida.
+//
+// TRES estados, porque con dos no existe "que el sistema decida", que es el de
+// casi todos:  —  automático  ·  🟢 OK  no avisar este mes  ·  🔴 No  avisar igual.
+//
+// Se guarda POR MES (`pagoOK["2026-09"]`) a propósito: un booleano simple
+// seguiría diciendo OK en octubre y ese estudiante no volvería a recibir un
+// aviso nunca, sin que nadie se acuerde de apagarlo.
+//
+// ⚠️ OK = "no enviar aviso este mes". NO es "pagó". Marcar OK no registra el
+// dinero: el pago hay que registrarlo en Pagos o la contabilidad queda vacía.
+
+/** Mes actual en hora local (Colombia), 'YYYY-MM'. */
+window.pagoOKMonthKey = function() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+
+/** Lo que Angélica marcó a mano este mes: true | false | null (sin marcar). */
+function pagoOKManual(student) {
+    const rec = student && student.pagoOK && student.pagoOK[window.pagoOKMonthKey()];
+    if (!rec || typeof rec.ok !== 'boolean') return null;
+    return rec.ok;
+}
+
+/**
+ * ¿El módulo de Pagos ya dice que este mes está cubierto?
+ * Misma aritmética que `getPaymentStatus()` en payments.js: suma la parte de
+ * MENSUALIDAD (baseAmount cuando existe, para que un pago de libros o matrícula
+ * no cuente) de los pagos no cancelados del mes, y la compara con el valor
+ * esperado. Devuelve 'full' | 'partial' | null.
+ */
+function buildPaidThisMonthIndex(records) {
+    const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+                   'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    const now = new Date();
+    const monthName = MESES[now.getMonth()];
+    const year = now.getFullYear();
+    const sums = {};
+    for (const p of records) {
+        if (!p || !p.studentId || p.status === 'cancelled') continue;
+        if (String(p.month || '').toLowerCase() !== monthName) continue;
+        if (Number(p.year) !== year) continue;
+        const base = p.baseAmount !== undefined ? Number(p.baseAmount) : Number(p.amount);
+        sums[p.studentId] = (sums[p.studentId] || 0) + (Number(base) || 0);
+    }
+    const out = {};
+    for (const [sid, paid] of Object.entries(sums)) {
+        if (paid <= 0) continue;
+        const st = window.StudentManager?.students?.get(sid);
+        const expected = st && window.getStudentMonthlyTotal ? window.getStudentMonthlyTotal(st) : 0;
+        out[sid] = !expected || paid >= expected ? 'full' : 'partial';
+    }
+    return out;
+}
+
+/**
+ * Meses sin mensualidad (vacaciones) y estudiantes por horas no deben avisarse
+ * nunca, así que la casilla los muestra en OK automático.
+ * OJO: `PaymentConfig` es un const de script en payments.js — se lee por su
+ * nombre, no por `window.PaymentConfig` (que es undefined).
+ */
+function pagoOKAutoExempt(student) {
+    if (student && student.tipoPago === 'POR_HORAS') return 'por horas';
+    try {
+        const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+                       'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+        const now = new Date();
+        if (typeof PaymentConfig !== 'undefined' && PaymentConfig.isHoliday &&
+            PaymentConfig.isHoliday(now.getFullYear(), MESES[now.getMonth()])) return 'vacaciones';
+    } catch (e) { /* payments.js no cargado aún */ }
+    return null;
+}
+
+/** Pinta las casillas OK que estén en pantalla (barato, re-ejecutable). */
+window.paintPagoOK = function() {
+    if (!window.StudentManager?.students) return;
+    const paid = window._paidThisMonth || {};
+    for (const s of window.StudentManager.students.values()) {
+        const el = document.getElementById(`pagoOK-${s.id}`);
+        if (!el) continue;
+        const manual = pagoOKManual(s);
+        const exempt = pagoOKAutoExempt(s);
+        let label, bg, color, border, title;
+        if (manual === true) {
+            label = 'OK'; bg = '#059669'; color = '#fff'; border = '#047857';
+            title = 'Exonerado a mano: NO recibe aviso de pago este mes. Clic para cambiar.';
+        } else if (manual === false) {
+            label = 'No'; bg = '#dc2626'; color = '#fff'; border = '#b91c1c';
+            title = 'Marcado a mano: SÍ recibe los avisos, aunque Pagos diga otra cosa. Clic para cambiar.';
+        } else if (exempt) {
+            label = 'OK'; bg = '#d1fae5'; color = '#065f46'; border = '#a7f3d0';
+            title = `Automático (${exempt}): no se le cobra este mes. Clic para marcar a mano.`;
+        } else if (paid[s.id] === 'full') {
+            label = 'OK'; bg = '#d1fae5'; color = '#065f46'; border = '#a7f3d0';
+            title = 'Automático: el módulo de Pagos ya registra el pago de este mes. Clic para marcar a mano.';
+        } else if (paid[s.id] === 'partial') {
+            label = '½'; bg = '#fef3c7'; color = '#92400e'; border = '#fde68a';
+            title = 'Pago parcial registrado este mes: sigue recibiendo aviso. Clic para exonerarlo.';
+        } else {
+            label = '—'; bg = '#f9fafb'; color = '#9ca3af'; border = '#e5e7eb';
+            title = 'Automático: manda el módulo de Pagos. Clic para exonerar el aviso de este mes.';
+        }
+        el.innerHTML = `<button onclick="cyclePagoOK('${s.id}', this)" title="${title}"
+            style="width: 44px; padding: 0.3rem 0; border-radius: 6px; border: 1px solid ${border};
+                   background: ${bg}; color: ${color}; font-weight: 800; font-size: 0.8rem; cursor: pointer;">${label}</button>`;
+    }
+};
+
+/**
+ * Clic: —  →  🟢 OK  →  🔴 No  →  —   (guarda de inmediato, como DP2).
+ * Solo escribe el mes en curso; los meses anteriores quedan como registro.
+ */
+window.cyclePagoOK = async function(studentId, btn) {
+    const st = window.StudentManager?.students?.get(studentId);
+    if (!st) return;
+    const cur = pagoOKManual(st);
+    const next = cur === null ? true : cur === true ? false : null;
+    const monthKey = window.pagoOKMonthKey();
+    const who = window.currentUser?.email || window.currentUser?.uid || 'staff';
+    btn.disabled = true;
+    try {
+        const pagoOK = { ...(st.pagoOK || {}) };
+        if (next === null) delete pagoOK[monthKey];
+        else pagoOK[monthKey] = { ok: next, by: who, at: new Date().toISOString() };
+        await window.StudentManager.updateStudent(studentId, { pagoOK });
+        st.pagoOK = pagoOK; // caché local, para repintar sin recargar
+        window.paintPagoOK();
+    } catch (e) {
+        console.error('pagoOK:', e);
+        window.showNotification('❌ No se pudo guardar: ' + (e.message || e), 'error');
+    } finally {
+        btn.disabled = false;
     }
 };
 
