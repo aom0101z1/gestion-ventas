@@ -733,7 +733,7 @@ function renderStudentTable(students) {
                     <th style="padding: 0.75rem; text-align: center; width: 50px;">#</th>
                     <th style="padding: 0.75rem; text-align: left;">Nombre</th>
                     <th style="padding: 0.75rem; text-align: center; width: 56px;" title="Día de Pago registrado en la ficha del estudiante">DP1</th>
-                    <th style="padding: 0.75rem; text-align: center; width: 72px;" title="Día de pago ajustado (manual) — se guarda al salir de la casilla">DP2</th>
+                    <th style="padding: 0.75rem; text-align: center; width: 72px;" title="Día de pago ajustado (manual) — se guarda al salir de la casilla. Escribe 0 (se pone morado) si el estudiante pagó el SEMESTRE completo: no se le cobra ni recibe avisos. Vacío = no está en cobro mensual.">DP2 · 0=sem</th>
                     <th style="padding: 0.75rem; text-align: center; width: 60px;" title="OK = NO enviarle el aviso de pago este mes (exonerar). Verde claro = automático, el módulo de Pagos ya registra el pago. Verde fuerte = lo exoneraste a mano. Rojo = avisar igual. — = automático. Se reinicia solo cada mes. OJO: marcar OK no registra el dinero; el pago se registra en Pagos.">OK</th>
                     <th style="padding: 0.75rem; text-align: left;">Teléfono</th>
                     <th style="padding: 0.75rem; text-align: left;">Grupo</th>
@@ -779,10 +779,12 @@ function renderStudentTable(students) {
                             </td>
                             <td style="padding: 0.75rem; text-align: center; font-weight: 700; color: #374151;">${s.diaPago || '-'}</td>
                             <td style="padding: 0.5rem; text-align: center;">
-                                <input type="number" min="1" max="31" value="${s.diaPago2 ?? ''}" placeholder="—"
+                                <input type="number" min="0" max="31" value="${s.diaPago2 ?? ''}" placeholder="—"
                                        onchange="saveDiaPago2('${s.id}', this)"
-                                       title="Día de pago ajustado — se guarda al salir de la casilla"
-                                       style="width: 56px; padding: 0.35rem; text-align: center; border: 1px solid #d1d5db; border-radius: 4px; font-weight: 700; color: #7c3aed; background: #faf5ff;">
+                                       title="${Number(s.diaPago2) === 0 ? '🎓 SEMESTRE PAGADO — no se le cobra ni se le envían avisos. Escribe un día 1-31 para volver a cobro mensual.' : 'Día de pago ajustado — se guarda al salir de la casilla. Escribe 0 si pagó el semestre completo (no se le cobra).'}"
+                                       style="width: 56px; padding: 0.35rem; text-align: center; border-radius: 4px; font-weight: 800; ${Number(s.diaPago2) === 0
+                                           ? 'border: 2px solid #6d28d9; color: #ffffff; background: #7c3aed;'
+                                           : 'border: 1px solid #d1d5db; color: #7c3aed; background: #faf5ff;'}">
                             </td>
                             <td id="pagoOK-${s.id}" style="padding: 0.5rem; text-align: center;"></td>
                             <td style="padding: 0.75rem;">
@@ -2313,6 +2315,8 @@ function buildPaidThisMonthIndex(records) {
  * nombre, no por `window.PaymentConfig` (que es undefined).
  */
 function pagoOKAutoExempt(student) {
+    // 🎓 DP2 = 0 → pagó el semestre: no se le cobra ni se le avisa.
+    if (student && Number(student.diaPago2) === 0 && student.diaPago2 !== null && student.diaPago2 !== '') return 'semestre';
     if (student && student.tipoPago === 'POR_HORAS') return 'por horas';
     try {
         const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
@@ -2387,12 +2391,20 @@ window.cyclePagoOK = async function(studentId, btn) {
 };
 
 /** DP2 inline save. Empty → removes the value (null). Rules: staff may write
- *  new fields on students/$id as long as the frozen ones stay unchanged. */
+ *  new fields on students/$id as long as the frozen ones stay unchanged.
+ *
+ *  🎓 23 sep 2026 (fundador): DP2 = 0 significa SEMESTRE PAGADO — no se le cobra
+ *  ni se le envía ningún aviso. Hacía falta porque un pago de semestre se guarda
+ *  PARTIDO por meses (recordMultiMonthPayment divide el total), así que el mes en
+ *  curso se ve cubierto pero `valor` suele traer el total del semestre: el cálculo
+ *  mensual lo lee como "Pago Parcial" y le cobraría a alguien que ya pagó todo.
+ *  Medido hoy: 47 estudiantes activos tienen pago multi-mes o meses futuros ya
+ *  pagados, y ninguno estaba marcado. */
 window.saveDiaPago2 = async function(studentId, input) {
     const raw = input.value.trim();
     const n = raw === '' ? null : parseInt(raw, 10);
-    if (n !== null && (isNaN(n) || n < 1 || n > 31)) {
-        window.showNotification('DP2 debe ser un día entre 1 y 31', 'error');
+    if (n !== null && (isNaN(n) || n < 0 || n > 31)) {
+        window.showNotification('DP2 debe ser un día entre 1 y 31, o 0 si pagó el semestre', 'error');
         const st = window.StudentManager.students.get(studentId);
         input.value = st?.diaPago2 ?? '';
         return;
@@ -2400,8 +2412,18 @@ window.saveDiaPago2 = async function(studentId, input) {
     input.disabled = true;
     try {
         await window.StudentManager.updateStudent(studentId, { diaPago2: n });
-        input.style.borderColor = '#10b981';
-        setTimeout(() => { input.style.borderColor = '#d1d5db'; }, 1200);
+        const st0 = window.StudentManager.students.get(studentId);
+        if (st0) st0.diaPago2 = n; // caché local, para repintar sin recargar
+        // El 0 cambia de aspecto (morado sólido) y exonera la columna OK.
+        if (n === 0) {
+            input.style.cssText = 'width: 56px; padding: 0.35rem; text-align: center; border-radius: 4px; font-weight: 800; border: 2px solid #6d28d9; color: #ffffff; background: #7c3aed;';
+            input.title = '🎓 SEMESTRE PAGADO — no se le cobra ni se le envían avisos. Escribe un día 1-31 para volver a cobro mensual.';
+            window.showNotification('🎓 Semestre pagado: no se le cobrará ni recibirá avisos', 'success');
+        } else {
+            input.style.cssText = 'width: 56px; padding: 0.35rem; text-align: center; border-radius: 4px; font-weight: 800; border: 1px solid #10b981; color: #7c3aed; background: #faf5ff;';
+            setTimeout(() => { input.style.borderColor = '#d1d5db'; input.style.borderWidth = '1px'; }, 1200);
+        }
+        window.paintPagoOK?.();
     } catch (e) {
         console.error('DP2:', e);
         window.showNotification('❌ No se pudo guardar DP2: ' + (e.message || e), 'error');
