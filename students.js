@@ -734,7 +734,7 @@ function renderStudentTable(students) {
                     <th style="padding: 0.75rem; text-align: left;">Nombre</th>
                     <th style="padding: 0.75rem; text-align: center; width: 56px;" title="Día de Pago registrado en la ficha del estudiante">DP1</th>
                     <th style="padding: 0.75rem; text-align: center; width: 72px;" title="Día de pago ajustado (manual) — se guarda al salir de la casilla. Escribe 0 (se pone morado) si el estudiante pagó el SEMESTRE completo: no se le cobra ni recibe avisos. Vacío = no está en cobro mensual.">DP2 · 0=sem</th>
-                    <th style="padding: 0.75rem; text-align: center; width: 60px;" title="OK = NO enviarle el aviso de pago este mes (exonerar). Verde claro = automático, el módulo de Pagos ya registra el pago. Verde fuerte = lo exoneraste a mano. Rojo = avisar igual. — = automático. Se reinicia solo cada mes. OJO: marcar OK no registra el dinero; el pago se registra en Pagos.">OK</th>
+                    <th style="padding: 0.75rem; text-align: center; width: 60px;" title="Clic cicla: — automático · 🟢 OK no enviarle aviso este mes · 📅 ACUERDO DE PAGO (pide fecha: no se le bloquea y el aviso le dice esa fecha, se vence solo) · 🔴 No avisar igual. Verde claro = automático, Pagos ya registra el pago del mes. OJO: marcar OK no registra el dinero; el pago se registra en Pagos.">OK · 📅</th>
                     <th style="padding: 0.75rem; text-align: left;">Teléfono</th>
                     <th style="padding: 0.75rem; text-align: left;">Grupo</th>
                     <th style="padding: 0.75rem; text-align: left;">Pago</th>
@@ -2278,6 +2278,30 @@ function pagoOKManual(student) {
 }
 
 /**
+ * 📅 ACUERDO DE PAGO (23 sep 2026, fundador). Un plazo pactado NO es lo mismo que
+ * exonerar el mes: el estudiante sí debe, pero tiene una fecha acordada y hasta
+ * entonces no se le bloquea — y el aviso que recibe debe decirle esa fecha, no
+ * regañarlo. Se guarda como `acuerdoPago = { hasta: 'YYYY-MM-DD', nota, by, at }`
+ * y se vence solo: pasada la fecha, el estudiante vuelve al cobro normal sin que
+ * nadie tenga que acordarse de apagarlo.
+ */
+function acuerdoVigente(student) {
+    const a = student && student.acuerdoPago;
+    if (!a || !a.hasta) return null;
+    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+    const hasta = new Date(`${a.hasta}T23:59:59`);
+    return hasta >= hoy ? a : null;
+}
+/** El texto que el estudiante verá en el aviso (lo empuja el CRM a TutorBox). */
+window.mensajeAcuerdo = function(student) {
+    const a = acuerdoVigente(student);
+    if (!a) return null;
+    const [y, m, d] = a.hasta.split('-').map(Number);
+    const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    return `Tienes plazo hasta el ${d} de ${MESES[m - 1]} para ponerte al día, según el acuerdo con la academia. Envía el comprobante cuando realices el pago.`;
+};
+
+/**
  * ¿El módulo de Pagos ya dice que este mes está cubierto?
  * Misma aritmética que `getPaymentStatus()` en payments.js: suma la parte de
  * MENSUALIDAD (baseAmount cuando existe, para que un pago de libros o matrícula
@@ -2337,8 +2361,15 @@ window.paintPagoOK = function() {
         if (!el) continue;
         const manual = pagoOKManual(s);
         const exempt = pagoOKAutoExempt(s);
+        const acu = acuerdoVigente(s);
         let label, bg, color, border, title;
-        if (manual === true) {
+        if (acu) {
+            // 📅 acuerdo vigente: manda sobre todo lo demás hasta su fecha
+            const [, mm, dd] = acu.hasta.split('-');
+            label = `📅${Number(dd)}`; bg = '#1e40af'; color = '#fff'; border = '#1d4ed8';
+            title = `📅 ACUERDO DE PAGO hasta el ${acu.hasta}: no se le bloquea y el aviso le dice esa fecha. `
+                  + `Después vuelve solo al cobro normal.${acu.nota ? '\nNota: ' + acu.nota : ''}\nClic para quitarlo.`;
+        } else if (manual === true) {
             label = 'OK'; bg = '#059669'; color = '#fff'; border = '#047857';
             title = 'Exonerado a mano: NO recibe aviso de pago este mes. Clic para cambiar.';
         } else if (manual === false) {
@@ -2364,24 +2395,49 @@ window.paintPagoOK = function() {
 };
 
 /**
- * Clic: —  →  🟢 OK  →  🔴 No  →  —   (guarda de inmediato, como DP2).
- * Solo escribe el mes en curso; los meses anteriores quedan como registro.
+ * Clic: —  →  🟢 OK  →  📅 acuerdo  →  🔴 No  →  —   (guarda de inmediato, como DP2).
+ * `pagoOK` solo escribe el mes en curso; el acuerdo lleva su propia fecha y se
+ * vence solo. Los meses anteriores quedan como registro.
  */
 window.cyclePagoOK = async function(studentId, btn) {
     const st = window.StudentManager?.students?.get(studentId);
     if (!st) return;
     const cur = pagoOKManual(st);
-    const next = cur === null ? true : cur === true ? false : null;
+    const conAcuerdo = !!acuerdoVigente(st);
     const monthKey = window.pagoOKMonthKey();
     const who = window.currentUser?.email || window.currentUser?.uid || 'staff';
+
+    // — → OK → 📅 acuerdo → No → —
+    let next, acuerdo = st.acuerdoPago || null;
+    if (conAcuerdo) { next = false; acuerdo = null; }            // 📅 → 🔴 No
+    else if (cur === null) next = true;                          // — → 🟢 OK
+    else if (cur === true) {                                     // 🟢 OK → 📅
+        const fin = new Date(); fin.setMonth(fin.getMonth() + 1, 0); // fin de mes
+        const sug = fin.toISOString().slice(0, 10);
+        const fecha = window.prompt(
+            `📅 ACUERDO DE PAGO para ${st.nombre || 'este estudiante'}\n\n` +
+            `¿Hasta qué fecha tiene plazo? (AAAA-MM-DD)\n\n` +
+            `Hasta esa fecha NO se le bloquea, y el aviso que recibe le dice la fecha acordada.\n` +
+            `Pasada la fecha vuelve al cobro normal, solo.`, sug);
+        if (fecha === null) { return; }                          // canceló: nada cambia
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha.trim()) || isNaN(new Date(fecha.trim()))) {
+            window.showNotification('Fecha inválida. Usa AAAA-MM-DD, por ejemplo 2026-09-30', 'error');
+            return;
+        }
+        const nota = window.prompt('Nota del acuerdo (opcional) — queda en el registro, no la ve el estudiante:', '') || '';
+        acuerdo = { hasta: fecha.trim(), nota: nota.slice(0, 300), by: who, at: new Date().toISOString() };
+        next = null;                                             // el acuerdo manda, no el OK del mes
+    } else { next = null; acuerdo = null; }                      // 🔴 No → —
+
     btn.disabled = true;
     try {
         const pagoOK = { ...(st.pagoOK || {}) };
         if (next === null) delete pagoOK[monthKey];
         else pagoOK[monthKey] = { ok: next, by: who, at: new Date().toISOString() };
-        await window.StudentManager.updateStudent(studentId, { pagoOK });
-        st.pagoOK = pagoOK; // caché local, para repintar sin recargar
+        await window.StudentManager.updateStudent(studentId, { pagoOK, acuerdoPago: acuerdo });
+        st.pagoOK = pagoOK; st.acuerdoPago = acuerdo; // caché local, para repintar sin recargar
         window.paintPagoOK();
+        if (acuerdo) window.showNotification(`📅 Acuerdo hasta el ${acuerdo.hasta}: no se le bloquea y el aviso le dirá la fecha`, 'success');
     } catch (e) {
         console.error('pagoOK:', e);
         window.showNotification('❌ No se pudo guardar: ' + (e.message || e), 'error');
