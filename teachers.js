@@ -6,7 +6,7 @@ class TeacherManager {
     constructor() {
         this.teachers = new Map();
         this.attendance = new Map();
-        this.payRates = [10000, 12000, 15000, 17500, 20000, 22000, 25000];
+        this.payRates = [10000, 12000, 15000, 16000, 17500, 18000, 20000, 22000, 25000]; // 16k/18k added 25 Sep 2026 (founder's pay sheet)
         this.initialized = false;
 
         // Document types
@@ -710,7 +710,10 @@ window.showTeacherModal = function(teacherId = null) {
                                 </label>
                                 <select id="tchHourlyRate"
                                         style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1rem;">
-                                    ${window.TeacherManager.payRates.map(rate => `
+                                    <option value="0" ${!teacher?.hourlyRate ? 'selected' : ''}>— Sin tarifa —</option>
+                                    ${/* 25 Sep 2026: with no empty option a $0 teacher opened the modal on $10.000 and any
+                                         save (even a phone change) stored it. A rate outside the list is kept as its own option. */ ''}
+                                    ${[...new Set([...window.TeacherManager.payRates, ...(teacher?.hourlyRate ? [teacher.hourlyRate] : [])])].sort((a, b) => a - b).map(rate => `
                                         <option value="${rate}" ${teacher?.hourlyRate === rate ? 'selected' : ''}>
                                             $${rate.toLocaleString('es-CO')}
                                         </option>
