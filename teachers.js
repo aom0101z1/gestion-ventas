@@ -97,6 +97,8 @@ class TeacherManager {
 
             this.teachers.set(id, teacher);
             console.log('✅ Teacher saved:', id);
+            // 💰 25 Sep 2026: keep TutorBox's cost panel in sync with the pay on file
+            window.scheduleTeacherRatesPush?.();
             return teacher;
         } catch (error) {
             console.error('❌ Error saving teacher:', error);
@@ -236,6 +238,11 @@ function renderTeachersView() {
                         style="background: rgba(255,255,255,.2); color: white; font-weight: bold; border: 1px solid rgba(255,255,255,.5);
                         padding: 0.75rem 1rem; border-radius: 8px; cursor: pointer; font-size: 0.9rem;">
                     🎓 Vincular todos en TutorBox
+                </button>
+                <button onclick="pushTeacherRatesToTutorBox(false)" title="Envía a TutorBox la tarifa por hora (o salario) de cada profesor vinculado y sus tarifas por grupo, para calcular el costo real de cada clase"
+                        style="background: rgba(255,255,255,.2); color: white; font-weight: bold; border: 1px solid rgba(255,255,255,.5);
+                        padding: 0.75rem 1rem; border-radius: 8px; cursor: pointer; font-size: 0.9rem;">
+                    💰 Enviar tarifas a TutorBox
                 </button>
                 <button onclick="showTeacherModal()" style="background: white; color: #d97706; font-weight: bold;
                         padding: 0.75rem 1.5rem; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem;">
@@ -1309,6 +1316,67 @@ window.linkAllTeachersOnTutorBox = async function() {
     if (typeof refreshTeachersGrid === 'function') await refreshTeachersGrid();
     const NL = String.fromCharCode(10);
     alert(`Vinculados ${done.length}:` + NL + done.join(NL) + (failed.length ? NL + NL + `Fallaron ${failed.length}:` + NL + failed.join(NL) : ''));
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   💰 Teacher pay → TutorBox (25 Sep 2026, founder: "no todos los profesores ganan igual,
+   algunos ganan 17500 hora, otros 15000 y otros 20000 o más")
+   TutorBox /admin/technology → "Costos y precios" multiplies each teacher's rate by the hours
+   they really taught to get the real cost per class hour and per student. Same rule as the
+   payroll here (attendance.js getTeacherGroupRate): a paymentRates row for teacher+group wins,
+   else the teacher's hourlyRate. Only pay fields leave the CRM — never bank data or documents.
+   Sent automatically a few seconds after any teacher is saved, and by the 💰 button.
+   ═══════════════════════════════════════════════════════════════════════════ */
+window.pushTeacherRatesToTutorBox = async function(silent) {
+    try {
+        const tm = window.TeacherManager;
+        if (!tm.teachers.size) await tm.loadTeachers();
+        const db = window.firebaseModules.database;
+        const rSnap = await db.get(db.ref(window.FirebaseData.database, 'paymentRates'));
+        const rates = rSnap.exists() ? rSnap.val() : {};
+        const byTeacher = {};
+        // newest row per teacher+group wins (ids are RATE-{timestamp}), as in attendance.js
+        Object.keys(rates).sort().forEach((id) => {
+            const r = rates[id] || {};
+            if (!r.teacherId || !r.groupId || !r.amount) return;
+            (byTeacher[r.teacherId] = byTeacher[r.teacherId] || {})[r.groupId] = Number(r.amount) || 0;
+        });
+        const linked = [...tm.teachers.values()].filter((t) => t.tutorboxUid);
+        const rows = linked.map((t) => ({
+            uid: t.tutorboxUid,
+            crmId: t.id,
+            name: t.name || '',
+            status: t.status || 'active',
+            paymentType: t.paymentType === 'salary' ? 'salary' : 'hourly',
+            hourlyRate: Number(t.hourlyRate) || 0,
+            monthlySalary: Number(t.monthlySalary) || 0,
+            groupRates: byTeacher[t.id] || {},
+        }));
+        if (!rows.length) { if (!silent) alert('Ningún profesor está vinculado a TutorBox todavía (botón 🎓).'); return; }
+        const r = await fetch(`${TBX_TEACHERS_CF}/setTeacherRates`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-admin-key': TBX_TEACHERS_KEY },
+            body: JSON.stringify({ teachers: rows, replace: true }),
+        });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error || `http_${r.status}`);
+        console.log('💰 teacher rates → TutorBox', j);
+        if (!silent) {
+            const NL = String.fromCharCode(10);
+            const noRate = rows.filter((x) => x.paymentType === 'hourly' && !x.hourlyRate).map((x) => x.name);
+            alert(`Tarifas enviadas a TutorBox: ${j.written} profesor(es).` +
+                (j.skipped && j.skipped.length ? NL + `Omitidos: ${j.skipped.map((x) => x.who + ' (' + x.why + ')').join(', ')}` : '') +
+                (noRate.length ? NL + NL + `Sin tarifa por hora (TutorBox usará la tarifa por defecto): ${noRate.join(', ')}` : ''));
+        }
+    } catch (e) {
+        console.error('pushTeacherRatesToTutorBox', e);
+        if (!silent) alert('No se pudieron enviar las tarifas a TutorBox: ' + (e.message || e));
+    }
+};
+let _teacherRatesTimer = null;
+window.scheduleTeacherRatesPush = function() {
+    clearTimeout(_teacherRatesTimer);
+    _teacherRatesTimer = setTimeout(() => window.pushTeacherRatesToTutorBox(true), 3000);
 };
 
 window.importTeachersFromTutorBox = async function() {
