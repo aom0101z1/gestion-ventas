@@ -507,6 +507,10 @@ async function renderSummaryTab() {
         totalAdminSalary += payroll?.total || emp.salary?.amount || 0;
     });
 
+    // 🎥 25 Sep 2026: online classes approved on TutorBox count as teacher payroll
+    const onlinePayroll = await window.fetchOnlinePayroll(year, month);
+    if (onlinePayroll && onlinePayroll.approved) totalTeachersSalary += onlinePayroll.approved.total || 0;
+
     const grandTotal = totalAdminSalary + totalContratistaSalary + totalTeachersSalary;
 
     const content = `
@@ -733,13 +737,14 @@ async function renderTeachersTab() {
 
     const teachers = Array.from(window.PayrollManager.teachers.values());
     const monthlyPayroll = await window.PayrollManager.getMonthlyPayroll(year, month);
+    const online = await window.fetchOnlinePayroll(year, month, true); // 🎥 25 Sep 2026
 
     let totalPayroll = 0;
 
     const content = `
         <div>
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-                <h3 style="margin: 0;">👩‍🏫 Nómina de Profesores</h3>
+                <h3 style="margin: 0;">👩‍🏫 Nómina de Profesores (presencial)</h3>
                 <div style="display: flex; gap: 1rem;">
                     <button onclick="showAddTeacherModal()" class="btn" style="background: #10b981; color: white; padding: 0.75rem 1.5rem;">
                         ➕ Nuevo Profesor
@@ -753,6 +758,7 @@ async function renderTeachersTab() {
                 </div>
             </div>
 
+            ${renderOnlinePayrollSection(online, year, month)}
             ${teachers.length === 0 ? `
                 <div style="text-align: center; padding: 3rem; color: #9ca3af;">
                     <p style="font-size: 1.125rem; margin: 0;">No hay profesores registrados</p>
@@ -2032,4 +2038,103 @@ window.showImportPayrollModal = function() {
 console.log('✅ Payroll module loaded successfully');
 
 // Global instance
+/* ═══════════════════════════════════════════════════════════════════════════
+   🎥 Clases en línea (TutorBox) — 25 Sep 2026, fundador.
+   The online classes are paid by their scheduled block (2 h weekdays, 4 h Saturdays) to whoever
+   taught them; the founder reviews novelties (late start, substitutions, trial groups) and APPROVES
+   the month on tutorbox.app/admin/nomina. Here we only READ that approved snapshot (getOnlinePayroll)
+   and show what to pay each teacher + how to pay them (Profesores 2.0 bank data). Nothing is written.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const _onlinePayrollCache = {};
+window.fetchOnlinePayroll = async function(year, month, force) {
+    const key = `${year}-${String(month).padStart(2, '0')}`;
+    if (!force && _onlinePayrollCache[key]) return _onlinePayrollCache[key];
+    try {
+        const base = typeof TBX_TEACHERS_CF !== 'undefined' ? TBX_TEACHERS_CF : 'https://us-central1-tutorbox-4d7c9.cloudfunctions.net';
+        const k = typeof TBX_TEACHERS_KEY !== 'undefined' ? TBX_TEACHERS_KEY : '';
+        const r = await fetch(`${base}/getOnlinePayroll`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-admin-key': k },
+            body: JSON.stringify({ month: key }),
+        });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error || `http_${r.status}`);
+        if (window.TeacherManager && !window.TeacherManager.teachers.size) await window.TeacherManager.loadTeachers();
+        _onlinePayrollCache[key] = { month: key, approved: j.approved || null };
+    } catch (e) {
+        console.warn('getOnlinePayroll', e);
+        _onlinePayrollCache[key] = { month: key, approved: null, error: e.message || String(e) };
+    }
+    return _onlinePayrollCache[key];
+};
+
+function _onlinePayInfo(crmId) {
+    const tm = window.TeacherManager;
+    const t = tm && crmId ? tm.teachers.get(crmId) : null;
+    if (!t || !t.bank) return { label: 'Sin datos de pago', account: '' };
+    const bank = t.bank === 'other' ? (t.otherBankName || 'Otro') : ((tm.banks || []).find(b => b.value === t.bank)?.label || t.bank);
+    const type = t.accountType ? ((tm.accountTypes || []).find(a => a.value === t.accountType)?.label || t.accountType) : '';
+    return { label: [bank, type].filter(Boolean).join(' · '), account: t.accountNumber || '' };
+}
+
+function renderOnlinePayrollSection(online, year, month) {
+    const a = online && online.approved;
+    const head = `
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; margin-bottom:.75rem;">
+            <h3 style="margin:0;">🎥 Clases en línea (aprobado en TutorBox)</h3>
+            <div style="display:flex; gap:.5rem;">
+                ${a ? `<button onclick="exportOnlinePayrollCsv(${year}, ${month})" class="btn" style="background:#0ea5e9; color:white; padding:.5rem 1rem;">⬇️ Excel</button>` : ''}
+                <a href="https://tutorbox.app/admin/nomina" target="_blank" class="btn" style="background:#6366f1; color:white; padding:.5rem 1rem; text-decoration:none;">🧾 Revisar / aprobar en TutorBox</a>
+            </div>
+        </div>`;
+    if (!a) {
+        return `<div style="margin-bottom:2rem; padding:1.25rem; border:1px dashed #cbd5e1; border-radius:8px; background:#f8fafc;">${head}
+            <p style="margin:0; color:#64748b;">${online && online.error ? 'No se pudo consultar TutorBox: ' + online.error : 'Este mes todavía no está aprobado en TutorBox. Revisa las novedades y aprueba en tutorbox.app/admin/nomina; aquí aparecerá lo aprobado.'}</p></div>`;
+    }
+    const rows = a.teachers.slice().sort((x, y) => y.amount - x.amount).map((t, i) => {
+        const pay = _onlinePayInfo(t.crmId);
+        const detail = (t.sessions || []).map(s => `<tr><td style="padding:.25rem .75rem;">${s.date}</td><td>${s.group || '—'}</td><td>${s.title}${s.note ? ' · ' + s.note : ''}</td><td style="text-align:right;">${s.hours} h</td><td style="text-align:right; padding-right:.75rem;">${formatCurrency(s.amount)}</td></tr>`).join('');
+        return `
+            <tr style="border-top:1px solid #e5e7eb; cursor:pointer;" onclick="const d=document.getElementById('onl-${i}'); d.style.display = d.style.display === 'none' ? 'table-row' : 'none';">
+                <td style="padding:.75rem; font-weight:600;">▸ ${t.name}</td>
+                <td style="text-align:center;">${t.classes}</td>
+                <td style="text-align:center;">${t.hours} h</td>
+                <td style="font-size:.85rem; color:#6b7280;">${t.rateLabel}</td>
+                <td style="font-size:.85rem;">${pay.label}${pay.account ? `<br><b>${pay.account}</b>` : ''}</td>
+                <td style="text-align:right; padding-right:.75rem; font-weight:700;">${formatCurrency(t.amount)}</td>
+            </tr>
+            <tr id="onl-${i}" style="display:none; background:#f9fafb;"><td colspan="6"><table style="width:100%; font-size:.85rem;">${detail}</table></td></tr>`;
+    }).join('');
+    return `
+        <div style="margin-bottom:2rem;">
+            ${head}
+            <div style="font-size:.85rem; color:#6b7280; margin-bottom:.5rem;">Aprobado el ${new Date(a.at).toLocaleString('es-CO')} por ${a.by} · ${a.hours} h</div>
+            <div style="background:white; border:1px solid #e5e7eb; border-radius:8px; overflow:auto;">
+                <table style="width:100%; border-collapse:collapse;">
+                    <thead style="background:#f9fafb;"><tr>
+                        <th style="padding:.75rem; text-align:left;">Profesor</th><th>Clases</th><th>Horas</th><th style="text-align:left;">Tarifa</th><th style="text-align:left;">Forma de pago</th><th style="text-align:right; padding-right:.75rem;">A pagar</th>
+                    </tr></thead>
+                    <tbody>${rows}</tbody>
+                    <tfoot><tr style="border-top:2px solid #e5e7eb;"><td colspan="5" style="padding:.75rem; font-weight:700;">TOTAL CLASES EN LÍNEA</td><td style="text-align:right; padding-right:.75rem; font-weight:700; color:#0ea5e9; font-size:1.2rem;">${formatCurrency(a.total)}</td></tr></tfoot>
+                </table>
+            </div>
+        </div>`;
+}
+
+window.exportOnlinePayrollCsv = function(year, month) {
+    const o = _onlinePayrollCache[`${year}-${String(month).padStart(2, '0')}`];
+    if (!o || !o.approved) return;
+    const q = (v) => '"' + String(v == null ? '' : v).split('"').join('""') + '"';
+    const lines = [['Profesor', 'Clases', 'Horas', 'Tarifa', 'Forma de pago', 'Cuenta', 'A pagar'].map(q).join(',')];
+    for (const t of o.approved.teachers) {
+        const pay = _onlinePayInfo(t.crmId);
+        lines.push([t.name, t.classes, t.hours, t.rateLabel, pay.label, pay.account, t.amount].map(q).join(','));
+    }
+    const blob = new Blob([String.fromCharCode(0xFEFF) + lines.join(String.fromCharCode(10))], { type: 'text/csv;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `nomina-clases-en-linea-${o.month}.csv`;
+    link.click();
+};
+
 window.PayrollManager = new PayrollManager();
