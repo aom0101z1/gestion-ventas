@@ -1189,12 +1189,35 @@ window.isTrialRecord = function(student) {
     return student.modalidad === 'Prueba' || valor <= 0;
 };
 
+// Director/admin, or staff with the explicit 🔄 studentStatus permission (Admin →
+// permisos). Mirrors the students/$id write rule (database.rules.json) — keep in sync.
+window.canToggleStudentStatus = function() {
+    if (window.isStudentMoneyAdmin()) return true;
+    const pe = window.PermissionEnforcer;
+    return pe?.userRole !== 'ventas' && pe?.userPermissions?.studentStatus === true;
+};
+
+// Status is part of what TutorBox mirrors: the profile's crmStatus and the group
+// member list (syncGroupMembers sends active students only). Best-effort.
+function syncStatusToTutorBox(id) {
+    const st = window.StudentManager?.students?.get(String(id));
+    if (!st) return;
+    window.syncStudentToTutorBox?.(id, st);
+    const groups = [...new Set([st.grupo, st.grupo2]
+        .map(g => String(g ?? '').trim())
+        .filter(g => g && !isNaN(parseInt(g))))];
+    for (const gid of groups) {
+        try { window.syncGroupMembersToTutorBox?.(gid); }
+        catch (e) { console.warn(`syncGroupMembers tras cambio de estado (grupo ${gid}):`, e.message); }
+    }
+}
+
 window.toggleStatus = async function(id) {
     const student = window.StudentManager.students.get(id);
     if (!student) return;
 
-    if (!window.isStudentMoneyAdmin()) {
-        window.showNotification('🚫 Solo el Director puede activar o inactivar estudiantes.', 'error');
+    if (!window.canToggleStudentStatus()) {
+        window.showNotification('🚫 No tienes permiso para activar o inactivar estudiantes (pídelo al Director).', 'error');
         return;
     }
 
@@ -1215,6 +1238,7 @@ window.toggleStatus = async function(id) {
             };
             
             await window.StudentManager.toggleStudentStatus(id, inactiveData);
+            syncStatusToTutorBox(id);
             closeInactiveModal();
             loadStudentsTab();
             window.showNotification('📋 Estado actualizado', 'success');
@@ -1226,6 +1250,7 @@ window.toggleStatus = async function(id) {
                 reason: 'Reactivado',
                 notes: 'Estudiante reactivado'
             });
+            syncStatusToTutorBox(id);
             loadStudentsTab();
             window.showNotification('✅ Estudiante reactivado', 'success');
         }
