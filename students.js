@@ -580,6 +580,11 @@ function renderStudentForm(student = null) {
                         <label>Acudiente</label>
                         <input type="text" id="stuAcudiente" value="${student?.acudiente || ''}">
                     </div>
+
+                    <div class="form-group" style="grid-column: span 2;">
+                        <label>🏫 Colegio <small style="color:#6b7280;">(opcional — adultos sin colegio lo dejan vacío)</small></label>
+                        ${window.ColegioPicker ? window.ColegioPicker.html('stu', student?.colegio || null) : ''}
+                    </div>
                     
                     <div class="form-group">
                         <label>Tipo Doc. Acudiente</label>
@@ -927,6 +932,12 @@ window.loadStudentsTab = async function() {
                             style="background: #0ea5e9; color: white;">
                         📸 Sincronizar fotos de clase
                     </button>
+                    ${window.canSeeColegiosReport?.() ? `
+                    <button onclick="showColegiosReport()" class="btn btn-sm"
+                            title="Cuántos estudiantes hay de cada colegio"
+                            style="background: #4f46e5; color: white;">
+                        🏫 Por colegio
+                    </button>` : ''}
                     <button onclick="showStudentForm()" class="btn btn-primary">
                         ➕ Nuevo Estudiante
                     </button>
@@ -1799,6 +1810,8 @@ async function saveStudentForm(studentId) {
             diaPago: parseInt(document.getElementById('stuDiaPago').value) || 1,
             photoUrl: document.getElementById('stuPhotoUrl')?.value || ''
         };
+        // 🏫 null clears it (optional field); skipped if the picker script didn't load
+        if (window.ColegioPicker) studentData.colegio = window.ColegioPicker.read('stu');
 
         let savedStudent;
         if (studentId) {
@@ -2725,7 +2738,8 @@ window.syncStudentToTutorBox = function(studentId, student) {
         edad: student.edad || null,
         acudiente: student.acudiente || null,
         email: String(student.correo || '').trim().toLowerCase(),
-        status: student.status || 'active'
+        status: student.status || 'active',
+        colegio: student.colegio || null
     }).catch(e => console.warn('syncStudentProfile:', e.message));
 };
 

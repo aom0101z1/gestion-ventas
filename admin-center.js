@@ -22,6 +22,8 @@ const SYSTEM_MODULES = [
   { id: 'students', name: 'Estudiantes', icon: '👥', color: '#ec4899' },
   // Not a tab: lets a non-Director flip Activo/Inactivo (students.js + students/$id rule)
   { id: 'studentStatus', name: 'Activar/Inactivar estudiantes', icon: '🔄', color: '#16a34a' },
+  // Not a tab: 🏫 "Por colegio" report in Estudiantes (colegio-picker.js)
+  { id: 'colegios', name: 'Reporte por colegio', icon: '🏫', color: '#4f46e5' },
   { id: 'payments', name: 'Pagos', icon: '💰', color: '#10b981' },
   { id: 'tienda', name: 'Tienda', icon: '🛒', color: '#f97316' },
   { id: 'finance', name: 'Finanzas', icon: '💵', color: '#14b8a6' },

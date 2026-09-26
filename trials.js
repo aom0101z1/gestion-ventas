@@ -320,6 +320,10 @@ function renderTrialForm(req = null) {
                         <label>Nombre Completo Acudiente <small style="color:#6b7280;">(para niños)</small></label>
                         <input type="text" id="trlAcudiente" value="${trialsEsc(req?.acudiente || '')}">
                     </div>
+                    <div class="form-group" style="grid-column: span 2;">
+                        <label>🏫 Colegio <small style="color:#6b7280;">(opcional)</small></label>
+                        ${window.ColegioPicker ? window.ColegioPicker.html('trl', req?.colegio || null) : ''}
+                    </div>
                     <div class="form-group">
                         <label>Tipo Pago</label>
                         <select id="trlTipoPago">
@@ -380,6 +384,7 @@ window.showTrialForm = function(id = null) {
                 telefono: v('trlTelefono'),
                 correo: v('trlCorreo').toLowerCase(),
                 acudiente: v('trlAcudiente'),
+                ...(window.ColegioPicker ? { colegio: window.ColegioPicker.read('trl') } : {}),
                 // Documento, modalidad and the enrollment fields are completed by
                 // reception at matriculation; modalidad is assumed Online for now.
                 modalidad: req?.modalidad || 'Online',
@@ -478,6 +483,7 @@ window.trialsRegisterStudent = async function(id) {
             telefono: req.telefono || '',
             correo: req.correo || '',
             acudiente: req.acudiente || '',
+            colegio: req.colegio || null,
             tipoDocAcudiente: req.tipoDocAcudiente || '',
             docAcudiente: req.docAcudiente || '',
             fechaInicio: date,
