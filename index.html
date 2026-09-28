@@ -3360,6 +3360,9 @@ onAuthStateChanged(auth, async (user) => {
                     if (typeof loadTutorBoxAdmin === 'function') {
                         loadTutorBoxAdmin();
                     }
+                } else if (tabName === 'socialMedia') {
+                    // 💬 Mensajes FB/IG (inbox.js)
+                    if (typeof loadSocialMediaData === 'function') loadSocialMediaData();
                 }
 
                 console.log('✅ Tab switched successfully:', tabName);
