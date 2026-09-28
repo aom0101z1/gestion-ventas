@@ -1668,7 +1668,7 @@
     
     <!-- ========== SECTION 4: SOCIAL MEDIA TAB (HIDDEN) ========== -->
     <div id="socialMedia" class="tab-content hidden">
-    <h2>💬 Gestión de Redes Sociales</h2>
+    <h2>💬 Mensajes de Facebook e Instagram</h2>
     <div id="socialMediaContainer">
         <!-- Content will be loaded by social.js -->
     </div>
@@ -1768,7 +1768,7 @@
                 <button class="tab" onclick="switchTab('auditLog')" id="auditLogTab" style="display: none;">📋 Registro</button>
                 <button class="tab" onclick="switchTab('config')" id="configTab" style="display: none;">⚙️ Config</button>
                 <button class="tab" onclick="switchTab('admin')" id="adminTab" style="display: none;">🔐 Admin</button>
-                <button class="tab" onclick="switchTab('socialMedia')" id="socialMediaTab">💬 Social Media</button>
+                <button class="tab" onclick="switchTab('socialMedia')" id="socialMediaTab">💬 Mensajes</button>
                 <button class="tab" onclick="switchTab('classProgress')" id="classProgressTab">📚 Progreso Clases</button>
                 <button class="tab" onclick="switchTab('tutorboxAdmin')" id="tutorboxAdminTab" style="background: linear-gradient(135deg, #7c3aed, #a855f7); color: white;">📱 TutorBox</button>
             </div>
@@ -5655,7 +5655,7 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
     <!-- Date utilities must load first (used by finance, payments, tienda) -->
     <script src="date-utils.js"></script>
     <script src="fixes.js"></script>
-    <script src="social.js"></script>
+    <script src="inbox.js?v=20260928a"></script>
     <script src="pipeline.js"></script>
     <script src="colegio-picker.js?v=20260926a"></script>
     <script src="trials.js?v=20260926a"></script>
@@ -5683,7 +5683,7 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
     <script src="payroll.js"></script>
     <script src="payroll-import.js"></script>
     <script src="fix-dates.js"></script>
-    <script src="admin-center.js?v=20260926b"></script>
+    <script src="admin-center.js?v=20260928a"></script>
     <script src="auditlog.js"></script>
     <script src="permission-enforcer.js?v=20260916"></script>
     <script src="class-progress.js"></script>

@@ -11,7 +11,7 @@ const SYSTEM_MODULES = [
   { id: 'reports', name: 'Reportes', icon: '📊', color: '#f59e0b' },
   { id: 'monitoring', name: 'Monitoreo', icon: '📡', color: '#ef4444' },
   { id: 'tasks', name: 'Tareas', icon: '📋', color: '#06b6d4' },
-  { id: 'socialMedia', name: 'Social Media', icon: '💬', color: '#0ea5e9' },
+  { id: 'socialMedia', name: 'Mensajes FB/IG', icon: '💬', color: '#0ea5e9' },
   { id: 'classProgress', name: 'Progreso Clases', icon: '📚', color: '#6366f1' },
   { id: 'tutorboxAdmin', name: 'TutorBox', icon: '📱', color: '#7c3aed' },
   { id: 'coatsReports', name: 'COATS', icon: '🏢', color: '#0891b2' },
