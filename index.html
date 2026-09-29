@@ -1648,18 +1648,10 @@
 </head>
 
 <body>
-     <script>
-    // Simple password protection
-    if (!sessionStorage.getItem('authenticated')) {
-        const password = prompt('Ingrese la contraseña del sistema:');
-        if (password !== 'ziudad2025') {  // ← CHANGE THIS PASSWORD
-            alert('Contraseña incorrecta');
-            window.location.href = 'https://google.com';
-        }
-        sessionStorage.setItem('authenticated', 'true');
-    }
-    </script>
-    
+    <!-- The old prompt() "system password" gate was removed on 29 Sep 2026
+         (founder): it sat in public page source and protected nothing. Access
+         control = Firebase Auth login + database rules. -->
+
     <!-- ========== SECTION 3: FIREBASE STATUS INDICATOR ========== -->
     <div id="firebaseStatus" class="firebase-status connecting">
         <div class="loading-spinner" style="width: 12px; height: 12px; border-width: 2px;"></div>
