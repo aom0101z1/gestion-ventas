@@ -292,7 +292,10 @@ function inboxRenderConversation() {
                 ${t.username ? `<span style="color:#6b7280; font-size:0.85rem;"> @${inboxEsc(t.username)}</span>` : ''}
                 <div style="color:#9ca3af; font-size:0.75rem;">${t.channel === 'ig' ? 'Instagram' : 'Facebook Messenger'}${t.lastAgent ? ` · última respuesta: ${inboxEsc(t.lastAgent)}` : ''}</div>
             </div>
-            ${t.unanswered ? `<span style="background:#fee2e2; color:#991b1b; padding:0.2rem 0.6rem; border-radius:999px; font-size:0.78rem; font-weight:600;">⏳ espera ${inboxDuration(Date.now() - (t.waitingSince || t.lastAt))}</span>` : ''}
+            <div style="display:flex; gap:0.4rem; align-items:center;">
+                ${t.unanswered ? `<span style="background:#fee2e2; color:#991b1b; padding:0.2rem 0.6rem; border-radius:999px; font-size:0.78rem; font-weight:600;">⏳ espera ${inboxDuration(Date.now() - (t.waitingSince || t.lastAt))}</span>` : ''}
+                ${Inbox.me?.isAdmin ? `<button onclick="inboxDeleteThread()" title="Eliminar conversación (solicitud de borrado de datos)" style="background:none; border:1px solid #fecaca; color:#b91c1c; border-radius:6px; padding:0.15rem 0.45rem; cursor:pointer;">🗑</button>` : ''}
+            </div>
         </div>
         <div id="inboxMessages" style="flex:1; overflow-y:auto; padding:0.75rem 1rem;">${msgs || '<div style="color:#9ca3af;">Cargando…</div>'}</div>
         <div style="border-top:1px solid #f3f4f6; padding:0.6rem;">
@@ -340,6 +343,30 @@ window.inboxSend = async function() {
     } catch (err) {
         window.showNotification?.('❌ No se envió: ' + err.message, 'error');
         if (btn) { btn.disabled = false; btn.textContent = 'Enviar'; }
+    }
+};
+
+// Data-deletion requests (borrar-datos.html): Director only, irreversible.
+window.inboxDeleteThread = async function() {
+    const t = Inbox.selected && Inbox.threads.get(Inbox.selected);
+    if (!t) return;
+    const who = t.name || (t.username ? '@' + t.username : 'este cliente');
+    if (!confirm(`¿Eliminar TODA la conversación con ${who}?
+
+Se borran los mensajes y los datos de perfil del CRM. No se puede deshacer.
+(Úsalo para solicitudes de borrado de datos.)`)) return;
+    try {
+        await inboxApi('deleteThread', { threadId: t.id });
+        Inbox.threads.delete(t.id);
+        Inbox.selected = null;
+        Inbox.messages = [];
+        inboxRenderList();
+        inboxRenderHeader();
+        inboxRenderConversation();
+        inboxUpdateBadge();
+        window.showNotification?.('🗑 Conversación eliminada', 'success');
+    } catch (err) {
+        window.showNotification?.('❌ ' + err.message, 'error');
     }
 };
 
