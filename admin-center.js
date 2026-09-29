@@ -812,11 +812,14 @@ function showCreateUserModal() {
 async function handleCreateUser(event) {
   event.preventDefault();
   
-  const name = document.getElementById('newUserName').value;
-  const email = document.getElementById('newUserEmail').value;
-  const password = document.getElementById('newUserPassword').value;
-  
-  const checkboxes = document.querySelectorAll('input[name="modules"]:checked');
+  // Read from THIS form: index.html has an older hidden form with the same
+  // ids, and getElementById returned its empty inputs (auth/invalid-email).
+  const form = event.target;
+  const name = form.querySelector('#newUserName').value.trim();
+  const email = form.querySelector('#newUserEmail').value.trim();
+  const password = form.querySelector('#newUserPassword').value;
+
+  const checkboxes = form.querySelectorAll('input[name="modules"]:checked');
   const permissions = {};
   SYSTEM_MODULES.forEach(module => {
     permissions[module.id] = false;
