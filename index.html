@@ -2558,6 +2558,18 @@ window.firebaseModules = {
         window.firebaseDb = database;
         window.firebaseAuth = auth;
 
+        // Admin → "Nuevo usuario" (29 Sep 2026): create the Auth account on a
+        // SECONDARY app so the Director's own session is not replaced by the
+        // new user's (createUserWithEmailAndPassword signs the new user in).
+        let staffCreateAuth = null;
+        window.createStaffAuthUser = async function(email, password) {
+            if (!staffCreateAuth) staffCreateAuth = getAuth(initializeApp(firebaseConfig, 'staffCreate'));
+            const cred = await createUserWithEmailAndPassword(staffCreateAuth, email, password);
+            const uid = cred.user.uid;
+            await signOut(staffCreateAuth);
+            return uid;
+        };
+
         // TutorBox Firebase - second app for reading student progress
         const tutorboxConfig = {
             apiKey: "AIzaSyC1sfWvRDJ-SLHXiCPxEmF7os9Sweh9JCA",
@@ -5686,7 +5698,7 @@ ${tabs.map(tab => `- ${tab}: ${document.getElementById(tab) ? '✅' : '❌'}`).j
     <script src="payroll.js"></script>
     <script src="payroll-import.js"></script>
     <script src="fix-dates.js"></script>
-    <script src="admin-center.js?v=20260928a"></script>
+    <script src="admin-center.js?v=20260929a"></script>
     <script src="auditlog.js"></script>
     <script src="permission-enforcer.js?v=20260916"></script>
     <script src="class-progress.js"></script>

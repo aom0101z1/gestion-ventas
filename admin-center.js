@@ -145,10 +145,9 @@ class AdminCenterManager {
       const { email, password, name, permissions } = userData;
       
       // Create auth user
-      const userCredential = await window.FirebaseData.auth
-        .createUserWithEmailAndPassword(email, password);
-      
-      const userId = userCredential.user.uid;
+      // Secondary-app helper in index.html: keeps the Director signed in
+      // (the old compat call no longer existed on the modular SDK).
+      const userId = await window.createStaffAuthUser(email, password);
       
       // Save user profile
       const db = window.firebaseModules.database;
