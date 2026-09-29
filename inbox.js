@@ -418,7 +418,12 @@ window.inboxConnect = async function() {
     const token = document.getElementById('inboxUserToken')?.value.trim();
     const btn = document.getElementById('inboxConnectBtn');
     const out = document.getElementById('inboxConnectResult');
-    if (!token) return;
+    if (!token) {
+        out.innerHTML = Inbox.pages.length
+            ? '<div style="color:#166534;">✅ Ya están conectadas: ' + Inbox.pages.map(p => inboxEsc(p.name)).join(', ') + '. Solo pega un token nuevo si quieres volver a conectar.</div>'
+            : '<div style="color:#b45309;">Pega primero el token de Graph API Explorer.</div>';
+        return;
+    }
     btn.disabled = true;
     btn.textContent = '⏳ Conectando…';
     try {
