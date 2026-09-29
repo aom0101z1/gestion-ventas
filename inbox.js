@@ -401,7 +401,7 @@ window.inboxShowConnect = function() {
                 <ol style="font-size:0.88rem; color:#374151; line-height:1.5;">
                     <li>Abre <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener">Graph API Explorer</a> con tu Facebook personal.</li>
                     <li>App de Meta: <b>Ciudad Bilingue CRM</b>. Usuario o página: <b>Token de usuario</b>.</li>
-                    <li>Permisos (agrégalos todos en "Permissions"): <code>pages_show_list, pages_messaging, pages_manage_metadata, pages_read_engagement, pages_manage_posts, pages_manage_engagement, instagram_basic, instagram_manage_messages, instagram_content_publishing, business_management</code>.</li>
+                    <li>Permisos (agrégalos todos en "Permissions"): <code>pages_show_list, pages_messaging, pages_manage_metadata, pages_read_engagement, pages_manage_posts, instagram_basic, instagram_manage_messages, instagram_content_publish, business_management</code>.</li>
                     <li><b>Generate Access Token</b> → elige las dos páginas (logo y C morada) y el Instagram → copia el token y pégalo aquí.</li>
                 </ol>
                 <textarea id="inboxUserToken" rows="3" placeholder="Pega aquí el token (empieza por EAA…)" style="width:100%; padding:0.5rem; border:1px solid #e5e7eb; border-radius:8px; font-family:monospace; font-size:0.8rem;"></textarea>
@@ -426,6 +426,7 @@ window.inboxConnect = async function() {
         document.getElementById('inboxUserToken').value = '';
         out.innerHTML = `<div style="color:#166534;">✅ Conectado:</div><ul>${r.pages.map(p =>
             `<li>${inboxEsc(p.name)}${p.igUsername ? ` + Instagram @${inboxEsc(p.igUsername)}` : ''} ${p.subscribed ? '✅' : `⚠️ ${inboxEsc(p.subscribeError || '')}`}</li>`).join('')}</ul>
+            ${r.skipped?.length ? `<div style="color:#6b7280;">No se conectaron (no son del colegio): ${r.skipped.map(inboxEsc).join(', ')}</div>` : ''}
             <div style="color:#6b7280;">Webhook: Facebook ${inboxEsc(r.appSubscriptions?.page)} · Instagram ${inboxEsc(r.appSubscriptions?.instagram)}</div>`;
         inboxRefresh(true);
     } catch (err) {
