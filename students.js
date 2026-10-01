@@ -126,6 +126,39 @@ class StudentManager {
         if (filters.grupo) {
             students = students.filter(s => s.grupo === filters.grupo);
         }
+
+        // 💳 Tipo de pago (1 oct 2026)
+        if (filters.tipoPago && filters.tipoPago !== 'all') {
+            students = students.filter(s => {
+                const t = s.tipoPago || 'MENSUAL';
+                return filters.tipoPago === 'NO_SEMESTRAL' ? t !== 'SEMESTRAL' : t === filters.tipoPago;
+            });
+        }
+
+        // 📅 Pago del mes — mismo cálculo que la casilla OK (window.pagoEstadoMes)
+        if (filters.pagoMes && filters.pagoMes !== 'all' && typeof window.pagoEstadoMes === 'function') {
+            const want = filters.pagoMes;
+            students = students.filter(s => {
+                const e = window.pagoEstadoMes(s).estado;
+                if (want === 'aldia') return e === 'ok' || e === 'okauto' || e === 'S';
+                if (want === 'debe') return e === 'pendiente' || e === 'parcial' || e === 'no';
+                return e === want;
+            });
+        }
+
+        // 💰 Último pago (antigüedad) — usa el índice que pinta la columna Último Pago
+        if (filters.ultimoPago && filters.ultimoPago !== 'all') {
+            const idx = window._lastPayByStudent || {};
+            const now = Date.now();
+            students = students.filter(s => {
+                const t = idx[s.id];
+                if (filters.ultimoPago === 'nunca') return !t;
+                if (!t || !t.date) return false; // "Nunca ha pagado" es su propia opción
+                const dias = (now - t.date.getTime()) / 86400000;
+                if (filters.ultimoPago === 'reciente') return dias <= 30;
+                return dias > Number(filters.ultimoPago);
+            });
+        }
         
         if (filters.search) {
             const search = filters.search.toLowerCase().trim();
@@ -739,7 +772,7 @@ function renderStudentTable(students) {
                     <th style="padding: 0.75rem; text-align: left;">Nombre</th>
                     <th style="padding: 0.75rem; text-align: center; width: 56px;" title="Día de Pago registrado en la ficha del estudiante">DP1</th>
                     <th style="padding: 0.75rem; text-align: center; width: 72px;" title="Día de pago ajustado (manual) — se guarda al salir de la casilla. Escribe 0 (se pone morado) si el estudiante pagó el SEMESTRE completo: no se le cobra ni recibe avisos. Vacío = no está en cobro mensual.">DP2 · 0=sem</th>
-                    <th style="padding: 0.75rem; text-align: center; width: 60px;" title="Clic cicla: — automático · 🟢 OK no enviarle aviso este mes · 📅 ACUERDO DE PAGO (pide fecha: no se le bloquea y el aviso le dice esa fecha, se vence solo) · 🔴 No avisar igual. Verde claro = automático, Pagos ya registra el pago del mes. OJO: marcar OK no registra el dinero; el pago se registra en Pagos.">OK · 📅</th>
+                    <th style="padding: 0.75rem; text-align: center; width: 60px;" title="Clic cicla: — automático · 🟢 OK no enviarle aviso este mes · S paga por SEMESTRE (se vence al terminar el semestre) · T estudiante de TEST · 📅 ACUERDO DE PAGO (pide fecha: no se le bloquea y el aviso le dice esa fecha, se vence solo) · 🔴 No avisar igual. Verde claro = automático, Pagos ya registra el pago del mes. OJO: marcar OK no registra el dinero; el pago se registra en Pagos.">OK · S · T</th>
                     <th style="padding: 0.75rem; text-align: left;">Teléfono</th>
                     <th style="padding: 0.75rem; text-align: left;">Grupo</th>
                     <th style="padding: 0.75rem; text-align: left;">Pago</th>
@@ -999,6 +1032,19 @@ window.loadStudentsTab = async function() {
                     <option value="Online" ${currentModalidadFilter === 'Online' ? 'selected' : ''}>Online</option>
                     <option value="Privadas" ${currentModalidadFilter === 'Privadas' ? 'selected' : ''}>Privadas</option>
                 </select>
+                <select id="studentTipoPagoFilter" title="Tipo de pago de la ficha" style="padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 4px;">
+                    ${[['all', '💳 Todos los tipos de pago'], ['MENSUAL', 'Mensual'], ['SEMESTRAL', 'Semestral'], ['POR_HORAS', 'Por horas'], ['NO_SEMESTRAL', 'No semestral (mensual + por horas)']]
+                        .map(([v, l]) => `<option value="${v}" ${(localStorage.getItem('studentTipoPagoFilter') || 'all') === v ? 'selected' : ''}>${l}</option>`).join('')}
+                </select>
+                <select id="studentPagoMesFilter" title="Lo mismo que muestra la columna OK" style="padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 4px;">
+                    ${[['all', '📅 Pago del mes: todos'], ['aldia', '✅ Al día (OK o S)'], ['debe', '⏳ Debe este mes (—, ½ o No)'], ['pendiente', '— Sin pago registrado'], ['parcial', '½ Pago parcial'], ['S', 'S Semestre'], ['T', 'T Test'], ['acuerdo', '📅 Con acuerdo de pago'], ['no', '🔴 Marcados No']]
+                        .map(([v, l]) => `<option value="${v}" ${(localStorage.getItem('studentPagoMesFilter') || 'all') === v ? 'selected' : ''}>${l}</option>`).join('')}
+                </select>
+                <select id="studentUltimoPagoFilter" title="Fecha del último pago registrado" style="padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 4px;">
+                    ${[['all', '💰 Último pago: cualquiera'], ['reciente', 'En los últimos 30 días'], ['30', 'Hace más de 30 días'], ['45', 'Hace más de 45 días'], ['60', 'Hace más de 60 días'], ['nunca', 'Nunca ha pagado']]
+                        .map(([v, l]) => `<option value="${v}" ${(localStorage.getItem('studentUltimoPagoFilter') || 'all') === v ? 'selected' : ''}>${l}</option>`).join('')}
+                </select>
+                <button type="button" onclick="clearStudentFilters()" class="btn btn-sm" style="background: #e5e7eb;" title="Quitar todos los filtros">✖ Limpiar filtros</button>
                 <input type="text" id="studentSearch" placeholder="Buscar por nombre, documento o teléfono..."
                        style="padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 4px; flex: 1; min-width: 200px;">
             </div>
@@ -1037,6 +1083,17 @@ window.loadStudentsTab = async function() {
         localStorage.setItem('studentModalidadFilter', e.target.value);
         refreshStudentTable();
     });
+
+    // 💳📅💰 filtros de pago (1 oct 2026) — se recuerdan en este navegador
+    for (const [id, key] of [['studentTipoPagoFilter', 'studentTipoPagoFilter'], ['studentPagoMesFilter', 'studentPagoMesFilter'], ['studentUltimoPagoFilter', 'studentUltimoPagoFilter']]) {
+        document.getElementById(id)?.addEventListener('change', (e) => {
+            try { localStorage.setItem(key, e.target.value); } catch (_) {}
+            refreshStudentTable();
+        });
+    }
+    // The first paint above only applied estado + modalidad: apply the rest now.
+    if (['studentTipoPagoFilter', 'studentPagoMesFilter', 'studentUltimoPagoFilter']
+        .some(k => (localStorage.getItem(k) || 'all') !== 'all')) refreshStudentTable();
 
     // Add date filter listeners
     document.getElementById('studentStartDate')?.addEventListener('change', refreshStudentTable);
@@ -2183,6 +2240,18 @@ window.applyCustomDateFilter = function() {
     refreshStudentTable();
 };
 
+/** ✖ Limpiar filtros: estado, modalidad, pago, búsqueda y fechas. */
+window.clearStudentFilters = function() {
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+    set('studentStatusFilter', 'all'); set('studentModalidadFilter', 'all');
+    set('studentTipoPagoFilter', 'all'); set('studentPagoMesFilter', 'all'); set('studentUltimoPagoFilter', 'all');
+    set('studentSearch', ''); set('studentStartDate', ''); set('studentEndDate', '');
+    for (const k of ['studentStatusFilter', 'studentModalidadFilter', 'studentTipoPagoFilter', 'studentPagoMesFilter', 'studentUltimoPagoFilter']) {
+        try { localStorage.setItem(k, 'all'); } catch (_) {}
+    }
+    refreshStudentTable();
+};
+
 function refreshStudentTable() {
     const statusFilter = document.getElementById('studentStatusFilter').value;
     const modalidadFilter = document.getElementById('studentModalidadFilter').value;
@@ -2195,12 +2264,16 @@ function refreshStudentTable() {
         modalidad: modalidadFilter,
         search: searchValue,
         startDate: startDate,
-        endDate: endDate
+        endDate: endDate,
+        tipoPago: document.getElementById('studentTipoPagoFilter')?.value || 'all',
+        pagoMes: document.getElementById('studentPagoMesFilter')?.value || 'all',
+        ultimoPago: document.getElementById('studentUltimoPagoFilter')?.value || 'all'
     });
 
     document.getElementById('studentTableContainer').innerHTML = renderStudentTable(filtered);
     if (typeof window.paintLiveClassChips === 'function') window.paintLiveClassChips();
     if (typeof window.paintLastPayments === 'function') window.paintLastPayments();
+    if (typeof window.paintPagoOK === 'function') window.paintPagoOK();
 
     // Update counter
     const counterText = startDate || endDate
@@ -2264,6 +2337,10 @@ window.refreshLastPayments = async function(force = false) {
     } catch (e) { console.warn('Último pago:', e.message); }
     window.paintLastPayments();
     window.paintPagoOK();
+    // "Pago del mes" / "Último pago" depend on the payments just loaded
+    const pm = document.getElementById('studentPagoMesFilter')?.value || 'all';
+    const up = document.getElementById('studentUltimoPagoFilter')?.value || 'all';
+    if ((pm !== 'all' || up !== 'all') && document.getElementById('studentTableContainer')) refreshStudentTable();
 };
 
 /** Paint "Último Pago" into whatever rows are on screen (cheap, re-runnable). */
@@ -2390,6 +2467,57 @@ function pagoOKAutoExempt(student) {
     return null;
 }
 
+// ── S (semestre) y T (test) — 1 oct 2026, fundador ──────────────────────────
+// Además de OK, la casilla marca:
+//   S = paga por SEMESTRE (no entra al cobro mensual). Automática si tipoPago es
+//       SEMESTRAL o DP2 = 0; a mano se guarda POR SEMESTRE (`pagoMarca.periodo`
+//       '2026-S2') y se vence sola al terminar el semestre (S1 feb–jun, S2 jul–dic).
+//   T = estudiante de TEST (clase de prueba). Automática si modalidad es 'Prueba';
+//       a mano no se vence (se quita con clic o al matricularlo).
+
+/** Semestre actual: '2026-S1' (ene–jun) o '2026-S2' (jul–dic). */
+function semestreKey(d = new Date()) {
+    return `${d.getFullYear()}-S${d.getMonth() < 6 ? 1 : 2}`;
+}
+
+/** Marca S/T puesta a mano y vigente: 'S' | 'T' | null. */
+function pagoMarcaManual(student) {
+    const m = student && student.pagoMarca;
+    if (!m || !m.tipo) return null;
+    if (m.tipo === 'S') return m.periodo === semestreKey() ? 'S' : null;
+    return m.tipo === 'T' ? 'T' : null;
+}
+
+/** Marca S/T automática por los datos de la ficha: 'S' | 'T' | null. */
+function pagoMarcaAuto(student) {
+    if (!student) return null;
+    if (student.modalidad === 'Prueba') return 'T';
+    if (student.tipoPago === 'SEMESTRAL') return 'S';
+    if (Number(student.diaPago2) === 0 && student.diaPago2 !== null && student.diaPago2 !== '') return 'S';
+    return null;
+}
+
+/**
+ * Estado de pago del mes de UN estudiante, en una sola palabra. Lo usan la
+ * casilla y el filtro "Pago del mes" para que siempre digan lo mismo:
+ * 'acuerdo' | 'ok' | 'no' | 'S' | 'T' | 'okauto' | 'parcial' | 'pendiente'
+ * (+ `manual` true si alguien lo marcó a mano).
+ */
+window.pagoEstadoMes = function(s) {
+    const paid = window._paidThisMonth || {};
+    if (acuerdoVigente(s)) return { estado: 'acuerdo', manual: true };
+    const manual = pagoOKManual(s);
+    if (manual === true) return { estado: 'ok', manual: true };
+    if (manual === false) return { estado: 'no', manual: true };
+    const marcaM = pagoMarcaManual(s);
+    if (marcaM) return { estado: marcaM, manual: true };
+    const marcaA = pagoMarcaAuto(s);
+    if (marcaA) return { estado: marcaA, manual: false };
+    if (pagoOKAutoExempt(s) || paid[s.id] === 'full') return { estado: 'okauto', manual: false };
+    if (paid[s.id] === 'partial') return { estado: 'parcial', manual: false };
+    return { estado: 'pendiente', manual: false };
+};
+
 /** Pinta las casillas OK que estén en pantalla (barato, re-ejecutable). */
 window.paintPagoOK = function() {
     if (!window.StudentManager?.students) return;
@@ -2400,8 +2528,24 @@ window.paintPagoOK = function() {
         const manual = pagoOKManual(s);
         const exempt = pagoOKAutoExempt(s);
         const acu = acuerdoVigente(s);
+        const marcaM = pagoMarcaManual(s);
+        const marcaA = pagoMarcaAuto(s);
         let label, bg, color, border, title;
-        if (acu) {
+        if (!acu && manual === null && (marcaM || marcaA)) {
+            const m = marcaM || marcaA;
+            const strong = !!marcaM;
+            if (m === 'S') {
+                label = 'S'; bg = strong ? '#7c3aed' : '#ede9fe'; color = strong ? '#fff' : '#5b21b6'; border = strong ? '#6d28d9' : '#ddd6fe';
+                title = strong
+                    ? `SEMESTRE marcado a mano (${semestreKey()}): no entra al cobro mensual. Se vence solo al terminar el semestre. Clic para cambiar.`
+                    : 'Automático: paga por SEMESTRE (tipo de pago Semestral o DP2 = 0). Clic para marcar a mano.';
+            } else {
+                label = 'T'; bg = strong ? '#ea580c' : '#ffedd5'; color = strong ? '#fff' : '#9a3412'; border = strong ? '#c2410c' : '#fed7aa';
+                title = strong
+                    ? 'TEST marcado a mano: estudiante de clase de prueba, no se le cobra. Clic para cambiar.'
+                    : 'Automático: modalidad Prueba (clase de prueba). Clic para marcar a mano.';
+            }
+        } else if (acu) {
             // 📅 acuerdo vigente: manda sobre todo lo demás hasta su fecha
             const [, mm, dd] = acu.hasta.split('-');
             label = `📅${Number(dd)}`; bg = '#1e40af'; color = '#fff'; border = '#1d4ed8';
@@ -2433,47 +2577,63 @@ window.paintPagoOK = function() {
 };
 
 /**
- * Clic: —  →  🟢 OK  →  📅 acuerdo  →  🔴 No  →  —   (guarda de inmediato, como DP2).
- * `pagoOK` solo escribe el mes en curso; el acuerdo lleva su propia fecha y se
- * vence solo. Los meses anteriores quedan como registro.
+ * Clic: —  →  🟢 OK  →  S  →  T  →  📅 acuerdo  →  🔴 No  →  —   (guarda de inmediato).
+ * `pagoOK` solo escribe el mes en curso; S lleva su semestre y T no se vence;
+ * el acuerdo lleva su propia fecha y se vence solo. Los meses anteriores quedan
+ * como registro. (S y T: 1 oct 2026, fundador.)
  */
 window.cyclePagoOK = async function(studentId, btn) {
     const st = window.StudentManager?.students?.get(studentId);
     if (!st) return;
-    const cur = pagoOKManual(st);
-    const conAcuerdo = !!acuerdoVigente(st);
     const monthKey = window.pagoOKMonthKey();
     const who = window.currentUser?.email || window.currentUser?.uid || 'staff';
+    const now = new Date().toISOString();
 
-    // — → OK → 📅 acuerdo → No → —
-    let next, acuerdo = st.acuerdoPago || null;
-    if (conAcuerdo) { next = false; acuerdo = null; }            // 📅 → 🔴 No
-    else if (cur === null) next = true;                          // — → 🟢 OK
-    else if (cur === true) {                                     // 🟢 OK → 📅
+    // Estado manual actual (lo automático no cuenta: un clic siempre arranca en —)
+    const cur = acuerdoVigente(st) ? 'acuerdo'
+        : pagoOKManual(st) === true ? 'ok'
+        : pagoOKManual(st) === false ? 'no'
+        : pagoMarcaManual(st) || 'none';
+    const NEXT = { none: 'ok', ok: 'S', S: 'T', T: 'acuerdo', acuerdo: 'no', no: 'none' };
+    let target = NEXT[cur];
+
+    let ok = null, marca = null, acuerdo = null;
+    if (target === 'ok') ok = true;
+    else if (target === 'no') ok = false;
+    else if (target === 'S') marca = { tipo: 'S', periodo: semestreKey(), by: who, at: now };
+    else if (target === 'T') marca = { tipo: 'T', by: who, at: now };
+    else if (target === 'acuerdo') {
         const fin = new Date(); fin.setMonth(fin.getMonth() + 1, 0); // fin de mes
-        const sug = fin.toISOString().slice(0, 10);
         const fecha = window.prompt(
-            `📅 ACUERDO DE PAGO para ${st.nombre || 'este estudiante'}\n\n` +
-            `¿Hasta qué fecha tiene plazo? (AAAA-MM-DD)\n\n` +
-            `Hasta esa fecha NO se le bloquea, y el aviso que recibe le dice la fecha acordada.\n` +
-            `Pasada la fecha vuelve al cobro normal, solo.`, sug);
-        if (fecha === null) { return; }                          // canceló: nada cambia
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha.trim()) || isNaN(new Date(fecha.trim()))) {
-            window.showNotification('Fecha inválida. Usa AAAA-MM-DD, por ejemplo 2026-09-30', 'error');
+            `📅 ACUERDO DE PAGO para ${st.nombre || 'este estudiante'}
+
+` +
+            `¿Hasta qué fecha tiene plazo? (AAAA-MM-DD)
+
+` +
+            `Hasta esa fecha NO se le bloquea, y el aviso que recibe le dice la fecha acordada.
+` +
+            `Pasada la fecha vuelve al cobro normal, solo.
+
+(Cancelar = saltar al siguiente: 🔴 No avisar igual)`,
+            fin.toISOString().slice(0, 10));
+        if (fecha === null) { target = 'no'; ok = false; }
+        else if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha.trim()) || isNaN(new Date(fecha.trim()))) {
+            window.showNotification('Fecha inválida. Usa AAAA-MM-DD, por ejemplo 2026-10-31', 'error');
             return;
+        } else {
+            const nota = window.prompt('Nota del acuerdo (opcional) — queda en el registro, no la ve el estudiante:', '') || '';
+            acuerdo = { hasta: fecha.trim(), nota: nota.slice(0, 300), by: who, at: now };
         }
-        const nota = window.prompt('Nota del acuerdo (opcional) — queda en el registro, no la ve el estudiante:', '') || '';
-        acuerdo = { hasta: fecha.trim(), nota: nota.slice(0, 300), by: who, at: new Date().toISOString() };
-        next = null;                                             // el acuerdo manda, no el OK del mes
-    } else { next = null; acuerdo = null; }                      // 🔴 No → —
+    }
 
     btn.disabled = true;
     try {
         const pagoOK = { ...(st.pagoOK || {}) };
-        if (next === null) delete pagoOK[monthKey];
-        else pagoOK[monthKey] = { ok: next, by: who, at: new Date().toISOString() };
-        await window.StudentManager.updateStudent(studentId, { pagoOK, acuerdoPago: acuerdo });
-        st.pagoOK = pagoOK; st.acuerdoPago = acuerdo; // caché local, para repintar sin recargar
+        if (ok === null) delete pagoOK[monthKey];
+        else pagoOK[monthKey] = { ok, by: who, at: now };
+        await window.StudentManager.updateStudent(studentId, { pagoOK, acuerdoPago: acuerdo, pagoMarca: marca });
+        st.pagoOK = pagoOK; st.acuerdoPago = acuerdo; st.pagoMarca = marca; // caché local
         window.paintPagoOK();
         if (acuerdo) window.showNotification(`📅 Acuerdo hasta el ${acuerdo.hasta}: no se le bloquea y el aviso le dirá la fecha`, 'success');
     } catch (e) {
