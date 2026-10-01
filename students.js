@@ -119,8 +119,12 @@ class StudentManager {
         }
 
         // Filter by modalidad
-        if (filters.modalidad && filters.modalidad !== 'all') {
-            students = students.filter(s => s.modalidad === filters.modalidad);
+        // Filtros de selección múltiple (1 oct 2026): 'all' o 'A,B,C'
+        const multi = (v) => (!v || v === 'all') ? null : String(v).split(',').filter(Boolean);
+
+        const modalidades = multi(filters.modalidad);
+        if (modalidades) {
+            students = students.filter(s => modalidades.includes(s.modalidad));
         }
 
         if (filters.grupo) {
@@ -128,21 +132,24 @@ class StudentManager {
         }
 
         // 💳 Tipo de pago (1 oct 2026)
-        if (filters.tipoPago && filters.tipoPago !== 'all') {
+        const tipos = multi(filters.tipoPago);
+        if (tipos) {
             students = students.filter(s => {
                 const t = s.tipoPago || 'MENSUAL';
-                return filters.tipoPago === 'NO_SEMESTRAL' ? t !== 'SEMESTRAL' : t === filters.tipoPago;
+                return tipos.some(w => w === 'NO_SEMESTRAL' ? t !== 'SEMESTRAL' : t === w);
             });
         }
 
         // 📅 Pago del mes — mismo cálculo que la casilla OK (window.pagoEstadoMes)
-        if (filters.pagoMes && filters.pagoMes !== 'all' && typeof window.pagoEstadoMes === 'function') {
-            const want = filters.pagoMes;
+        const pagos = multi(filters.pagoMes);
+        if (pagos && typeof window.pagoEstadoMes === 'function') {
             students = students.filter(s => {
                 const e = window.pagoEstadoMes(s).estado;
-                if (want === 'aldia') return e === 'ok' || e === 'okauto' || e === 'S';
-                if (want === 'debe') return e === 'pendiente' || e === 'parcial' || e === 'no';
-                return e === want;
+                return pagos.some(want => {
+                    if (want === 'aldia') return e === 'ok' || e === 'okauto' || e === 'S';
+                    if (want === 'debe') return e === 'pendiente' || e === 'parcial' || e === 'no';
+                    return e === want;
+                });
             });
         }
 
@@ -1024,22 +1031,12 @@ window.loadStudentsTab = async function() {
                     <option value="active" ${currentStatusFilter === 'active' ? 'selected' : ''}>Activos</option>
                     <option value="inactive" ${currentStatusFilter === 'inactive' ? 'selected' : ''}>Inactivos</option>
                 </select>
-                <select id="studentModalidadFilter" style="padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 4px;">
-                    <option value="all" ${currentModalidadFilter === 'all' ? 'selected' : ''}>Todas las modalidades</option>
-                    <option value="Presencial" ${currentModalidadFilter === 'Presencial' ? 'selected' : ''}>Presencial</option>
-                    <option value="Compañia" ${currentModalidadFilter === 'Compañia' ? 'selected' : ''}>Compañía</option>
-                    <option value="Escuela" ${currentModalidadFilter === 'Escuela' ? 'selected' : ''}>Escuela</option>
-                    <option value="Online" ${currentModalidadFilter === 'Online' ? 'selected' : ''}>Online</option>
-                    <option value="Privadas" ${currentModalidadFilter === 'Privadas' ? 'selected' : ''}>Privadas</option>
-                </select>
-                <select id="studentTipoPagoFilter" title="Tipo de pago de la ficha" style="padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 4px;">
-                    ${[['all', '💳 Todos los tipos de pago'], ['MENSUAL', 'Mensual'], ['SEMESTRAL', 'Semestral'], ['POR_HORAS', 'Por horas'], ['NO_SEMESTRAL', 'No semestral (mensual + por horas)']]
-                        .map(([v, l]) => `<option value="${v}" ${(localStorage.getItem('studentTipoPagoFilter') || 'all') === v ? 'selected' : ''}>${l}</option>`).join('')}
-                </select>
-                <select id="studentPagoMesFilter" title="Lo mismo que muestra la columna OK" style="padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 4px;">
-                    ${[['all', '📅 Pago del mes: todos'], ['aldia', '✅ Al día (OK o S)'], ['debe', '⏳ Debe este mes (—, ½ o No)'], ['pendiente', '— Sin pago registrado'], ['parcial', '½ Pago parcial'], ['S', 'S Semestre'], ['T', 'T Test'], ['acuerdo', '📅 Con acuerdo de pago'], ['no', '🔴 Marcados No']]
-                        .map(([v, l]) => `<option value="${v}" ${(localStorage.getItem('studentPagoMesFilter') || 'all') === v ? 'selected' : ''}>${l}</option>`).join('')}
-                </select>
+                ${mselHTML('studentModalidadFilter', 'Modalidad', 'Todas las modalidades',
+                    [['Presencial', 'Presencial'], ['Compañia', 'Compañía'], ['Escuela', 'Escuela'], ['Online', 'Online'], ['Privadas', 'Privadas'], ['Prueba', '🧪 Prueba']])}
+                ${mselHTML('studentTipoPagoFilter', '💳 Tipo de pago', 'Todos los tipos de pago',
+                    [['MENSUAL', 'Mensual'], ['SEMESTRAL', 'Semestral'], ['POR_HORAS', 'Por horas'], ['NO_SEMESTRAL', 'No semestral (mensual + por horas)']])}
+                ${mselHTML('studentPagoMesFilter', '📅 Pago del mes', 'Pago del mes: todos',
+                    [['aldia', '✅ Al día (OK o S)'], ['debe', '⏳ Debe este mes (—, ½ o No)'], ['pendiente', '— Sin pago registrado'], ['parcial', '½ Pago parcial'], ['S', 'S Semestre'], ['T', 'T Test'], ['acuerdo', '📅 Con acuerdo de pago'], ['no', '🔴 Marcados No']])}
                 <select id="studentUltimoPagoFilter" title="Fecha del último pago registrado" style="padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 4px;">
                     ${[['all', '💰 Último pago: cualquiera'], ['reciente', 'En los últimos 30 días'], ['30', 'Hace más de 30 días'], ['45', 'Hace más de 45 días'], ['60', 'Hace más de 60 días'], ['nunca', 'Nunca ha pagado']]
                         .map(([v, l]) => `<option value="${v}" ${(localStorage.getItem('studentUltimoPagoFilter') || 'all') === v ? 'selected' : ''}>${l}</option>`).join('')}
@@ -1078,19 +1075,16 @@ window.loadStudentsTab = async function() {
         refreshStudentTable();
     });
 
-    // Add modalidad filter listener
-    document.getElementById('studentModalidadFilter')?.addEventListener('change', (e) => {
-        localStorage.setItem('studentModalidadFilter', e.target.value);
-        refreshStudentTable();
-    });
+    // Modalidad / Tipo de pago / Pago del mes: selección múltiple (mselHTML) — guardan y refrescan solos
 
     // 💳📅💰 filtros de pago (1 oct 2026) — se recuerdan en este navegador
-    for (const [id, key] of [['studentTipoPagoFilter', 'studentTipoPagoFilter'], ['studentPagoMesFilter', 'studentPagoMesFilter'], ['studentUltimoPagoFilter', 'studentUltimoPagoFilter']]) {
+    for (const [id, key] of [['studentUltimoPagoFilter', 'studentUltimoPagoFilter']]) {
         document.getElementById(id)?.addEventListener('change', (e) => {
             try { localStorage.setItem(key, e.target.value); } catch (_) {}
             refreshStudentTable();
         });
     }
+    for (const id of ['studentModalidadFilter', 'studentTipoPagoFilter', 'studentPagoMesFilter']) window.mselSync(id);
     // The first paint above only applied estado + modalidad: apply the rest now.
     if (['studentTipoPagoFilter', 'studentPagoMesFilter', 'studentUltimoPagoFilter']
         .some(k => (localStorage.getItem(k) || 'all') !== 'all')) refreshStudentTable();
@@ -2240,6 +2234,79 @@ window.applyCustomDateFilter = function() {
     refreshStudentTable();
 };
 
+// ── Selector de selección múltiple para los filtros (1 oct 2026, fundador:
+// "permíteme seleccionar varios, por ejemplo Presencial y Online"). Guarda el
+// resultado en un <input hidden id=…> con 'all' o 'A,B' para que todo el código
+// que ya lee `.value` del filtro siga funcionando sin cambios.
+function mselHTML(id, title, allLabel, options) {
+    let stored = 'all';
+    try { stored = localStorage.getItem(id) || 'all'; } catch (_) {}
+    const sel = stored === 'all' ? [] : stored.split(',');
+    return `
+        <div class="msel" id="${id}-wrap" data-title="${title}" data-all="${allLabel}" style="position: relative;">
+            <input type="hidden" id="${id}" value="${stored}">
+            <button type="button" onclick="mselToggle('${id}')" id="${id}-btn"
+                    style="padding: 0.5rem 0.75rem; border: 1px solid #e5e7eb; border-radius: 4px; background: white; cursor: pointer; white-space: nowrap; max-width: 260px; overflow: hidden; text-overflow: ellipsis;"></button>
+            <div id="${id}-panel" style="display: none; position: absolute; z-index: 1200; top: 100%; left: 0; margin-top: 4px; background: white;
+                 border: 1px solid #d1d5db; border-radius: 8px; box-shadow: 0 8px 20px rgba(0,0,0,0.15); padding: 0.4rem; min-width: 240px;">
+                ${options.map(([v, l]) => `
+                    <label style="display: flex; gap: 0.5rem; align-items: center; padding: 0.35rem 0.5rem; cursor: pointer; border-radius: 4px;"
+                           onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='white'">
+                        <input type="checkbox" value="${v}" ${sel.includes(v) ? 'checked' : ''} onchange="mselChange('${id}')"> ${l}
+                    </label>`).join('')}
+                <div style="display: flex; justify-content: space-between; border-top: 1px solid #f3f4f6; margin-top: 0.3rem; padding-top: 0.3rem;">
+                    <button type="button" onclick="mselSet('${id}', 'all')" style="background: none; border: none; color: #2563eb; cursor: pointer; font-size: 0.85rem;">Todos</button>
+                    <button type="button" onclick="mselToggle('${id}')" style="background: none; border: none; color: #374151; cursor: pointer; font-size: 0.85rem;">Cerrar</button>
+                </div>
+            </div>
+        </div>`;
+}
+
+/** Repinta casillas + texto del botón desde el valor guardado. */
+window.mselSync = function(id) {
+    const wrap = document.getElementById(`${id}-wrap`);
+    const hidden = document.getElementById(id);
+    if (!wrap || !hidden) return;
+    const sel = hidden.value === 'all' ? [] : hidden.value.split(',');
+    const boxes = [...wrap.querySelectorAll('input[type=checkbox]')];
+    boxes.forEach(b => { b.checked = sel.includes(b.value); });
+    const names = boxes.filter(b => b.checked).map(b => b.parentElement.textContent.trim());
+    const btn = document.getElementById(`${id}-btn`);
+    btn.textContent = names.length === 0 ? `${wrap.dataset.all} ▾`
+        : names.length <= 2 ? `${names.join(' + ')} ▾` : `${wrap.dataset.title}: ${names.length} ▾`;
+    btn.title = names.length ? names.join(', ') : wrap.dataset.all;
+    btn.style.background = names.length ? '#eef2ff' : 'white';
+    btn.style.borderColor = names.length ? '#a5b4fc' : '#e5e7eb';
+};
+
+window.mselSet = function(id, value) {
+    const hidden = document.getElementById(id);
+    if (!hidden) return;
+    hidden.value = value || 'all';
+    try { localStorage.setItem(id, hidden.value); } catch (_) {}
+    window.mselSync(id);
+    refreshStudentTable();
+};
+
+window.mselChange = function(id) {
+    const vals = [...document.querySelectorAll(`#${id}-wrap input[type=checkbox]:checked`)].map(b => b.value);
+    window.mselSet(id, vals.length ? vals.join(',') : 'all');
+};
+
+window.mselToggle = function(id) {
+    const panel = document.getElementById(`${id}-panel`);
+    if (!panel) return;
+    const open = panel.style.display === 'none';
+    document.querySelectorAll('.msel > div[id$="-panel"]').forEach(p => { p.style.display = 'none'; });
+    panel.style.display = open ? 'block' : 'none';
+};
+
+// Clic fuera de un selector → se cierra
+document.addEventListener('click', (e) => {
+    if (e.target.closest && e.target.closest('.msel')) return;
+    document.querySelectorAll('.msel > div[id$="-panel"]').forEach(p => { p.style.display = 'none'; });
+});
+
 /** ✖ Limpiar filtros: estado, modalidad, pago, búsqueda y fechas. */
 window.clearStudentFilters = function() {
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
@@ -2249,6 +2316,7 @@ window.clearStudentFilters = function() {
     for (const k of ['studentStatusFilter', 'studentModalidadFilter', 'studentTipoPagoFilter', 'studentPagoMesFilter', 'studentUltimoPagoFilter']) {
         try { localStorage.setItem(k, 'all'); } catch (_) {}
     }
+    for (const id of ['studentModalidadFilter', 'studentTipoPagoFilter', 'studentPagoMesFilter']) window.mselSync(id);
     refreshStudentTable();
 };
 
