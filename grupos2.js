@@ -350,9 +350,15 @@ function renderGrupos2View() {
                     <h2 style="margin: 0 0 0.5rem 0; font-size: 1.75rem;">🎓 Grupos 2.0 (Nuevo Sistema)</h2>
                     <p style="margin: 0; opacity: 0.9; font-size: 0.9rem;">Sistema mejorado de gestión de grupos - Solo Admin</p>
                 </div>
-                <button onclick="showGrupo2Form()" class="btn" style="background: white; color: #667eea; font-weight: bold; padding: 0.75rem 1.5rem;">
-                    ➕ Nuevo Grupo
-                </button>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                    <button onclick="syncGroupsWithTutorBox()" class="btn" title="Copia de las salas en vivo el libro y la unidad reales y avisa si el profesor de la sala no coincide"
+                            style="background: rgba(255,255,255,0.18); color: white; border: 1px solid rgba(255,255,255,0.6); font-weight: bold; padding: 0.75rem 1.25rem;">
+                        🔄 Sincronizar con TutorBox
+                    </button>
+                    <button onclick="showGrupo2Form()" class="btn" style="background: white; color: #667eea; font-weight: bold; padding: 0.75rem 1.5rem;">
+                        ➕ Nuevo Grupo
+                    </button>
+                </div>
             </div>
 
             <!-- Filters -->
@@ -1762,3 +1768,88 @@ function showBatchResultsModal(data, groupId) {
 }
 
 console.log('✅ Grupos2 module loaded successfully');
+
+
+// ============================================================================
+// 📡 LIVE STATE OF EACH GROUP'S ROOM + 🔄 SYNC (5 Oct 2026, fundador)
+// The CRM's book/unit went stale ("U1" everywhere while rooms were at U26–U48)
+// and some rooms were taught by a different teacher than the CRM said. The CF
+// getGroupsLive reads only stage/teacher/lastActivity per room (cheap).
+// ============================================================================
+window._groupsLive = {};
+let _groupsLiveAt = 0;
+window.loadGroupsLive = async function(force = false) {
+    if (!force && _groupsLiveAt && Date.now() - _groupsLiveAt < 5 * 60 * 1000) return window._groupsLive;
+    try { await window.loadClassLinks(); } catch (_) {}
+    const codes = {};
+    for (const g of (window.GroupsManager2?.groups?.values() || [])) {
+        if (g.status === 'inactive') continue;
+        const l = window.classCodeFor(g);
+        if (l && l.code) codes[g.groupId] = l.code;
+    }
+    if (!Object.keys(codes).length) return window._groupsLive;
+    try {
+        const r = await fetch(`${TUTORBOX_CF_BASE}/getGroupsLive`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-admin-key': TUTORBOX_KEY },
+            body: JSON.stringify({ codes })
+        });
+        const j = await r.json();
+        if (r.ok && j.byGroup) { window._groupsLive = j.byGroup; _groupsLiveAt = Date.now(); }
+    } catch (e) { console.warn('getGroupsLive:', e.message); }
+    return window._groupsLive;
+};
+
+/** "Teen Book 1" for 421, "Book 2" for 2 (books-manifest title before the " - "). */
+window.tbxBookName = function(n) {
+    if (n == null || n === '') return 'Libro ?';
+    const b = (window._tbxBooks || []).find(x => Number(x.book_number) === Number(n));
+    return b && b.title ? String(b.title).split(' - ')[0] : `Libro ${n}`;
+};
+
+window.syncGroupsWithTutorBox = async function() {
+    window.showNotification?.('⏳ Leyendo las salas en vivo…', 'info');
+    try { await window.loadTutorBoxBooks(); } catch (_) {}
+    const live = await window.loadGroupsLive(true);
+    const changed = [], teacherDiff = [], noRoom = [], stale = [];
+    for (const g of window.GroupsManager2.groups.values()) {
+        if (g.status === 'inactive') continue;
+        const L = live[String(g.groupId)];
+        if (!L) { noRoom.push(g); continue; }
+        if (L.lastActivity && Date.now() - L.lastActivity > 14 * 864e5) stale.push({ g, L });
+        if (L.book != null && (Number(g.book) !== Number(L.book) || Number(g.unit || 0) !== Number(L.unit || 0))) {
+            changed.push({ g, from: `${window.tbxBookName(g.book)}${g.unit ? ' U' + g.unit : ''}`, to: `${window.tbxBookName(L.book)} U${L.unit}` });
+            // patchGroup, NOT saveGroup: saveGroup's book-ledger hook would mark the
+            // "new" book as OWED for every student — wrong when the CRM number was
+            // just stale. Book debts stay a deliberate step in 📕 Libros.
+            try {
+                const next = { ...g, book: Number(L.book), unit: Number(L.unit) || null };
+                await window.GroupsManager2.patchGroup(g.groupId, {
+                    book: next.book, unit: next.unit,
+                    displayName: window.GroupsManager2.generateDisplayName(next),
+                    liveSyncedAt: new Date().toISOString()
+                });
+            } catch (e) { console.warn('sync save', g.groupId, e.message); }
+        }
+        if (L.ownerUid && g.teacherUid && L.ownerUid !== g.teacherUid) teacherDiff.push({ g, L });
+    }
+    const li = (arr, f) => arr.length ? `<ul style="margin: 0.3rem 0 0.8rem; padding-left: 1.2rem;">${arr.map(f).join('')}</ul>` : '<div style="color:#6b7280; margin: 0.3rem 0 0.8rem;">Ninguno.</div>';
+    document.getElementById('groupsSyncModal')?.remove();
+    document.body.insertAdjacentHTML('beforeend', `
+        <div id="groupsSyncModal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 3000;">
+            <div style="background: white; border-radius: 10px; padding: 1.5rem; width: 94%; max-width: 680px; max-height: 88vh; overflow-y: auto; font-size: 0.9rem;">
+                <h3 style="margin-top: 0;">🔄 Sincronización con TutorBox</h3>
+                <b>📚 Libro y unidad actualizados (${changed.length})</b>
+                ${changed.length ? '<div style="color:#92400e; background:#fffbeb; border-radius:6px; padding:0.4rem 0.6rem; margin:0.3rem 0;">No se generaron cobros de libros: si un grupo de verdad pasó a un libro nuevo, regístralo en 📕 Libros.</div>' : ''}
+                ${li(changed, x => `<li>${x.g.groupId}: ${x.from} → <b>${x.to}</b></li>`)}
+                <b>👩‍🏫 Profesor de la sala distinto al del CRM (${teacherDiff.length})</b>
+                ${li(teacherDiff, x => `<li>${x.g.groupId}: CRM <b>${x.g.teacherName || '—'}</b> · sala <b>${x.L.teacherName || '—'}</b> — si el CRM está bien, edita y guarda el grupo para que ese profesor quede de titular</li>`)}
+                <b>💤 Sin clase hace más de 14 días (${stale.length})</b>
+                ${li(stale, x => `<li>${x.g.groupId}: última clase hace ${Math.round((Date.now() - x.L.lastActivity) / 864e5)} días</li>`)}
+                <b>🚫 Sin sala en TutorBox (${noRoom.length})</b>
+                ${li(noRoom, g => `<li>${g.groupId} · ${g.displayName || ''}</li>`)}
+                <div style="text-align: right;"><button class="btn" onclick="document.getElementById('groupsSyncModal').remove()" style="background:#4f46e5; color:white;">Cerrar</button></div>
+            </div>
+        </div>`);
+    if (typeof window.refreshGrupos2Grid === 'function') window.refreshGrupos2Grid();
+};

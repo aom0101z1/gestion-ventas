@@ -118,18 +118,55 @@ function trialsTestGroupOptions(selected) {
 // ── 5 Oct 2026 (fundador): Felipe asigna el GRUPO al registrar ─────────────
 // Lista de TODOS los grupos activos de Grupos 2.0 con libro, unidad, profesor y
 // horario, para ubicar a la persona según el nivel que hable con ella.
+function trialsFmtTime(x) {
+    const m = String(x || '').match(/^(\d{1,2}):(\d{2})/);
+    if (!m) return x || '';
+    const h = Number(m[1]);
+    return `${((h + 11) % 12) + 1}:${m[2]}${h < 12 ? 'am' : 'pm'}`;
+}
+
+function trialsActiveCount(g) {
+    const ids = g.studentIds || [];
+    const sm = window.StudentManager?.students;
+    if (!sm || !sm.size) return ids.length;
+    return ids.filter(id => { const s = sm.get(id); return s && (s.status || 'active') === 'active'; }).length;
+}
+
+/** Label with the LIVE level + the teacher actually giving the class (5 Oct 2026). */
 function trialsGroupLabel(g) {
-    const n = (g.studentIds || []).length;
+    const L = (window._groupsLive || {})[String(g.groupId)];
+    const book = L && L.book != null ? L.book : g.book;
+    const unit = L && L.unit != null ? L.unit : g.unit;
+    const teacher = (L && L.teacherName) || g.teacherName || 'Sin profesor';
     const days = g.daysShort || (window.GroupsManager2?.getDaysShort ? window.GroupsManager2.getDaysShort(g.days || []) : (g.days || []).join(','));
-    const test = Number(g.groupId) >= 990 && Number(g.groupId) <= 999 ? '🧪 ' : '';
-    return `${test}${g.groupId} · Libro ${g.book || '?'}${g.unit ? ' U' + g.unit : ''} · ${g.teacherName || 'Sin profesor'} · ${days} ${g.startTime || ''}${g.endTime ? '–' + g.endTime : ''} · ${g.modality || ''} · ${n}/${g.maxStudents || 8}`;
+    const name = typeof window.tbxBookName === 'function' ? window.tbxBookName(book) : `Libro ${book}`;
+    const n = trialsActiveCount(g), max = g.maxStudents || 8;
+    return `${g.groupId} · ${name}${unit ? ' U' + unit : ''} · ${teacher} · ${days} ${trialsFmtTime(g.startTime)} · ${n}/${max}${n >= max ? ' ⚠️ lleno' : ''}`;
+}
+
+/**
+ * Groups Felipe can pick: active, not COATS (company groups), and — when the
+ * live data loaded — with a room that had class in the last 14 days. If the
+ * live data failed, active non-COATS groups with at least one active student.
+ */
+function trialsPickableGroups() {
+    const groups = window.GroupsManager2?.groups ? Array.from(window.GroupsManager2.groups.values()) : [];
+    const live = window._groupsLive || {};
+    const haveLive = Object.keys(live).length > 0;
+    return groups.filter(g => {
+        if (g.status === 'inactive' || String(g.modality || '').toUpperCase() === 'COATS') return false;
+        if (haveLive) {
+            const L = live[String(g.groupId)];
+            return !!L && (!L.lastActivity || Date.now() - L.lastActivity <= 14 * 864e5);
+        }
+        return trialsActiveCount(g) > 0;
+    }).sort((a, b) => Number(a.groupId) - Number(b.groupId));
 }
 
 function trialsAllGroupOptions(selected, placeholder = 'Sin grupo todavía (queda pendiente)') {
-    const groups = window.GroupsManager2?.groups ? Array.from(window.GroupsManager2.groups.values()) : [];
-    const active = groups.filter(g => g.status !== 'inactive').sort((a, b) => Number(a.groupId) - Number(b.groupId));
-    if (!active.length) return '<option value="">— No hay grupos en Grupos 2.0 —</option>';
-    return `<option value="">${placeholder}</option>` + active.map(g =>
+    const list = trialsPickableGroups();
+    if (!list.length) return '<option value="">— No hay grupos con clase en vivo —</option>';
+    return `<option value="">${placeholder}</option>` + list.map(g =>
         `<option value="${g.groupId}" ${String(selected) === String(g.groupId) ? 'selected' : ''}>${trialsEsc(trialsGroupLabel(g))}</option>`
     ).join('');
 }
@@ -138,7 +175,8 @@ async function trialsEnsureGroups() {
     if (window.GroupsManager2 && (!window.GroupsManager2.groups || window.GroupsManager2.groups.size === 0)) {
         try { await window.GroupsManager2.init(true); } catch (_) {}
     }
-    try { if (typeof window.loadClassLinks === 'function') await window.loadClassLinks(); } catch (_) {}
+    try { if (typeof window.loadTutorBoxBooks === 'function') await window.loadTutorBoxBooks(); } catch (_) {}
+    try { if (typeof window.loadGroupsLive === 'function') await window.loadGroupsLive(); } catch (_) {}
 }
 
 /** Crea el estudiante de prueba, lo mete al grupo y lo refleja en TutorBox. */
