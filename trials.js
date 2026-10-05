@@ -222,31 +222,45 @@ async function trialsIssueCode(id) {
 }
 
 /** Texto de WhatsApp con toda la información de la clase de prueba. */
+/**
+ * Texto de WhatsApp de la clase de prueba (5 oct 2026, fundador): clase VIRTUAL,
+ * sin lugar, sin nivel ni días de la semana (es UNA clase; el grupo se decide
+ * después), con instrucciones de entrada y una invitación a Tutor's World.
+ */
 function trialsWelcomeText(req, g, code) {
-    const DIAS = { Lunes: 'lunes', Martes: 'martes', 'Miércoles': 'miércoles', Miercoles: 'miércoles', Jueves: 'jueves', Viernes: 'viernes', 'Sábado': 'sábado', Sabado: 'sábado', Domingo: 'domingo' };
-    const dias = (g?.days || []).map(d => DIAS[d] || String(d).toLowerCase()).join(', ');
     let fecha = req.trialDate || '';
     try {
         if (fecha) fecha = new Date(`${fecha}T12:00:00`).toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' });
     } catch (_) {}
-    const link = g && typeof window.classCodeFor === 'function' ? window.classCodeFor(g) : null;
-    const online = !g || String(g.modality || '').toLowerCase() !== 'cb';
+    const fmt = (t) => {
+        const m = String(t || '').match(/^(\d{1,2}):(\d{2})/);
+        if (!m) return t || '';
+        const h = Number(m[1]);
+        return `${((h + 11) % 12) + 1}:${m[2]} ${h < 12 ? 'a.m.' : 'p.m.'}`;
+    };
+    const hora = g && g.startTime ? `${fmt(g.startTime)}${g.endTime ? ' a ' + fmt(g.endTime) : ''}` : '';
     const first = String(req.nombre || '').trim().split(/\s+/)[0] || '';
     const lines = [
-        `¡Hola ${first}! 👋 Te esperamos en tu *clase de prueba* de Ciudad Bilingüe.`,
+        `¡Hola ${first}! 👋 ¡Qué bueno tenerte con nosotros! Te esperamos en tu *clase de prueba GRATIS* de inglés con Ciudad Bilingüe. 🇬🇧✨`,
         '',
         `📅 *Fecha:* ${fecha || 'por confirmar'}`,
-        g ? `🕓 *Horario:* ${g.startTime || ''}${g.endTime ? ' a ' + g.endTime : ''}${dias ? ' (' + dias + ')' : ''}` : null,
-        g?.teacherName ? `👩‍🏫 *Profesor(a):* ${g.teacherName}` : null,
-        g ? `📚 *Nivel:* Libro ${g.book || '?'}${g.unit ? ', unidad ' + g.unit : ''} · grupo ${g.groupId}` : null,
-        !online && (g?.location || g?.room) ? `📍 *Lugar:* ${[g.location, g.room].filter(Boolean).join(' · ')}` : null,
+        hora ? `🕓 *Hora:* ${hora}` : null,
+        g && g.teacherName ? `👩‍🏫 *Tu profesor(a):* ${g.teacherName}` : null,
         '',
         code ? `🎟️ *Tu código personal:* ${code}` : null,
-        online ? `🔗 *Para entrar:* abre https://tutorbox.app/login → "Tengo un código" → escribe tu código.` : null,
-        online && link ? `   Enlace directo de tu clase: https://tutorbox.app/class?c=${link.code}` : null,
-        online ? `   Entra 5 minutos antes con audífonos y micrófono. 🎧` : null,
         '',
-        `Si te gusta la clase, comunícate con tu asesor para completar tu registro y continuar desde la siguiente clase. ¡Bienvenido(a)! 🎉`
+        `*¿Cómo entrar?* Es muy fácil:`,
+        `1️⃣ Abre 👉 https://tutorbox.app/login`,
+        `2️⃣ Toca *"🎟️ Tengo un código"*`,
+        code ? `3️⃣ Escribe tu código *${code}* y ¡listo! Entras directo a tu clase.` : `3️⃣ Escribe tu código personal y ¡listo! Entras directo a tu clase.`,
+        `🎧 Conéctate 5 minutos antes, con audífonos y micrófono, desde el computador o el celular.`,
+        '',
+        `🐙 *Mientras empieza tu clase…* ¡conoce a *Tuto* y su mundo! Con el mismo código entra a *Tutor's World* 👉 https://tutorbox.app/class/world`,
+        `Ahí practicas inglés hablando: pides un café, compras ropa para Tuto, viajas al aeropuerto… y ganas 💎 cristales por cada frase que dices. ¡Es un juego, pero aprendes de verdad!`,
+        '',
+        `💬 Si te gusta la clase, escríbele a tu asesor para completar tu registro y seguir desde la próxima clase con tu mismo código.`,
+        '',
+        `¡Nos vemos en clase! 🚀`
     ];
     return lines.filter(l => l !== null).join('\n');
 }
