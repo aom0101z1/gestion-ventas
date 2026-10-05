@@ -115,6 +115,210 @@ function trialsTestGroupOptions(selected) {
     ).join('');
 }
 
+// ── 5 Oct 2026 (fundador): Felipe asigna el GRUPO al registrar ─────────────
+// Lista de TODOS los grupos activos de Grupos 2.0 con libro, unidad, profesor y
+// horario, para ubicar a la persona según el nivel que hable con ella.
+function trialsGroupLabel(g) {
+    const n = (g.studentIds || []).length;
+    const days = g.daysShort || (window.GroupsManager2?.getDaysShort ? window.GroupsManager2.getDaysShort(g.days || []) : (g.days || []).join(','));
+    const test = Number(g.groupId) >= 990 && Number(g.groupId) <= 999 ? '🧪 ' : '';
+    return `${test}${g.groupId} · Libro ${g.book || '?'}${g.unit ? ' U' + g.unit : ''} · ${g.teacherName || 'Sin profesor'} · ${days} ${g.startTime || ''}${g.endTime ? '–' + g.endTime : ''} · ${g.modality || ''} · ${n}/${g.maxStudents || 8}`;
+}
+
+function trialsAllGroupOptions(selected, placeholder = 'Sin grupo todavía (queda pendiente)') {
+    const groups = window.GroupsManager2?.groups ? Array.from(window.GroupsManager2.groups.values()) : [];
+    const active = groups.filter(g => g.status !== 'inactive').sort((a, b) => Number(a.groupId) - Number(b.groupId));
+    if (!active.length) return '<option value="">— No hay grupos en Grupos 2.0 —</option>';
+    return `<option value="">${placeholder}</option>` + active.map(g =>
+        `<option value="${g.groupId}" ${String(selected) === String(g.groupId) ? 'selected' : ''}>${trialsEsc(trialsGroupLabel(g))}</option>`
+    ).join('');
+}
+
+async function trialsEnsureGroups() {
+    if (window.GroupsManager2 && (!window.GroupsManager2.groups || window.GroupsManager2.groups.size === 0)) {
+        try { await window.GroupsManager2.init(true); } catch (_) {}
+    }
+    try { if (typeof window.loadClassLinks === 'function') await window.loadClassLinks(); } catch (_) {}
+}
+
+/** Crea el estudiante de prueba, lo mete al grupo y lo refleja en TutorBox. */
+async function trialsCreateStudentForTrial(id, groupId, date) {
+    const req = window.TrialsManager.requests.get(id);
+    if (!req) throw new Error('Solicitud no encontrada');
+    if (!window.StudentManager) throw new Error('Módulo de estudiantes no cargado');
+    if (window.StudentManager.students && window.StudentManager.students.size === 0 && typeof window.StudentManager.init === 'function') {
+        try { await window.StudentManager.init(); } catch (_) {}
+    }
+    const student = await window.StudentManager.saveStudent({
+        nombre: req.nombre,
+        tipoDoc: req.tipoDoc || 'C.C',
+        numDoc: req.numDoc || '',
+        edad: req.edad || '',
+        telefono: req.telefono || '',
+        correo: req.correo || '',
+        acudiente: req.acudiente || '',
+        colegio: req.colegio || null,
+        tipoDocAcudiente: req.tipoDocAcudiente || '',
+        docAcudiente: req.docAcudiente || '',
+        fechaInicio: date,
+        grupo: String(groupId),
+        grupo2: '',
+        modalidad: 'Prueba',
+        modalidadDetalle: '',
+        tipoPago: req.tipoPago || 'MENSUAL',
+        cursoTipo: '',
+        valor: 0,
+        valor2: null,
+        valorHora: 0,
+        diaPago: 1,
+        photoUrl: '',
+        fuente: req.fuente || '',
+        notes: req.notas || '',
+        trialRequestId: req.id,
+        trialIntendedModalidad: req.modalidad || ''
+    });
+    try {
+        const g = window.GroupsManager2?.groups?.get(parseInt(groupId));
+        if (g) {
+            const ids = g.studentIds || [];
+            if (!ids.includes(student.id)) await window.GroupsManager2.saveGroup({ ...g, studentIds: [...ids, student.id] });
+        }
+    } catch (e) {
+        console.warn('trial group update skipped:', e.message);
+    }
+    await window.TrialsManager.update(id, {
+        status: req.status === 'si' ? 'si' : 'programada',
+        studentId: student.id,
+        trialGroupId: String(groupId),
+        trialDate: date,
+        registeredBy: window.TrialsManager.me(),
+        registeredAt: window.TrialsManager.now()
+    }, `Clase de prueba: grupo ${groupId} (${date}) — ${req.nombre} → ${student.id}`);
+    return student;
+}
+
+/**
+ * Código PERSONAL del estudiante (el mismo con el que entra a clase y que se
+ * conserva si se matricula). Crea la cuenta de clase en TutorBox si no existe.
+ * Nunca rota un código existente.
+ */
+async function trialsIssueCode(id) {
+    const req = window.TrialsManager.requests.get(id);
+    const st = req && req.studentId && window.StudentManager?.students?.get(req.studentId);
+    if (!st) return null;
+    let code = st.loginCode || null;
+    if (!code && typeof window.generateStudentLoginCode === 'function') {
+        code = await window.generateStudentLoginCode(st.id, { silent: true });
+    }
+    if (code) {
+        await window.TrialsManager.update(id, { loginCode: code });
+        // la cuenta de TutorBox ya existe: ahora sí entra en la lista del grupo
+        const gid = req.trialGroupId || st.grupo;
+        if (gid && typeof window.syncGroupMembersToTutorBox === 'function') {
+            try { window.syncGroupMembersToTutorBox(gid); } catch (_) {}
+        }
+    }
+    return code;
+}
+
+/** Texto de WhatsApp con toda la información de la clase de prueba. */
+function trialsWelcomeText(req, g, code) {
+    const DIAS = { Lunes: 'lunes', Martes: 'martes', 'Miércoles': 'miércoles', Miercoles: 'miércoles', Jueves: 'jueves', Viernes: 'viernes', 'Sábado': 'sábado', Sabado: 'sábado', Domingo: 'domingo' };
+    const dias = (g?.days || []).map(d => DIAS[d] || String(d).toLowerCase()).join(', ');
+    let fecha = req.trialDate || '';
+    try {
+        if (fecha) fecha = new Date(`${fecha}T12:00:00`).toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' });
+    } catch (_) {}
+    const link = g && typeof window.classCodeFor === 'function' ? window.classCodeFor(g) : null;
+    const online = !g || String(g.modality || '').toLowerCase() !== 'cb';
+    const first = String(req.nombre || '').trim().split(/\s+/)[0] || '';
+    const lines = [
+        `¡Hola ${first}! 👋 Te esperamos en tu *clase de prueba* de Ciudad Bilingüe.`,
+        '',
+        `📅 *Fecha:* ${fecha || 'por confirmar'}`,
+        g ? `🕓 *Horario:* ${g.startTime || ''}${g.endTime ? ' a ' + g.endTime : ''}${dias ? ' (' + dias + ')' : ''}` : null,
+        g?.teacherName ? `👩‍🏫 *Profesor(a):* ${g.teacherName}` : null,
+        g ? `📚 *Nivel:* Libro ${g.book || '?'}${g.unit ? ', unidad ' + g.unit : ''} · grupo ${g.groupId}` : null,
+        !online && (g?.location || g?.room) ? `📍 *Lugar:* ${[g.location, g.room].filter(Boolean).join(' · ')}` : null,
+        '',
+        code ? `🎟️ *Tu código personal:* ${code}` : null,
+        online ? `🔗 *Para entrar:* abre https://tutorbox.app/login → "Tengo un código" → escribe tu código.` : null,
+        online && link ? `   Enlace directo de tu clase: https://tutorbox.app/class?c=${link.code}` : null,
+        online ? `   Entra 5 minutos antes con audífonos y micrófono. 🎧` : null,
+        '',
+        `Si te gusta la clase, comunícate con tu asesor para completar tu registro y continuar desde la siguiente clase. ¡Bienvenido(a)! 🎉`
+    ];
+    return lines.filter(l => l !== null).join('\n');
+}
+
+window.showTrialWelcome = async function(id) {
+    const req = window.TrialsManager.requests.get(id);
+    if (!req) return;
+    await trialsEnsureGroups();
+    const g = req.trialGroupId ? window.GroupsManager2?.groups?.get(parseInt(req.trialGroupId)) : null;
+    let code = req.loginCode || (req.studentId && window.StudentManager?.students?.get(req.studentId)?.loginCode) || null;
+    const text = trialsWelcomeText(req, g, code);
+    const digits = String(req.telefono || '').split(/[\/,;]+/)[0].replace(/\D/g, '');
+    const wa = digits.length === 10 && digits.startsWith('3') ? '57' + digits : digits;
+    document.getElementById('trialWelcomeModal')?.remove();
+    trialsContainerEl().insertAdjacentHTML('beforeend', `
+        <div id="trialWelcomeModal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;">
+            <div style="background: white; padding: 1.5rem; border-radius: 10px; max-width: 560px; width: 94%; max-height: 92vh; overflow-y: auto;">
+                <h3 style="margin: 0 0 0.25rem;">✅ ${trialsEsc(req.nombre)} quedó en la clase de prueba</h3>
+                <div style="color: #6b7280; font-size: 0.85rem; margin-bottom: 0.75rem;">${g ? trialsEsc(trialsGroupLabel(g)) : 'Sin grupo'}</div>
+                ${code ? `
+                <div style="background: #fffbeb; border: 2px solid #f59e0b; border-radius: 8px; padding: 0.6rem; text-align: center; margin-bottom: 0.75rem;">
+                    <div style="font-size: 0.75rem; color: #92400e; font-weight: 700;">🎟️ CÓDIGO PERSONAL (no cambia si se matricula)</div>
+                    <div style="font-family: monospace; font-size: 2rem; font-weight: 900; letter-spacing: 0.2em; color: #78350f;">${trialsEsc(code)}</div>
+                </div>` : `
+                <div style="background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; border-radius: 8px; padding: 0.6rem; margin-bottom: 0.75rem; font-size: 0.85rem;">
+                    ⚠️ No se pudo generar el código todavía (TutorBox no respondió).
+                    <button onclick="trialsRetryCode('${id}')" style="margin-left: 0.4rem; padding: 0.2rem 0.5rem; border: none; border-radius: 5px; background: #dc2626; color: white; cursor: pointer;">Reintentar</button>
+                </div>`}
+                <label style="font-size: 0.8rem; color: #374151; font-weight: 600;">Mensaje para enviar:</label>
+                <textarea id="trialWelcomeText" rows="14" style="width: 100%; padding: 0.6rem; border: 1px solid #e5e7eb; border-radius: 8px; font-family: inherit; font-size: 0.85rem;">${trialsEsc(text)}</textarea>
+                <div style="display: flex; gap: 0.5rem; justify-content: flex-end; flex-wrap: wrap; margin-top: 0.75rem;">
+                    <button onclick="document.getElementById('trialWelcomeModal').remove()" class="btn" style="background: #e5e7eb;">Cerrar</button>
+                    <button onclick="trialsCopyWelcome()" class="btn" style="background: #4f46e5; color: white;">📋 Copiar mensaje</button>
+                    ${wa ? `<button onclick="trialsSendWhatsApp('${wa}')" class="btn" style="background: #16a34a; color: white;">💬 Enviar por WhatsApp</button>` : ''}
+                </div>
+            </div>
+        </div>`);
+};
+
+window.trialsCopyWelcome = function() {
+    const t = document.getElementById('trialWelcomeText');
+    if (!t) return;
+    (navigator.clipboard?.writeText(t.value) || Promise.reject()).then(
+        () => window.showNotification?.('📋 Mensaje copiado', 'success'),
+        () => { t.select(); document.execCommand('copy'); window.showNotification?.('📋 Mensaje copiado', 'success'); }
+    );
+};
+
+window.trialsSendWhatsApp = function(phone) {
+    const t = document.getElementById('trialWelcomeText');
+    if (!t) return;
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(t.value)}`, '_blank', 'noopener');
+};
+
+window.trialsRetryCode = async function(id) {
+    const code = await trialsIssueCode(id);
+    if (!code) { window.showNotification?.('❌ TutorBox sigue sin responder. Intenta en un minuto.', 'error'); return; }
+    window.showTrialWelcome(id);
+    renderTrialsTab();
+};
+
+/** Todo en un paso: estudiante + grupo + código + mensaje. */
+async function trialsAssignAndWelcome(id, groupId, date) {
+    const req = window.TrialsManager.requests.get(id);
+    if (!req.studentId) await trialsCreateStudentForTrial(id, groupId, date);
+    let code = null;
+    try { code = await trialsIssueCode(id); } catch (e) { console.warn('trial code:', e.message); }
+    renderTrialsTab();
+    await window.showTrialWelcome(id);
+    if (!code) window.showNotification?.('⚠️ Persona registrada en el grupo, pero el código no se generó: usa "Reintentar".', 'warning');
+}
+
 // The module can be open in TWO places: the 🧪 tab (#trials > #trialsContainer) and
 // the 🏫 Módulos Escolares overlay (school-buttons.js openModule creates its own
 // #trialsContainer inside #schoolModuleView). Prefer the visible one.
@@ -217,7 +421,10 @@ function renderTrialRow(r) {
     const actions = [];
     actions.push(btn('✏️ Editar', `showTrialForm('${r.id}')`, '#4b5563'));
     if (staff && !r.studentId && st !== 'no') {
-        actions.push(btn('🧪 Registrar en Test Class', `showTrialRegisterModal('${r.id}')`, '#2563eb'));
+        actions.push(btn('🎓 Asignar grupo', `showTrialRegisterModal('${r.id}')`, '#2563eb'));
+    }
+    if (r.studentId && st !== 'no' && st !== 'matriculado') {
+        actions.push(btn('📲 Mensaje', `showTrialWelcome('${r.id}')`, '#16a34a'));
     }
     if (st === 'pendiente' || st === 'programada') {
         actions.push(btn('✅ Sí se matricula', `trialsSetDecision('${r.id}', 'si')`, '#059669'));
@@ -227,7 +434,7 @@ function renderTrialRow(r) {
         actions.push(btn('🎓 Matricular', `trialsOpenEnrollment('${r.id}')`, '#7c3aed'));
     }
     if (staff && st === 'si' && !r.studentId) {
-        actions.push(btn('🧪 Primero regístralo en Test Class', `showTrialRegisterModal('${r.id}')`, '#2563eb'));
+        actions.push(btn('🎓 Primero asígnale un grupo', `showTrialRegisterModal('${r.id}')`, '#2563eb'));
     }
     if (st === 'no' && !sales) {
         actions.push(btn('↩️ Reabrir', `trialsSetDecision('${r.id}', 'pendiente')`, '#9ca3af'));
@@ -235,7 +442,7 @@ function renderTrialRow(r) {
 
     // Test-class group + date live under the status once reception registered the person
     const trialInfo = r.trialGroupId
-        ? `<div style="color:#6b7280; font-size:0.75rem;">🧪 Grupo ${trialsEsc(r.trialGroupId)} · ${trialsEsc(r.trialDate || '')}</div>`
+        ? `<div style="color:#6b7280; font-size:0.75rem;">🎓 Grupo ${trialsEsc(r.trialGroupId)} · ${trialsEsc(r.trialDate || '')}${r.loginCode ? ' · 🎟️ ' + trialsEsc(r.loginCode) : ''}</div>`
         : '';
 
     return `
@@ -336,6 +543,20 @@ function renderTrialForm(req = null) {
                         <label>Fuente / cómo nos conoció</label>
                         <input type="text" id="trlFuente" value="${trialsEsc(req?.fuente || '')}" placeholder="Instagram, referido, convenio…">
                     </div>
+                    ${!req?.studentId ? `
+                    <div style="grid-column: span 2; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:0.75rem;">
+                        <div style="font-weight:700; color:#1e40af; margin-bottom:0.4rem;">🎓 Clase de prueba (opcional — si eliges grupo, se le crea su código y te doy el mensaje para enviarle)</div>
+                        <div style="display:grid; grid-template-columns: 1fr 180px; gap:0.6rem;">
+                            <div class="form-group" style="margin:0;">
+                                <label>Grupo (libro · unidad · profesor · horario)</label>
+                                <select id="trlGroup">${trialsAllGroupOptions(req?.trialGroupId)}</select>
+                            </div>
+                            <div class="form-group" style="margin:0;">
+                                <label>Fecha de la clase</label>
+                                <input type="date" id="trlGroupDate" value="${trialsEsc(req?.trialDate || new Date().toISOString().slice(0, 10))}">
+                            </div>
+                        </div>
+                    </div>` : ''}
                     <div class="form-group" style="grid-column: span 2;">
                         <label>Notas para recepción</label>
                         <textarea id="trlNotas" rows="2" placeholder="Horario que prefiere, nivel, observaciones…">${trialsEsc(req?.notas || '')}</textarea>
@@ -360,7 +581,8 @@ window.trialsEdadCategoriaChange = function() {
     if (!isChild) input.value = '';
 };
 
-window.showTrialForm = function(id = null) {
+window.showTrialForm = async function(id = null) {
+    await trialsEnsureGroups();
     const req = id ? window.TrialsManager.requests.get(id) : null;
     const container = trialsContainerEl();
     const existing = document.getElementById('trialFormModal');
@@ -376,7 +598,10 @@ window.showTrialForm = function(id = null) {
             const edadCategoria = v('trlEdadCategoria');
             const isChild = edadCategoria === 'Niño' || edadCategoria === 'Niña';
             if (isChild && !v('trlEdad')) throw new Error('Indica la edad del niño/niña');
-            await window.TrialsManager.save({
+            const groupId = document.getElementById('trlGroup')?.value || '';
+            const groupDate = document.getElementById('trlGroupDate')?.value || '';
+            if (groupId && !groupDate) throw new Error('Indica la fecha de la clase de prueba');
+            const saved = await window.TrialsManager.save({
                 id: req?.id,
                 nombre: v('trlNombre'),
                 edadCategoria,
@@ -394,7 +619,12 @@ window.showTrialForm = function(id = null) {
             });
             closeTrialForm();
             renderTrialsTab();
-            window.showNotification?.(req ? '✅ Datos actualizados' : '🧪 Persona registrada para clase de prueba', 'success');
+            if (groupId && saved && !saved.studentId) {
+                window.showNotification?.('⏳ Asignando grupo y creando el código…', 'info');
+                await trialsAssignAndWelcome(saved.id, groupId, groupDate);
+            } else {
+                window.showNotification?.(req ? '✅ Datos actualizados' : '🧪 Persona registrada para clase de prueba', 'success');
+            }
         } catch (err) {
             console.error('trial save:', err);
             window.showNotification?.('❌ No se pudo guardar: ' + err.message, 'error');
@@ -413,7 +643,11 @@ window.closeTrialForm = function() {
 window.trialsSetDecision = async function(id, decision) {
     const req = window.TrialsManager.requests.get(id);
     if (!req) return;
-    const labels = { si: '✅ ¿Confirmas que decidió matricularse?', no: '❌ ¿Marcar como "no continúa"?', pendiente: '↩️ ¿Reabrir esta solicitud?' };
+    const labels = {
+        si: '✅ ¿Confirmas que decidió matricularse?\n\nSe abrirá la ficha para completar la matrícula. Su código personal NO cambia.',
+        no: '❌ ¿Marcar como "no continúa"?\n\nEl estudiante de prueba queda INACTIVO y su código deja de funcionar.',
+        pendiente: '↩️ ¿Reabrir esta solicitud?\n\nSi tenía estudiante de prueba, se reactiva y su código vuelve a funcionar.'
+    };
     if (!confirm(`${labels[decision] || '¿Continuar?'}\n\n${req.nombre}`)) return;
     try {
         await window.TrialsManager.update(id, {
@@ -421,8 +655,35 @@ window.trialsSetDecision = async function(id, decision) {
             decisionAt: window.TrialsManager.now(),
             decisionBy: window.TrialsManager.me()
         }, `Decisión: ${TRIAL_STATUS[decision]?.label || decision} — ${req.nombre}`);
+
+        // ❌ / ↩️ : el estudiante de prueba se inactiva / reactiva (y con él su código en TutorBox)
+        const st = req.studentId && window.StudentManager?.students?.get(req.studentId);
+        if (st && (decision === 'no' || decision === 'pendiente')) {
+            const wantActive = decision === 'pendiente';
+            const isActive = (st.status || 'active') === 'active';
+            if (wantActive !== isActive) {
+                try {
+                    await window.StudentManager.toggleStudentStatus(st.id, wantActive
+                        ? { reason: 'Clase de prueba reabierta', notes: 'Reactivado desde Clases de prueba' }
+                        : { date: new Date().toISOString().slice(0, 10), reason: 'Clase de prueba: no continúa', notes: 'Inactivado desde Clases de prueba' });
+                    if (typeof window.syncStatusToTutorBox === 'function') window.syncStatusToTutorBox(st.id);
+                } catch (e) {
+                    window.showNotification?.('⚠️ Estado guardado, pero no se pudo cambiar el estudiante: ' + e.message, 'warning');
+                }
+            }
+        }
         renderTrialsTab();
-        window.showNotification?.(decision === 'si' ? '🎉 Marcado: decidió matricularse. Recepción completa la matrícula.' : 'Estado actualizado', 'success');
+        if (decision === 'si') {
+            if (req.studentId) {
+                window.showNotification?.('🎉 Decidió matricularse — abriendo la ficha para completar la matrícula…', 'success');
+                await window.trialsOpenEnrollment(id);
+            } else {
+                window.showNotification?.('🎉 Marcado. Primero asígnale un grupo para crear su ficha y su código.', 'info');
+                await window.showTrialRegisterModal(id);
+            }
+        } else {
+            window.showNotification?.(decision === 'no' ? '❌ No continúa: estudiante inactivo y código desactivado' : 'Solicitud reabierta', 'success');
+        }
     } catch (err) {
         window.showNotification?.('❌ No se pudo actualizar: ' + err.message, 'error');
     }
@@ -433,9 +694,7 @@ window.trialsSetDecision = async function(id, decision) {
 window.showTrialRegisterModal = async function(id) {
     const req = window.TrialsManager.requests.get(id);
     if (!req) return;
-    if (window.GroupsManager2 && (!window.GroupsManager2.groups || window.GroupsManager2.groups.size === 0)) {
-        try { await window.GroupsManager2.init(true); } catch (_) {}
-    }
+    await trialsEnsureGroups();
     const today = new Date().toISOString().slice(0, 10);
     const container = trialsContainerEl();
     const existing = document.getElementById('trialRegisterModal');
@@ -445,12 +704,12 @@ window.showTrialRegisterModal = async function(id) {
             <div style="background: white; padding: 2rem; border-radius: 8px; max-width: 520px; width: 92%;">
                 <h3 style="margin-top:0;">🧪 Registrar en Test Class</h3>
                 <p style="color:#4b5563; font-size:0.9rem;">
-                    Se crea el estudiante <b>${trialsEsc(req.nombre)}</b> con modalidad <b>Prueba</b> y sin valor,
-                    dentro del grupo de prueba elegido. Grupo real, tipo de curso, valor y día de pago se completan al matricular.
+                    Se crea el estudiante <b>${trialsEsc(req.nombre)}</b> con modalidad <b>Prueba</b> y sin valor, dentro del
+                    grupo elegido, con su <b>código personal</b> de clase. Tipo de curso, valor y día de pago se completan al matricular.
                 </p>
                 <div class="form-group">
-                    <label>Grupo 🧪 Test Class*</label>
-                    <select id="trlRegGroup">${trialsTestGroupOptions(req.trialGroupId)}</select>
+                    <label>Grupo* (libro · unidad · profesor · horario)</label>
+                    <select id="trlRegGroup">${trialsAllGroupOptions(req.trialGroupId, 'Seleccionar grupo')}</select>
                 </div>
                 <div class="form-group">
                     <label>Fecha de la clase de prueba*</label>
@@ -469,68 +728,13 @@ window.trialsRegisterStudent = async function(id) {
     if (!req) return;
     const groupId = document.getElementById('trlRegGroup')?.value;
     const date = document.getElementById('trlRegDate')?.value;
-    if (!groupId) { window.showNotification?.('Elige un grupo 🧪 Test Class', 'error'); return; }
+    if (!groupId) { window.showNotification?.('Elige un grupo', 'error'); return; }
     if (!date) { window.showNotification?.('Indica la fecha de la clase de prueba', 'error'); return; }
     const btn = document.getElementById('trlRegBtn');
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Creando…'; }
     try {
-        if (!window.StudentManager) throw new Error('Módulo de estudiantes no cargado');
-        const student = await window.StudentManager.saveStudent({
-            nombre: req.nombre,
-            tipoDoc: req.tipoDoc || 'C.C',
-            numDoc: req.numDoc || '',
-            edad: req.edad || '',
-            telefono: req.telefono || '',
-            correo: req.correo || '',
-            acudiente: req.acudiente || '',
-            colegio: req.colegio || null,
-            tipoDocAcudiente: req.tipoDocAcudiente || '',
-            docAcudiente: req.docAcudiente || '',
-            fechaInicio: date,
-            grupo: String(groupId),
-            grupo2: '',
-            modalidad: 'Prueba',
-            modalidadDetalle: '',
-            tipoPago: req.tipoPago || 'MENSUAL',
-            cursoTipo: '',
-            valor: 0,
-            valor2: null,
-            valorHora: 0,
-            diaPago: 1,
-            photoUrl: '',
-            fuente: req.fuente || '',
-            notes: req.notas || '',
-            trialRequestId: req.id,
-            trialIntendedModalidad: req.modalidad || ''
-        });
-
-        // Put the student in the Test Class group (Grupos 2.0 list) and mirror
-        // it to the TutorBox class group.
-        try {
-            const g = window.GroupsManager2?.groups?.get(parseInt(groupId));
-            if (g) {
-                const ids = g.studentIds || [];
-                if (!ids.includes(student.id)) {
-                    await window.GroupsManager2.saveGroup({ ...g, studentIds: [...ids, student.id] });
-                }
-                window.syncGroupMembersToTutorBox?.(groupId);
-            }
-        } catch (e) {
-            console.warn('test-class group update skipped:', e.message);
-        }
-
-        await window.TrialsManager.update(id, {
-            status: req.status === 'si' ? 'si' : 'programada',
-            studentId: student.id,
-            trialGroupId: String(groupId),
-            trialDate: date,
-            registeredBy: window.TrialsManager.me(),
-            registeredAt: window.TrialsManager.now()
-        }, `Registrado en Test Class ${groupId} (${date}) — ${req.nombre} → ${student.id}`);
-
         document.getElementById('trialRegisterModal')?.remove();
-        renderTrialsTab();
-        window.showNotification?.(`🧪 ${req.nombre} registrado como estudiante de prueba en el grupo ${groupId}`, 'success');
+        await trialsAssignAndWelcome(id, groupId, date);
     } catch (err) {
         console.error('trial register:', err);
         window.showNotification?.('❌ No se pudo crear el estudiante: ' + err.message, 'error');

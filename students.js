@@ -1261,6 +1261,8 @@ window.canToggleStudentStatus = function() {
 
 // Status is part of what TutorBox mirrors: the profile's crmStatus and the group
 // member list (syncGroupMembers sends active students only). Best-effort.
+// window.* so Clases de prueba (trials.js) can reuse it on "No continúa" / "Reabrir"
+window.syncStatusToTutorBox = syncStatusToTutorBox;
 function syncStatusToTutorBox(id) {
     const st = window.StudentManager?.students?.get(String(id));
     if (!st) return;
