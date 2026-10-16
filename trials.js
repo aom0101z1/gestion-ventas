@@ -137,12 +137,25 @@ function trialsActiveCount(g) {
 }
 
 /** 427 → "B7", 422 → "B2", 8 → "B8", 110/410 → "B10" (regla del fundador: último dígito del libro). */
-function trialsBookShort(n) {
+function trialsBookNum(n) {
     const v = Number(n);
-    if (n == null || n === '' || !Number.isFinite(v)) return 'B?';
-    if (v <= 10) return 'B' + v;
-    if (v % 100 === 10) return 'B10';
-    return 'B' + (v % 10);
+    if (n == null || n === '' || !Number.isFinite(v)) return null;
+    if (v <= 10) return v;
+    if (v % 100 === 10) return 10;
+    return v % 10;
+}
+function trialsBookShort(n) {
+    const b = trialsBookNum(n);
+    return b == null ? 'B?' : 'B' + b;
+}
+/** Adultos (1-10) · Teens (42x) · Kids (43x, 47x) — por el número del libro. */
+function trialsFamily(n) {
+    const v = Number(n);
+    if (!Number.isFinite(v) || v <= 0) return '';
+    if (v <= 10) return 'Adultos';
+    if ((v >= 430 && v < 440) || (v >= 470 && v < 480)) return 'Kids';
+    if (v >= 420 && v < 430) return 'Teens';
+    return '';
 }
 
 /** "4-6pm", "6:30-8:30pm", "8-12", "1-5pm" a partir de "16:00"/"18:00". */
@@ -161,11 +174,11 @@ function trialsFmtRange(start, end) {
 }
 
 const TRIAL_SLOTS = [
-    { key: 'tarde', label: 'L-M-V 4-6pm' },
-    { key: 'noche', label: 'L-M-V 6:30-8:30pm' },
-    { key: 'sabam', label: 'Sáb 8-12' },
-    { key: 'sabpm', label: 'Sáb 1-5pm' },
-    { key: 'otro',  label: 'Otro horario' }
+    { key: 'tarde', label: 'L-M-V 4-6pm',      days: 'Lun · Mié · Vie', hours: '4:00 – 6:00 pm',  dow: [1, 3, 5], cls: 'tarde' },
+    { key: 'noche', label: 'L-M-V 6:30-8:30pm', days: 'Lun · Mié · Vie', hours: '6:30 – 8:30 pm',  dow: [1, 3, 5], cls: 'noche' },
+    { key: 'sabam', label: 'Sáb 8-12',          days: 'Sábado',          hours: '8:00 – 12:00',    dow: [6],       cls: 'sab' },
+    { key: 'sabpm', label: 'Sáb 1-5pm',         days: 'Sábado',          hours: '1:00 – 5:00 pm',  dow: [6],       cls: 'sab' },
+    { key: 'otro',  label: 'Otro horario',      days: 'Otro horario',    hours: '',                dow: null,      cls: 'otro' }
 ];
 const TRIAL_DAY = { 0: 'Dom', 1: 'Lun', 2: 'Mar', 3: 'Mié', 4: 'Jue', 5: 'Vie', 6: 'Sáb' };
 
@@ -244,27 +257,145 @@ function trialsPickableGroups() {
         .sort((a, b) => Number(a.groupId) - Number(b.groupId));
 }
 
-function trialsAllGroupOptions(selected, placeholder = 'Sin grupo todavía (queda pendiente)') {
-    const sel = (gid) => String(selected) === String(gid) ? 'selected' : '';
+// ── 16 Oct 2026 (fundador, diseño aprobado): TABLERO en vez de <select> ────
+// Una columna por franja real de la escuela, dentro los grupos como tarjetas
+// ordenadas por nivel (B7 U12 · profesor · G104 · puntos de cupo). Tocar una
+// tarjeta elige el grupo (input oculto con el mismo id que antes) y propone las
+// próximas fechas de esa clase. Sin filtros: Felipe ve todo de una vez.
+function trialsBoardCss() {
+    if (document.getElementById('trialsBoardCss')) return;
+    const st = document.createElement('style');
+    st.id = 'trialsBoardCss';
+    st.textContent = `
+.tb-wrap{min-width:0}
+.tb-empty{color:#6b7280;font-size:.85rem;padding:.6rem 0}
+.tb-board{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;align-items:start}
+.tb-col{display:grid;gap:7px;align-content:start;min-width:0}
+.tb-head{border-radius:10px;padding:8px 10px;display:grid;gap:1px;line-height:1.25}
+.tb-head b{font-size:.95rem}.tb-head .tb-h{font-family:ui-monospace,Consolas,monospace;font-size:.78rem}.tb-head small{font-size:.72rem;opacity:.85}
+.tb-head.tarde{background:#fff4e0;color:#b45309}.tb-head.noche{background:#f0e9ff;color:#6d28d9}.tb-head.sab{background:#dff5ea;color:#047857}.tb-head.otro{background:#f1f5f9;color:#475569}
+.tb-card{display:grid;grid-template-columns:auto minmax(0,1fr);gap:3px 9px;align-items:center;background:#fff;border:1.5px solid #d6dee8;border-radius:10px;padding:8px 10px;cursor:pointer;text-align:left;font:inherit;color:#15233a;width:100%;min-width:0;overflow:hidden;transition:border-color .12s,transform .12s}
+.tb-card:hover{border-color:#64748b;transform:translateY(-1px)}
+.tb-card.sel{border-color:#0f8f7f;box-shadow:0 0 0 3px #d9f2ee}
+.tb-card.off{cursor:default;opacity:.5;border-style:dashed}
+.tb-card:focus-visible,.tb-date:focus-visible{outline:3px solid #0f8f7f;outline-offset:2px}
+.tb-lv{grid-row:span 2;font-family:ui-monospace,Consolas,monospace;font-weight:700;font-size:1.15rem;line-height:1;padding:8px 6px;border-radius:8px;background:#eef2f6;text-align:center;min-width:48px}
+.tb-lv small{display:block;font-size:.62rem;font-weight:500;margin-top:3px;color:#5b6b82}
+.tb-who{font-weight:600;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.tb-meta{display:flex;flex-wrap:wrap;align-items:center;gap:3px 7px;font-size:.75rem;color:#5b6b82;min-width:0}
+.tb-gid{font-family:ui-monospace,Consolas,monospace}
+.tb-dots{display:inline-flex;gap:2px}.tb-dots i{width:6px;height:6px;border-radius:50%;background:#d6dee8;display:inline-block}.tb-dots i.f{background:#0f8f7f}.tb-dots i.x{background:#b91c1c}
+.tb-full{color:#b91c1c;font-weight:700}
+.tb-fam{font-size:.66rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.tb-dates{display:flex;flex-wrap:wrap;gap:6px;margin:.35rem 0}
+.tb-date{font:inherit;font-size:.82rem;padding:5px 10px;border-radius:999px;border:1.5px solid #d6dee8;background:#fff;color:#15233a;cursor:pointer}
+.tb-date.sel{border-color:#0f8f7f;background:#d9f2ee;font-weight:700}
+.tb-daterow{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem}
+.tb-daterow input[type=date]{width:auto}
+`;
+    document.head.appendChild(st);
+}
+
+function trialsCardHTML(inputId, x, selected) {
+    const r = x.room || {}, g = x.g;
+    const book = r.book != null ? r.book : (g ? g.book : null);
+    const unit = r.unit != null ? r.unit : (g ? g.unit : null);
+    const teacher = r.teacherName || (g && g.teacherName) || 'Sin profesor';
+    const lv = `<span class="tb-lv">${trialsBookShort(book)}<small>${unit ? 'U' + unit : '&nbsp;'}</small></span>`;
+    const fam = trialsFamily(book) ? `<span class="tb-fam">${trialsFamily(book)}</span>` : '';
+    if (!g) {
+        return `<div class="tb-card off">${lv}<span class="tb-who">${trialsEsc(r.title || teacher)}</span><span class="tb-meta">sin grupo activo en el CRM ${fam}</span></div>`;
+    }
+    const n = trialsActiveCount(g), max = g.maxStudents || 8, full = n > max;
+    let dots = '';
+    for (let i = 0; i < Math.min(max, 16); i++) dots += `<i class="${i < n ? (full ? 'x' : 'f') : ''}"></i>`;
+    let sched = '';
+    if (x.slot === 'otro') {
+        sched = r.start ? trialsRoomSchedule(r)
+            : `${g.daysShort || (window.GroupsManager2?.getDaysShort ? window.GroupsManager2.getDaysShort(g.days || []) : '')} ${trialsFmtTime(g.startTime)}`.trim();
+        if (sched) sched = `<span>${trialsEsc(sched)}</span>`;
+    }
+    const sel = String(selected || '') === String(g.groupId) ? ' sel' : '';
+    return `<button type="button" class="tb-card${sel}" data-gid="${g.groupId}" onclick="trialsPickGroup('${inputId}', '${g.groupId}', this)">
+        ${lv}<span class="tb-who">${trialsEsc(teacher)}</span>
+        <span class="tb-meta"><span class="tb-gid">G${g.groupId}</span><span class="tb-dots">${dots}</span><span class="${full ? 'tb-full' : ''}">${n}/${max}${full ? ' lleno' : ''}</span>${sched}${fam}</span>
+    </button>`;
+}
+
+/** El tablero completo + el input oculto `inputId` que lee el resto del flujo. */
+function trialsBoardHTML(inputId, selected) {
+    trialsBoardCss();
+    const hidden = `<input type="hidden" id="${inputId}" value="${trialsEsc(selected || '')}" data-selected="${trialsEsc(selected || '')}">`;
     const live = trialsLiveRooms();
     if (!live.length) {
-        if (!_trialsLiveLoaded) return '<option value="">⏳ Cargando las clases en vivo…</option>';
+        if (!_trialsLiveLoaded) return `<div id="${inputId}_board" class="tb-wrap">${hidden}<div class="tb-empty">⏳ Cargando las clases en vivo…</div></div>`;
         const list = trialsPickableGroups();
-        if (!list.length) return '<option value="">— No hay grupos activos —</option>';
-        return `<option value="">${placeholder}</option>` + list.map(g =>
-            `<option value="${g.groupId}" ${sel(g.groupId)}>${trialsEsc(trialsGroupLabel(g))}</option>`).join('');
+        if (!list.length) return `<div id="${inputId}_board" class="tb-wrap">${hidden}<div class="tb-empty">— No hay grupos activos —</div></div>`;
+        return `<div id="${inputId}_board" class="tb-wrap">${hidden}<div class="tb-empty">TutorBox no respondió: se muestran los grupos del CRM.</div>
+            <div class="tb-board"><div class="tb-col">${list.map(g => trialsCardHTML(inputId, { g, room: {}, slot: 'otro' }, selected)).join('')}</div></div></div>`;
     }
-    let html = `<option value="">${placeholder}</option>`;
+    const rank = x => { const b = trialsBookNum(x.room.book != null ? x.room.book : (x.g ? x.g.book : null)); return b == null ? 99 : b; };
+    let cols = '';
     for (const s of TRIAL_SLOTS) {
-        const rows = live.filter(x => x.slot === s.key);
+        const rows = live.filter(x => x.slot === s.key)
+            .sort((a, b) => (a.g ? 0 : 1) - (b.g ? 0 : 1) || rank(a) - rank(b) || (a.room.unit || 0) - (b.room.unit || 0));
         if (!rows.length) continue;
-        html += `<optgroup label="${s.label}">` + rows.map(x => x.g
-            ? `<option value="${x.g.groupId}" ${sel(x.g.groupId)}>${trialsEsc(trialsRoomLabel(x))}</option>`
-            : `<option value="" disabled>${trialsEsc(x.room.title || x.room.code)} · sin grupo activo en el CRM</option>`
-        ).join('') + '</optgroup>';
+        const open = rows.filter(x => x.g).length;
+        cols += `<div class="tb-col"><div class="tb-head ${s.cls}"><b>${s.days}</b>${s.hours ? `<span class="tb-h">${s.hours}</span>` : ''}<small>${open} grupo${open === 1 ? '' : 's'}</small></div>${rows.map(x => trialsCardHTML(inputId, x, selected)).join('')}</div>`;
     }
-    return html;
+    return `<div id="${inputId}_board" class="tb-wrap">${hidden}<div class="tb-board">${cols}</div></div>`;
 }
+
+window.trialsPickGroup = function(inputId, gid, btn) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    input.value = gid; input.dataset.selected = gid;
+    const board = document.getElementById(inputId + '_board');
+    if (board) board.querySelectorAll('.tb-card.sel').forEach(b => b.classList.remove('sel'));
+    if (btn) btn.classList.add('sel');
+    trialsSuggestDates(inputId, gid, true);
+};
+
+function trialsIsoLocal(d) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function trialsNextDates(dow, count) {
+    const out = [], d = new Date(); d.setHours(12, 0, 0, 0);
+    for (let i = 0; i < 45 && out.length < count; i++) {
+        const x = new Date(d); x.setDate(d.getDate() + i);
+        if (dow.includes(x.getDay())) out.push(x);
+    }
+    return out;
+}
+const TRIAL_DATE_INPUT = { trlRegGroup: 'trlRegDate', trlGroup: 'trlGroupDate' };
+
+/** Próximas 3 fechas de la clase del grupo elegido como chips; setDate=true pone la primera en el input. */
+function trialsSuggestDates(inputId, gid, setDate) {
+    const dateId = TRIAL_DATE_INPUT[inputId];
+    const dateEl = dateId && document.getElementById(dateId), box = dateId && document.getElementById(dateId + '_chips');
+    if (!dateEl || !box) return;
+    const x = trialsLiveRooms().find(y => y.g && String(y.g.groupId) === String(gid));
+    let dow = null;
+    if (x) {
+        const s = TRIAL_SLOTS.find(s => s.key === x.slot);
+        dow = s && s.dow ? s.dow : String(x.room.days || '').split(',').filter(Boolean).map(Number);
+    }
+    if (!dow || !dow.length) { box.innerHTML = ''; return; }
+    const dates = trialsNextDates(dow, 3);
+    if (setDate && dates.length) dateEl.value = trialsIsoLocal(dates[0]);
+    box.innerHTML = dates.map((d, i) => {
+        const iso = trialsIsoLocal(d);
+        const txt = d.toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' });
+        return `<button type="button" class="tb-date${dateEl.value === iso ? ' sel' : ''}" data-iso="${iso}" onclick="trialsSetDate('${dateId}', '${iso}', this)">${i === 0 ? 'Próxima clase · ' : ''}${trialsEsc(txt)}</button>`;
+    }).join('');
+}
+window.trialsSetDate = function(dateId, iso, btn) {
+    const el = document.getElementById(dateId);
+    if (el) el.value = iso;
+    const box = document.getElementById(dateId + '_chips');
+    if (box) box.querySelectorAll('.tb-date.sel').forEach(b => b.classList.remove('sel'));
+    if (btn) btn.classList.add('sel');
+};
 
 // Precarga (grupos + libros + salas en vivo) una sola vez por pestaña, en segundo
 // plano; se refresca sola si pasaron más de 5 minutos. Los modales no esperan:
@@ -287,13 +418,14 @@ function trialsPreload(force = false) {
 }
 async function trialsEnsureGroups() { return trialsPreload(); }
 
-/** Vuelve a llenar los <select> de grupo que estén abiertos, conservando la elección. */
+/** Vuelve a pintar los tableros de grupo que estén abiertos, conservando la elección. */
 function trialsRefreshGroupSelects() {
     for (const id of ['trlRegGroup', 'trlGroup']) {
-        const el = document.getElementById(id);
-        if (!el) continue;
-        const cur = el.value || el.dataset.selected || '';
-        el.innerHTML = trialsAllGroupOptions(cur, el.dataset.placeholder || undefined);
+        const input = document.getElementById(id), board = document.getElementById(id + '_board');
+        if (!input || !board) continue;
+        const cur = input.value || input.dataset.selected || '';
+        board.outerHTML = trialsBoardHTML(id, cur);
+        if (cur) trialsSuggestDates(id, cur, false);
     }
 }
 
@@ -747,15 +879,14 @@ function renderTrialForm(req = null) {
                     ${!req?.studentId ? `
                     <div style="grid-column: span 2; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:0.75rem;">
                         <div style="font-weight:700; color:#1e40af; margin-bottom:0.4rem;">🎓 Clase de prueba (opcional — si eliges grupo, se le crea su código y te doy el mensaje para enviarle)</div>
-                        <div style="display:grid; grid-template-columns: 1fr 180px; gap:0.6rem;">
-                            <div class="form-group" style="margin:0;">
-                                <label>Grupo (libro · unidad · profesor · horario)</label>
-                                <select id="trlGroup">${trialsAllGroupOptions(req?.trialGroupId)}</select>
-                            </div>
-                            <div class="form-group" style="margin:0;">
-                                <label>Fecha de la clase</label>
-                                <input type="date" id="trlGroupDate" value="${trialsEsc(req?.trialDate || new Date().toISOString().slice(0, 10))}">
-                            </div>
+                        <div class="form-group" style="margin:0 0 .6rem;">
+                            <label>Grupo — toca la tarjeta (franja · nivel · profesor · cupo)</label>
+                            ${trialsBoardHTML('trlGroup', req?.trialGroupId)}
+                        </div>
+                        <div class="form-group" style="margin:0;">
+                            <label>Fecha de la clase</label>
+                            <div class="tb-daterow"><div id="trlGroupDate_chips" class="tb-dates"></div>
+                            <input type="date" id="trlGroupDate" value="${trialsEsc(req?.trialDate || new Date().toISOString().slice(0, 10))}"></div>
                         </div>
                     </div>` : ''}
                     <div class="form-group" style="grid-column: span 2;">
@@ -902,19 +1033,20 @@ window.showTrialRegisterModal = async function(id) {
     if (existing) existing.remove();
     container.insertAdjacentHTML('beforeend', `
         <div id="trialRegisterModal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;">
-            <div style="background: white; padding: 2rem; border-radius: 8px; max-width: 520px; width: 92%;">
+            <div style="background: white; padding: 1.5rem 2rem; border-radius: 8px; max-width: 1040px; width: 94%; max-height: 92vh; overflow-y: auto;">
                 <h3 style="margin-top:0;">🧪 Registrar en Test Class</h3>
-                <p style="color:#4b5563; font-size:0.9rem;">
+                <p style="color:#4b5563; font-size:0.9rem; margin-top:0;">
                     Se crea el estudiante <b>${trialsEsc(req.nombre)}</b> con modalidad <b>Prueba</b> y sin valor, dentro del
                     grupo elegido, con su <b>código personal</b> de clase. Tipo de curso, valor y día de pago se completan al matricular.
                 </p>
                 <div class="form-group">
-                    <label>Grupo* (franja → grupo · libro · unidad · profesor · cupo)</label>
-                    <select id="trlRegGroup" data-placeholder="Seleccionar grupo" data-selected="${trialsEsc(req.trialGroupId || '')}">${trialsAllGroupOptions(req.trialGroupId, 'Seleccionar grupo')}</select>
+                    <label>Grupo* — toca la tarjeta (franja · nivel · profesor · cupo)</label>
+                    ${trialsBoardHTML('trlRegGroup', req.trialGroupId)}
                 </div>
                 <div class="form-group">
                     <label>Fecha de la clase de prueba*</label>
-                    <input type="date" id="trlRegDate" value="${trialsEsc(req.trialDate || today)}">
+                    <div class="tb-daterow"><div id="trlRegDate_chips" class="tb-dates"></div>
+                    <input type="date" id="trlRegDate" value="${trialsEsc(req.trialDate || today)}"></div>
                 </div>
                 <div style="display:flex; gap:0.75rem; justify-content:flex-end; margin-top:1rem;">
                     <button onclick="document.getElementById('trialRegisterModal').remove()" class="btn" style="background:#e5e7eb;">Cancelar</button>
