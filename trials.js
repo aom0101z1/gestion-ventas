@@ -116,8 +116,12 @@ function trialsTestGroupOptions(selected) {
 }
 
 // ── 5 Oct 2026 (fundador): Felipe asigna el GRUPO al registrar ─────────────
-// Lista de TODOS los grupos activos de Grupos 2.0 con libro, unidad, profesor y
-// horario, para ubicar a la persona según el nivel que hable con ella.
+// 16 Oct 2026 (fundador): la lista son las SALAS REPETITIVAS de tutorbox.app/admin/live
+// — todas, sin filtro de 14 días — agrupadas por franja (L-M-V 4-6pm · L-M-V 6:30-8:30pm ·
+// Sáb 8-12 · Sáb 1-5pm) con el libro corto (427 → B7) y la unidad EN VIVO. Cada sala se
+// enlaza a su grupo del CRM (número del título "104 CB - …" o código manual) para que el
+// estudiante quede en el grupo y su tarjeta de clase apunte a esa sala. Los datos se
+// precargan al abrir la pestaña: los modales abren al instante.
 function trialsFmtTime(x) {
     const m = String(x || '').match(/^(\d{1,2}):(\d{2})/);
     if (!m) return x || '';
@@ -132,51 +136,165 @@ function trialsActiveCount(g) {
     return ids.filter(id => { const s = sm.get(id); return s && (s.status || 'active') === 'active'; }).length;
 }
 
-/** Label with the LIVE level + the teacher actually giving the class (5 Oct 2026). */
-function trialsGroupLabel(g) {
-    const L = (window._groupsLive || {})[String(g.groupId)];
-    const book = L && L.book != null ? L.book : g.book;
-    const unit = L && L.unit != null ? L.unit : g.unit;
-    const teacher = (L && L.teacherName) || g.teacherName || 'Sin profesor';
-    const days = g.daysShort || (window.GroupsManager2?.getDaysShort ? window.GroupsManager2.getDaysShort(g.days || []) : (g.days || []).join(','));
-    const name = typeof window.tbxBookName === 'function' ? window.tbxBookName(book) : `Libro ${book}`;
-    const n = trialsActiveCount(g), max = g.maxStudents || 8;
-    return `${g.groupId} · ${name}${unit ? ' U' + unit : ''} · ${teacher} · ${days} ${trialsFmtTime(g.startTime)} · ${n}/${max}${n >= max ? ' ⚠️ lleno' : ''}`;
+/** 427 → "B7", 422 → "B2", 8 → "B8", 110/410 → "B10" (regla del fundador: último dígito del libro). */
+function trialsBookShort(n) {
+    const v = Number(n);
+    if (n == null || n === '' || !Number.isFinite(v)) return 'B?';
+    if (v <= 10) return 'B' + v;
+    if (v % 100 === 10) return 'B10';
+    return 'B' + (v % 10);
+}
+
+/** "4-6pm", "6:30-8:30pm", "8-12", "1-5pm" a partir de "16:00"/"18:00". */
+function trialsFmtRange(start, end) {
+    const p = (t) => {
+        const m = String(t || '').match(/^(\d{1,2}):(\d{2})/);
+        if (!m) return null;
+        const h = Number(m[1]);
+        return { h, txt: `${((h + 11) % 12) + 1}${m[2] === '00' ? '' : ':' + m[2]}` };
+    };
+    const a = p(start), b = p(end);
+    if (!a) return '';
+    if (!b) return a.txt + (a.h < 12 ? 'am' : 'pm');
+    if (a.h < 12 && b.h <= 12) return `${a.txt}-${b.txt}`;
+    return `${a.txt}-${b.txt}${b.h < 12 ? 'am' : 'pm'}`;
+}
+
+const TRIAL_SLOTS = [
+    { key: 'tarde', label: 'L-M-V 4-6pm' },
+    { key: 'noche', label: 'L-M-V 6:30-8:30pm' },
+    { key: 'sabam', label: 'Sáb 8-12' },
+    { key: 'sabpm', label: 'Sáb 1-5pm' },
+    { key: 'otro',  label: 'Otro horario' }
+];
+const TRIAL_DAY = { 0: 'Dom', 1: 'Lun', 2: 'Mar', 3: 'Mié', 4: 'Jue', 5: 'Vie', 6: 'Sáb' };
+
+/** Franja de una sala repetitiva (misma regla que /admin/live: tarde < 18:00, noche ≥ 18:00, sábado am/pm). */
+function trialsSlotOf(room) {
+    const days = String(room.days || '').split(',').filter(Boolean).map(Number);
+    if (!days.length) return 'otro';
+    const weekdays = days.filter(d => d !== 0 && d !== 6);
+    const start = String(room.start || '');
+    if (!weekdays.length) return start < '12:00' ? 'sabam' : 'sabpm';
+    const mwf = weekdays.length === 3 && [1, 3, 5].every(d => weekdays.includes(d));
+    if (!mwf) return 'otro';
+    return start >= '18:00' ? 'noche' : 'tarde';
+}
+
+function trialsRoomSchedule(room) {
+    const days = String(room.days || '').split(',').filter(Boolean).map(d => TRIAL_DAY[Number(d)] || d).join('-');
+    return `${days} ${trialsFmtRange(room.start, room.end)}`.trim();
 }
 
 /**
- * Groups Felipe can pick: active, not COATS (company groups), and — when the
- * live data loaded — with a room that had class in the last 14 days. If the
- * live data failed, active non-COATS groups with at least one active student.
+ * Salas repetitivas de TutorBox (getClassLinks → _tbxLinks.live) con su grupo del CRM:
+ * [{ room, g|null, slot, num }] ordenadas por número de grupo. Sin filtro de actividad.
  */
+function trialsLiveRooms() {
+    const rooms = (window._tbxLinks && window._tbxLinks.live) || [];
+    const groups = window.GroupsManager2?.groups ? Array.from(window.GroupsManager2.groups.values()) : [];
+    const byCode = {};
+    for (const g of groups) {
+        if (g.status === 'inactive') continue;
+        const l = typeof window.classCodeFor === 'function' ? window.classCodeFor(g) : null;
+        if (l && l.code && !byCode[String(l.code)]) byCode[String(l.code)] = g;
+    }
+    return rooms
+        .filter(r => r && r.status !== 'retired')
+        .map(r => {
+            const g = byCode[String(r.code)] || null;
+            const m = String(r.title || '').match(/^(\d{3})\b/);
+            return { room: r, g, slot: trialsSlotOf(r), num: g ? Number(g.groupId) : (m ? Number(m[1]) : 999) };
+        })
+        .sort((a, b) => a.num - b.num || String(a.room.title || '').localeCompare(String(b.room.title || '')));
+}
+
+/** "104 · B7 U12 · Vanessa Osorio · 6/8" (+ horario cuando la franja es "Otro horario"). */
+function trialsRoomLabel(x) {
+    const r = x.room, g = x.g;
+    const book = r.book != null ? r.book : (g ? g.book : null);
+    const level = `${trialsBookShort(book)}${r.unit ? ' U' + r.unit : ''}`;
+    const teacher = r.teacherName || (g && g.teacherName) || 'Sin profesor';
+    const sched = x.slot === 'otro' ? ` · ${trialsRoomSchedule(r)}` : '';
+    let cap = '';
+    if (g) {
+        const n = trialsActiveCount(g), max = g.maxStudents || 8;
+        cap = ` · ${n}/${max}${n >= max ? ' ⚠️ lleno' : ''}`;
+    }
+    return `${g ? g.groupId : '—'} · ${level} · ${teacher}${sched}${cap}`;
+}
+
+/** Etiqueta de un grupo del CRM: su sala en vivo si la tiene, si no los datos del CRM. */
+function trialsGroupLabel(g) {
+    const x = trialsLiveRooms().find(y => y.g && String(y.g.groupId) === String(g.groupId));
+    if (x) {
+        const slot = TRIAL_SLOTS.find(s => s.key === x.slot);
+        return `${trialsRoomLabel(x)}${x.slot !== 'otro' && slot ? ' · ' + slot.label : ''}`;
+    }
+    const days = g.daysShort || (window.GroupsManager2?.getDaysShort ? window.GroupsManager2.getDaysShort(g.days || []) : (g.days || []).join(','));
+    const n = trialsActiveCount(g), max = g.maxStudents || 8;
+    return `${g.groupId} · ${trialsBookShort(g.book)}${g.unit ? ' U' + g.unit : ''} · ${g.teacherName || 'Sin profesor'} · ${days} ${trialsFmtTime(g.startTime)} · ${n}/${max}${n >= max ? ' ⚠️ lleno' : ''}`;
+}
+
+/** Respaldo cuando TutorBox no respondió: grupos activos del CRM (sin COATS) con algún estudiante. */
 function trialsPickableGroups() {
     const groups = window.GroupsManager2?.groups ? Array.from(window.GroupsManager2.groups.values()) : [];
-    const live = window._groupsLive || {};
-    const haveLive = Object.keys(live).length > 0;
-    return groups.filter(g => {
-        if (g.status === 'inactive' || String(g.modality || '').toUpperCase() === 'COATS') return false;
-        if (haveLive) {
-            const L = live[String(g.groupId)];
-            return !!L && (!L.lastActivity || Date.now() - L.lastActivity <= 14 * 864e5);
-        }
-        return trialsActiveCount(g) > 0;
-    }).sort((a, b) => Number(a.groupId) - Number(b.groupId));
+    return groups
+        .filter(g => g.status !== 'inactive' && String(g.modality || '').toUpperCase() !== 'COATS' && trialsActiveCount(g) > 0)
+        .sort((a, b) => Number(a.groupId) - Number(b.groupId));
 }
 
 function trialsAllGroupOptions(selected, placeholder = 'Sin grupo todavía (queda pendiente)') {
-    const list = trialsPickableGroups();
-    if (!list.length) return '<option value="">— No hay grupos con clase en vivo —</option>';
-    return `<option value="">${placeholder}</option>` + list.map(g =>
-        `<option value="${g.groupId}" ${String(selected) === String(g.groupId) ? 'selected' : ''}>${trialsEsc(trialsGroupLabel(g))}</option>`
-    ).join('');
+    const sel = (gid) => String(selected) === String(gid) ? 'selected' : '';
+    const live = trialsLiveRooms();
+    if (!live.length) {
+        if (!_trialsLiveLoaded) return '<option value="">⏳ Cargando las clases en vivo…</option>';
+        const list = trialsPickableGroups();
+        if (!list.length) return '<option value="">— No hay grupos activos —</option>';
+        return `<option value="">${placeholder}</option>` + list.map(g =>
+            `<option value="${g.groupId}" ${sel(g.groupId)}>${trialsEsc(trialsGroupLabel(g))}</option>`).join('');
+    }
+    let html = `<option value="">${placeholder}</option>`;
+    for (const s of TRIAL_SLOTS) {
+        const rows = live.filter(x => x.slot === s.key);
+        if (!rows.length) continue;
+        html += `<optgroup label="${s.label}">` + rows.map(x => x.g
+            ? `<option value="${x.g.groupId}" ${sel(x.g.groupId)}>${trialsEsc(trialsRoomLabel(x))}</option>`
+            : `<option value="" disabled>${trialsEsc(x.room.title || x.room.code)} · sin grupo activo en el CRM</option>`
+        ).join('') + '</optgroup>';
+    }
+    return html;
 }
 
-async function trialsEnsureGroups() {
-    if (window.GroupsManager2 && (!window.GroupsManager2.groups || window.GroupsManager2.groups.size === 0)) {
-        try { await window.GroupsManager2.init(true); } catch (_) {}
+// Precarga (grupos + libros + salas en vivo) una sola vez por pestaña, en segundo
+// plano; se refresca sola si pasaron más de 5 minutos. Los modales no esperan:
+// pintan lo que hay y los <select> se vuelven a llenar cuando llegan los datos.
+let _trialsPreload = null, _trialsPreloadAt = 0, _trialsLiveLoaded = false;
+function trialsPreload(force = false) {
+    const fresh = _trialsPreload && !force && Date.now() - _trialsPreloadAt < 5 * 60 * 1000;
+    if (fresh) return _trialsPreload;
+    _trialsPreloadAt = Date.now();
+    _trialsPreload = (async () => {
+        if (window.GroupsManager2 && (!window.GroupsManager2.groups || window.GroupsManager2.groups.size === 0)) {
+            try { await window.GroupsManager2.init(true); } catch (_) {}
+        }
+        try { if (typeof window.loadTutorBoxBooks === 'function') await window.loadTutorBoxBooks(); } catch (_) {}
+        try { if (typeof window.loadGroupsLive === 'function') await window.loadGroupsLive(force); } catch (_) {}
+        _trialsLiveLoaded = true;
+        trialsRefreshGroupSelects();
+    })();
+    return _trialsPreload;
+}
+async function trialsEnsureGroups() { return trialsPreload(); }
+
+/** Vuelve a llenar los <select> de grupo que estén abiertos, conservando la elección. */
+function trialsRefreshGroupSelects() {
+    for (const id of ['trlRegGroup', 'trlGroup']) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        const cur = el.value || el.dataset.selected || '';
+        el.innerHTML = trialsAllGroupOptions(cur, el.dataset.placeholder || undefined);
     }
-    try { if (typeof window.loadTutorBoxBooks === 'function') await window.loadTutorBoxBooks(); } catch (_) {}
-    try { if (typeof window.loadGroupsLive === 'function') await window.loadGroupsLive(); } catch (_) {}
 }
 
 /** Crea el estudiante de prueba, lo mete al grupo y lo refleja en TutorBox. */
@@ -384,6 +502,7 @@ function trialsContainerEl() {
 window.loadTrialsTab = async function() {
     const container = trialsContainerEl();
     if (!container) return;
+    trialsPreload(); // grupos + salas en vivo en segundo plano: "Asignar grupo" abre al instante
     try {
         await window.TrialsManager.load();
         // Student cache lets the list show 🎓 Matriculado automatically
@@ -443,7 +562,8 @@ function renderTrialsTab() {
             <div style="text-align:center; color:#6b7280; padding:3rem; background:#f9fafb; border-radius:8px;">
                 ${all.length === 0 ? 'Aún no hay personas registradas para clase de prueba.' : 'Ninguna persona coincide con el filtro.'}
             </div>` : `
-            <div style="overflow-x:auto;">
+            <div id="trialsScrollTop" style="overflow-x:auto; overflow-y:hidden; position:sticky; top:0; z-index:5; background:#fff;" title="Desliza para ver más columnas"><div id="trialsScrollTopInner" style="height:14px;"></div></div>
+            <div id="trialsScroll" style="overflow-x:auto;">
             <table class="data-table" style="width:100%; border-collapse:collapse;">
                 <thead>
                     <tr style="background:#f3f4f6; text-align:left;">
@@ -461,6 +581,35 @@ function renderTrialsTab() {
             </table>
             </div>`}
     `;
+    trialsSyncScrollbars();
+}
+
+/**
+ * 16 Oct 2026 (fundador): la barra horizontal de la tabla quedaba abajo, fuera de
+ * pantalla — había que bajar para poder moverse a la derecha. Una barra espejo
+ * ARRIBA, pegada al borde superior mientras se hace scroll, sincronizada con la real.
+ */
+function trialsSyncScrollbars() {
+    const top = document.getElementById('trialsScrollTop');
+    const inner = document.getElementById('trialsScrollTopInner');
+    const body = document.getElementById('trialsScroll');
+    if (!top || !inner || !body) return;
+    const fit = () => {
+        inner.style.width = body.scrollWidth + 'px';
+        top.style.display = body.scrollWidth > body.clientWidth + 2 ? '' : 'none';
+    };
+    let lock = false;
+    top.onscroll = () => { if (lock) return; lock = true; body.scrollLeft = top.scrollLeft; lock = false; };
+    body.onscroll = () => { if (lock) return; lock = true; top.scrollLeft = body.scrollLeft; lock = false; };
+    if (trialsSyncScrollbars._fit) window.removeEventListener('resize', trialsSyncScrollbars._fit);
+    trialsSyncScrollbars._fit = fit;
+    window.addEventListener('resize', fit, { passive: true });
+    if (window.ResizeObserver) {
+        if (trialsSyncScrollbars._ro) trialsSyncScrollbars._ro.disconnect();
+        trialsSyncScrollbars._ro = new ResizeObserver(fit);
+        trialsSyncScrollbars._ro.observe(body);
+    }
+    fit();
 }
 
 function renderTrialRow(r) {
@@ -634,7 +783,7 @@ window.trialsEdadCategoriaChange = function() {
 };
 
 window.showTrialForm = async function(id = null) {
-    await trialsEnsureGroups();
+    trialsPreload(); // no espera: el <select> de grupo se llena solo cuando lleguen las salas
     const req = id ? window.TrialsManager.requests.get(id) : null;
     const container = trialsContainerEl();
     const existing = document.getElementById('trialFormModal');
@@ -746,7 +895,7 @@ window.trialsSetDecision = async function(id, decision) {
 window.showTrialRegisterModal = async function(id) {
     const req = window.TrialsManager.requests.get(id);
     if (!req) return;
-    await trialsEnsureGroups();
+    trialsPreload(); // no espera: abre ya; el <select> se refresca al llegar las salas
     const today = new Date().toISOString().slice(0, 10);
     const container = trialsContainerEl();
     const existing = document.getElementById('trialRegisterModal');
@@ -760,8 +909,8 @@ window.showTrialRegisterModal = async function(id) {
                     grupo elegido, con su <b>código personal</b> de clase. Tipo de curso, valor y día de pago se completan al matricular.
                 </p>
                 <div class="form-group">
-                    <label>Grupo* (libro · unidad · profesor · horario)</label>
-                    <select id="trlRegGroup">${trialsAllGroupOptions(req.trialGroupId, 'Seleccionar grupo')}</select>
+                    <label>Grupo* (franja → grupo · libro · unidad · profesor · cupo)</label>
+                    <select id="trlRegGroup" data-placeholder="Seleccionar grupo" data-selected="${trialsEsc(req.trialGroupId || '')}">${trialsAllGroupOptions(req.trialGroupId, 'Seleccionar grupo')}</select>
                 </div>
                 <div class="form-group">
                     <label>Fecha de la clase de prueba*</label>

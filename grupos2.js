@@ -1780,23 +1780,41 @@ window._groupsLive = {};
 let _groupsLiveAt = 0;
 window.loadGroupsLive = async function(force = false) {
     if (!force && _groupsLiveAt && Date.now() - _groupsLiveAt < 5 * 60 * 1000) return window._groupsLive;
-    try { await window.loadClassLinks(); } catch (_) {}
-    const codes = {};
+    try { await window.loadClassLinks(force); } catch (_) {}
+    // 16 Oct 2026: getClassLinks now returns book/unit/teacher/lastActivity for
+    // every recurring room, so the live state is derived here with NO second
+    // call. getGroupsLive is only asked for groups whose (manual) code points
+    // at a room that is not recurring.
+    const byCode = {};
+    for (const r of (window._tbxLinks.live || [])) byCode[String(r.code)] = r;
+    const next = {}, missing = {};
     for (const g of (window.GroupsManager2?.groups?.values() || [])) {
         if (g.status === 'inactive') continue;
         const l = window.classCodeFor(g);
-        if (l && l.code) codes[g.groupId] = l.code;
+        if (!l || !l.code) continue;
+        const r = byCode[String(l.code)];
+        if (r) {
+            next[g.groupId] = {
+                code: String(r.code), book: r.book != null ? Number(r.book) : null, unit: r.unit != null ? Number(r.unit) : null,
+                teacherName: r.teacherName || null, ownerUid: r.createdBy || null,
+                lastActivity: r.lastActivity ? Number(r.lastActivity) : null, title: r.title || null
+            };
+        } else {
+            missing[g.groupId] = l.code;
+        }
     }
-    if (!Object.keys(codes).length) return window._groupsLive;
-    try {
-        const r = await fetch(`${TUTORBOX_CF_BASE}/getGroupsLive`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-admin-key': TUTORBOX_KEY },
-            body: JSON.stringify({ codes })
-        });
-        const j = await r.json();
-        if (r.ok && j.byGroup) { window._groupsLive = j.byGroup; _groupsLiveAt = Date.now(); }
-    } catch (e) { console.warn('getGroupsLive:', e.message); }
+    if (Object.keys(missing).length) {
+        try {
+            const r = await fetch(`${TUTORBOX_CF_BASE}/getGroupsLive`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-admin-key': TUTORBOX_KEY },
+                body: JSON.stringify({ codes: missing })
+            });
+            const j = await r.json();
+            if (r.ok && j.byGroup) Object.assign(next, j.byGroup);
+        } catch (e) { console.warn('getGroupsLive:', e.message); }
+    }
+    if (Object.keys(next).length || (window._tbxLinks.live || []).length) { window._groupsLive = next; _groupsLiveAt = Date.now(); }
     return window._groupsLive;
 };
 
