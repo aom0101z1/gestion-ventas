@@ -140,7 +140,7 @@ function trialsActiveCount(g) {
 function trialsBookNum(n) {
     const v = Number(n);
     if (n == null || n === '' || !Number.isFinite(v)) return null;
-    if (v <= 10) return v;
+    if (v <= 12) return v; // 1–10 hoy; 11–12 (C1) cuando existan
     if (v % 100 === 10) return 10;
     return v % 10;
 }
@@ -148,6 +148,31 @@ function trialsBookShort(n) {
     const b = trialsBookNum(n);
     return b == null ? 'B?' : 'B' + b;
 }
+/**
+ * Nivel MCER por libro corto, según el programa (etiquetas del books-manifest, igual que
+ * src/lib/level.ts en el portal): A1 1–2 · A2 3–5 · B1 6–8 · B2 9–10 · C1 11–12 (por venir).
+ * Es la misma escala para adultos, Teens (42x) y Kids (43x); Tiny (47x) 1–3 Pre-A1, 4–6 A1.
+ */
+const TRIAL_CEFR = [
+    { cefr: 'A1', from: 1, to: 2,  name: 'Principiante' },
+    { cefr: 'A2', from: 3, to: 5,  name: 'Elemental' },
+    { cefr: 'B1', from: 6, to: 8,  name: 'Intermedio' },
+    { cefr: 'B2', from: 9, to: 10, name: 'Intermedio alto' },
+    { cefr: 'C1', from: 11, to: 12, name: 'Avanzado · próximamente' }
+];
+function trialsCefr(book) {
+    const v = Number(book), b = trialsBookNum(book);
+    if (b == null) return '';
+    if (v >= 470 && v < 480) return b <= 3 ? 'Pre-A1' : 'A1';
+    const row = TRIAL_CEFR.find(r => b >= r.from && b <= r.to);
+    return row ? row.cefr : '';
+}
+function trialsCefrLegendHTML() {
+    return `<div class="tb-legend"><span class="tb-legend-t">Niveles del programa</span>${TRIAL_CEFR.map(r =>
+        `<span class="tb-lg ${r.to > 10 ? 'soon' : ''}"><b>${r.cefr}</b> Books ${r.from}–${r.to}<small>${r.name}</small></span>`).join('')}
+        <span class="tb-lg kids"><b>Tiny</b> 1–3 Pre-A1 · 4–6 A1<small>Kids pequeños</small></span></div>`;
+}
+
 /** Adultos (1-10) · Teens (42x) · Kids (43x, 47x) — por el número del libro. */
 function trialsFamily(n) {
     const v = Number(n);
@@ -292,6 +317,13 @@ function trialsBoardCss() {
 .tb-date.sel{border-color:#0f8f7f;background:#d9f2ee;font-weight:700}
 .tb-daterow{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem}
 .tb-daterow input[type=date]{width:auto}
+.tb-legend{display:flex;flex-wrap:wrap;align-items:stretch;gap:6px;margin:0 0 10px;padding:8px 10px;background:#f6f8fb;border:1px solid #e3e9f0;border-radius:10px}
+.tb-legend-t{align-self:center;font-size:.72rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#5b6b82;margin-right:4px}
+.tb-lg{display:grid;gap:1px;padding:4px 10px;border-radius:8px;background:#fff;border:1px solid #d6dee8;font-size:.8rem;color:#15233a;line-height:1.2}
+.tb-lg b{font-family:ui-monospace,Consolas,monospace;font-size:.85rem;color:#0f8f7f;margin-right:4px}
+.tb-lg small{font-size:.68rem;color:#5b6b82}
+.tb-lg.soon{border-style:dashed;opacity:.75}.tb-lg.kids{background:#fff8e6;border-color:#f3dca0}
+.tb-cefr{color:#0f8f7f;font-weight:700}
 `;
     document.head.appendChild(st);
 }
@@ -301,7 +333,8 @@ function trialsCardHTML(inputId, x, selected) {
     const book = r.book != null ? r.book : (g ? g.book : null);
     const unit = r.unit != null ? r.unit : (g ? g.unit : null);
     const teacher = r.teacherName || (g && g.teacherName) || 'Sin profesor';
-    const lv = `<span class="tb-lv">${trialsBookShort(book)}<small>${unit ? 'U' + unit : '&nbsp;'}</small></span>`;
+    const cefr = trialsCefr(book);
+    const lv = `<span class="tb-lv">${trialsBookShort(book)}<small>${unit ? 'U' + unit : ''}${unit && cefr ? ' · ' : ''}${cefr ? `<span class="tb-cefr">${cefr}</span>` : ''}${!unit && !cefr ? '&nbsp;' : ''}</small></span>`;
     const fam = trialsFamily(book) ? `<span class="tb-fam">${trialsFamily(book)}</span>` : '';
     if (!g) {
         return `<div class="tb-card off">${lv}<span class="tb-who">${trialsEsc(r.title || teacher)}</span><span class="tb-meta">sin grupo activo en el CRM ${fam}</span></div>`;
@@ -343,7 +376,7 @@ function trialsBoardHTML(inputId, selected) {
         const open = rows.filter(x => x.g).length;
         cols += `<div class="tb-col"><div class="tb-head ${s.cls}"><b>${s.days}</b>${s.hours ? `<span class="tb-h">${s.hours}</span>` : ''}<small>${open} grupo${open === 1 ? '' : 's'}</small></div>${rows.map(x => trialsCardHTML(inputId, x, selected)).join('')}</div>`;
     }
-    return `<div id="${inputId}_board" class="tb-wrap">${hidden}<div class="tb-board">${cols}</div></div>`;
+    return `<div id="${inputId}_board" class="tb-wrap">${hidden}${trialsCefrLegendHTML()}<div class="tb-board">${cols}</div></div>`;
 }
 
 window.trialsPickGroup = function(inputId, gid, btn) {
