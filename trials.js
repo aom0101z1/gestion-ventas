@@ -144,9 +144,10 @@ function trialsBookNum(n) {
     if (v % 100 === 10) return 10;
     return v % 10;
 }
+/** "Book 7" — nunca "B7": el fundador no quiere que se confunda con B1/B2 del MCER (16 Oct 2026). */
 function trialsBookShort(n) {
     const b = trialsBookNum(n);
-    return b == null ? 'B?' : 'B' + b;
+    return b == null ? 'Book ?' : 'Book ' + b;
 }
 /**
  * Nivel MCER por libro corto, según el programa (etiquetas del books-manifest, igual que
@@ -154,10 +155,11 @@ function trialsBookShort(n) {
  * Es la misma escala para adultos, Teens (42x) y Kids (43x); Tiny (47x) 1–3 Pre-A1, 4–6 A1.
  */
 const TRIAL_CEFR = [
-    { cefr: 'A1', from: 1, to: 2,  name: 'Principiante' },
-    { cefr: 'A2', from: 3, to: 5,  name: 'Elemental' },
-    { cefr: 'B1', from: 6, to: 8,  name: 'Intermedio' },
-    { cefr: 'B2', from: 9, to: 10, name: 'Intermedio alto' },
+    // nombres = carátulas de los libros físicos (foto del fundador, 16 Oct 2026)
+    { cefr: 'A1', from: 1, to: 2,  name: 'Book 1 Pre-A1→A1 Foundation · Book 2 A1+ Elementary' },
+    { cefr: 'A2', from: 3, to: 5,  name: 'Part 1 · 2 · 3' },
+    { cefr: 'B1', from: 6, to: 8,  name: 'Part 1 · 2 · 3' },
+    { cefr: 'B2', from: 9, to: 10, name: 'Part 1 · 2' },
     { cefr: 'C1', from: 11, to: 12, name: 'Avanzado · próximamente' }
 ];
 function trialsCefr(book) {
@@ -231,20 +233,33 @@ function trialsRoomSchedule(room) {
 function trialsLiveRooms() {
     const rooms = (window._tbxLinks && window._tbxLinks.live) || [];
     const groups = window.GroupsManager2?.groups ? Array.from(window.GroupsManager2.groups.values()) : [];
+    // Varios grupos del CRM pueden compartir una sala (16 Oct 2026: 111 unido al 109,
+    // Daniel dicta los dos Book 9 del sábado): la tarjeta es UNA, el cupo se suma y la
+    // prueba se matricula en el grupo principal (el del número con que empieza el título).
     const byCode = {};
     for (const g of groups) {
         if (g.status === 'inactive') continue;
         const l = typeof window.classCodeFor === 'function' ? window.classCodeFor(g) : null;
-        if (l && l.code && !byCode[String(l.code)]) byCode[String(l.code)] = g;
+        if (l && l.code) (byCode[String(l.code)] = byCode[String(l.code)] || []).push(g);
     }
     return rooms
         .filter(r => r && r.status !== 'retired')
         .map(r => {
-            const g = byCode[String(r.code)] || null;
+            const gs = (byCode[String(r.code)] || []).slice().sort((a, b) => Number(a.groupId) - Number(b.groupId));
             const m = String(r.title || '').match(/^(\d{3})\b/);
-            return { room: r, g, slot: trialsSlotOf(r), num: g ? Number(g.groupId) : (m ? Number(m[1]) : 999) };
+            const g = gs.find(x => m && String(x.groupId) === m[1]) || gs[0] || null;
+            return { room: r, g, gs, slot: trialsSlotOf(r), num: g ? Number(g.groupId) : (m ? Number(m[1]) : 999) };
         })
         .sort((a, b) => a.num - b.num || String(a.room.title || '').localeCompare(String(b.room.title || '')));
+}
+
+/** Cupo de la sala: suma de los grupos del CRM que comparten la sala. */
+function trialsCapacity(x) {
+    const gs = (x.gs && x.gs.length) ? x.gs : (x.g ? [x.g] : []);
+    return {
+        n: gs.reduce((a, g) => a + trialsActiveCount(g), 0),
+        max: gs.reduce((a, g) => a + (g.maxStudents || 8), 0)
+    };
 }
 
 /** "104 · B7 U12 · Vanessa Osorio · 6/8" (+ horario cuando la franja es "Otro horario"). */
@@ -256,10 +271,11 @@ function trialsRoomLabel(x) {
     const sched = x.slot === 'otro' ? ` · ${trialsRoomSchedule(r)}` : '';
     let cap = '';
     if (g) {
-        const n = trialsActiveCount(g), max = g.maxStudents || 8;
+        const { n, max } = trialsCapacity(x);
         cap = ` · ${n}/${max}${n >= max ? ' ⚠️ lleno' : ''}`;
     }
-    return `${g ? g.groupId : '—'} · ${level} · ${teacher}${sched}${cap}`;
+    const ids = (x.gs && x.gs.length > 1) ? x.gs.map(y => y.groupId).join('+') : (g ? g.groupId : '—');
+    return `${ids} · ${level} · ${teacher}${sched}${cap}`;
 }
 
 /** Etiqueta de un grupo del CRM: su sala en vivo si la tiene, si no los datos del CRM. */
@@ -306,6 +322,7 @@ function trialsBoardCss() {
 .tb-card:focus-visible,.tb-date:focus-visible{outline:3px solid #0f8f7f;outline-offset:2px}
 .tb-lv{grid-row:span 2;font-family:ui-monospace,Consolas,monospace;font-weight:700;font-size:1.15rem;line-height:1;padding:8px 6px;border-radius:8px;background:#eef2f6;text-align:center;min-width:48px}
 .tb-lv small{display:block;font-size:.62rem;font-weight:500;margin-top:3px;color:#5b6b82}
+.tb-lv small.tb-bk{margin:0 0 2px;font-size:.58rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-family:system-ui,sans-serif}
 .tb-who{font-weight:600;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .tb-meta{display:flex;flex-wrap:wrap;align-items:center;gap:3px 7px;font-size:.75rem;color:#5b6b82;min-width:0}
 .tb-gid{font-family:ui-monospace,Consolas,monospace}
@@ -334,12 +351,14 @@ function trialsCardHTML(inputId, x, selected) {
     const unit = r.unit != null ? r.unit : (g ? g.unit : null);
     const teacher = r.teacherName || (g && g.teacherName) || 'Sin profesor';
     const cefr = trialsCefr(book);
-    const lv = `<span class="tb-lv">${trialsBookShort(book)}<small>${unit ? 'U' + unit : ''}${unit && cefr ? ' · ' : ''}${cefr ? `<span class="tb-cefr">${cefr}</span>` : ''}${!unit && !cefr ? '&nbsp;' : ''}</small></span>`;
+    const bn = trialsBookNum(book);
+    const lv = `<span class="tb-lv"><small class="tb-bk">Book</small>${bn == null ? '?' : bn}<small>${unit ? 'U' + unit : ''}${unit && cefr ? ' · ' : ''}${cefr ? `<span class="tb-cefr">${cefr}</span>` : ''}${!unit && !cefr ? '&nbsp;' : ''}</small></span>`;
     const fam = trialsFamily(book) ? `<span class="tb-fam">${trialsFamily(book)}</span>` : '';
     if (!g) {
         return `<div class="tb-card off">${lv}<span class="tb-who">${trialsEsc(r.title || teacher)}</span><span class="tb-meta">sin grupo activo en el CRM ${fam}</span></div>`;
     }
-    const n = trialsActiveCount(g), max = g.maxStudents || 8, full = n > max;
+    const { n, max } = trialsCapacity(x), full = n > max;
+    const gid = (x.gs && x.gs.length > 1) ? x.gs.map(y => 'G' + y.groupId).join(' + ') : 'G' + g.groupId;
     let dots = '';
     for (let i = 0; i < Math.min(max, 16); i++) dots += `<i class="${i < n ? (full ? 'x' : 'f') : ''}"></i>`;
     let sched = '';
@@ -351,7 +370,7 @@ function trialsCardHTML(inputId, x, selected) {
     const sel = String(selected || '') === String(g.groupId) ? ' sel' : '';
     return `<button type="button" class="tb-card${sel}" data-gid="${g.groupId}" onclick="trialsPickGroup('${inputId}', '${g.groupId}', this)">
         ${lv}<span class="tb-who">${trialsEsc(teacher)}</span>
-        <span class="tb-meta"><span class="tb-gid">G${g.groupId}</span><span class="tb-dots">${dots}</span><span class="${full ? 'tb-full' : ''}">${n}/${max}${full ? ' lleno' : ''}</span>${sched}${fam}</span>
+        <span class="tb-meta"><span class="tb-gid">${gid}</span><span class="tb-dots">${dots}</span><span class="${full ? 'tb-full' : ''}">${n}/${max}${full ? ' lleno' : ''}</span>${sched}${fam}</span>
     </button>`;
 }
 
