@@ -611,7 +611,17 @@ window.showTrialWelcome = async function(id) {
     await trialsEnsureGroups();
     const g = req.trialGroupId ? window.GroupsManager2?.groups?.get(parseInt(req.trialGroupId)) : null;
     let code = req.loginCode || (req.studentId && window.StudentManager?.students?.get(req.studentId)?.loginCode) || null;
-    const text = trialsWelcomeText(req, g, code);
+    // 16 Oct 2026: hora y profesor salen de la SALA EN VIVO (recurrence + teacherName de
+    // TutorBox), no de la ficha del grupo en el CRM, que suele estar desactualizada
+    // (111 dice Melissa; la clase la da Daniel). Si no hay sala, datos del CRM.
+    const live = g ? trialsLiveRooms().find(y => (y.gs || []).some(x => String(x.groupId) === String(g.groupId)) || (y.g && String(y.g.groupId) === String(g.groupId))) : null;
+    const gi = g ? {
+        ...g,
+        startTime: (live && live.room.start) || g.startTime,
+        endTime: (live && live.room.end) || g.endTime,
+        teacherName: (live && live.room.teacherName) || g.teacherName
+    } : null;
+    const text = trialsWelcomeText(req, gi, code);
     const digits = String(req.telefono || '').split(/[\/,;]+/)[0].replace(/\D/g, '');
     const wa = digits.length === 10 && digits.startsWith('3') ? '57' + digits : digits;
     document.getElementById('trialWelcomeModal')?.remove();
