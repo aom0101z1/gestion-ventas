@@ -64,6 +64,22 @@ const ActivityIcons = {
     'Contacto eliminado': '🗑️📞'
 };
 
+/**
+ * 📧 Owner e-mail notification (23 Oct 2026) — see AuditLogManager.notifyOwner.
+ * NOISE = high-volume routine entries that are not money/student/security
+ * movements. Everything else (payments, invoices, students, status changes,
+ * exceptions, alerts, deletes, prices, books, store, cierres…) notifies.
+ */
+const OWNER_EMAIL = 'admin@ciudadbilingue.com';
+const NOTIFY_OWNER_URL = 'https://us-central1-tutorbox-4d7c9.cloudfunctions.net/notifyCrmMovement';
+const NOTIFY_NOISE = new Set([
+    'Progreso de clase registrado', // teachers, every class
+    'Tarea creada',
+    'Tarea actualizada',
+    'Contacto añadido',             // sales leads, daily routine
+    'Contacto editado'
+]);
+
 // ==================================================================================
 // SECTION 2: AUDIT LOG MANAGER CLASS
 // ==================================================================================
@@ -151,11 +167,109 @@ class AuditLogManager {
 
             this.logs.set(id, logEntry);
             console.log('✅ Activity logged:', activityType, description);
+            // 23 Oct 2026: e-mail the owner (fire-and-forget, never blocks or throws)
+            this.notifyOwner(logEntry, details);
             return logEntry;
         } catch (error) {
             console.error('❌ Error logging activity:', error);
             throw error;
         }
+    }
+
+    /**
+     * 📧 Owner notification (tarea 4, 23 Oct 2026). Founder: "notify me at
+     * admin@ciudadbilingue.com every time another user makes a movement".
+     * Posts the audit entry to the TutorBox Cloud Function notifyCrmMovement,
+     * which sends the e-mail (the CRM project has no Cloud Functions).
+     * Fire-and-forget: never awaited, never throws. Kill switch:
+     * `window.CRM_NOTIFY_OWNER = false`.
+     */
+    notifyOwner(entry, details) {
+        try {
+            this._notifyOwner(entry, details).catch(() => {});
+        } catch (e) { /* never break the caller */ }
+    }
+
+    async _notifyOwner(entry, details) {
+        if (!entry || window.CRM_NOTIFY_OWNER === false) return;
+        const fbUser = window.FirebaseData?.currentUser;
+        const actorEmail = String(fbUser?.email || entry.userName || '').toLowerCase();
+        if (actorEmail === OWNER_EMAIL) return;
+        if (NOTIFY_NOISE.has(entry.activityType)) return;
+
+        // Reuse the CRM-bridge key already loaded by another script (no second copy here).
+        const key = typeof TB_ADMIN_KEY !== 'undefined' ? TB_ADMIN_KEY
+            : typeof TUTORBOX_ADMIN_KEY !== 'undefined' ? TUTORBOX_ADMIN_KEY
+            : typeof TUTORBOX_KEY !== 'undefined' ? TUTORBOX_KEY
+            : typeof SP_ADMIN_KEY !== 'undefined' ? SP_ADMIN_KEY
+            : null;
+        if (!key) return;
+
+        // Actor name + role (profile read once per session only if globals are empty).
+        let name = window.currentUser?.name || fbUser?.displayName || '';
+        let role = window.userRole || (typeof userRole !== 'undefined' ? userRole : '') || '';
+        if ((!name || !role) && window.FirebaseData?.loadUserProfile) {
+            if (!this._actorProfilePromise) {
+                this._actorProfilePromise = window.FirebaseData.loadUserProfile().catch(() => null);
+            }
+            const profile = await this._actorProfilePromise;
+            name = name || profile?.name || '';
+            role = role || profile?.role || '';
+        }
+
+        // Student name + amount when derivable.
+        const d = (details && typeof details === 'object') ? details : {};
+        const side = (d.after && typeof d.after === 'object') ? d.after
+            : (d.before && typeof d.before === 'object') ? d.before : {};
+        const mapGet = (m, id) => {
+            if (!m || id === undefined || id === null) return null;
+            if (typeof m.get === 'function') return m.get(id) || null;
+            return m[id] || null;
+        };
+        const students = window.StudentManager?.students;
+        let studentName = '';
+        let amount = null;
+        if (entry.entityType === 'payment') {
+            const p = mapGet(window.PaymentManager?.payments, entry.entityId);
+            if (p) {
+                studentName = mapGet(students, p.studentId)?.nombre || '';
+                if (p.amount !== undefined && p.amount !== null) amount = Number(p.amount);
+            }
+        } else if (entry.entityType === 'student') {
+            studentName = mapGet(students, entry.entityId)?.nombre || side.nombre || '';
+        }
+        if (!studentName) {
+            studentName = side.estudiante || side.studentName || mapGet(students, side.studentId || d.studentId)?.nombre || '';
+        }
+        if (amount === null || !Number.isFinite(amount)) {
+            const raw = side.montoTotal ?? side.monto ?? side.amount ?? d.monto ?? d.amount;
+            amount = (raw !== undefined && raw !== null && raw !== '' && Number.isFinite(Number(raw))) ? Number(raw) : null;
+        }
+
+        const payload = {
+            actor: { uid: entry.userId, email: actorEmail, name, role },
+            activityType: entry.activityType,
+            entityType: entry.entityType,
+            entityId: entry.entityId,
+            description: entry.description,
+            details: d,
+            studentName: studentName ? String(studentName) : null,
+            amount,
+            at: entry.timestamp,
+            crmUrl: 'https://crm.tutorbox.app/'
+        };
+        let body = JSON.stringify(payload);
+        // keepalive requests are capped at 64 KB — drop the details if they are huge.
+        if (body.length > 60000) {
+            payload.details = { nota: 'detalle demasiado grande — ver Auditoría' };
+            body = JSON.stringify(payload);
+        }
+        await fetch(NOTIFY_OWNER_URL, {
+            method: 'POST',
+            keepalive: true,
+            headers: { 'Content-Type': 'application/json', 'x-admin-key': key },
+            body
+        });
     }
 
     // Get filtered logs

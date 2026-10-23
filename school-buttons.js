@@ -39,6 +39,9 @@ function addSchoolButtons() {
     // Create buttons
     const modules = [
         { name: 'Estudiantes', icon: '👥', color: '#3b82f6', func: 'Students', perm: 'students' },
+        // 🧑‍🎓 ficha + pagos in one screen (students-unified.js, 23 Oct 2026). salesOk: the
+        // sales role may see it when granted explicitly (read-only inside the module).
+        { name: 'Estudiantes unificado', icon: '🧑‍🎓', color: '#0f766e', func: 'StudentsUnified', perm: 'studentsUnified', salesOk: true },
         // 🧪 people sent by sales for a test class (trials.js) — badge = pending count
         { name: 'Clases de prueba', icon: '🧪', color: '#f59e0b', func: 'Trials', perm: 'trials', badge: 'trials' },
         { name: 'Pagos', icon: '💰', color: '#10b981', func: 'Payments', perm: 'payments' },
@@ -55,16 +58,18 @@ function addSchoolButtons() {
 
     // 🔐 Module permissions (15 Sep 2026). The bar is rebuilt several times after
     // login, so it gates itself instead of relying on the enforcer's first pass:
-    //  - the sales role (`ventas`) never gets the bar;
+    //  - the sales role (`ventas`) gets no bar, except `salesOk` modules ticked explicitly;
     //  - once PermissionEnforcer has loaded users/{uid}/permissions/modules, each
     //    button needs its module (admins/directors always pass);
     //  - admin-only / director-only modules also open for a user whose module was
     //    ticked EXPLICITLY in Admin → Ver Permisos.
-    if (window.userRole === 'ventas') {
+    const pe = window.PermissionEnforcer;
+    // Sales role: no bar, unless a `salesOk` module was granted EXPLICITLY.
+    const isSales = window.userRole === 'ventas';
+    if (isSales && !modules.some(m => m.salesOk && pe && pe.isReady && pe.userPermissions && pe.userPermissions[m.perm] === true)) {
         console.log('🚫 Sales role — no school modules');
         return;
     }
-    const pe = window.PermissionEnforcer;
     const permsReady = !!(pe && pe.isReady);
     // Tell the enforcer this bar already applied the module + role/email rules, so
     // its text-based pass must not hide role-granted buttons (Grupos 2.0 / Empleados
@@ -77,6 +82,8 @@ function addSchoolButtons() {
     modules.forEach(module => {
         const userRole = window.userRole || '';
         const userEmail = window.FirebaseData?.currentUser?.email || '';
+
+        if (isSales && !module.salesOk) return; // sales role: only salesOk modules
 
         // Skip admin-only modules (only admin@ciudadbilingue.com, or an explicit grant)
         if (module.adminOnly) {
@@ -212,7 +219,7 @@ function openModule(moduleName) {
     // Create header
     container.innerHTML = `
         <div style="background: #f3f4f6; padding: 1rem; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
-            <h2 style="margin: 0;">${moduleName === 'Trials' ? '🧪 Clases de prueba' : `📚 ${moduleName} Module`}</h2>
+            <h2 style="margin: 0;">${moduleName === 'Trials' ? '🧪 Clases de prueba' : moduleName === 'StudentsUnified' ? '🧑‍🎓 Estudiantes unificado' : `📚 ${moduleName} Module`}</h2>
             <button onclick="document.getElementById('schoolModuleView').style.display='none'"
                     style="padding: 0.5rem 1rem; background: #dc2626; color: white; border: none; border-radius: 4px; cursor: pointer;">
                 ✖️ Cerrar

@@ -148,6 +148,7 @@ class PermissionEnforcer {
             // School modules (button bar) — matched by button TEXT in
             // enforceSchoolButtonPermissions (school-buttons.js sets no ids)
             students: { elementId: 'studentsBtn', type: 'school' },
+            studentsUnified: { elementId: 'studentsUnifiedBtn', type: 'school' }, // 🧑‍🎓 students-unified.js
             payments: { elementId: 'paymentsBtn', type: 'school' },
             tienda: { elementId: 'tiendaBtn', type: 'school' },
             finance: { elementId: 'financeBtn', type: 'school' },
@@ -498,6 +499,8 @@ class PermissionEnforcer {
         // Map of button text to module permission
         const buttonModuleMap = {
             'Estudiantes': 'students',
+            // must come AFTER 'Estudiantes': includes() matches both and the last match wins
+            'Estudiantes unificado': 'studentsUnified',
             'Pagos': 'payments',
             'Tienda': 'tienda',
             'Finanzas': 'finance',
@@ -530,7 +533,7 @@ class PermissionEnforcer {
     
     // Modules that live in the 🏫 school button bar
     get schoolModules() {
-        return ['students', 'payments', 'tienda', 'finance', 'nomina', 'groups', 'employees', 'teachers', 'attendance'];
+        return ['students', 'studentsUnified', 'payments', 'tienda', 'finance', 'nomina', 'groups', 'employees', 'teachers', 'attendance'];
     }
 
     // Observer for school buttons. school-buttons.js REMOVES and RE-CREATES the bar

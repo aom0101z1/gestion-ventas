@@ -20,6 +20,8 @@ const SYSTEM_MODULES = [
   { id: 'admin', name: 'Admin (requiere rol admin/director)', icon: '🔐', color: '#dc2626' },
   // 🏫 Módulos Escolares (button bar)
   { id: 'students', name: 'Estudiantes', icon: '👥', color: '#ec4899' },
+  // 🧑‍🎓 ficha + pagos in one screen (students-unified.js); for ventas it is read-only
+  { id: 'studentsUnified', name: 'Estudiantes unificado', icon: '🧑‍🎓', color: '#0f766e' },
   // Not a tab: lets a non-Director flip Activo/Inactivo (students.js + students/$id rule)
   { id: 'studentStatus', name: 'Activar/Inactivar estudiantes', icon: '🔄', color: '#16a34a' },
   // Not a tab: 🏫 "Por colegio" report in Estudiantes (colegio-picker.js)
