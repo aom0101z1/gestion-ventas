@@ -14,6 +14,16 @@
 // Pagos show the same data after any movement made here.
 //
 // Plan / recon map: estudiantes-unificado-PLAN.md (§8).
+//
+// 💰 Cobranza (23 oct 2026, tarde — PLAN §10): a "Cobranza" filter (buckets from
+// cobros-engine.js, the same rule as tutorbox.app/admin/cobros) + a Cobranza card in
+// the ficha with the WhatsApp text. The ONLY write of this module lives in
+// logSent()/unlogSent(): cobrosLog/{YYYY-MM-DD}/{studentId} (the "✓ ya le envié" mark).
+//
+// 🖼️ Tarjeta (23 oct 2026, noche — PLAN §11): the Cobranza card's "🖼️ Tarjeta" button opens a
+// modal that draws the 1080×1350 WhatsApp image (cobros-card.js, ported from
+// tutorbox.app/admin/cobranza) → copy image / download / open WhatsApp / ✅ Ya le envié
+// (logSent channel 'card'). No new writes.
 
 (function () {
     'use strict';
@@ -24,6 +34,10 @@
     const OWNER_EMAIL = 'admin@ciudadbilingue.com';
     const LS_LAST = 'suLastStudentId';
     const LS_STATUS = 'suStatusFilter';
+    const LS_BUCKET = 'suCobrosBucket';       // stored, but the view always opens on "Todos"
+    const LS_HIDESENT = 'suCobrosHideSent';
+    const LS_SENDER = 'tbx_cobros_sender';    // same key as tutorbox.app/admin/cobros
+    const CHANNEL_ICON = { wa: '💬', copy: '📋', manual: '✅', card: '🖼️' };
     // Modals of the old modules that land in <body> with z-index 1000 and would
     // stay hidden behind #schoolModuleView (z-index 10000) — PLAN R1.
     const LIFT_IDS = ['paymentModal', 'studentNotesModal', 'inactiveModal', 'studentFormModal',
@@ -38,7 +52,16 @@
         statusCache: new Map(),   // studentId -> PaymentManager.getPaymentStatus(s)
         bodyObserver: null,
         viewObserver: null,
-        loading: false
+        loading: false,
+        // 💰 Cobranza
+        bucket: '',               // '' = Todos · a CobrosEngine bucket key · 'ok' = Al día
+        hideSent: true,
+        cobros: null,             // { rows, notes, ok, byId, day } from CobrosEngine.computeRows
+        sent: {},                 // cobrosLog/{sentDay} → { studentId: {kind, channel, at, by, name} }
+        sentDay: '',
+        drafts: new Map(),        // 'studentId|bucket' → edited text
+        listIds: [],              // ids rendered in the list (for ➡ Siguiente)
+        anchorAfter: null         // ids that followed the selected student before it left the list
     };
 
     // ───────────────────────── small helpers ─────────────────────────
@@ -108,11 +131,341 @@
             console.error('Estudiantes unificado — recarga:', e);
             notify('❌ No se pudo recargar: ' + (e.message || e), 'error');
         }
+        if (reload || SU.sentDay !== today()) await loadSentLog();
         if (!$('studentsUnifiedContainer')) return;
         SU.statusCache.clear();
+        computeCobros();
         if (studentId) SU.selectedId = studentId;
         renderList();
         renderFicha();
+    }
+
+    // ───────────────────────── 💰 cobranza (engine + "ya le envié" log) ─────────────────────────
+
+    const engine = () => window.CobrosEngine || null;
+    const senderName = () => (lsGet(LS_SENDER) || '').trim() || 'Ciudad Bilingüe';
+    const bucketInfo = (key) => (key === 'ok'
+        ? { key: 'ok', emoji: '✅', label: 'Al día', short: 'Al día' }
+        : (engine()?.BUCKET?.[key] || { key, emoji: '', label: key, short: key }));
+    const timeCO = (iso) => {
+        try {
+            return new Date(iso).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Bogota' });
+        } catch (e) { return ''; }
+    };
+    const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+    /** "venció hace 3 días" / "vence hoy" / "vence en 2 días" / "septiembre sin pagar" */
+    const dueShort = (r) => r.bucket === 'prev' ? `${r.prevMonthName || ''} sin pagar`
+        : r.bucket === 'agreement' ? `acuerdo hasta ${ddmm(r.agreement?.hasta)}`
+        : r.diff === 0 ? 'vence hoy' : r.diff < 0 ? `vence en ${plural(-r.diff, 'día')}` : `venció hace ${plural(r.diff, 'día')}`;
+    const ddmm = (iso) => { const m = /^\d{4}-(\d{2})-(\d{2})/.exec(String(iso || '')); return m ? `${m[2]}/${m[1]}` : '—'; };
+
+    /** Runs the pure engine over the managers' caches (no reads, no writes). */
+    function computeCobros() {
+        const E = engine();
+        SU.cobros = null;
+        if (!E) return;
+        try {
+            const day = today();
+            const res = E.computeRows({
+                students: window.StudentManager.students,
+                payments: window.PaymentManager.payments,
+                exceptions: (sid, mi, y) => !!window.PaymentExceptionsManager?.isExempt?.(sid, mi, y),
+                todayIso: day,
+                // PaymentConfig is a script-level const of payments.js (not on window — PLAN R3)
+                holidays: (typeof PaymentConfig !== 'undefined' && Array.isArray(PaymentConfig.holidays)) ? PaymentConfig.holidays : undefined,
+                isMonthRequired: typeof window.isMonthRequiredByStatus === 'function' ? window.isMonthRequiredByStatus : undefined
+            });
+            const byId = new Map();
+            res.notes.forEach(n => byId.set(n.id, { type: 'note', n }));
+            res.ok.forEach(o => byId.set(o.id, { type: 'ok', o }));
+            res.rows.forEach(r => byId.set(r.s.id, { type: 'row', r }));
+            SU.cobros = Object.assign({}, res, { byId, day });
+        } catch (e) {
+            console.error('Estudiantes unificado — cobranza:', e);
+        }
+    }
+
+    /** Today's "ya le envié" marks — one READ of cobrosLog/{today}. */
+    async function loadSentLog() {
+        const day = today();
+        try {
+            const db = window.firebaseModules.database;
+            const snap = await db.get(db.ref(window.FirebaseData.database, `cobrosLog/${day}`));
+            SU.sent = snap.val() || {};
+        } catch (e) {
+            console.warn('Estudiantes unificado — cobrosLog (¿reglas sin publicar?):', e);
+            SU.sent = {};
+        }
+        SU.sentDay = day;
+    }
+
+    function repaintCobros() {
+        renderList();
+        renderFicha();
+    }
+
+    // THE ONLY FIREBASE WRITES OF THIS MODULE: cobrosLog/{YYYY-MM-DD}/{studentId}
+    async function logSent(studentId, bucket, channel) {
+        if (!canWrite() || !studentId) return false;
+        const day = today();
+        if (SU.sentDay !== day) { SU.sent = {}; SU.sentDay = day; }
+        const s = window.StudentManager.students.get(studentId);
+        const cu = window.FirebaseData?.currentUser;
+        const rec = { kind: bucket, channel, at: new Date().toISOString(), by: cu?.email || cu?.uid || 'desconocido', name: s?.nombre || '' };
+        const before = SU.sent[studentId];
+        SU.sent[studentId] = rec;
+        repaintCobros();
+        try {
+            const db = window.firebaseModules.database;
+            await db.set(db.ref(window.FirebaseData.database, `cobrosLog/${day}/${studentId}`), rec);
+        } catch (e) {
+            console.error('cobrosLog set:', e);
+            if (before) SU.sent[studentId] = before; else delete SU.sent[studentId];
+            repaintCobros();
+            notify('❌ Falta publicar las reglas (cobrosLog): la marca «enviado» no se guardó. ' + (e.code || e.message || ''), 'error');
+            return false;
+        }
+        if (typeof window.logAudit === 'function') {
+            const b = bucketInfo(bucket);
+            try {
+                window.logAudit('Cobro enviado', 'student', studentId,
+                    `💬 ${b.emoji} ${b.label} · ${channel} · ${s?.nombre || studentId}`, { bucket, channel });
+            } catch (e) { console.warn('logAudit:', e); }
+        }
+        return true;
+    }
+
+    async function unlogSent(studentId) {
+        if (!canWrite() || !studentId) return false;
+        const day = SU.sentDay || today();
+        const before = SU.sent[studentId];
+        delete SU.sent[studentId];
+        repaintCobros();
+        try {
+            const db = window.firebaseModules.database;
+            await db.remove(db.ref(window.FirebaseData.database, `cobrosLog/${day}/${studentId}`));
+        } catch (e) {
+            console.error('cobrosLog remove:', e);
+            if (before) SU.sent[studentId] = before;
+            repaintCobros();
+            notify('❌ Falta publicar las reglas (cobrosLog): no se pudo deshacer. ' + (e.code || e.message || ''), 'error');
+            return false;
+        }
+        return true;
+    }
+
+    /** The text in the card's textarea (edited draft wins over the generated one). */
+    function cobroText(r) {
+        const key = `${r.s.id}|${r.bucket}`;
+        if (SU.drafts.has(key)) return SU.drafts.get(key);
+        return engine().buildText(r, senderName()).whatsapp;
+    }
+
+    function currentRow() {
+        const e = SU.cobros?.byId?.get(SU.selectedId);
+        return e && e.type === 'row' ? e.r : null;
+    }
+
+    function cobWhatsApp() {
+        const r = currentRow();
+        if (!r || !canWrite()) return;
+        const text = $('suCobText')?.value || cobroText(r);
+        const link = engine().waLink(r.s.telefono, text);
+        if (!link) { notify('Este estudiante no tiene un teléfono válido para WhatsApp', 'warning'); return; }
+        window.open(link, '_blank', 'noopener'); // synchronous in the click → not blocked as a popup
+        logSent(r.s.id, r.bucket, 'wa');
+    }
+
+    async function cobCopy() {
+        const r = currentRow();
+        if (!r || !canWrite()) return;
+        const text = $('suCobText')?.value || cobroText(r);
+        let ok = false;
+        try { await navigator.clipboard.writeText(text); ok = true; } catch (e) {
+            const ta = $('suCobText');
+            if (ta) { ta.focus(); ta.select(); try { ok = document.execCommand('copy'); } catch (e2) { ok = false; } }
+        }
+        if (!ok) { notify('No pude copiar; selecciona el texto a mano', 'warning'); return; }
+        notify('📋 Mensaje copiado', 'success');
+        logSent(r.s.id, r.bucket, 'copy');
+    }
+
+    function nextStudentId() {
+        const ids = SU.listIds;
+        const i = ids.indexOf(SU.selectedId);
+        if (i >= 0) return ids[i + 1] || null;
+        if (SU.anchorAfter) { const n = SU.anchorAfter.find(id => ids.includes(id)); if (n) return n; }
+        return ids[0] || null;
+    }
+
+    function goNext() {
+        const id = nextStudentId();
+        if (!id || id === SU.selectedId) { notify('No hay más estudiantes en esta lista 🎉', 'info'); return; }
+        selectStudent(id);
+        const sel = window.CSS?.escape ? CSS.escape(id) : id;
+        document.querySelector(`#suList [data-id="${sel}"]`)?.scrollIntoView({ block: 'nearest' });
+        $('suFicha')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    // ───────────────────────── 🖼️ Tarjeta (WhatsApp image, PLAN §11) ─────────────────────────
+    // A modal in <body> (z-index 10001, above #schoolModuleView) with its own listeners.
+    // Read-only except "✅ Ya le envié", which goes through logSent (channel 'card').
+
+    const cardApi = () => window.CobrosCard || null;
+    const CARD = { row: null, moment: '', octo: null };
+
+    function closeCardModal() {
+        const m = $('suCardModal');
+        if (m) m.remove();
+        document.removeEventListener('keydown', onCardKey);
+        CARD.row = null;
+    }
+    function onCardKey(e) { if (e.key === 'Escape') closeCardModal(); }
+    const cardMsg = (t, kind = 'info') => {
+        const el = $('suCardMsg');
+        if (el) { el.textContent = t; el.className = `su-card-msg su-card-msg-${kind}`; }
+    };
+
+    function drawCardNow() {
+        const C = cardApi();
+        const cv = $('suCardCanvas');
+        if (!C || !cv || !CARD.row) return;
+        const t = C.textFor(CARD.row, senderName(), CARD.moment);
+        C.drawCard(cv, Object.assign({}, t, { octo: CARD.octo }));
+    }
+
+    /** Plain WhatsApp text for the chosen moment (the card's textarea draft wins when the moment is the row's own). */
+    function cardWhatsAppText() {
+        const r = CARD.row;
+        const ta = $('suCobText');
+        if (CARD.moment === r.bucket && ta && ta.dataset.key === `${r.s.id}|${r.bucket}`) return ta.value;
+        if (CARD.moment === r.bucket) return cobroText(r);
+        return engine().buildText(Object.assign({}, r, { bucket: CARD.moment }), senderName()).whatsapp;
+    }
+
+    function openCardModal() {
+        const C = cardApi();
+        const r = currentRow();
+        if (!r) return;
+        if (!C) { notify('❌ No cargó cobros-card.js (recarga la página)', 'error'); return; }
+        closeCardModal();
+        CARD.row = r;
+        CARD.moment = C.MOMENT[r.bucket] ? r.bucket : 'remind';
+        const sales = isSales();
+        const sl = SU.sent[r.s.id];
+        const link = engine().waLink(r.s.telefono, 'x');
+        const opts = C.MOMENTS.map(m => `<option value="${esc(m.id)}"${m.id === CARD.moment ? ' selected' : ''}>${esc(m.label)}${m.id === r.bucket ? ' (actual)' : ''}</option>`).join('');
+        const wrapEl = document.createElement('div');
+        wrapEl.id = 'suCardModal';
+        wrapEl.className = 'su-card-modal';
+        wrapEl.innerHTML = `
+            <div class="su-card-box" role="dialog" aria-label="Tarjeta de cobro">
+                <div class="su-card-preview"><canvas id="suCardCanvas" width="1080" height="1350"></canvas></div>
+                <div class="su-card-side">
+                    <div class="su-row-between" style="align-items:flex-start;">
+                        <div>
+                            <h3 style="margin:0;font-size:1.1rem;">🖼️ Tarjeta para WhatsApp</h3>
+                            <div class="su-muted" style="font-size:0.82rem;">${esc(r.s.nombre || '')}</div>
+                        </div>
+                        <button type="button" class="su-linkbtn" data-card="close" title="Cerrar (Esc)" style="font-size:1.2rem;color:#6b7280;">✕</button>
+                    </div>
+                    <label class="su-card-lbl">Momento
+                        <select id="suCardMoment" class="su-input">${opts}</select>
+                    </label>
+                    <label class="su-card-lbl">Firma
+                        <input id="suCardSender" class="su-input" maxlength="40" value="${esc(senderName())}">
+                    </label>
+                    ${sl ? `<div class="su-sent-line">✓ enviado hoy ${esc(timeCO(sl.at))} por ${esc(sl.by || '—')} · ${CHANNEL_ICON[sl.channel] || esc(sl.channel || '')}</div>` : ''}
+                    <div class="su-card-actions">
+                        <button type="button" class="su-btn" style="background:#111827;" data-card="copy">📋 Copiar imagen</button>
+                        <button type="button" class="su-btn" style="background:#4f46e5;" data-card="download">⬇️ Descargar</button>
+                        ${sales ? '' : `<button type="button" class="su-btn" style="background:#16a34a;" data-card="wa" ${link ? '' : 'disabled title="Sin teléfono válido en la ficha"'}>💬 Abrir WhatsApp</button>`}
+                        ${sales ? '' : (sl ? '<button type="button" class="su-btn" style="background:#059669;" disabled>✓ Ya enviado hoy</button>'
+                                          : '<button type="button" class="su-btn" style="background:#059669;" data-card="mark" title="Marca el envío de hoy (canal 🖼️ tarjeta)">✅ Ya le envié</button>')}
+                        <button type="button" class="su-btn" style="background:#6b7280;" data-card="close">Cerrar</button>
+                    </div>
+                    <p class="su-card-hint">💡 ${sales ? '' : '«Abrir WhatsApp» abre el chat con el mensaje de texto; '}copia la imagen y pégala en el chat (Ctrl+V). Copiar imágenes funciona en Chrome/Edge; si no se puede, se descarga el PNG.</p>
+                    <div id="suCardMsg" class="su-card-msg"></div>
+                </div>
+            </div>`;
+        document.body.appendChild(wrapEl);
+        document.addEventListener('keydown', onCardKey);
+
+        wrapEl.addEventListener('click', (e) => {
+            if (e.target === wrapEl) { closeCardModal(); return; } // backdrop
+            const b = e.target.closest('[data-card]');
+            if (!b || b.disabled) return;
+            const act = b.dataset.card;
+            if (act === 'close') closeCardModal();
+            else if (act === 'copy') cardCopy();
+            else if (act === 'download') cardDownload(false);
+            else if (act === 'wa') cardWhatsApp();
+            else if (act === 'mark') cardMark(b);
+        });
+        wrapEl.addEventListener('change', (e) => {
+            if (e.target.id === 'suCardMoment') { CARD.moment = e.target.value; drawCardNow(); }
+        });
+        wrapEl.addEventListener('input', (e) => {
+            if (e.target.id !== 'suCardSender') return;
+            lsSet(LS_SENDER, e.target.value);
+            // keep the Cobranza card (Firma input + generated text) in sync
+            const fs = $('suSender'); if (fs) fs.value = e.target.value;
+            const ta = $('suCobText');
+            if (ta && CARD.row && !SU.drafts.has(`${CARD.row.s.id}|${CARD.row.bucket}`)) ta.value = cobroText(CARD.row);
+            drawCardNow();
+        });
+
+        drawCardNow();
+        C.loadOcto().then((img) => { if (img && CARD.row === r) { CARD.octo = img; drawCardNow(); } });
+    }
+
+    function cardDownload(fallback) {
+        const C = cardApi();
+        const cv = $('suCardCanvas');
+        if (!C || !cv || !CARD.row) return;
+        const a = document.createElement('a');
+        a.href = cv.toDataURL('image/png');
+        a.download = C.fileName(CARD.row);
+        document.body.appendChild(a); a.click(); a.remove();
+        cardMsg(fallback ? '⚠️ Este navegador no dejó copiar la imagen: la descargué. Adjúntala en WhatsApp.' : '⬇️ Imagen descargada', fallback ? 'warn' : 'ok');
+    }
+
+    async function cardCopy() {
+        const C = cardApi();
+        const cv = $('suCardCanvas');
+        if (!C || !cv) return;
+        if (!navigator.clipboard?.write || typeof window.ClipboardItem === 'undefined') { cardDownload(true); return; }
+        try {
+            try {
+                // promise form first: keeps the user gesture alive while the PNG encodes (Safari needs it)
+                await navigator.clipboard.write([new ClipboardItem({ 'image/png': C.toPngBlob(cv) })]);
+            } catch (e1) {
+                const blob = await C.toPngBlob(cv);
+                await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+            }
+            cardMsg('📋 Imagen copiada — pégala en el chat de WhatsApp (Ctrl+V)', 'ok');
+        } catch (e) {
+            console.warn('Tarjeta — copiar imagen:', e);
+            cardDownload(true);
+        }
+    }
+
+    function cardWhatsApp() {
+        const r = CARD.row;
+        if (!r || !canWrite()) return;
+        const link = engine().waLink(r.s.telefono, cardWhatsAppText());
+        if (!link) { cardMsg('Este estudiante no tiene un teléfono válido para WhatsApp', 'warn'); return; }
+        window.open(link, '_blank', 'noopener'); // synchronous in the click → not blocked as a popup
+        cardMsg('💬 WhatsApp abierto con el texto — ahora pega la imagen (📋 Copiar imagen → Ctrl+V)', 'ok');
+    }
+
+    async function cardMark(btn) {
+        const r = CARD.row;
+        if (!r || !canWrite()) return;
+        btn.disabled = true;
+        const ok = await logSent(r.s.id, CARD.moment || r.bucket, 'card');
+        if (ok) { notify(`✅ Marcado como enviado (🖼️ tarjeta) · ${r.s.nombre || ''}`, 'success'); closeCardModal(); }
+        else { btn.disabled = false; cardMsg('❌ No se guardó la marca (ver aviso)', 'err'); }
     }
 
     // ───────────────────────── modal lifting (PLAN R1) ─────────────────────────
@@ -144,6 +497,7 @@
     function stopLift() {
         if (SU.bodyObserver) { SU.bodyObserver.disconnect(); SU.bodyObserver = null; }
         if (SU.viewObserver) { SU.viewObserver.disconnect(); SU.viewObserver = null; }
+        closeCardModal(); // the 🖼️ Tarjeta modal lives in <body>: never leave it over another module
     }
 
     function viewIsOpen() {
@@ -175,8 +529,47 @@
         return SU.statusCache.get(s.id);
     }
 
+    /** Students of the chosen Cobranza bucket (active only), most overdue first. */
+    function bucketStudents() {
+        const c = SU.cobros;
+        if (!c) return [];
+        let list;
+        if (SU.bucket === 'ok') {
+            list = c.ok.map(o => o.s).sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es'));
+        } else {
+            list = c.rows.filter(r => r.bucket === SU.bucket).sort((a, b) => b.diff - a.diff ||
+                String(a.s.nombre || '').localeCompare(String(b.s.nombre || ''), 'es')).map(r => r.s);
+        }
+        if (SU.hideSent) list = list.filter(s => !SU.sent[s.id]);
+        return list;
+    }
+
+    function renderBucketOptions() {
+        const sel = $('suBucket');
+        if (!sel) return;
+        const c = SU.cobros;
+        const E = engine();
+        if (!c || !E) {
+            sel.innerHTML = '<option value="">💰 Cobranza: no disponible</option>';
+            sel.disabled = true;
+            return;
+        }
+        sel.disabled = false;
+        const counts = {};
+        const sentCounts = {};
+        c.rows.forEach(r => {
+            counts[r.bucket] = (counts[r.bucket] || 0) + 1;
+            if (SU.sent[r.s.id]) sentCounts[r.bucket] = (sentCounts[r.bucket] || 0) + 1;
+        });
+        const opt = (key, emoji, label, n, sentN) =>
+            `<option value="${key}"${SU.bucket === key ? ' selected' : ''}>${emoji} ${esc(label)} · ${n}${sentN ? ` (${sentN} ✓)` : ''}</option>`;
+        sel.innerHTML = `<option value=""${SU.bucket ? '' : ' selected'}>💰 Cobranza: Todos</option>` +
+            E.BUCKETS.map(b => opt(b.key, b.emoji, b.label, counts[b.key] || 0, sentCounts[b.key] || 0)).join('') +
+            opt('ok', '✅', 'Al día', c.ok.length, 0);
+    }
+
     function filteredStudents() {
-        const all = window.StudentManager.getStudents({ status: SU.status });
+        const all = SU.bucket ? bucketStudents() : window.StudentManager.getStudents({ status: SU.status });
         const q = SU.search.toLowerCase().trim();
         if (!q) return all;
         const qDigits = q.replace(/\D/g, '');
@@ -196,30 +589,55 @@
     function renderList() {
         const box = $('suList');
         if (!box) return;
+        renderBucketOptions();
+        const statusSel = $('suStatus');
+        if (statusSel) {
+            statusSel.disabled = !!SU.bucket;
+            statusSel.title = SU.bucket ? 'Con un filtro de Cobranza la lista muestra solo estudiantes activos' : '';
+        }
+        const hideBox = $('suHideSent');
+        if (hideBox) hideBox.disabled = !SU.bucket;
         const list = filteredStudents();
         const MAX = 300;
+        // ➡ Siguiente: remember who followed the selected student if it just left the list (e.g. marked as sent)
+        const ids = list.slice(0, MAX).map(s => s.id);
+        if (SU.selectedId && !ids.includes(SU.selectedId) && SU.listIds.includes(SU.selectedId)) {
+            SU.anchorAfter = SU.listIds.slice(SU.listIds.indexOf(SU.selectedId) + 1);
+        }
+        SU.listIds = ids;
         $('suCount').textContent = `${list.length} estudiante(s)`;
         if (!list.length) {
-            box.innerHTML = '<div class="su-empty">No hay estudiantes con ese filtro.</div>';
+            box.innerHTML = `<div class="su-empty">${SU.bucket ? '🎉 Nadie pendiente en este grupo de cobranza.' : 'No hay estudiantes con ese filtro.'}</div>`;
             return;
         }
+        const rowOf = (id) => { const e = SU.cobros?.byId?.get(id); return e && e.type === 'row' ? e.r : null; };
         box.innerHTML = list.slice(0, MAX).map(s => {
             const st = statusOf(s);
             const inactive = s.status === 'inactive';
             const groups = groupsOf(s);
+            let chip = `<span class="su-chip" style="background:${esc(st.color)}1a;color:${esc(st.color)};border-color:${esc(st.color)}55;"
+                              title="Estado del mes actual según Pagos (usa DP1)">${esc(st.icon || '')} ${esc(st.status)}</span>`;
+            let sentMark = '';
+            if (SU.bucket) {
+                const r = rowOf(s.id);
+                const b = bucketInfo(r ? r.bucket : 'ok');
+                chip = `<span class="su-chip su-b-${esc(b.key)}" title="${esc(b.label)}">${b.emoji} ${esc(b.short)}</span>`;
+                const sl = SU.sent[s.id];
+                if (sl) sentMark = `<span class="su-sent" title="Enviado por ${esc(sl.by || '')}">✓ ${esc(timeCO(sl.at))} ${CHANNEL_ICON[sl.channel] || ''}</span>`;
+            }
             return `
                 <button type="button" class="su-item${s.id === SU.selectedId ? ' su-item-on' : ''}${inactive ? ' su-item-off' : ''}"
                         data-su="pick" data-id="${esc(s.id)}">
                     <div class="su-item-top">
                         <span class="su-item-name">${esc(s.nombre || '(sin nombre)')}</span>
-                        <span class="su-chip" style="background:${esc(st.color)}1a;color:${esc(st.color)};border-color:${esc(st.color)}55;"
-                              title="Estado del mes actual según Pagos (usa DP1)">${esc(st.icon || '')} ${esc(st.status)}</span>
+                        <span style="display:flex;gap:0.3rem;align-items:center;flex-shrink:0;">${sentMark}${chip}</span>
                     </div>
                     <div class="su-item-sub">
                         ${groups.length ? groups.map(g => `📚 ${esc(g)}`).join(' · ') : '<span class="su-muted">Sin grupo</span>'}
                         · DP ${esc(s.diaPago || '—')}
                         · ${s.tipoPago === 'POR_HORAS' ? `${money(s.valorHora)}/h` : money(window.getStudentMonthlyTotal(s))}
                         ${inactive ? ' · <b style="color:#b91c1c;">Inactivo</b>' : ''}
+                        ${SU.bucket && rowOf(s.id) ? ` · <b>${esc(dueShort(rowOf(s.id)))}</b>` : ''}
                     </div>
                 </button>`;
         }).join('') + (list.length > MAX
@@ -285,6 +703,67 @@
         return `<span title="${esc(uid)}">${esc(String(uid).slice(0, 6))}…</span>`;
     }
 
+    /** 💰 Cobranza card (inside the first card, right under the actions bar). */
+    function renderCobranza(s) {
+        const E = engine();
+        if (!E || !SU.cobros || (s.status || 'active') !== 'active') return '';
+        const entry = SU.cobros.byId.get(s.id);
+        if (!entry) return '';
+        const nextBtn = SU.listIds.length ? '<button type="button" class="su-linkbtn" data-su="cobNext" title="Pasa al siguiente estudiante de la lista de la izquierda">➡ Siguiente</button>' : '';
+        if (entry.type === 'ok') {
+            const why = entry.o.why === 'vacaciones' ? ' (mes de vacaciones)' : entry.o.why === 'excepcion' ? ' (mes exonerado)' : '';
+            return `<div class="su-cob-line su-b-ok">✅ Al día${why}${entry.o.nextDueIso ? ` — próximo vencimiento ${ddmm(entry.o.nextDueIso)}` : ''} ${nextBtn}</div>`;
+        }
+        if (entry.type === 'note') {
+            return `<div class="su-cob-line su-muted">💰 Cobranza: ${esc(entry.n.label)}${entry.n.nextDueIso ? ` — primer vencimiento ${ddmm(entry.n.nextDueIso)}` : ''} ${nextBtn}</div>`;
+        }
+        const r = entry.r;
+        const b = bucketInfo(r.bucket);
+        const sales = isSales();
+        const sl = SU.sent[s.id];
+        const link = E.waLink(s.telefono, 'x');
+        const owe = r.bucket === 'prev' ? (r.prevOwed?.remaining || 0) : r.remaining + (r.prevOwed?.remaining || 0);
+        const lines = [];
+        if (r.bucket === 'prev') {
+            lines.push(`La mensualidad de <b>${esc(r.prevMonthName)}</b> quedó sin pagar (venció el ${esc(E.longDate(r.dueIso))}, hace ${plural(r.diff, 'día')}).`);
+        } else {
+            lines.push(r.diff === 0 ? `Vence <b>hoy</b> (${esc(E.longDate(r.dueIso))}).`
+                : r.diff < 0 ? `Vence el <b>${esc(E.longDate(r.dueIso))}</b> (en ${plural(-r.diff, 'día')}).`
+                : `Venció el <b>${esc(E.longDate(r.dueIso))}</b> (hace ${plural(r.diff, 'día')}).`);
+        }
+        lines.push(`Debe <b>${money(owe)}</b>${r.bucket !== 'prev' ? ` · mensualidad ${money(r.expected)}` : ''}.`);
+        if (r.partial) lines.push(`Pago parcial: abonó ${money(r.paidNow)}, le falta ${money(r.remaining)}.`);
+        if (r.prevOwed && r.bucket !== 'prev') lines.push(`También debe ${esc(r.prevOwed.month)} (${money(r.prevOwed.remaining)}).`);
+        if (r.agreement) lines.push(`📅 Acuerdo de pago hasta el ${esc(E.longDate(r.agreement.hasta))}${r.agreement.nota ? ` — ${esc(r.agreement.nota)}` : ''}.`);
+        const sentLine = sl
+            ? `<div class="su-sent-line">✓ enviado hoy ${esc(timeCO(sl.at))} por ${esc(sl.by || '—')} · ${CHANNEL_ICON[sl.channel] || esc(sl.channel || '')}${sl.kind && sl.kind !== r.bucket ? ` <span class="su-muted">(como ${esc(bucketInfo(sl.kind).short)})</span>` : ''}</div>`
+            : '';
+        const buttons = sales ? '' : `
+            <button type="button" class="su-btn" style="background:#16a34a;" data-su="cobWa" ${link ? '' : 'disabled title="Sin teléfono válido en la ficha"'}>💬 WhatsApp</button>
+            <button type="button" class="su-btn" style="background:#111827;" data-su="cobCopy">📋 Copiar</button>
+            ${sl ? '<button type="button" class="su-btn" style="background:#6b7280;" data-su="cobUndo" title="Quita la marca de hoy">↩ Deshacer</button>'
+                 : '<button type="button" class="su-btn" style="background:#059669;" data-su="cobMark" title="Márcalo como enviado sin abrir WhatsApp">✅ Ya le envié</button>'}`;
+        return `
+            <div class="su-cob su-cob-${esc(r.bucket)}">
+                <div class="su-row-between" style="margin-bottom:0.35rem;">
+                    <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+                        <b>💰 Cobranza</b>
+                        <span class="su-chip su-b-${esc(r.bucket)}">${b.emoji} ${esc(b.label)}</span>
+                        ${link ? '' : '<span class="su-chip" style="background:#fee2e2;color:#b91c1c;border-color:#fecaca;">sin teléfono válido</span>'}
+                    </div>
+                    ${nextBtn}
+                </div>
+                <div class="su-cob-why">${lines.join(' ')}</div>
+                ${sentLine}
+                <textarea id="suCobText" class="su-input su-cob-text" ${sales ? 'readonly' : ''} data-key="${esc(s.id + '|' + r.bucket)}">${esc(cobroText(r))}</textarea>
+                <div class="su-cob-actions">
+                    ${sales ? '' : `<label class="su-muted" style="font-size:0.8rem;">Firma <input id="suSender" class="su-input" style="width:150px;padding:0.3rem 0.45rem;" value="${esc(senderName())}" maxlength="40"></label>`}
+                    ${buttons}
+                    ${window.CobrosCard ? '<button type="button" class="su-btn" style="background:#4f46e5;" data-su="cobCard" title="Imagen bonita para WhatsApp con el nombre del estudiante (copiar / descargar)">🖼️ Tarjeta</button>' : ''}
+                </div>
+            </div>`;
+    }
+
     function renderFicha() {
         const box = $('suFicha');
         if (!box) return;
@@ -339,6 +818,7 @@
                     <button type="button" class="su-btn" style="background:#6b7280;" data-su="refresh" title="Vuelve a leer estudiantes y pagos desde la base de datos">↻ Recargar</button>
                 </div>
                 ${sales ? '<div class="su-note">Vista de solo lectura para el rol de ventas.</div>' : ''}
+                ${renderCobranza(s)}
 
                 <div class="su-cols">
                     <div>
@@ -761,6 +1241,7 @@
 
     function selectStudent(id) {
         SU.selectedId = id;
+        SU.anchorAfter = null;
         lsSet(LS_LAST, id);
         document.querySelectorAll('#suList .su-item').forEach(b =>
             b.classList.toggle('su-item-on', b.dataset.id === id));
@@ -771,6 +1252,10 @@
     }
 
     async function onClick(e) {
+        // OK · S · T · 📅 acuerdo (cyclePagoOK, students.js) may change acuerdoPago → recompute the Cobranza card
+        if (e.target.closest && e.target.closest('[id^="pagoOK-"]')) {
+            setTimeout(() => { if (viewIsOpen()) refresh(); }, 1500);
+        }
         const el = e.target.closest('[data-su]');
         if (!el || el.disabled) return;
         const act = el.dataset.su;
@@ -787,6 +1272,12 @@
                 case 'exc': $('suExcCard')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); break;
                 case 'excGrant': await grantException(id); break;
                 case 'excRevoke': await revokeException(id, el.dataset.key); break;
+                case 'cobWa': cobWhatsApp(); break; // window.open must stay synchronous in the click
+                case 'cobCopy': await cobCopy(); break;
+                case 'cobMark': { const r = currentRow(); if (r) await logSent(r.s.id, r.bucket, 'manual'); break; }
+                case 'cobUndo': await unlogSent(id); break;
+                case 'cobNext': goNext(); break;
+                case 'cobCard': openCardModal(); break;
                 case 'refresh':
                     el.disabled = true; el.textContent = '⏳ Recargando...';
                     await refresh(id, { reload: true });
@@ -883,6 +1374,44 @@
         .su-grouphead td { background:#f8fafc; font-size:0.75rem; font-weight:700; color:#475569; }
         .su-grouprow td:first-child { border-left:3px solid #cbd5e1; }
         .su-excform { display:flex; flex-wrap:wrap; gap:0.4rem; margin-top:0.7rem; align-items:center; }
+        .su-b-suspend   { color:#991b1b; background:#fee2e2; border-color:#fca5a5; }
+        .su-b-late      { color:#b91c1c; background:#fee2e2; border-color:#fecaca; }
+        .su-b-today     { color:#c2410c; background:#ffedd5; border-color:#fed7aa; }
+        .su-b-soon      { color:#b45309; background:#fef3c7; border-color:#fde68a; }
+        .su-b-remind    { color:#a16207; background:#fef9c3; border-color:#fef08a; }
+        .su-b-prev      { color:#6b7280; background:#f3f4f6; border-color:#e5e7eb; }
+        .su-b-agreement { color:#1e40af; background:#dbeafe; border-color:#bfdbfe; }
+        .su-b-ok        { color:#065f46; background:#d1fae5; border-color:#a7f3d0; }
+        .su-sent { font-size:0.7rem; font-weight:700; color:#047857; white-space:nowrap; }
+        .su-cob { margin-top:0.75rem; border:1px solid var(--su-border); border-left:4px solid #9ca3af; border-radius:8px; padding:0.65rem 0.75rem; background:#fcfcfd; }
+        .su-cob-suspend { border-left-color:#991b1b; } .su-cob-late { border-left-color:#b91c1c; }
+        .su-cob-today { border-left-color:#c2410c; } .su-cob-soon { border-left-color:#b45309; }
+        .su-cob-remind { border-left-color:#a16207; } .su-cob-prev { border-left-color:#6b7280; }
+        .su-cob-agreement { border-left-color:#1e40af; }
+        .su-cob-why { font-size:0.85rem; color:#374151; margin-bottom:0.4rem; }
+        .su-cob-text { min-height:96px; resize:vertical; font-family:inherit; font-size:0.85rem; line-height:1.35; }
+        .su-cob-text[readonly] { background:#f9fafb; }
+        .su-cob-actions { display:flex; flex-wrap:wrap; gap:0.4rem; align-items:center; margin-top:0.45rem; }
+        .su-cob-line { margin-top:0.75rem; border:1px solid var(--su-border); border-radius:8px; padding:0.45rem 0.7rem; font-size:0.85rem; font-weight:600; }
+        .su-cob-line.su-muted { font-weight:500; background:#f9fafb; }
+        .su-sent-line { font-size:0.8rem; font-weight:700; color:#047857; background:#ecfdf5; border:1px solid #a7f3d0; border-radius:6px; padding:0.25rem 0.5rem; margin-bottom:0.4rem; }
+        .su-card-modal { position:fixed; inset:0; z-index:10001; background:rgba(15,23,42,0.6); display:flex; align-items:center; justify-content:center; padding:1rem; color:#111827; --su-border:#e5e7eb; --su-muted:#6b7280; --su-accent:#3b82f6; }
+        .su-card-modal * { box-sizing:border-box; }
+        .su-card-box { background:#fff; border-radius:12px; box-shadow:0 20px 50px rgba(0,0,0,0.35); display:flex; gap:1rem; padding:1rem; max-width:min(980px, 100%); max-height:calc(100vh - 2rem); overflow:auto; }
+        .su-card-preview { flex:0 0 auto; display:flex; align-items:flex-start; justify-content:center; }
+        .su-card-preview canvas { display:block; width:auto; height:min(650px, calc(100vh - 4rem)); max-width:520px; border-radius:10px; border:1px solid #e5e7eb; box-shadow:0 4px 14px rgba(0,0,0,0.15); }
+        .su-card-side { width:330px; display:flex; flex-direction:column; gap:0.6rem; }
+        .su-card-lbl { display:flex; flex-direction:column; gap:0.2rem; font-size:0.78rem; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:0.02em; }
+        .su-card-lbl .su-input { text-transform:none; font-weight:500; color:#111827; letter-spacing:normal; }
+        .su-card-actions { display:flex; flex-wrap:wrap; gap:0.4rem; }
+        .su-card-hint { font-size:0.78rem; color:#6b7280; margin:0; line-height:1.35; }
+        .su-card-msg { font-size:0.82rem; font-weight:600; min-height:1.2em; }
+        .su-card-msg-ok { color:#047857; } .su-card-msg-warn { color:#b45309; } .su-card-msg-err { color:#b91c1c; }
+        @media (max-width: 760px) {
+            .su-card-box { flex-direction:column; }
+            .su-card-preview canvas { width:100%; height:auto; max-width:100%; }
+            .su-card-side { width:100%; }
+        }
         .su-foot { font-size:0.78rem; color:var(--su-muted); border-top:1px solid var(--su-border); padding-top:0.6rem; margin-top:0.5rem; }
         @media (max-width: 1100px) { .su-cols { grid-template-columns:1fr; } }
         @media (max-width: 860px) {
@@ -928,7 +1457,13 @@
         SU.status = ['active', 'inactive', 'all'].includes(savedStatus) ? savedStatus : 'active';
         SU.year = new Date().getFullYear();
         SU.search = ''; // the search box is rebuilt empty → the filter must start empty too (founder, 23 Oct: "solo me muestra 1")
+        SU.bucket = ''; // same lesson: always open on "Cobranza: Todos" (the choice is stored in LS_BUCKET but not restored)
+        SU.hideSent = lsGet(LS_HIDESENT) !== '0';
+        SU.listIds = [];
+        SU.anchorAfter = null;
         SU.statusCache.clear();
+        await loadSentLog();
+        computeCobros();
         const last = lsGet(LS_LAST);
         SU.selectedId = last && window.StudentManager.students.has(last) ? last : null;
 
@@ -950,6 +1485,10 @@
                             </select>
                             <span id="suCount" class="su-muted" style="font-size:0.78rem;white-space:nowrap;"></span>
                         </div>
+                        <select id="suBucket" class="su-input" style="margin-top:0.5rem;" title="Condiciones de cobro (misma regla que Cobros en tutorbox.app)"></select>
+                        <label class="su-muted" style="display:flex;gap:0.35rem;align-items:center;font-size:0.8rem;margin-top:0.35rem;">
+                            <input type="checkbox" id="suHideSent"${SU.hideSent ? ' checked' : ''}> ocultar enviados hoy
+                        </label>
                         <div id="suList" class="su-list"></div>
                     </aside>
                     <section id="suFicha"></section>
@@ -971,6 +1510,28 @@
                 const s = window.StudentManager.students.get(SU.selectedId);
                 const card = $('suGridCard');
                 if (s && card) card.innerHTML = renderGrid(s);
+            } else if (e.target.id === 'suBucket') {
+                SU.bucket = e.target.value || '';
+                lsSet(LS_BUCKET, SU.bucket);
+                renderList();
+                renderFicha();
+            } else if (e.target.id === 'suHideSent') {
+                SU.hideSent = !!e.target.checked;
+                lsSet(LS_HIDESENT, SU.hideSent ? '1' : '0');
+                renderList();
+            } else if (e.target.classList && e.target.classList.contains('su-dp2')) {
+                // saveDiaPago2 (students.js) updates the cache asynchronously → recompute the Cobranza card
+                setTimeout(() => { if (viewIsOpen()) refresh(); }, 1200);
+            }
+        });
+        container.addEventListener('input', (e) => {
+            if (e.target.id === 'suCobText') {
+                SU.drafts.set(e.target.dataset.key, e.target.value);
+            } else if (e.target.id === 'suSender') {
+                lsSet(LS_SENDER, e.target.value);
+                const r = currentRow();
+                const ta = $('suCobText');
+                if (r && ta && !SU.drafts.has(`${r.s.id}|${r.bucket}`)) ta.value = cobroText(r);
             }
         });
         let t = null;

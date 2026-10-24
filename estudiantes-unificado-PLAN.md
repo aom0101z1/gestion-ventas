@@ -250,3 +250,90 @@ Pedido del fundador: "Felipe va a tener acceso a pagos, pero avísame a admin@ci
 **Qué hay que desplegar.** TutorBox: `firebase deploy --only functions:notifyCrmMovement,database --project tutorbox-4d7c9` (la regla nueva `crmNotifyLog`; `onUserSignup` ahora usa `functions/lib/mailer.js` con el mismo comportamiento — se puede redesplegar después sin prisa). CRM: subir `auditlog.js` + la línea `?v=20261023a` de `index.html` (push a main = producción).
 
 **Punto abierto.** ¿Está configurado el secreto `SMTP_PASSWORD` (contraseña de aplicación de admin@tutorbox.app) en `tutorbox-4d7c9`? Verificar con `firebase functions:secrets:get SMTP_PASSWORD --project tutorbox-4d7c9` (lista versiones sin mostrar el valor) (o mirar si llegan los correos de signup). Si no está, la CF responde `{sent:false, reason:'smtp-not-configured'}` y solo queda el registro en `crmNotifyLog`.
+
+## 10. Filtro de cobranza + ✓ enviado (23 Oct 2026, tarde)
+
+Pedido del fundador: "En Estudiantes unificado agrega un filtro para seleccionar las condiciones de cobranza que tenemos, para enviarles el mensaje desde aquí, y una función arriba para marcar 'Ya le envié mensaje'. Después haremos la función automática que mande estos mensajes antes, el día de pago y cuando estén atrasados."
+
+### 10.1 `cobros-engine.js` (nuevo, puro: sin DOM, sin Firebase)
+Misma regla que tutorbox.app/admin/cobros (`CobrosPanel.tsx`, `computeRows` + `buildText`), portada tal cual. UMD: `window.CobrosEngine` en el navegador y `module.exports` en Node.
+
+- `computeRows({ students, payments, exceptions, todayIso, holidays, isActive, isMonthRequired })` → `{ rows, notes, ok }`.
+  - `students` / `payments`: array, Map u objeto (los pagos `cancelled` se saltan). `exceptions`: el árbol `paymentExceptions` o una función `isExempt(sid, monthIndex0, year)`. `holidays`: claves `'2025-11'`, el array `PaymentConfig.holidays` o una función (por defecto dic 2025 + ene 2026). `isActive` por defecto = convención del CRM `(status || 'active') === 'active'`. `isMonthRequired` (opcional, el CRM pasa `isMonthRequiredByStatus`): solo se usa para el MES ANTERIOR (un mes que pasó inactivo no se debe).
+  - `rows[]`: `{ s, bucket, dueIso, diff, expected, paidNow, remaining, partial, prevOwed {month, remaining, partial}|null, prevMonthName, agreement {hasta, nota}|null, phone }`, ordenadas por bucket y luego `diff` descendente.
+  - `notes[]`: activos que no se cobran y por qué (`prueba`, `por_horas`, `semestre` DP2 = 0, `sin_dia`, `sin_valor`, `inicia_despues` + `nextDueIso`). `ok[]`: al día (`pagado`, `excepcion`, `vacaciones`, `aun_no`) + `nextDueIso`.
+- Regla: día efectivo = DP2 (1–31) si existe, si no DP1 (29–31 se recortan al último día del mes); mensualidad pagada del mes = Σ `baseAmount ?? amount` de los pagos con `month` + `year` del mes; esperado = `valor + valor2`; excepción del mes = cubierto; inscrito después de la fecha de este mes → empieza el mes siguiente. `diff = hoy − vencimiento`.
+- `BUCKETS` (en orden): 🔒 `suspend` Cuenta suspendida (8+ días) · ⛔ `late` Vencido (1–7 días) · 🔴 `today` Hoy es su día de pago · 🟠 `soon` Se vence en 1–2 días · 🟡 `remind` Recordar (3–5 días antes) · ⏪ `prev` Mes anterior pendiente (este mes cubierto o aún lejos) · 📅 `agreement` Acuerdo de pago vigente (`acuerdoPago.hasta ≥ hoy` y el mes sin cubrir). `partial` = pagó > 0 pero < esperado.
+- `buildText(row, sender)` → `{ whatsapp, body }` — los textos del portal ("Hola {2 nombres}, te escribe {firma} de Ciudad Bilingüe 👋 …", sufijos de parcial / mes anterior, firma con `324 297 3737`, montos `$280.000`, fechas "viernes 17 de noviembre"). `waLink(telefono, text)` → `https://wa.me/57XXXXXXXXXX?text=…` (primer número de la ficha; 10 dígitos → 57; null si no hay número usable).
+- Quitado respecto al portal (solo TutorBox): cuentas/roles de TutorBox (saltar profesores), avisos `paymentStatus` en la plataforma, el texto "inClass", `cobrosLog` en la base de TutorBox.
+
+### 10.2 En Estudiantes unificado (`students-unified.js`)
+- Panel izquierdo: select **Cobranza** ("Todos" + un bucket por línea con conteo en vivo y cuántos ✓ hoy, + "✅ Al día") y la casilla **ocultar enviados hoy** (por defecto marcada; se recuerda en `localStorage suCobrosHideSent`). Con un bucket elegido la lista son solo esos activos, del más atrasado al menos; el chip de Pagos se cambia por el del bucket y se ve "✓ 10:32 💬" si ya se envió hoy. Al abrir la vista siempre vuelve a "Todos" (misma lección que el buscador).
+- Ficha: tarjeta **💰 Cobranza** bajo la barra de acciones (explicación, mensaje editable, **Firma** guardada en `tbx_cobros_sender`, 💬 WhatsApp · 📋 Copiar · ✅ Ya le envié · ↩ Deshacer · ➡ Siguiente). Si no está en ningún bucket: "✅ Al día — próximo vencimiento DD/MM" o el motivo por el que no se cobra. Ventas: solo lectura (sin botones que escriban).
+- Cambiar DP2 o el acuerdo (botón OK/S/T/📅) desde la ficha vuelve a calcular la tarjeta a los ~1,5 s.
+
+### 10.3 Nodo `cobrosLog` (única escritura nueva)
+`cobrosLog/{YYYY-MM-DD}/{studentId}` = `{ kind: bucket, channel: 'wa'|'copy'|'manual', at: ISO, by: email, name }` en la base del **CRM**, solo desde `logSent()` / `unlogSent()`. Día = `getTodayInColombia()`. Se lee una vez al abrir y en cada ↻ Recargar. Tras una marca buena: `logAudit('Cobro enviado', 'student', id, '💬 {bucket} · {canal} · {nombre}', {bucket, channel})` → el dueño recibe el correo de §9 cuando lo hace otra persona.
+
+Regla agregada a `database.rules.json` (**no desplegada**):
+```json
+"cobrosLog": {
+  ".read": "auth != null",
+  "$day": { "$studentId": {
+    ".write": "auth != null && root.child('users').child(auth.uid).child('profile').child('role').val() !== 'ventas'",
+    ".validate": "newData.hasChildren(['kind','channel','at','by'])"
+  } }
+}
+```
+Despliegue (cuenta admin del fundador, fuera de las clases): `firebase deploy --only database --project ciudad-bilingue-crm`. Antes de desplegar, la lectura falla en silencio (nadie aparece como enviado) y marcar muestra "❌ Falta publicar las reglas (cobrosLog)…" sin dejar la marca.
+
+### 10.4 Automatización (siguiente paso)
+`cobros-engine.js` corre igual en Node: `const E = require('./cobros-engine.js')`. Una CF programada (p. ej. 8 am hora Colombia) lee `students`, `payments`, `paymentExceptions` con Admin SDK, llama `E.computeRows({ …, todayIso })`, filtra los buckets que se quieren enviar solos (`remind`, `soon`, `today`, `late`), salta los que ya tienen `cobrosLog/{hoy}/{id}`, manda `E.buildText(row, 'Ciudad Bilingüe').whatsapp` por la API de WhatsApp Business (plantillas aprobadas por Meta) y escribe `cobrosLog/{hoy}/{id}` con `channel: 'auto'` (habría que agregar ese valor a la UI). Como el engine es el mismo archivo, la vista manual y el envío automático nunca se contradicen.
+
+### 10.5 Cómo probar
+1. `node --check cobros-engine.js students-unified.js`; prueba del engine (30+ casos, todos los buckets, parcial, mes anterior, acuerdo vencido/vigente, semestre, prueba, por horas, inscrito después, vacaciones, día 31).
+2. Navegador (sesión del dueño, después de desplegar la regla): Estudiantes unificado → select Cobranza muestra conteos; elegir ⛔ Vencido → lista ordenada, chips de bucket; abrir uno → tarjeta 💰 con el texto; cambiar la Firma → el texto cambia; 💬 WhatsApp abre wa.me con el texto y el estudiante sale de la lista (✓ enviado hoy …); ➡ Siguiente pasa al que seguía; desmarcar "ocultar enviados hoy" → vuelve a aparecer con "✓ hh:mm 💬"; ↩ Deshacer quita la marca; Firebase console → `cobrosLog/{hoy}`; Admin → Auditoría → "Cobro enviado".
+3. Cerrar y abrir la vista → el select vuelve a "Todos". Con un usuario `ventas`: tarjeta sin botones de escritura.
+4. Comparar los conteos con tutorbox.app/admin/cobros el mismo día (diferencias esperadas: ver 10.6).
+
+### 10.6 Diferencias conocidas con el portal
+- Activo = `status || 'active'` (convención del CRM); el portal además mira Grupos 2.0 para fichas sin `status`.
+- El portal salta a los profesores/personal que tienen ficha de alumno (por su rol en TutorBox); aquí no hay roles de TutorBox, así que aparecen (salvo que sean Prueba/por horas/valor 0).
+- El mes anterior no se cobra si el estudiante estuvo inactivo ese mes (`isMonthRequiredByStatus`); el portal no lo mira.
+
+## 11. 🖼️ Tarjeta (imagen WhatsApp) — 23 Oct 2026
+
+Pedido del fundador: "Agrega a los botones un generador de imagen que pueda copiar, con el nombre del estudiante, con el mensaje bonito… uno para 8–5 días antes, otro para 2 días, otro para el día de pago y otro para cuentas suspendidas. Que para entrar a clase hoy debe pagar, pero bonito y motivador, recordándole todo lo que se pierde."
+
+### 11.1 Archivos
+- `cobros-card.js` (nuevo, UMD como `cobros-engine.js`: `window.CobrosCard` + `module.exports`; sin Firebase). `MOMENTS` / `MOMENT`, `textFor(row, sender, moment?)` → `{ who, pill, body, headline, sub, sender }` (puro, corre en Node), `drawCard(canvas, {…, octo})`, `loadOcto()` (→ `images/octopus.png`, nunca falla: sin imagen dibuja sin pulpo), `toPngBlob(canvas)`, `fileName(row)` → `recordatorio-{dos nombres}-{fecha de vencimiento}.png`.
+- `images/octopus.png` (copiado de `portal-web/public/octopus.png`).
+- `students-unified.js`: botón **🖼️ Tarjeta** en la tarjeta 💰 Cobranza → modal en `<body>` (z-index 10001) con la vista previa, select **Momento** (por defecto el bucket de la fila), **Firma** (misma clave `tbx_cobros_sender`; sincroniza la Firma y el texto de la tarjeta 💰), **📋 Copiar imagen**, **⬇️ Descargar**, **💬 Abrir WhatsApp** (wa.me con el texto plano de `buildText` — o el borrador editado si el momento es el de la fila; la imagen se pega a mano), **✅ Ya le envié** (`logSent(id, momento, 'card')`, icono 🖼️) y **Cerrar** (también Esc / clic afuera; se cierra solo si se sale de la vista). Ventas: abre, copia y descarga; sin WhatsApp ni "Ya le envié". Ninguna escritura nueva.
+- `index.html`: `cobros-card.js?v=20261023` entre `cobros-engine.js` y `students-unified.js?v=20261023c`.
+
+### 11.2 Momentos → textos (fila de ejemplo: vence el viernes 2 de octubre, $200.000)
+Saludo dibujado: "Hola, {dos nombres} 👋". Sub = `Mensualidad $X · Nequi / Bancolombia o efectivo en la escuela` (pago parcial: `Te falta $X de tu mensualidad · …`; mes anterior: el saldo de ese mes).
+
+| Bucket | Pill | Cuerpo | Recuadro 🗓️ |
+|---|---|---|---|
+| `remind` (3–5 días antes) | Recordatorio de pago | Te recordamos que tu mensualidad vence el {fecha}. Realiza tu pago desde ya para que sigas disfrutando de tus clases 😉 | Vence el {fecha} |
+| `soon` (1–2 días) | Recordatorio de pago | Tu mensualidad vence mañana, {fecha} / vence en 2 días, el {fecha}. Realiza tu pago para que sigas disfrutando de tus clases 😉 | Mañana · {fecha} / Vence el {fecha} |
+| `today` | Hoy es tu día de pago | Recuerda que para entrar a clase hoy debes realizar tu pago. ¡Tus clases en vivo, tu grupo, tus cristales y tu progreso en Tuto's World te esperan! 💎 | Hoy · {fecha} |
+| `late` (1–7 días) | Pago pendiente | Tu mensualidad venció el {fecha}. Realiza tu pago antes de tu próxima clase para que sigas disfrutando con normalidad 🙏 | Venció el {fecha} |
+| `suspend` (8+ días) | Cuenta suspendida | Tu cuenta está suspendida por falta de pago. Paga, envíanos el comprobante y recuperas tu cupo, tus cristales y todo lo ganado. ¡Te esperamos! 💙 | Venció el {fecha} |
+| `prev` | Mensualidad pendiente | La mensualidad de {mes} quedó pendiente. Si ya la pagaste, envíanos el comprobante; si no, ponte al día para seguir disfrutando de tus clases 🙏 | Mensualidad de {mes} |
+| `agreement` | Acuerdo de pago | Según tu acuerdo con la academia, tienes plazo hasta el {hasta} para ponerte al día. ¡Gracias por cumplirlo! 😉 | Hasta el {hasta} |
+
+Los cuerpos están medidos para caber en **3 líneas** a 760 px con la fecha más larga ("miércoles 30 de septiembre"): con 4 líneas la caja de WhatsApp baja hasta el pulpo y el número queda tapado. Si se cambia un texto, renderizar de nuevo y revisar.
+
+### 11.3 Cómo se portó el dibujo
+`wrap`, `roundRect` y `drawCard` copiados línea por línea de `portal-web/src/app/admin/cobranza/page.tsx` (TypeScript → JS): mismo degradado, puntos, círculo "CIUDAD BILINGÜE", pill amarilla `📅 …`, tamaños/posiciones, fuente `"Segoe UI", Inter, Roboto, Arial`, número `324 297 3737` y pulpo en (760, 1000). Dos diferencias mínimas: (1) el titular del recuadro 🗓️ se encoge (34 → 24 px) solo si pasa de 610 px, para que una fecha larga no se salga; (2) el pie usa la Firma tal cual (el portal le añadía " Osorio").
+
+### 11.4 Portapapeles
+`navigator.clipboard.write([new ClipboardItem({'image/png': …})])` solo funciona en contexto seguro (HTTPS o localhost) y, para imágenes, en Chrome/Edge (Firefox y algunos Safari no). Primero se intenta con la promesa del PNG (Safari la exige) y luego con el Blob; si todo falla se descarga el PNG y el modal lo dice.
+
+### 11.5 Cómo probar
+1. `node --check cobros-card.js students-unified.js`; `node -e "const c=require('./cobros-card.js'); …textFor(…)"` imprime los 7 textos.
+2. Navegador (sesión del dueño): Estudiantes unificado → filtro 🔴 Hoy (o cualquier bucket) → abrir un estudiante → **🖼️ Tarjeta** → aparece la imagen con su nombre y el pulpo. Cambiar Momento → se redibuja; cambiar Firma → cambia el pie y el texto de la tarjeta 💰.
+3. **📋 Copiar imagen** → pegar (Ctrl+V) en WhatsApp Web; **⬇️ Descargar** → `recordatorio-nombre-AAAA-MM-DD.png`; **💬 Abrir WhatsApp** → wa.me con el texto; **✅ Ya le envié** → el modal se cierra, la lista muestra "✓ hh:mm 🖼️" y `cobrosLog/{hoy}/{id}.channel = 'card'`.
+4. Usuario `ventas`: el botón 🖼️ Tarjeta abre el modal con solo Copiar / Descargar / Cerrar.

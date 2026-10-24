@@ -259,6 +259,15 @@
       ".read": "auth != null",
       ".write": "(auth != null && root.child('users').child(auth.uid).child('profile').child('role').val() !== 'ventas') && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || auth.token.email === 'admin@ciudadbilingue.com')"
     },
+    "cobrosLog": {
+      ".read": "auth != null",
+      "$day": {
+        "$studentId": {
+          ".write": "auth != null && root.child('users').child(auth.uid).child('profile').child('role').val() !== 'ventas'",
+          ".validate": "newData.hasChildren(['kind','channel','at','by'])"
+        }
+      }
+    },
     "bankReconciliations": {
       ".read": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || auth.token.email === 'admin@ciudadbilingue.com')",
       ".write": "(auth != null && root.child('users').child(auth.uid).child('profile').child('role').val() !== 'ventas') && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || auth.token.email === 'admin@ciudadbilingue.com')"
