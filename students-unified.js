@@ -24,6 +24,12 @@
 // modal that draws the 1080×1350 WhatsApp image (cobros-card.js, ported from
 // tutorbox.app/admin/cobranza) → copy image / download / open WhatsApp / ✅ Ya le envié
 // (logSent channel 'card'). No new writes.
+//
+// 📎 Comprobante (25 oct 2026 — PLAN §12): upload / drop / paste a payment receipt → the TutorBox CF
+// readReceipt (Claude vision) reads it → ✅/⚠️/⛔ checks → "✅ Registrar pago con estos datos" saves the image
+// in CRM Storage (receipts/{studentId}/…) and PRE-FILLS the existing payment modal; the person confirms
+// with its own Registrar button (processPayment stays the only payment writer). After the save,
+// saveReceiptRecord() writes paymentReceipts/{autoId} — the module's third allowed write.
 
 (function () {
     'use strict';
@@ -61,7 +67,10 @@
         sentDay: '',
         drafts: new Map(),        // 'studentId|bucket' → edited text
         listIds: [],              // ids rendered in the list (for ➡ Siguiente)
-        anchorAfter: null         // ids that followed the selected student before it left the list
+        anchorAfter: null,        // ids that followed the selected student before it left the list
+        // 📎 Comprobantes
+        receipts: null,           // paymentReceipts/* (null = not readable yet, e.g. rules not published)
+        receiptByPayment: new Map() // paymentId → receipt record (for the 📎 icon in the payments table)
     };
 
     // ───────────────────────── small helpers ─────────────────────────
@@ -132,6 +141,7 @@
             notify('❌ No se pudo recargar: ' + (e.message || e), 'error');
         }
         if (reload || SU.sentDay !== today()) await loadSentLog();
+        if (reload || SU.receipts === null) await loadReceipts();
         if (!$('studentsUnifiedContainer')) return;
         SU.statusCache.clear();
         computeCobros();
@@ -468,6 +478,677 @@
         else { btn.disabled = false; cardMsg('❌ No se guardó la marca (ver aviso)', 'err'); }
     }
 
+    // ───────────────────────── 📎 Comprobante (receipt reader, PLAN §12) ─────────────────────────
+    // Upload / drop / paste the student's receipt → readReceipt (TutorBox CF, Claude vision) reads it →
+    // checks (amount, date, duplicate reference, payer, destination, confidence) → "✅ Registrar pago con
+    // estos datos" uploads the image to CRM Storage and PRE-FILLS the existing payment modal (openPayment →
+    // processPayment, the only validated path). A person confirms with the modal's own Registrar button:
+    // nothing here writes a payment. After a successful save, saveReceiptRecord() writes
+    // paymentReceipts/{autoId} (this module's third and last allowed write).
+
+    const RECEIPT_FN_URL = 'https://us-central1-tutorbox-4d7c9.cloudfunctions.net/readReceipt';
+    // TODO(founder): fill with the school's REAL destination accounts, e.g.
+    //   { provider: 'Nequi', name: 'Ciudad Bilingüe', account: '3242973737' },
+    //   { provider: 'Bancolombia', name: 'Ciudad Bilingüe SAS', account: '00000000000' },
+    // Matching uses the last 4 digits (receipts often mask the rest) or, without digits, the name.
+    // While this list is empty every receipt shows "⚠️ cuenta destino no configurada".
+    const SCHOOL_ACCOUNTS = [];
+    const RC_MAX_DAYS = 45;              // older receipts get a ⚠️
+    const RC_MAX_PX = 1600;              // client-side downscale before sending
+    const RC_MAX_BYTES = 6 * 1024 * 1024;
+    const RC_MIN_CONF = 0.6;
+    const RC_RECENT_MS = 2 * 60 * 1000;  // the payment saved by the modal must be this recent
+    const FIREBASE_SDK = '10.7.1';       // same version index.html imports
+    const RC = { studentId: null, blob: null, mime: '', ext: '', name: '', previewUrl: '', data: null, model: '', busy: false };
+    const RC_ERR = {
+        unauthorized: 'la clave del puente TutorBox fue rechazada',
+        file_too_large: 'el archivo pesa más de 6 MB',
+        unsupported_mime_type: 'formato no soportado (usa JPG, PNG, WebP o PDF)',
+        image_required: 'no llegó la imagen',
+        refused: 'el lector se negó a procesar esta imagen',
+        unparseable_reply: 'el lector no devolvió datos claros — prueba con una imagen más nítida',
+        ai_error: 'el servicio de IA no respondió (¿créditos de Anthropic?)',
+        anthropic_disabled: 'el proveedor de IA está desactivado en TutorBox',
+        anthropic_not_configured: 'falta la clave de Anthropic en TutorBox',
+        server_not_configured: 'la función no tiene configurada la clave del puente'
+    };
+    const RC_FIELDS = [
+        ['provider', 'Medio', 'select'], ['amount', 'Monto (COP)', 'number'],
+        ['dateIso', 'Fecha', 'date'], ['timeHHmm', 'Hora', 'time'],
+        ['reference', 'Referencia', 'text'], ['payerName', 'Pagó (nombre)', 'text'],
+        ['payerAccountLast4', 'Origen (4 últimos)', 'text'], ['destinationName', 'Destino (nombre)', 'text'],
+        ['destinationAccount', 'Destino (cuenta)', 'text'], ['concept', 'Mensaje / concepto', 'text']
+    ];
+    const RC_ICON = { ok: '✅', warn: '⚠️', stop: '⛔' };
+
+    const refKey = (v) => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const nameWords = (v) => String(v || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+        .replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter(w => w.length >= 3);
+    const daysBetween = (a, b) => {
+        const p = (s) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || '')); return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) : NaN; };
+        return Math.round((p(b) - p(a)) / 86400000);
+    };
+    // the CRM-bridge key already loaded by tutorbox-admin.js / students.js (same lookup as auditlog.js)
+    const bridgeKey = () => (typeof TB_ADMIN_KEY !== 'undefined' ? TB_ADMIN_KEY
+        : typeof TUTORBOX_ADMIN_KEY !== 'undefined' ? TUTORBOX_ADMIN_KEY : null);
+
+    /** paymentReceipts — one READ (open to any signed-in user); null when the rules are not published yet. */
+    async function loadReceipts() {
+        try {
+            const db = window.firebaseModules.database;
+            const snap = await db.get(db.ref(window.FirebaseData.database, 'paymentReceipts'));
+            SU.receipts = snap.val() || {};
+        } catch (e) {
+            console.warn('Estudiantes unificado — paymentReceipts (¿reglas sin publicar?):', e);
+            SU.receipts = null;
+        }
+        indexReceipts();
+    }
+
+    function indexReceipts() {
+        SU.receiptByPayment = new Map();
+        Object.entries(SU.receipts || {}).forEach(([rid, r]) => {
+            if (!r) return;
+            const ids = Array.isArray(r.paymentIds) && r.paymentIds.length ? r.paymentIds : (r.paymentId ? [r.paymentId] : []);
+            ids.forEach(pid => SU.receiptByPayment.set(pid, Object.assign({ id: rid }, r)));
+        });
+    }
+
+    // Firebase Storage: the CRM page does not import it (InvoiceStorage falls back to DB-only), so load the
+    // same SDK version lazily here — without touching window.firebaseModules (invoices keep behaving as today).
+    let storageApi = null;
+    async function getStorageApi() {
+        if (storageApi) return storageApi;
+        const m = window.firebaseModules?.storage;
+        if (m && m.storage && m.storageRef && m.uploadBytes && m.getDownloadURL) {
+            storageApi = { storage: m.storage, ref: m.storageRef, uploadBytes: m.uploadBytes, getDownloadURL: m.getDownloadURL };
+            return storageApi;
+        }
+        if (!window.firebaseApp) throw new Error('Firebase no está listo');
+        const mod = await import(`https://www.gstatic.com/firebasejs/${FIREBASE_SDK}/firebase-storage.js`);
+        storageApi = { storage: mod.getStorage(window.firebaseApp), ref: mod.ref, uploadBytes: mod.uploadBytes, getDownloadURL: mod.getDownloadURL };
+        return storageApi;
+    }
+
+    function loadImage(blob) {
+        return new Promise((resolve, reject) => {
+            const url = URL.createObjectURL(blob);
+            const img = new Image();
+            img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+            img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('No pude abrir la imagen (¿formato HEIC?). Envíala como JPG o PNG.')); };
+            img.src = url;
+        });
+    }
+
+    /** PDF as-is (≤ 6 MB); images re-encoded to JPEG ≤ 1600 px when big or not jpeg/png/webp. */
+    async function prepareReceiptFile(file) {
+        const type = String(file.type || '').toLowerCase();
+        if (type === 'application/pdf') {
+            if (file.size > RC_MAX_BYTES) throw new Error('El PDF pesa más de 6 MB');
+            return { blob: file, mime: 'application/pdf', ext: 'pdf' };
+        }
+        if (!type.startsWith('image/')) throw new Error('Sube una imagen (JPG, PNG, WebP) o un PDF');
+        const img = await loadImage(file);
+        const w = img.naturalWidth, h = img.naturalHeight;
+        const keep = ['image/jpeg', 'image/png', 'image/webp'].includes(type) && Math.max(w, h) <= RC_MAX_PX && file.size <= 2 * 1024 * 1024;
+        if (keep) return { blob: file, mime: type, ext: type === 'image/jpeg' ? 'jpg' : type.split('/')[1] };
+        const k = Math.min(1, RC_MAX_PX / Math.max(w, h));
+        const cv = document.createElement('canvas');
+        cv.width = Math.max(1, Math.round(w * k));
+        cv.height = Math.max(1, Math.round(h * k));
+        const ctx = cv.getContext('2d');
+        ctx.fillStyle = '#fff'; // transparent PNG → white, not black
+        ctx.fillRect(0, 0, cv.width, cv.height);
+        ctx.drawImage(img, 0, 0, cv.width, cv.height);
+        const blob = await new Promise((res, rej) => cv.toBlob(b => (b ? res(b) : rej(new Error('No pude convertir la imagen'))), 'image/jpeg', 0.88));
+        return { blob, mime: 'image/jpeg', ext: 'jpg' };
+    }
+
+    const blobToBase64 = (blob) => new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => { const s = String(fr.result || ''); resolve(s.slice(s.indexOf(',') + 1)); };
+        fr.onerror = () => reject(fr.error || new Error('No pude leer el archivo'));
+        fr.readAsDataURL(blob);
+    });
+
+    /** What the student owes now: the CobrosEngine row if there is one, else the monthly total. */
+    function owedFor(s) {
+        const monthly = Number(window.getStudentMonthlyTotal?.(s)) || 0;
+        const e = SU.cobros?.byId?.get(s.id);
+        if (e && e.type === 'row') {
+            const r = e.r;
+            const owe = r.bucket === 'prev' ? (r.prevOwed?.remaining || 0) : (r.remaining || 0) + (r.prevOwed?.remaining || 0);
+            return { owe, monthly, source: bucketInfo(r.bucket).label };
+        }
+        return { owe: monthly, monthly, source: e && e.type === 'ok' ? 'al día — mensualidad' : 'mensualidad' };
+    }
+
+    /**
+     * Month(s) this payment should cover, in order: continues after the last month with tuition
+     * (or completes it if it was partial), skipping exonerated / holiday / not-required months; starts at
+     * fechaInicio (or this month) when there are no payments. Stops at next month (Mensual limit).
+     */
+    function suggestMonths(s, amount) {
+        const out = { months: [], leftover: 0, partial: false, notes: [] };
+        if (s.tipoPago === 'POR_HORAS' || s.modalidad === 'Privadas') {
+            out.notes.push('Estudiante por horas: escribe las horas en el formulario (el total se calcula solo).');
+            return out;
+        }
+        const monthly = Number(window.getStudentMonthlyTotal?.(s)) || 0;
+        const [cy, cm] = today().split('-').map(Number);
+        const curAbs = cy * 12 + (cm - 1);
+        const paidBy = new Map();
+        let lastAbs = -1;
+        studentPaymentRecords(s.id).forEach(p => {
+            const mi = MESES.indexOf(String(p.month || '').toLowerCase());
+            const y = Number(p.year);
+            if (mi < 0 || !(y > 2000) || p.status === 'cancelled') return;
+            const t = tuitionOf(p);
+            if (t <= 0) return;
+            const abs = y * 12 + mi;
+            paidBy.set(abs, (paidBy.get(abs) || 0) + t);
+            if (abs > lastAbs) lastAbs = abs;
+        });
+        let start;
+        if (lastAbs >= 0) start = (monthly > 0 && paidBy.get(lastAbs) < monthly) ? lastAbs : lastAbs + 1;
+        else {
+            const fi = /^(\d{4})-(\d{1,2})/.exec(String(s.fechaInicio || ''));
+            start = fi ? Number(fi[1]) * 12 + Number(fi[2]) - 1 : curAbs;
+        }
+        const pem = window.PaymentExceptionsManager;
+        const skip = (y, mi) => !!pem?.isExempt?.(s.id, mi, y)
+            || ((typeof PaymentConfig !== 'undefined' && PaymentConfig.isHoliday) ? !!PaymentConfig.isHoliday(y, MESES[mi]) : false)
+            || (typeof window.isMonthRequiredByStatus === 'function' && !window.isMonthRequiredByStatus(s, mi, y));
+        let remaining = Number(amount) || 0;
+        for (let abs = start, guard = 0; guard < 36 && out.months.length < 12; abs++, guard++) {
+            const y = Math.floor(abs / 12), mi = abs % 12;
+            if (abs !== lastAbs && skip(y, mi)) continue;
+            if (abs > curAbs + 1) {
+                if (!out.months.length) out.notes.push(`El siguiente mes por pagar es ${MESES[mi]} ${y} (más de un mes adelante): en Mensual solo se adelanta 1 mes — elige Trimestre/Semestre/Anual en el formulario.`);
+                else if (remaining > 0) out.notes.push('El monto alcanza para más meses, pero en pago Mensual solo se adelanta el mes siguiente (usa Trimestre/Semestre/Anual en el formulario).');
+                break;
+            }
+            const need = monthly > 0 ? monthly - (paidBy.get(abs) || 0) : remaining;
+            if (!out.months.length || remaining >= need) {
+                out.months.push({ mes: MESES[mi], mi, y, completes: paidBy.has(abs) });
+                if (remaining < need) out.partial = true;
+                remaining -= need;
+                if (monthly <= 0 || remaining <= 0) break;
+            } else break;
+        }
+        out.leftover = Math.max(0, remaining);
+        if (out.leftover > 0 && out.months.length) out.notes.push(`Sobran ${money(out.leftover)} después de ${out.months.length} mes${out.months.length === 1 ? '' : 'es'}: ¿matrícula, libro u otro concepto? Agrégalo en el formulario.`);
+        const years = [...new Set(out.months.map(m => m.y))];
+        if (years.length > 1) out.notes.push(`Los meses cruzan de año: el formulario muestra un año a la vez — se marcan los de ${years[0]}; registra los de ${years[1]} en otro pago.`);
+        return out;
+    }
+
+    /** ✅ / ⚠️ / ⛔ checks over the (editable) fields. Texts are plain (escaped when rendered). */
+    function receiptChecks(s, d) {
+        const out = [];
+        const add = (level, text) => out.push({ level, text });
+        if (!d.isReceipt) add('stop', 'El lector dice que esto no es un comprobante de pago exitoso. Sube el comprobante correcto.');
+
+        const { owe, monthly, source } = owedFor(s);
+        if (!(d.amount > 0)) add('stop', 'Falta el monto.');
+        else if (owe > 0) {
+            if (d.amount === owe) add('ok', `Monto ${money(d.amount)} = lo que debe (${source}).`);
+            else if (d.amount < owe) add('warn', `Monto ${money(d.amount)} menor a lo que debe (${money(owe)}, ${source}): quedará como abono parcial.`);
+            else if (monthly > 0 && d.amount % monthly === 0) add('ok', `Monto ${money(d.amount)} = ${d.amount / monthly} mensualidades de ${money(monthly)}.`);
+            else add('warn', `Monto ${money(d.amount)} mayor a lo que debe (${money(owe)}): ¿varios meses, matrícula o libro?`);
+        } else add('warn', `La ficha no tiene valor mensual: no puedo comparar el monto ${money(d.amount)}.`);
+
+        if (!d.dateIso) add('warn', 'No hay fecha (el comprobante no la muestra o no se leyó).');
+        else {
+            const days = daysBetween(d.dateIso, today());
+            if (isNaN(days)) add('warn', 'Fecha inválida.');
+            else if (days < 0) add('stop', `La fecha ${d.dateIso} está en el futuro.`);
+            else if (days > RC_MAX_DAYS) add('warn', `El comprobante tiene ${days} días (más de ${RC_MAX_DAYS}).`);
+            else add('ok', `Fecha ${d.dateIso}${d.timeHHmm ? ' ' + d.timeHHmm : ''} (${days === 0 ? 'hoy' : 'hace ' + plural(days, 'día')}).`);
+        }
+
+        const key = refKey(d.reference);
+        const all = SU.receipts ? Object.values(SU.receipts).filter(Boolean) : null;
+        if (!all) add('warn', 'No pude revisar duplicados (falta publicar las reglas de paymentReceipts).');
+        else if (!key) add('warn', 'Sin número de referencia: no se puede verificar si ya se usó.');
+        else {
+            const dup = all.find(r => refKey(r.reference) === key);
+            if (dup) add('stop', `Referencia ${d.reference} YA registrada el ${fmtDate(dup.at)} para ${dup.studentName || dup.studentId} (por ${dup.readBy || '—'}).`);
+            else add('ok', `Referencia ${d.reference} no se ha usado antes.`);
+        }
+        if (all && d.amount > 0 && d.dateIso) {
+            const twin = all.find(r => Number(r.amount) === d.amount && r.dateIso === d.dateIso
+                && (r.timeHHmm || '') === (d.timeHHmm || '') && (!key || refKey(r.reference) !== key));
+            if (twin) add('warn', `Ya hay otro comprobante con el mismo monto, fecha y hora (${twin.studentName || twin.studentId}). ¿Es el mismo?`);
+        }
+
+        if (!d.payerName) add('warn', 'El comprobante no muestra quién pagó.');
+        else {
+            const pw = nameWords(d.payerName);
+            const sw = nameWords([s.nombre, s.acudiente].filter(Boolean).join(' '));
+            const hit = pw.some(a => sw.some(b => a.startsWith(b) || b.startsWith(a)));
+            if (hit) add('ok', `Pagó ${d.payerName} (coincide con estudiante/acudiente).`);
+            else add('warn', `Pagó ${d.payerName}: no coincide con el estudiante ni el acudiente (puede ser un familiar).`);
+        }
+
+        if (!SCHOOL_ACCOUNTS.length) add('warn', 'Cuenta destino no configurada (SCHOOL_ACCOUNTS): no puedo confirmar que el dinero llegó a la escuela.');
+        else {
+            const digits = String(d.destinationAccount || '').replace(/\D/g, '');
+            const last4 = digits.length >= 4 ? digits.slice(-4) : '';
+            const dn = nameWords(d.destinationName);
+            const acct = SCHOOL_ACCOUNTS.find(a => (last4 && String(a.account || '').replace(/\D/g, '').slice(-4) === last4)
+                || (!last4 && dn.length && nameWords(a.name).some(w => dn.includes(w))));
+            if (acct) add('ok', `Destino: ${[acct.provider, acct.name].filter(Boolean).join(' · ')} (···${String(acct.account || '').replace(/\D/g, '').slice(-4)}).`);
+            else if (last4) add('stop', `La cuenta destino (···${last4}) no es ninguna de las cuentas de la escuela.`);
+            else add('warn', 'El comprobante no muestra la cuenta destino.');
+        }
+
+        const pct = Math.round((Number(d.confidence) || 0) * 100);
+        if ((Number(d.confidence) || 0) < RC_MIN_CONF) add('warn', `El lector no está seguro (confianza ${pct} %): compara cada campo con la imagen.`);
+        else add('ok', `Confianza del lector ${pct} %.`);
+        (d.warnings || []).forEach(w => add('warn', `Lector: ${w}`));
+        return out;
+    }
+
+    function closeReceiptModal() {
+        const m = $('suRcModal');
+        if (m) m.remove();
+        if (RC.previewUrl) { try { URL.revokeObjectURL(RC.previewUrl); } catch (e) { /* noop */ } }
+        RC.previewUrl = '';
+        document.removeEventListener('keydown', onRcKey);
+        document.removeEventListener('paste', onRcPaste);
+    }
+    function onRcKey(e) { if (e.key === 'Escape') closeReceiptModal(); }
+    function onRcPaste(e) {
+        const items = e.clipboardData?.items || [];
+        for (const it of items) {
+            if (it.kind !== 'file') continue;
+            const f = it.getAsFile();
+            if (f && (String(f.type).startsWith('image/') || f.type === 'application/pdf')) {
+                e.preventDefault();
+                rcSetFile(f);
+                return;
+            }
+        }
+    }
+    const rcMsg = (t, kind = 'info') => {
+        const el = $('suRcMsg');
+        if (el) { el.textContent = t; el.className = `su-card-msg su-card-msg-${kind}`; }
+    };
+
+    function openReceiptModal(id) {
+        if (!canWrite()) return;
+        const s = window.StudentManager.students.get(id);
+        if (!s) return;
+        closeReceiptModal();
+        Object.assign(RC, { studentId: id, blob: null, mime: '', ext: '', name: '', previewUrl: '', data: null, model: '', busy: false });
+        const { owe, source } = owedFor(s);
+        const el = document.createElement('div');
+        el.id = 'suRcModal';
+        el.className = 'su-card-modal';
+        el.innerHTML = `
+            <div class="su-card-box su-rc-box" role="dialog" aria-label="Comprobante de pago">
+                <div class="su-rc-left">
+                    <div id="suRcDrop" class="su-rc-drop">
+                        <div id="suRcPreview" class="su-rc-preview su-muted">📎 Arrastra aquí la imagen o el PDF del comprobante,<br>
+                            o pégala con <b>Ctrl+V</b> (copiada de WhatsApp Web).</div>
+                        <label class="su-btn" style="background:#4f46e5;display:inline-block;margin-top:0.6rem;">📂 Elegir archivo
+                            <input id="suRcFile" type="file" accept="image/*,application/pdf" style="display:none;"></label>
+                    </div>
+                </div>
+                <div class="su-card-side su-rc-side">
+                    <div class="su-row-between" style="align-items:flex-start;margin-bottom:0;">
+                        <div>
+                            <h3 style="margin:0;font-size:1.1rem;">📎 Comprobante de pago</h3>
+                            <div class="su-muted" style="font-size:0.82rem;">${esc(s.nombre || '')} · debe ${money(owe)} (${esc(source)})</div>
+                        </div>
+                        <button type="button" class="su-linkbtn" data-rc="close" title="Cerrar (Esc)" style="font-size:1.2rem;color:#6b7280;">✕</button>
+                    </div>
+                    <button type="button" id="suRcRead" class="su-btn" style="background:#0f766e;" data-rc="read" disabled>🔍 Leer comprobante</button>
+                    <div id="suRcMsg" class="su-card-msg"></div>
+                    <div id="suRcFields"></div>
+                    <div id="suRcChecks"></div>
+                    <div id="suRcMonths"></div>
+                    <div class="su-card-actions">
+                        <button type="button" id="suRcGo" class="su-btn" style="background:#16a34a;" data-rc="go" disabled>✅ Registrar pago con estos datos</button>
+                        <button type="button" class="su-btn" style="background:#6b7280;" data-rc="close">Cerrar</button>
+                    </div>
+                    <p class="su-card-hint">🔒 <b>Revisa y confirma.</b> Este botón NO registra el pago solo: guarda la imagen y abre el
+                        formulario de «Registrar pago» ya lleno (mismas validaciones antifraude, precio, factura y auditoría).
+                        El pago queda registrado solo cuando tú presionas su botón <b>Registrar Pago</b>.</p>
+                </div>
+            </div>`;
+        document.body.appendChild(el);
+        document.addEventListener('keydown', onRcKey);
+        document.addEventListener('paste', onRcPaste);
+
+        el.addEventListener('click', (e) => {
+            if (e.target === el) { closeReceiptModal(); return; } // backdrop
+            const b = e.target.closest('[data-rc]');
+            if (!b || b.disabled) return;
+            const act = b.dataset.rc;
+            if (act === 'close') closeReceiptModal();
+            else if (act === 'read') rcRead();
+            else if (act === 'go') rcRegister(b);
+        });
+        el.addEventListener('change', (e) => {
+            if (e.target.id === 'suRcFile' && e.target.files && e.target.files[0]) rcSetFile(e.target.files[0]);
+            else if (e.target.id && e.target.id.startsWith('suRc_')) rcUpdate();
+        });
+        el.addEventListener('input', (e) => { if (e.target.id && e.target.id.startsWith('suRc_')) rcUpdate(); });
+        const drop = $('suRcDrop');
+        drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('su-rc-over'); });
+        drop.addEventListener('dragleave', () => drop.classList.remove('su-rc-over'));
+        drop.addEventListener('drop', (e) => {
+            e.preventDefault();
+            drop.classList.remove('su-rc-over');
+            const f = e.dataTransfer?.files?.[0];
+            if (f) rcSetFile(f);
+        });
+    }
+
+    async function rcSetFile(file) {
+        if (!$('suRcModal') || RC.busy) return;
+        rcMsg('Preparando imagen…');
+        try {
+            const p = await prepareReceiptFile(file);
+            if (RC.previewUrl) { try { URL.revokeObjectURL(RC.previewUrl); } catch (e) { /* noop */ } }
+            Object.assign(RC, p, { name: file.name || `comprobante.${p.ext}`, data: null, model: '', previewUrl: '' });
+            const pv = $('suRcPreview');
+            if (pv) {
+                pv.classList.remove('su-muted');
+                if (p.mime === 'application/pdf') {
+                    pv.innerHTML = `<div style="font-size:3rem;">📄</div><div>${esc(RC.name)} · ${Math.round(p.blob.size / 1024)} KB</div>`;
+                } else {
+                    RC.previewUrl = URL.createObjectURL(p.blob);
+                    pv.innerHTML = `<img src="${RC.previewUrl}" alt="Comprobante">`;
+                }
+            }
+            $('suRcFields').innerHTML = '';
+            $('suRcChecks').innerHTML = '';
+            $('suRcMonths').innerHTML = '';
+            $('suRcGo').disabled = true;
+            const rb = $('suRcRead');
+            rb.disabled = false;
+            rb.textContent = '🔍 Leer comprobante';
+            rcMsg(`Listo (${Math.round(p.blob.size / 1024)} KB). Presiona «Leer comprobante».`, 'ok');
+        } catch (e) {
+            rcMsg('❌ ' + (e.message || e), 'err');
+        }
+    }
+
+    async function rcRead() {
+        const s = window.StudentManager.students.get(RC.studentId);
+        if (!s || !RC.blob || RC.busy) return;
+        const key = bridgeKey();
+        if (!key) { rcMsg('❌ Falta la clave del puente TutorBox (tutorbox-admin.js no cargó). Recarga la página.', 'err'); return; }
+        const btn = $('suRcRead');
+        RC.busy = true;
+        btn.disabled = true;
+        btn.textContent = '⏳ Leyendo…';
+        $('suRcGo').disabled = true;
+        rcMsg('Leyendo el comprobante (5–30 s)…');
+        try {
+            const imageBase64 = await blobToBase64(RC.blob);
+            let res;
+            try {
+                res = await fetch(RECEIPT_FN_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-admin-key': key },
+                    body: JSON.stringify({ imageBase64, mimeType: RC.mime, studentName: s.nombre || '', expectedAmount: owedFor(s).owe || undefined })
+                });
+            } catch (netErr) {
+                throw new Error('no hay conexión con la función readReceipt (¿ya está desplegada?)');
+            }
+            const j = await res.json().catch(() => ({}));
+            if (!res.ok || !j.ok) throw new Error(RC_ERR[j.error] || j.error || `HTTP ${res.status}`);
+            RC.data = j.data || {};
+            RC.model = j.model || '';
+            if (SU.receipts === null) await loadReceipts(); // retry the duplicate source once
+            renderRcFields();
+            rcUpdate();
+            rcMsg('✅ Leído. Compara los campos con la imagen y corrige lo que haga falta.', 'ok');
+        } catch (e) {
+            rcMsg('❌ No se pudo leer: ' + (e.message || e), 'err');
+        } finally {
+            RC.busy = false;
+            if ($('suRcRead')) { btn.disabled = false; btn.textContent = RC.data ? '🔍 Leer de nuevo' : '🔍 Leer comprobante'; }
+        }
+    }
+
+    function renderRcFields() {
+        const box = $('suRcFields');
+        if (!box || !RC.data) return;
+        const d = RC.data;
+        box.innerHTML = `<div class="su-rc-grid">${RC_FIELDS.map(([k, label, type]) => {
+            const v = d[k] ?? '';
+            const input = type === 'select'
+                ? `<select id="suRc_${k}" class="su-input">${['Nequi', 'Bancolombia', 'Daviplata', 'otro'].map(o =>
+                    `<option value="${o}"${o === v ? ' selected' : ''}>${o === 'otro' ? 'Otro' : o}</option>`).join('')}</select>`
+                : `<input id="suRc_${k}" class="su-input" type="${type}" value="${esc(v)}"${type === 'number' ? ' min="0" step="1"' : ''}>`;
+            return `<label${k === 'concept' ? ' style="grid-column:1/-1;"' : ''}>${esc(label)}${input}</label>`;
+        }).join('')}</div>`;
+    }
+
+    /** Current values of the editable fields + what only the reader knows (isReceipt, confidence, warnings). */
+    function readRcFields() {
+        const d = RC.data || {};
+        const v = (k) => { const el = $(`suRc_${k}`); return el ? String(el.value || '').trim() : ''; };
+        const amount = Math.round(Number(v('amount').replace(/[^\d.]/g, ''))) || null;
+        return {
+            isReceipt: d.isReceipt === true,
+            provider: v('provider') || 'otro',
+            amount,
+            dateIso: /^\d{4}-\d{2}-\d{2}$/.test(v('dateIso')) ? v('dateIso') : null,
+            timeHHmm: /^\d{2}:\d{2}$/.test(v('timeHHmm')) ? v('timeHHmm') : null,
+            reference: v('reference') || null,
+            payerName: v('payerName') || null,
+            payerAccountLast4: v('payerAccountLast4').replace(/\D/g, '').slice(-4) || null,
+            destinationName: v('destinationName') || null,
+            destinationAccount: v('destinationAccount') || null,
+            concept: v('concept') || null,
+            confidence: Number(d.confidence) || 0,
+            warnings: Array.isArray(d.warnings) ? d.warnings : []
+        };
+    }
+
+    function rcUpdate() {
+        const s = window.StudentManager.students.get(RC.studentId);
+        if (!s || !RC.data) return;
+        const d = readRcFields();
+        const checks = receiptChecks(s, d);
+        $('suRcChecks').innerHTML = `<ul class="su-rc-checks">${checks.map(c =>
+            `<li class="su-rc-${c.level}">${RC_ICON[c.level]} ${esc(c.text)}</li>`).join('')}</ul>`;
+        const sug = d.amount > 0 ? suggestMonths(s, d.amount) : null;
+        $('suRcMonths').innerHTML = sug ? `<div class="su-rc-months">🗓️ <b>Meses que cubre:</b> ${sug.months.length
+            ? sug.months.map(m => `${m.mes} ${m.y}${m.completes ? ' (completa abono)' : ''}`).join(', ') + (sug.partial ? ' — <b>abono parcial</b>' : '')
+            : '—'}${sug.notes.map(n => `<div class="su-muted" style="font-size:0.78rem;margin-top:0.2rem;">${esc(n)}</div>`).join('')}</div>` : '';
+        const stops = checks.filter(c => c.level === 'stop').length;
+        const go = $('suRcGo');
+        go.disabled = RC.busy || stops > 0;
+        go.title = stops ? 'Corrige los ⛔ antes de registrar' : 'Abre el formulario de pago ya lleno; tú confirmas con Registrar Pago';
+    }
+
+    async function uploadReceiptImage(studentId) {
+        const api = await getStorageApi();
+        const path = `receipts/${studentId}/${Date.now()}.${RC.ext || 'jpg'}`;
+        const cu = window.FirebaseData?.currentUser;
+        const snap = await api.uploadBytes(api.ref(api.storage, path), RC.blob, {
+            contentType: RC.mime,
+            customMetadata: { studentId, readBy: cu?.email || cu?.uid || '' }
+        });
+        let url = null;
+        try { url = await api.getDownloadURL(snap.ref); } catch (e) { console.warn('receipt URL:', e); }
+        return { imagePath: path, imageUrl: url };
+    }
+
+    /** Pre-fills #paymentModal (already open). The person still presses its Registrar button. */
+    function prefillPaymentModal(s, d, sug) {
+        const hourly = s.tipoPago === 'POR_HORAS' || s.modalidad === 'Privadas';
+        const notes = [];
+        if (!hourly && sug.months.length) {
+            const pt = $('paymentType');
+            if (pt && pt.value !== 'monthly') { pt.value = 'monthly'; window.handlePaymentTypeChange?.(); }
+            const y0 = sug.months[0].y;
+            const ysel = $('monthYearSelector');
+            if (ysel && Number(ysel.value) !== y0 && [...ysel.options].some(o => Number(o.value) === y0)) {
+                ysel.value = String(y0);
+                window.changeMonthYearDisplay?.();
+            }
+            document.querySelectorAll('#paymentModal .month-checkbox').forEach(cb => { cb.checked = false; });
+            sug.months.filter(m => m.y === y0).forEach(m => {
+                const cb = document.querySelector(`#paymentModal .month-checkbox[data-month="${m.mes}"][data-year="${m.y}"]`);
+                if (cb) cb.checked = true;
+            });
+            window.updateMonthSelection?.(); // fills the official price (read-only) like a manual tick
+            const base = $('payAmountBase');
+            if (base && d.amount > 0) {
+                const official = window.parseCurrencyValue ? window.parseCurrencyValue(base.value) : 0;
+                if (official > 0 && d.amount < official) {
+                    const pc = $('partialPaymentCheck');
+                    if (pc && !pc.checked) { pc.checked = true; window.PricingManager?.onPartialToggle?.(); }
+                    base.value = '$' + d.amount.toLocaleString('es-CO');
+                    notes.push(`Monto menor al precio de lista (${money(official)}): marqué «Abono / Pago parcial».`);
+                } else if (official > 0 && d.amount > official) {
+                    notes.push(`El comprobante trae ${money(d.amount - official)} más que la mensualidad: si es matrícula, libro u otro, márcalo en «Artículos adicionales».`);
+                } else if (!official || !base.readOnly) {
+                    base.value = '$' + d.amount.toLocaleString('es-CO');
+                }
+                window.updatePaymentTotal?.();
+            }
+        }
+        const method = $('payMethod');
+        if (method) { method.value = 'Transferencia'; window.toggleBankOptions?.(); }
+        const bank = $('payBank');
+        if (bank) bank.value = d.provider === 'Nequi' ? 'Nequi' : d.provider === 'Bancolombia' ? 'Bancolombia' : 'Otro';
+        const pn = $('payNotes');
+        if (pn) pn.value = `Comprobante ${d.provider} ref ${d.reference || '—'} · ${d.dateIso || 'sin fecha'}`;
+        const form = $('paymentForm');
+        if (form) {
+            form.insertAdjacentHTML('afterbegin', `
+                <div class="su-rc-banner">📎 <b>Datos tomados del comprobante</b> — ${esc(d.provider)} · ${money(d.amount)} · ref ${esc(d.reference || '—')} · ${esc(d.dateIso || 'sin fecha')}<br>
+                    🗓️ ${sug.months.length ? esc(sug.months.map(m => `${m.mes} ${m.y}`).join(', ')) : 'elige el/los mes(es)'}
+                    ${[...sug.notes, ...notes].map(n => `<div style="font-size:0.8rem;margin-top:0.2rem;">⚠️ ${esc(n)}</div>`).join('')}
+                    <div style="margin-top:0.35rem;font-weight:700;">Revisa y confirma con «Registrar Pago» (abajo). Si cancelas, no se registra nada.</div>
+                </div>`);
+        }
+    }
+
+    async function rcRegister(btn) {
+        const s = window.StudentManager.students.get(RC.studentId);
+        if (!s || !RC.data || !RC.blob || RC.busy || !canWrite()) return;
+        await loadReceipts(); // fresh duplicate check right before using the reference
+        rcUpdate();
+        const d = readRcFields();
+        const checks = receiptChecks(s, d);
+        if (checks.some(c => c.level === 'stop')) { rcMsg('⛔ Hay validaciones que impiden registrar (ver lista).', 'err'); return; }
+        if (!window.PricingManager?.loaded) { rcMsg('⏳ Los precios aún no cargan; usa ↻ Recargar y vuelve a intentar.', 'warn'); return; }
+        RC.busy = true;
+        btn.disabled = true;
+        btn.textContent = '⏳ Guardando imagen…';
+        let img = { imagePath: null, imageUrl: null };
+        try {
+            img = await uploadReceiptImage(s.id);
+        } catch (e) {
+            console.warn('Comprobante — Storage:', e);
+            if (!confirm('No se pudo guardar la imagen del comprobante (¿Storage o sus reglas sin publicar?).\n\n¿Continuar con el pago sin guardar la imagen?')) {
+                RC.busy = false; btn.disabled = false; btn.textContent = '✅ Registrar pago con estos datos';
+                rcMsg('❌ Imagen no guardada: ' + (e.code || e.message || e), 'err');
+                return;
+            }
+        }
+        const ctx = {
+            studentId: s.id, studentName: s.nombre || '', d, img, model: RC.model, startedAt: Date.now(),
+            flags: checks.filter(c => c.level !== 'ok').map(c => `${RC_ICON[c.level]} ${c.text}`)
+        };
+        const sug = suggestMonths(s, d.amount);
+        RC.busy = false;
+        closeReceiptModal();
+        await openPayment(s.id, {
+            prefill: () => prefillPaymentModal(s, d, sug),
+            afterSave: () => saveReceiptRecord(ctx)
+        });
+    }
+
+    // ONE OF THIS MODULE'S FIREBASE WRITES (with logSent/unlogSent): paymentReceipts/{autoId}, create-only.
+    async function saveReceiptRecord(ctx) {
+        if (!canWrite() || !ctx) return false;
+        const now = Date.now();
+        // the payment processPayment just wrote: newest PAY-{ts}… of this student from the last 2 min
+        const cands = [];
+        for (const [pid, p] of window.PaymentManager.payments.entries()) {
+            if (!p || p.studentId !== ctx.studentId) continue;
+            const id = p.id || pid;
+            const m = /^PAY-(\d{13})/.exec(String(id));
+            const ts = m ? Number(m[1]) : NaN;
+            if (!(ts >= ctx.startedAt - 5000 && now - ts <= RC_RECENT_MS)) continue;
+            if (SU.receiptByPayment.has(id)) continue;
+            cands.push({ id, ts, group: p.masterPaymentId || p.mixedGroupId || null });
+        }
+        cands.sort((a, b) => b.ts - a.ts);
+        const newest = cands[0] || null;
+        const ids = newest ? (newest.group ? cands.filter(c => c.group === newest.group).map(c => c.id) : [newest.id]) : [];
+        const cu = window.FirebaseData?.currentUser;
+        const d = ctx.d;
+        const rec = {
+            studentId: ctx.studentId,
+            studentName: ctx.studentName,
+            paymentId: newest ? newest.id : null,
+            paymentIds: ids.length ? ids : null,
+            groupId: newest ? newest.group : null,
+            reference: d.reference || null,
+            provider: d.provider,
+            amount: d.amount,
+            dateIso: d.dateIso,
+            timeHHmm: d.timeHHmm,
+            payerName: d.payerName,
+            destinationAccount: d.destinationAccount,
+            imagePath: ctx.img.imagePath,
+            imageUrl: ctx.img.imageUrl,
+            readBy: cu?.email || cu?.uid || 'desconocido',
+            at: new Date().toISOString(),
+            confidence: d.confidence,
+            warnings: ctx.flags.length ? ctx.flags.slice(0, 20) : null,
+            model: ctx.model || null
+        };
+        try {
+            const db = window.firebaseModules.database;
+            const r = await db.push(db.ref(window.FirebaseData.database, 'paymentReceipts'), rec);
+            if (!SU.receipts) SU.receipts = {};
+            SU.receipts[r.key] = rec;
+            indexReceipts();
+            notify(newest ? '📎 Comprobante guardado y enlazado al pago' : '📎 Comprobante guardado (no encontré el pago nuevo para enlazarlo)', newest ? 'success' : 'warning');
+            if (viewIsOpen()) renderFicha();
+            return true;
+        } catch (e) {
+            console.error('paymentReceipts push:', e);
+            notify('❌ El pago SÍ quedó registrado, pero no se guardó el registro del comprobante (¿reglas paymentReceipts sin publicar?). ' + (e.code || e.message || ''), 'error');
+            return false;
+        }
+    }
+
+    async function viewReceipt(pid) {
+        const r = SU.receiptByPayment.get(pid);
+        if (!r) return;
+        const w = window.open('', '_blank'); // opened inside the click → not blocked as a popup
+        try {
+            let url = r.imageUrl;
+            if (!url && r.imagePath) {
+                const api = await getStorageApi();
+                url = await api.getDownloadURL(api.ref(api.storage, r.imagePath));
+            }
+            if (!url) {
+                if (w) w.close();
+                notify(`📎 Comprobante ${r.provider || ''} ref ${r.reference || '—'} · ${r.dateIso || ''} — sin imagen guardada`, 'info');
+                return;
+            }
+            if (w) w.location.href = url; else window.open(url, '_blank', 'noopener');
+        } catch (e) {
+            if (w) w.close();
+            notify('❌ No se pudo abrir la imagen: ' + (e.code || e.message || e), 'error');
+        }
+    }
+
     // ───────────────────────── modal lifting (PLAN R1) ─────────────────────────
 
     function liftModals() {
@@ -498,6 +1179,7 @@
         if (SU.bodyObserver) { SU.bodyObserver.disconnect(); SU.bodyObserver = null; }
         if (SU.viewObserver) { SU.viewObserver.disconnect(); SU.viewObserver = null; }
         closeCardModal(); // the 🖼️ Tarjeta modal lives in <body>: never leave it over another module
+        closeReceiptModal(); // same for 📎 Comprobante
     }
 
     function viewIsOpen() {
@@ -809,6 +1491,7 @@
 
                 <div class="su-actions">
                     ${canWrite() ? `<button type="button" class="su-btn" style="background:#10b981;" data-su="pay" ${pricingReady ? '' : 'disabled title="Cargando precios… (si no carga, usa ↻ Recargar)"'}>💵 Registrar pago</button>` : ''}
+                    ${canWrite() ? '<button type="button" class="su-btn" style="background:#0e7490;" data-su="receipt" title="Sube el comprobante (Nequi / Bancolombia…): se lee solo, se valida y llena el formulario de pago para que lo confirmes">📎 Comprobante</button>' : ''}
                     ${canWrite() ? '<button type="button" class="su-btn" style="background:#3b82f6;" data-su="edit">✏️ Editar datos</button>' : ''}
                     ${canToggle() ? `<button type="button" class="su-btn" style="background:${inactive ? '#16a34a' : '#ef4444'};" data-su="toggle">🔄 ${inactive ? 'Activar' : 'Inactivar'}</button>` : ''}
                     ${canWrite() ? `<button type="button" class="su-btn" style="background:${notes.length ? '#f59e0b' : '#8b5cf6'};" data-su="notes">📝 Notas${notes.length ? ' (' + notes.length + ')' : ''}</button>` : ''}
@@ -1081,6 +1764,9 @@
                     ? `<button type="button" class="su-linkbtn" data-su="inv" data-pid="${esc(p.id)}" title="Ver la factura. Si no existe en la base de datos, Pagos la vuelve a generar (escribe).">🧾 ${esc(p.invoiceNumber)}</button>`
                     : (sales ? '<span class="su-muted">—</span>'
                         : `<button type="button" class="su-linkbtn" style="color:#b45309;" data-su="inv" data-pid="${esc(p.id)}" data-new="1" title="Este pago no tiene factura: al abrirla se GENERA una nueva con número nuevo.">🧾 generar</button>`);
+                const rc = SU.receiptByPayment.get(p.id);
+                const rcBtn = rc ? ` <button type="button" class="su-icon" data-su="rcView" data-pid="${esc(p.id)}"
+                    title="Ver comprobante · ${esc(rc.provider || '')} ref ${esc(rc.reference || '—')} · ${esc(rc.dateIso || '')} · leído por ${esc(rc.readBy || '')}">📎</button>` : '';
                 const acts = owner ? `
                     <button type="button" class="su-icon" data-su="editPay" data-pid="${esc(p.id)}" title="Editar pago (solo admin@)">✏️</button>
                     <button type="button" class="su-icon" data-su="delPay" data-pid="${esc(p.id)}" title="Anular pago y factura (solo admin@)">🗑️</button>` : '';
@@ -1090,7 +1776,7 @@
                     <td>${esc(paymentConcept(p))}${p.notes ? `<div class="su-muted" style="font-size:0.75rem;">${esc(p.notes)}</div>` : ''}</td>
                     <td style="text-align:right;white-space:nowrap;"><b>${money(p.amount)}</b>${base}</td>
                     <td>${esc(p.method || '—')}${p.bank ? ' · ' + esc(p.bank) : ''}${ces}</td>
-                    <td>${inv}</td>
+                    <td style="white-space:nowrap;">${inv}${rcBtn}</td>
                     <td>${userLabel(p.registeredBy)}${p.lastEditedBy ? `<div class="su-muted" style="font-size:0.75rem;">editado: ${esc(p.lastEditedBy)}</div>` : ''}</td>
                     <td style="white-space:nowrap;">${acts}</td>
                 </tr>`;
@@ -1107,7 +1793,8 @@
 
     // ───────────────────────── actions (thin wrappers) ─────────────────────────
 
-    async function openPayment(id) {
+    // opts (📎 Comprobante): prefill() fills the freshly opened modal; afterSave() runs once it closed = saved.
+    async function openPayment(id, opts = {}) {
         if (!canWrite()) return;
         if (!window.PricingManager?.loaded) {
             notify('⏳ Los precios aún no cargan; el pago no se puede validar. Usa ↻ Recargar.', 'warning');
@@ -1127,8 +1814,14 @@
         form.onsubmit = async (e) => {
             e.preventDefault();
             await window.processPayment(id);
-            if (!$('paymentModal')) await refresh(id, { reload: true }); // closed = saved
+            if (!$('paymentModal')) { // closed = saved
+                await refresh(id, { reload: true });
+                if (typeof opts.afterSave === 'function') await opts.afterSave();
+            }
         };
+        if (typeof opts.prefill === 'function') {
+            try { opts.prefill(); } catch (err) { console.error('Prefill del pago:', err); notify('⚠️ No pude llenar todo el formulario: revisa los campos', 'warning'); }
+        }
     }
 
     async function openEdit(id) {
@@ -1264,6 +1957,8 @@
             switch (act) {
                 case 'pick': selectStudent(el.dataset.id); break;
                 case 'pay': await openPayment(id); break;
+                case 'receipt': openReceiptModal(id); break;
+                case 'rcView': await viewReceipt(el.dataset.pid); break;
                 case 'edit': await openEdit(id); break;
                 case 'toggle': await toggleStudent(id); break;
                 case 'notes': if (canWrite()) window.openStudentNotes?.(id); break;
@@ -1412,6 +2107,24 @@
             .su-card-preview canvas { width:100%; height:auto; max-width:100%; }
             .su-card-side { width:100%; }
         }
+        .su-rc-box { width:min(1000px, 100%); }
+        .su-rc-left { flex:1 1 360px; min-width:240px; display:flex; }
+        .su-rc-drop { flex:1; border:2px dashed #cbd5e1; border-radius:10px; padding:1rem; text-align:center; min-height:320px; display:flex; flex-direction:column; align-items:center; justify-content:center; background:#f8fafc; }
+        .su-rc-drop.su-rc-over { border-color:#4f46e5; background:#eef2ff; }
+        .su-rc-preview { font-size:0.88rem; line-height:1.5; }
+        .su-rc-preview img { display:block; max-width:100%; max-height:calc(100vh - 9rem); border-radius:8px; border:1px solid #e5e7eb; margin:0 auto; }
+        .su-rc-side { width:390px; }
+        .su-rc-grid { display:grid; grid-template-columns:1fr 1fr; gap:0.35rem 0.5rem; }
+        .su-rc-grid label { display:flex; flex-direction:column; gap:0.15rem; font-size:0.7rem; font-weight:700; color:#6b7280; }
+        .su-rc-grid .su-input { padding:0.3rem 0.45rem; font-size:0.85rem; color:#111827; font-weight:500; }
+        .su-rc-checks { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:0.2rem; font-size:0.8rem; }
+        .su-rc-checks li { padding:0.2rem 0.45rem; border-radius:6px; }
+        .su-rc-ok { background:#ecfdf5; color:#065f46; }
+        .su-rc-warn { background:#fffbeb; color:#92400e; }
+        .su-rc-stop { background:#fef2f2; color:#991b1b; font-weight:700; }
+        .su-rc-months { font-size:0.82rem; background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:0.35rem 0.5rem; color:#1e3a8a; }
+        .su-rc-banner { background:#ecfdf5; border:2px solid #10b981; border-radius:8px; padding:0.6rem 0.75rem; margin-bottom:1rem; font-size:0.88rem; color:#065f46; line-height:1.4; }
+        @media (max-width: 760px) { .su-rc-side { width:100%; } .su-rc-drop { min-height:200px; } }
         .su-foot { font-size:0.78rem; color:var(--su-muted); border-top:1px solid var(--su-border); padding-top:0.6rem; margin-top:0.5rem; }
         @media (max-width: 1100px) { .su-cols { grid-template-columns:1fr; } }
         @media (max-width: 860px) {
@@ -1463,6 +2176,7 @@
         SU.anchorAfter = null;
         SU.statusCache.clear();
         await loadSentLog();
+        await loadReceipts();
         computeCobros();
         const last = lsGet(LS_LAST);
         SU.selectedId = last && window.StudentManager.students.has(last) ? last : null;
@@ -1551,5 +2265,6 @@
     };
 
     // exposed for the console / reviewer
-    window.StudentsUnified = { refresh, ensureLoaded, liftModals, stopLift };
+    window.StudentsUnified = { refresh, ensureLoaded, liftModals, stopLift,
+        receipts: { suggestMonths, receiptChecks, loadReceipts, SCHOOL_ACCOUNTS } };
 })();

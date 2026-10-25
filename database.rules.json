@@ -268,6 +268,14 @@
         }
       }
     },
+    "paymentReceipts": {
+      ".read": "auth != null",
+      ".indexOn": ["reference", "studentId"],
+      "$receiptId": {
+        ".write": "auth != null && !data.exists() && newData.exists() && root.child('users').child(auth.uid).child('profile').child('role').val() !== 'ventas'",
+        ".validate": "newData.hasChildren(['studentId','amount','at','readBy'])"
+      }
+    },
     "bankReconciliations": {
       ".read": "auth != null && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || auth.token.email === 'admin@ciudadbilingue.com')",
       ".write": "(auth != null && root.child('users').child(auth.uid).child('profile').child('role').val() !== 'ventas') && (root.child('users').child(auth.uid).child('profile').child('role').val() === 'admin' || root.child('users').child(auth.uid).child('profile').child('role').val() === 'director' || auth.token.email === 'admin@ciudadbilingue.com')"

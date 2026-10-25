@@ -337,3 +337,79 @@ Los cuerpos están medidos para caber en **3 líneas** a 760 px con la fecha má
 2. Navegador (sesión del dueño): Estudiantes unificado → filtro 🔴 Hoy (o cualquier bucket) → abrir un estudiante → **🖼️ Tarjeta** → aparece la imagen con su nombre y el pulpo. Cambiar Momento → se redibuja; cambiar Firma → cambia el pie y el texto de la tarjeta 💰.
 3. **📋 Copiar imagen** → pegar (Ctrl+V) en WhatsApp Web; **⬇️ Descargar** → `recordatorio-nombre-AAAA-MM-DD.png`; **💬 Abrir WhatsApp** → wa.me con el texto; **✅ Ya le envié** → el modal se cierra, la lista muestra "✓ hh:mm 🖼️" y `cobrosLog/{hoy}/{id}.channel = 'card'`.
 4. Usuario `ventas`: el botón 🖼️ Tarjeta abre el modal con solo Copiar / Descargar / Cerrar.
+
+## 12. 📎 Comprobantes (lector de comprobantes de pago) — 25 Oct 2026
+
+Pedido del fundador: "Una función para subir el comprobante de pago de cada persona: cuando lo envían, lo subimos a la plataforma, la plataforma lo lee, aprueba el pago y lo actualiza."
+
+**Regla antifraude (julio 2026) que manda sobre todo esto:** la ÚNICA forma validada de registrar un pago es `processPayment(studentId)` detrás de `showPaymentModal(id)`. Por eso "la plataforma aprueba el pago" = la IA **lee y valida** el comprobante, **llena** el modal de pago existente y una persona **confirma con un clic** en el botón «Registrar Pago» del modal. Ninguna escritura de pagos en el servidor; `recordPayment`/`recordMultiMonthPayment` nunca se llaman.
+
+### 12.1 Flujo
+1. Ficha → **📎 Comprobante** (oculto para `ventas`) → modal en `<body>` (z-index 10001): elegir archivo, arrastrar y soltar, o **Ctrl+V** de una imagen copiada en WhatsApp Web. Imágenes grandes (> 1600 px o > 2 MB, o formatos raros) se pasan a JPEG ≤ 1600 px en el navegador; PDF tal cual (≤ 6 MB).
+2. **🔍 Leer comprobante** → `POST https://us-central1-tutorbox-4d7c9.cloudfunctions.net/readReceipt` con `x-admin-key` (la constante del puente `TB_ADMIN_KEY`/`TUTORBOX_ADMIN_KEY`, igual que auditlog.js) y `{ imageBase64, mimeType, studentName, expectedAmount }`.
+3. La CF (repo TutorBox `functions/crm/readReceipt.js` + `receiptParse.js`) llama a Claude (`claude-sonnet-5-5`, visión; PDF como bloque `document`) con un prompt que exige JSON estricto: `{ isReceipt, provider ('Nequi'|'Bancolombia'|'Daviplata'|'otro'), amount (COP entero), dateIso, timeHHmm, reference, payerName, payerAccountLast4, destinationName, destinationAccount, concept, confidence 0–1, warnings[] }` (formatos colombianos: `$200.000` = 200000, "24 oct 2026"). Respuesta: `{ ok, data, model }`. Parser defensivo (quita ``` y texto alrededor, valida tipos, re-interpreta montos/fechas/horas). Uso medido en TutorBox `usage/crm-receipts/…/anthropic_receipt/claude-sonnet-5-5`. Nunca registra la imagen en logs ni la guarda.
+4. Los campos salen **editables** y los chequeos se recalculan al escribir:
+
+| Chequeo | ✅ | ⚠️ | ⛔ (bloquea el botón) |
+|---|---|---|---|
+| Es comprobante | — | — | `isReceipt=false` |
+| Monto vs lo que debe (fila de `CobrosEngine.computeRows`; si no hay fila, `getStudentMonthlyTotal`) | igual, o múltiplo exacto de la mensualidad | menor (abono parcial) / mayor (¿varios meses, matrícula, libro?) / ficha sin valor | sin monto |
+| Fecha | ≤ 45 días | sin fecha / > 45 días | en el futuro |
+| Referencia duplicada (todo `paymentReceipts`, comparación sin espacios ni guiones, mayúsculas) | no usada | sin referencia / reglas sin publicar / otro comprobante con mismo monto+fecha+hora | ya usada |
+| Quién pagó vs estudiante/acudiente (palabras ≥ 3 letras, prefijos) | coincide | no coincide (puede ser familiar) / no aparece | — |
+| Cuenta destino vs `SCHOOL_ACCOUNTS` (4 últimos dígitos, o el nombre si no hay dígitos) | coincide | **lista vacía → "cuenta destino no configurada"** / el comprobante no la muestra | dígitos que no son de la escuela |
+| Confianza del lector | ≥ 60 % | < 60 % | — |
+| Avisos del lector | — | cada uno | — |
+
+5. **Meses sugeridos** (`suggestMonths`): sigue después del último mes con mensualidad (`baseAmount ?? amount` > 0) o **completa** ese mes si quedó parcial; sin pagos empieza en `fechaInicio` (o el mes actual). Salta exonerados (`PaymentExceptionsManager.isExempt`), vacaciones (`PaymentConfig.isHoliday`) y meses no exigidos (`isMonthRequiredByStatus`). Si el monto alcanza para varios, los propone en orden, hasta el mes siguiente al actual (límite del pago Mensual). Avisa si sobra dinero (matrícula/libro) o si los meses cruzan de año (el modal muestra un año a la vez).
+6. **✅ Registrar pago con estos datos** (solo sin ⛔; vuelve a leer `paymentReceipts` justo antes): sube la imagen a Storage del CRM `receipts/{studentId}/{timestamp}.{ext}` (SDK de Storage 10.7.1 cargado aquí con `import()` dinámico — `window.firebaseModules.storage` no existe en index.html, así que InvoiceStorage sigue igual), cierra el modal y llama `openPayment(id, { prefill, afterSave })` → modal de pago **lleno**: tipo Mensual, meses marcados, `payAmountBase` (precio oficial; si el comprobante trae menos se marca «Abono / Pago parcial» y se pone el monto; si trae más, aviso para agregar artículos), método `Transferencia`, banco Nequi/Bancolombia/Otro (Daviplata → Otro), notas `Comprobante {provider} ref {reference} · {dateIso}` y un recuadro verde **"Revisa y confirma con «Registrar Pago»"**. Si la persona cancela, no se registra nada (la imagen queda huérfana en Storage).
+7. Al cerrarse el modal tras `processPayment` (= guardado) → `refresh(reload)` → `saveReceiptRecord()` busca el pago **más nuevo de ese estudiante creado en los últimos 2 min** (`PAY-{ts}` en el id, posterior al clic; en multimes/mixto se enlazan todos los registros del grupo) y escribe `paymentReceipts/{autoId}`.
+8. Tabla de pagos de la ficha: **📎** junto a la factura en cada pago con comprobante (lookup por `paymentId`/`paymentIds`) → abre la imagen (`imageUrl`, o `getDownloadURL(imagePath)`).
+
+### 12.2 Datos — `paymentReceipts/{autoId}` (base del CRM)
+`{ studentId, studentName, paymentId, paymentIds[], groupId, reference, provider, amount, dateIso, timeHHmm, payerName, destinationAccount, imagePath, imageUrl, readBy (email), at (ISO), confidence, warnings[] (los ⚠️/⛔ que había al registrar), model }`. Escritura única en `saveReceiptRecord()` (tercera escritura permitida del módulo, junto a `logSent/unlogSent`).
+
+Reglas agregadas a `database.rules.json` (**no desplegadas**):
+```json
+"paymentReceipts": {
+  ".read": "auth != null",
+  ".indexOn": ["reference", "studentId"],
+  "$receiptId": {
+    ".write": "auth != null && !data.exists() && newData.exists() && root.child('users').child(auth.uid).child('profile').child('role').val() !== 'ventas'",
+    ".validate": "newData.hasChildren(['studentId','amount','at','readBy'])"
+  }
+}
+```
+Antes de publicarlas: la lectura falla en silencio (⚠️ "no pude revisar duplicados"), el pago igual se puede registrar y al final sale "❌ El pago SÍ quedó registrado, pero no se guardó el registro del comprobante".
+
+**Storage:** el repo **no tiene `storage.rules`** ni sección `storage` en `firebase.json`. Propuesta (crear `storage.rules` + `"storage": { "rules": "storage.rules" }` en firebase.json, o pegarla en la consola de Firebase → Storage → Reglas — ¡ojo! publicar un archivo nuevo REEMPLAZA las reglas actuales del bucket; si en la consola hay reglas para `invoices/`, conservarlas). Las reglas de Storage **no pueden leer la Realtime Database**, así que "no ventas" solo se puede exigir con un custom claim (`request.auth.token.role`), que el CRM hoy no pone. v1: cualquier usuario con sesión puede subir (el botón está oculto para ventas y la escritura en `paymentReceipts` sí exige no-ventas):
+```
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /receipts/{studentId}/{file} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.size < 10 * 1024 * 1024
+        && (request.resource.contentType.matches('image/.*') || request.resource.contentType == 'application/pdf');
+    }
+  }
+}
+```
+Si el bucket `ciudad-bilingue-crm.firebasestorage.app` no está creado (Storage nuevo exige plan Blaze), la subida falla: el modal pregunta "¿Continuar sin guardar la imagen?" y el registro queda con `imagePath: null`.
+
+### 12.3 Pendiente del fundador
+- Llenar `SCHOOL_ACCOUNTS` (students-unified.js, sección 📎) con las cuentas reales de la escuela: `{ provider: 'Nequi', name: 'Ciudad Bilingüe', account: '3XXXXXXXXX' }`, Bancolombia, etc. Mientras esté vacío, todos los comprobantes muestran "⚠️ cuenta destino no configurada".
+- Créditos de Anthropic en la cuenta cuya clave usa TutorBox (`apiConfig/providers/anthropic`).
+
+### 12.4 Despliegue (fuera de los bloques de clase)
+1. TutorBox: `firebase deploy --only functions:readReceipt --project tutorbox-4d7c9` (usa `ADMIN_API_KEY` del `.env` de functions, igual que notifyCrmMovement).
+2. CRM (cuenta admin@ciudadbilingue.com): `firebase deploy --only database --project ciudad-bilingue-crm`; Storage: reglas de 12.2 (consola o `firebase deploy --only storage` tras agregar `storage.rules` a firebase.json).
+3. CRM: commit de `students-unified.js` + `index.html` (`students-unified.js?v=20261025a`) + `database.rules.json` + este plan, y push a **los dos remotos**: `git push origin main` y `git push gitlab main` (push a main = producción).
+
+### 12.5 Cómo probar
+1. `node --check students-unified.js`; en TutorBox `node --check functions/crm/readReceipt.js functions/crm/receiptParse.js`; prueba del parser sin red (JSON limpio, con ```, monto "$200.000", basura).
+2. `curl` a la CF: `curl -X POST https://us-central1-tutorbox-4d7c9.cloudfunctions.net/readReceipt -H "x-admin-key: <clave>" -H "Content-Type: application/json" -d "{\"mimeType\":\"image/jpeg\",\"imageBase64\":\"$(base64 -w0 comprobante.jpg)\"}"` → `{ ok:true, data:{…} }`.
+3. Navegador (sesión del dueño, con reglas publicadas): Estudiantes unificado → estudiante que debe → **📎 Comprobante** → pegar con Ctrl+V una captura real de Nequi copiada de WhatsApp Web → **🔍 Leer** → revisar campos y chequeos → **✅ Registrar pago con estos datos** → el modal de pago aparece lleno con el recuadro verde → **Registrar Pago** → factura → la ficha muestra el pago con **📎**; clic → abre la imagen. Firebase → `paymentReceipts/` tiene el registro con `paymentId`.
+4. Volver a subir el MISMO comprobante (a ese u otro estudiante) → ⛔ "Referencia … YA registrada" y el botón queda deshabilitado.
+5. Cancelar el modal de pago → no se escribe pago ni registro. Usuario `ventas`: no ve el botón 📎 Comprobante (sí ve los 📎 de la tabla).
