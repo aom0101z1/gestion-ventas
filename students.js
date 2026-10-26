@@ -518,7 +518,7 @@ function renderStudentForm(student = null) {
     return `
         <div id="studentFormModal" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; 
              background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;">
-            <div style="background: white; padding: 2rem; border-radius: 8px; max-width: 900px; width: 90%; 
+            <div style="background: white; padding: 2rem; border-radius: 8px; max-width: 1240px; width: 94%;
                         max-height: 90vh; overflow-y: auto;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
                     <h3>${isEdit ? '✏️ Editar' : '➕ Nuevo'} Estudiante</h3>
