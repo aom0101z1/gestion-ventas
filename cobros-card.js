@@ -214,14 +214,17 @@
         ctx.fillStyle = '#d9f99d'; ctx.font = `400 28px ${F}`; ctx.fillText('Envía tu comprobante al ', 410, cy2 + 41);
         const tw = ctx.measureText('Envía tu comprobante al ').width;
         ctx.font = `900 28px ${F}`; ctx.fillText(SCHOOL_WA, 410 + tw, cy2 + 41);
-        // footer
+        // footer — 27 Oct 2026 (fundador): sigue al bloque de contacto en vez de estar fijo en y=1080;
+        // con un cuerpo de 4 líneas (suspensión) el pie y el pulpo tapaban el número de WhatsApp.
+        const fy = Math.min(cy2 + 60 + 64, H - 120 - 70);
         ctx.fillStyle = '#c7d2fe'; ctx.font = `400 24px ${F}`;
-        ctx.fillText('Gracias por ser parte de Ciudad Bilingüe. ¡Nos vemos en clase!', 158, 1080);
-        ctx.fillStyle = '#fff'; ctx.font = `900 24px ${F}`; ctx.fillText(o.sender || '', 158, 1118);
+        ctx.fillText('Gracias por ser parte de Ciudad Bilingüe. ¡Nos vemos en clase!', 158, fy);
+        ctx.fillStyle = '#fff'; ctx.font = `900 24px ${F}`; ctx.fillText(o.sender || '', 158, fy + 38);
         const sw = ctx.measureText(o.sender || '').width;
-        ctx.fillStyle = '#c7d2fe'; ctx.font = `400 24px ${F}`; ctx.fillText(' · Dirección', 158 + sw, 1118);
+        ctx.fillStyle = '#c7d2fe'; ctx.font = `400 24px ${F}`; ctx.fillText(' · Dirección', 158 + sw, fy + 38);
+        // Tuto en la esquina superior derecha de la tarjeta: nunca cruza texto (el título termina ~x=640)
         if (o.octo) {
-            try { ctx.drawImage(o.octo, 760, 1000, 150, 150 * (o.octo.height / o.octo.width)); } catch (e) { /* broken image: card without the octopus */ }
+            try { ctx.drawImage(o.octo, 800, 150, 140, 140 * (o.octo.height / o.octo.width)); } catch (e) { /* broken image: card without the octopus */ }
         }
     }
 
