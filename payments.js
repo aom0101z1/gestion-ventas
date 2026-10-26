@@ -147,6 +147,9 @@ getPaymentStatus(student) {
     if (student.tipoPago === 'POR_HORAS') {
         return { color: '#6b7280', status: 'Por horas', icon: '⏱️' };
     }
+    // 🧪 27 Oct 2026: un registro de Clase de prueba (modalidad Prueba, sin valor) no debe nada —
+    // antes salía "Vencido 26d" porque solo miraba el día de pago.
+    if (student.modalidad === 'Prueba') return { color: '#0ea5e9', status: '🧪 Prueba', icon: '🧪', trial: true };
 
     if (!student.diaPago) return { color: '#6b7280', status: 'Sin fecha', icon: '❓' };
 
@@ -211,8 +214,25 @@ getPaymentStatus(student) {
         return { color: '#10b981', status: 'Pagado', icon: '✅' };
     }
     
-    // Calculate days until payment
-    let payDate = new Date(today.getFullYear(), currentMonth, payDay);
+    // Calculate days until payment (day capped to the month's length, like cobros-engine.js)
+    const lastDayOfMonth = new Date(today.getFullYear(), currentMonth + 1, 0).getDate();
+    let payDate = new Date(today.getFullYear(), currentMonth, Math.min(payDay, lastDayOfMonth));
+
+    // 🗓️ 27 Oct 2026 (fundador: "Marlly aparece debiendo hace 26 días y apenas inicia en noviembre"):
+    // quien INICIA después del día de pago de este mes no debe este mes. Primer cobro = día de
+    // pago del mes siguiente. Misma regla 'inicia_despues' que cobros-engine.js (cobranza y portal).
+    const fi = String(student.fechaInicio || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (fi) {
+        const started = new Date(Number(fi[1]), Number(fi[2]) - 1, Number(fi[3]));
+        const monthStart = new Date(today.getFullYear(), currentMonth, 1);
+        if (started > payDate && started >= monthStart) {
+            const nextLast = new Date(today.getFullYear(), currentMonth + 2, 0).getDate();
+            const next = new Date(today.getFullYear(), currentMonth + 1, Math.min(payDay, nextLast));
+            const short = (d) => `${d.getDate()} ${monthNames[d.getMonth()].slice(0, 3)}`;
+            return { color: '#10b981', status: `Inicia ${short(started)} · 1er pago ${short(next)}`, icon: '🗓️', startsLater: true, nextDue: next };
+        }
+    }
+
     if (payDate < today) {
         // Payment is overdue
         const daysLate = Math.ceil((today - payDate) / (1000 * 60 * 60 * 24));
