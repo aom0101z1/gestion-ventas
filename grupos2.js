@@ -891,21 +891,12 @@ window.saveGrupo2Form = async function(groupId) {
         await window.GroupsManager2.saveGroup(groupData);
 
         window.showNotification(`✅ Grupo ${groupData.groupId} guardado exitosamente`, 'success');
-        // 🔗 apply the (possibly new) class link on the TutorBox side right away
+        // 🔄 26 Oct 2026: the group goes to TutorBox COMPLETE on every save (fields + room code
+        // + teacher as owner + members). Before, only the teacher went (setGroupTeacher) and the
+        // admin had to import by hand in tutorbox.app/admin/groups — group 128 stayed half-created.
+        await window.syncCrmGroupToTutorBox(groupData.groupId);
+        // 🔗 refresh the class links shown on the cards (the room may be new)
         try { await window.loadClassLinks(true); } catch (e) { /* offline */ }
-        // 👑 21 Sep 2026: the group's teacher becomes the OWNER of its TutorBox room (old owner stays co-teacher)
-        if (groupData.teacherUid || groupData.teacherEmail) {
-            try {
-                const r = await fetch(`${TUTORBOX_CF_BASE}/setGroupTeacher`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'x-admin-key': TUTORBOX_KEY },
-                    body: JSON.stringify({ groupId: groupData.groupId, uid: groupData.teacherUid || undefined, email: groupData.teacherEmail || undefined })
-                });
-                const j = await r.json();
-                if (r.ok && j.changedOwner) window.showNotification(`👑 ${groupData.teacherName} ahora es el profesor titular de la sala ${j.code}`, 'success');
-                else if (!r.ok && j.error === 'teacher_not_on_tutorbox') window.showNotification('⚠️ Ese profesor no tiene cuenta en TutorBox todavía: créala desde el Teachers Module (🎓 Cuenta TutorBox)', 'warning');
-            } catch (e) { console.warn('setGroupTeacher', e); }
-        }
         cancelGrupo2Form();
         await refreshGrupos2Grid();
 
@@ -928,6 +919,8 @@ window.deleteGrupo2 = async function(groupId) {
     try {
         await window.GroupsManager2.deleteGroup(groupId);
         window.showNotification('✅ Grupo eliminado', 'success');
+        // 🔄 TutorBox keeps the group (attendance history) but marks it deleted + hidden
+        window.syncCrmGroupToTutorBox(groupId, { deleted: true, quiet: true });
         await refreshGrupos2Grid();
     } catch (error) {
         console.error('❌ Error deleting group:', error);
@@ -1465,6 +1458,7 @@ window.toggleGrupo2Status = async function(groupId) {
             try { window.logAudit('Grupo editado', 'group', String(groupId), `${g.displayName} → ${next}`, { before: { status: g.status || 'active' }, after: { status: next } }); } catch (e) { /* ignore */ }
         }
         window.showNotification(next === 'active' ? `✅ Grupo ${groupId} activo` : `⏸ Grupo ${groupId} inactivo`, 'success');
+        window.syncCrmGroupToTutorBox(groupId, { quiet: true }); // 🔄 mirror the status in tutorbox.app/admin/groups
     } catch (e) {
         window.showNotification(`❌ No se pudo cambiar el estado: ${e.message}`, 'error');
     }
@@ -1478,6 +1472,7 @@ window.toggleGrupo2Hidden = async function(groupId) {
     try {
         await window.GroupsManager2.patchGroup(groupId, { hidden: next });
         window.showNotification(next ? `🙈 Grupo ${groupId} oculto (botón "Mostrar ocultos" para verlo)` : `👁 Grupo ${groupId} visible`, 'success');
+        window.syncCrmGroupToTutorBox(groupId, { quiet: true }); // 🔄 mirror the flag in tutorbox.app/admin/groups
     } catch (e) {
         window.showNotification(`❌ No se pudo ocultar: ${e.message}`, 'error');
     }
@@ -1490,6 +1485,77 @@ window.toggleGrupo2Hidden = async function(groupId) {
 
 const TUTORBOX_CF_BASE = 'https://us-central1-tutorbox-4d7c9.cloudfunctions.net';
 const TUTORBOX_KEY = 'tbx-admin-2026-cb-provision-k9x7m';
+
+/**
+ * 🔄 Push ONE Grupos 2.0 group to TutorBox, complete (26 Oct 2026).
+ * CF `syncCrmGroup` upserts classGroups/{gid} (name, book, unit, days, times, room,
+ * status, hidden, teacher), creates the permanent room code when the group has a
+ * TutorBox teacher and no room yet, makes that teacher the room owner, and then the
+ * member list is mirrored with syncGroupMembersToTutorBox. Called after every save,
+ * ✅/⏸ status, 🙈 hide, 🔗 link and delete. Best-effort: never blocks the CRM.
+ * opts: { quiet: no toasts, deleted: mark the group deleted on the TutorBox side }
+ */
+window.syncCrmGroupToTutorBox = async function(groupId, opts = {}) {
+    const gid = parseInt(groupId);
+    const g = opts.deleted ? { groupId: gid } : window.GroupsManager2?.groups?.get(gid);
+    if (!g) return null;
+    const group = {
+        groupId: gid,
+        displayName: g.displayName || '',
+        modality: g.modality || '',
+        book: g.book ?? null,
+        unit: g.unit ?? null,
+        days: g.days || [],
+        daysShort: g.daysShort || '',
+        startTime: g.startTime || '',
+        endTime: g.endTime || '',
+        room: g.room || '',
+        location: g.location || '',
+        maxStudents: g.maxStudents || null,
+        ageCategory: g.ageCategory || '',
+        status: g.status || 'active',
+        hidden: g.hidden === true,
+        teacherUid: g.teacherUid || '',
+        teacherEmail: (g.teacherEmail || '').trim().toLowerCase(),
+        teacherName: g.teacherName || '',
+        classCode: g.classCode && /^\d{6}$/.test(String(g.classCode)) ? String(g.classCode) : null
+    };
+    try {
+        const r = await fetch(`${TUTORBOX_CF_BASE}/syncCrmGroup`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-admin-key': TUTORBOX_KEY },
+            body: JSON.stringify({ group, deleted: !!opts.deleted })
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) { console.warn('syncCrmGroup', gid, j.error || r.status); if (!opts.quiet) window.showNotification?.(`⚠️ TutorBox no recibió el grupo ${gid}: ${j.error || r.status}`, 'warning'); return j; }
+        if (!opts.deleted && typeof window.syncGroupMembersToTutorBox === 'function') {
+            try { await window.syncGroupMembersToTutorBox(gid); } catch (_) {}
+        }
+        if (!opts.quiet) {
+            if (j.created) window.showNotification?.(`🏫 Sala ${j.classCode} creada en TutorBox para el grupo ${gid} — ya aparece en tutorbox.app/admin/groups`, 'success');
+            if (j.changedOwner) window.showNotification?.(`👑 ${group.teacherName} ahora es el profesor titular de la sala ${j.classCode}`, 'success');
+            const ts = j.teacher?.status;
+            if (ts === 'not_on_tutorbox') window.showNotification?.('⚠️ Ese profesor no tiene cuenta en TutorBox todavía: créala desde el Teachers Module (🎓 Cuenta TutorBox)', 'warning');
+            else if (ts === 'not_a_teacher') window.showNotification?.('⚠️ Esa cuenta de TutorBox no es de profesor: el grupo quedó sin sala', 'warning');
+            else if (!j.classCode) window.showNotification?.(`ℹ️ Grupo ${gid} en TutorBox sin sala todavía: asígnale un profesor de TutorBox Live para crearla`, 'info');
+        }
+        return j;
+    } catch (e) {
+        console.warn('syncCrmGroup', gid, e.message);
+        return null;
+    }
+};
+
+/** One-time backfill (CRM console, groups loaded): pushes every group, then its members. */
+window.syncAllCrmGroupsToTutorBox = async function() {
+    const out = [];
+    for (const g of window.GroupsManager2.groups.values()) {
+        const j = await window.syncCrmGroupToTutorBox(g.groupId, { quiet: true });
+        out.push({ gid: g.groupId, name: g.displayName, room: j?.classCode || '-', created: !!j?.created, teacher: j?.teacher?.status || '?', error: j?.error || null });
+    }
+    console.table(out);
+    return out;
+};
 
 /**
  * 👩‍🏫 TutorBox Live teachers (same list as tutorbox.app/admin/live) for the
@@ -1584,6 +1650,7 @@ window.linkClassToGroup = async function(groupId) {
     if (code && !/^\d{6}$/.test(code)) { window.showNotification('El código debe tener 6 dígitos', 'error'); return; }
     await window.GroupsManager2.patchGroup(groupId, { classCode: code || null });
     window.showNotification(code ? `🔗 Grupo ${groupId} enlazado a la clase ${code}` : `Enlace manual quitado del grupo ${groupId}`, 'success');
+    await window.syncCrmGroupToTutorBox(groupId, { quiet: true }); // 🔄 a group without room adopts the linked one
     if (document.getElementById('filterModality')) window.applyGrupos2Filters(); else window.refreshGrupos2Grid();
 };
 
