@@ -374,16 +374,49 @@ function trialsCardHTML(inputId, x, selected) {
     </button>`;
 }
 
+/** Franja de un grupo del CRM SIN sala en vivo (días en español + hora de inicio). */
+const TRIAL_DOW_ES = { domingo: 0, lunes: 1, martes: 2, miercoles: 3, miércoles: 3, jueves: 4, viernes: 5, sabado: 6, sábado: 6 };
+function trialsSlotOfGroup(g) {
+    const dow = (g.days || []).map(d => TRIAL_DOW_ES[String(d).trim().toLowerCase()]).filter(d => d != null);
+    return trialsSlotOf({ days: dow.join(','), start: g.startTime || '' });
+}
+
+// Opciones por tablero (26 Oct 2026, fundador: el mismo tablero en la ficha del estudiante):
+//   allGroups  → además de las salas en vivo, TODOS los grupos activos del CRM (con o sin sala),
+//                y el grupo ya elegido aunque esté inactivo (ficha en edición);
+//   clearLabel → chip "— Sin asignar —" que deja el campo vacío;
+//   legend     → false oculta la franja de niveles (segundo tablero de la misma ficha).
+const _trialsBoardOpts = {};
+
 /** El tablero completo + el input oculto `inputId` que lee el resto del flujo. */
-function trialsBoardHTML(inputId, selected) {
+function trialsBoardHTML(inputId, selected, opts) {
     trialsBoardCss();
-    const hidden = `<input type="hidden" id="${inputId}" value="${trialsEsc(selected || '')}" data-selected="${trialsEsc(selected || '')}">`;
-    const live = trialsLiveRooms();
+    if (opts) _trialsBoardOpts[inputId] = opts; else opts = _trialsBoardOpts[inputId] || {};
+    const sel = String(selected || '');
+    const hidden = `<input type="hidden" id="${inputId}" value="${trialsEsc(sel)}" data-selected="${trialsEsc(sel)}">`;
+    const clear = opts.clearLabel
+        ? `<div class="tb-dates" style="margin:0 0 8px"><button type="button" class="tb-date${sel ? '' : ' sel'}" id="${inputId}_clear" onclick="trialsPickGroup('${inputId}', '', null)">— ${trialsEsc(opts.clearLabel)} —</button></div>`
+        : '';
+    const legend = opts.legend === false ? '' : trialsCefrLegendHTML();
+    let live = trialsLiveRooms();
+    if (opts.allGroups) {
+        const seen = new Set();
+        for (const x of live) for (const g of (x.gs && x.gs.length ? x.gs : (x.g ? [x.g] : []))) seen.add(String(g.groupId));
+        const groups = window.GroupsManager2?.groups ? Array.from(window.GroupsManager2.groups.values()) : [];
+        for (const g of groups) {
+            const gid = String(g.groupId);
+            if (seen.has(gid)) continue;
+            const active = g.status !== 'inactive' && !g.hidden;
+            if (!active && gid !== sel) continue;
+            seen.add(gid);
+            live.push({ room: {}, g, gs: [g], slot: trialsSlotOfGroup(g), num: Number(g.groupId), noRoom: true, inactive: !active });
+        }
+    }
     if (!live.length) {
-        if (!_trialsLiveLoaded) return `<div id="${inputId}_board" class="tb-wrap">${hidden}<div class="tb-empty">⏳ Cargando las clases en vivo…</div></div>`;
+        if (!_trialsLiveLoaded) return `<div id="${inputId}_board" class="tb-wrap">${hidden}${clear}<div class="tb-empty">⏳ Cargando las clases en vivo…</div></div>`;
         const list = trialsPickableGroups();
-        if (!list.length) return `<div id="${inputId}_board" class="tb-wrap">${hidden}<div class="tb-empty">— No hay grupos activos —</div></div>`;
-        return `<div id="${inputId}_board" class="tb-wrap">${hidden}<div class="tb-empty">TutorBox no respondió: se muestran los grupos del CRM.</div>
+        if (!list.length) return `<div id="${inputId}_board" class="tb-wrap">${hidden}${clear}<div class="tb-empty">— No hay grupos activos —</div></div>`;
+        return `<div id="${inputId}_board" class="tb-wrap">${hidden}${clear}<div class="tb-empty">TutorBox no respondió: se muestran los grupos del CRM.</div>
             <div class="tb-board"><div class="tb-col">${list.map(g => trialsCardHTML(inputId, { g, room: {}, slot: 'otro' }, selected)).join('')}</div></div></div>`;
     }
     const rank = x => { const b = trialsBookNum(x.room.book != null ? x.room.book : (x.g ? x.g.book : null)); return b == null ? 99 : b; };
@@ -395,7 +428,8 @@ function trialsBoardHTML(inputId, selected) {
         const open = rows.filter(x => x.g).length;
         cols += `<div class="tb-col"><div class="tb-head ${s.cls}"><b>${s.days}</b>${s.hours ? `<span class="tb-h">${s.hours}</span>` : ''}<small>${open} grupo${open === 1 ? '' : 's'}</small></div>${rows.map(x => trialsCardHTML(inputId, x, selected)).join('')}</div>`;
     }
-    return `<div id="${inputId}_board" class="tb-wrap">${hidden}${trialsCefrLegendHTML()}<div class="tb-board">${cols}</div></div>`;
+    const loading = (!_trialsLiveLoaded && opts.allGroups) ? `<div class="tb-empty">⏳ Cargando las salas en vivo (libro y unidad actuales)…</div>` : '';
+    return `<div id="${inputId}_board" class="tb-wrap">${hidden}${clear}${legend}${loading}<div class="tb-board">${cols}</div></div>`;
 }
 
 window.trialsPickGroup = function(inputId, gid, btn) {
@@ -405,6 +439,8 @@ window.trialsPickGroup = function(inputId, gid, btn) {
     const board = document.getElementById(inputId + '_board');
     if (board) board.querySelectorAll('.tb-card.sel').forEach(b => b.classList.remove('sel'));
     if (btn) btn.classList.add('sel');
+    const clear = document.getElementById(inputId + '_clear');
+    if (clear) clear.classList.toggle('sel', !gid);
     trialsSuggestDates(inputId, gid, true);
 };
 
@@ -472,7 +508,7 @@ async function trialsEnsureGroups() { return trialsPreload(); }
 
 /** Vuelve a pintar los tableros de grupo que estén abiertos, conservando la elección. */
 function trialsRefreshGroupSelects() {
-    for (const id of ['trlRegGroup', 'trlGroup']) {
+    for (const id of new Set(['trlRegGroup', 'trlGroup', ...Object.keys(_trialsBoardOpts)])) {
         const input = document.getElementById(id), board = document.getElementById(id + '_board');
         if (!input || !board) continue;
         const cur = input.value || input.dataset.selected || '';
@@ -480,6 +516,8 @@ function trialsRefreshGroupSelects() {
         if (cur) trialsSuggestDates(id, cur, false);
     }
 }
+window.trialsRefreshGroupSelects = trialsRefreshGroupSelects;
+window.trialsPreload = trialsPreload;
 
 /** Crea el estudiante de prueba, lo mete al grupo y lo refleja en TutorBox. */
 async function trialsCreateStudentForTrial(id, groupId, date) {

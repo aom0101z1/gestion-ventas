@@ -648,12 +648,11 @@ function renderStudentForm(student = null) {
                         <input type="date" id="stuFechaInicio" value="${student?.fechaInicio || ''}" required>
                     </div>
                     
-                    <div class="form-group">
-                        <label>Grupo</label>
-                        <select id="stuGrupo">
-                            <option value="">Sin asignar</option>
-                            ${getGrupos2Options(student?.grupo)}
-                        </select>
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label>Grupo — toca la tarjeta (franja · nivel · profesor · cupo)</label>
+                        ${typeof trialsBoardHTML === 'function'
+                            ? trialsBoardHTML('stuGrupo', student?.grupo || '', { allGroups: true, clearLabel: 'Sin asignar' })
+                            : `<select id="stuGrupo"><option value="">Sin asignar</option>${getGrupos2Options(student?.grupo)}</select>`}
                     </div>
 
                     <div class="form-group">
@@ -718,11 +717,10 @@ function renderStudentForm(student = null) {
                             Para estudiantes que toman dos cursos (ej: entre semana + sábados).
                             La mensualidad total a facturar será la suma de los dos valores.
                         </small>
-                        <label>Grupo segundo curso</label>
-                        <select id="stuGrupo2">
-                            <option value="">Sin segundo curso</option>
-                            ${getGrupos2Options(student?.grupo2)}
-                        </select>
+                        <label>Grupo segundo curso — toca la tarjeta</label>
+                        ${typeof trialsBoardHTML === 'function'
+                            ? trialsBoardHTML('stuGrupo2', student?.grupo2 || '', { allGroups: true, clearLabel: 'Sin segundo curso', legend: false })
+                            : `<select id="stuGrupo2"><option value="">Sin segundo curso</option>${getGrupos2Options(student?.grupo2)}</select>`}
                         <label style="margin-top: 0.5rem;">Tipo de curso (segundo curso)</label>
                         <select id="stuCursoTipo2" onchange="applyCursoTipo('2')" ${priceLocked ? 'disabled style="background:#f3f4f6;"' : ''}>
                             <option value="">— Elegir tipo de curso —</option>
@@ -1109,6 +1107,10 @@ window.showStudentForm = async function(studentId = null) {
     if (window.GroupsManager2) {
         await window.GroupsManager2.init(true); // Force reload to get latest groups
     }
+    // 🗓️ 26 Oct 2026 (fundador): el grupo se elige en el TABLERO de Clases de prueba (franja ·
+    // nivel · profesor · cupo). Las salas en vivo (libro/unidad actuales) se cargan en segundo
+    // plano y el tablero se repinta solo; mientras tanto se ven los grupos del CRM.
+    if (typeof window.trialsPreload === 'function') { try { window.trialsPreload(); } catch (_) {} }
 
     // Append modal to container
     const container = document.getElementById('studentsContainer');
